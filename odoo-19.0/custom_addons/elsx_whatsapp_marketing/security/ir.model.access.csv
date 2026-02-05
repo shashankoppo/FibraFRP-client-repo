@@ -1,0 +1,15 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_whatsapp_account_user,whatsapp.account.user,model_whatsapp_account,base.group_user,1,1,1,0
+access_whatsapp_account_manager,whatsapp.account.manager,model_whatsapp_account,base.group_system,1,1,1,1
+access_whatsapp_message_user,whatsapp.message.user,model_whatsapp_message,base.group_user,1,1,1,0
+access_whatsapp_message_manager,whatsapp.message.manager,model_whatsapp_message,base.group_system,1,1,1,1
+access_whatsapp_campaign_user,whatsapp.campaign.user,model_whatsapp_campaign,base.group_user,1,1,1,0
+access_whatsapp_campaign_manager,whatsapp.campaign.manager,model_whatsapp_campaign,base.group_system,1,1,1,1
+access_whatsapp_template_user,whatsapp.template.user,model_whatsapp_template,base.group_user,1,1,1,0
+access_whatsapp_template_manager,whatsapp.template.manager,model_whatsapp_template,base.group_system,1,1,1,1
+access_whatsapp_contact_user,whatsapp.contact.user,model_whatsapp_contact,base.group_user,1,1,1,0
+access_whatsapp_contact_manager,whatsapp.contact.manager,model_whatsapp_contact,base.group_system,1,1,1,1
+access_whatsapp_contact_tag_user,whatsapp.contact.tag.user,model_whatsapp_contact_tag,base.group_user,1,1,1,0
+access_whatsapp_contact_tag_manager,whatsapp.contact.tag.manager,model_whatsapp_contact_tag,base.group_system,1,1,1,1
+access_whatsapp_send_wizard_user,whatsapp.send.wizard.user,model_whatsapp_send_wizard,base.group_user,1,1,1,1
+access_whatsapp_campaign_step_user,whatsapp.campaign.step.user,model_whatsapp_campaign_step,base.group_user,1,1,1,1

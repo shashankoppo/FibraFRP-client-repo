@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_elsx_security_audit_tree" model="ir.ui.view">
+        <field name="name">elsx.security.audit.tree</field>
+        <field name="model">elsx.security.audit</field>
+        <field name="arch" type="xml">
+            <list string="Security Audit" create="false" decoration-danger="threat_level=='critical'" decoration-warning="threat_level=='high'">
+                <field name="timestamp"/>
+                <field name="user_id"/>
+                <field name="ip_address"/>
+                <field name="action"/>
+                <field name="threat_level"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_elsx_security_audit" model="ir.actions.act_window">
+        <field name="name">Security Audit</field>
+        <field name="res_model">elsx.security.audit</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="menu_elsx_security_audit" name="Security Audit" parent="elsx_blockchain_ledger.menu_elsx_security_root" action="action_elsx_security_audit"/>
+</odoo>

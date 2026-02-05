@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Demo Marketing AI Campaigns -->
+        <record id="demo_ai_campaign_email" model="elsx.marketing.ai">
+            <field name="name">Q1 2026 Product Launch</field>
+            <field name="target_audience">Tech Executives, CTOs</field>
+            <field name="platform">email</field>
+            <field name="state">approved</field>
+            <field name="generated_content">Subject: Revolutionize Your Enterprise with ELSX ERP
+
+Dear Innovator,
+
+Discover the world's first self-evolving ERP system. ELSX adapts to your business in real-time, eliminating manual updates forever.
+
+🚀 Auto-upgrading technology
+🔐 Blockchain-verified audit trails
+🤖 AI-powered lead scoring
+
+Schedule your personalized demo: https://elsx-erp.com/demo
+
+Best regards,
+ELSX Evolution Team</field>
+        </record>
+
+        <record id="demo_ai_campaign_linkedin" model="elsx.marketing.ai">
+            <field name="name">LinkedIn Thought Leadership</field>
+            <field name="target_audience">Business Leaders, Entrepreneurs</field>
+            <field name="platform">linkedin</field>
+            <field name="state">approved</field>
+            <field name="generated_content">🌟 Just deployed ELSX ERP across our global operations. The self-evolution engine has already optimized 47 workflows without human intervention.
+
+This isn't just software - it's a living business intelligence system.
+
+#DigitalTransformation #AI #ERP #Innovation</field>
+        </record>
+
+        <record id="demo_ai_campaign_twitter" model="elsx.marketing.ai">
+            <field name="name">Twitter Product Awareness</field>
+            <field name="target_audience">Tech Community</field>
+            <field name="platform">twitter</field>
+            <field name="state">posted</field>
+            <field name="generated_content">Why choose between features and stability? 
+
+ELSX ERP gives you both. Our evolution engine continuously integrates the latest tech while maintaining 99.99% uptime.
+
+Welcome to the future. 🚀
+
+#TechInnovation #SaaS</field>
+        </record>
+    </data>
+</odoo>

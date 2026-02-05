@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Security Groups -->
+    <!-- This group is intentionally empty - NO users should have direct menu access -->
+    <!-- Access to Apps is ONLY through /action-39 secret URL -->
+    <record id="group_secret_apps_access" model="res.groups">
+        <field name="name">Secret Apps Access (Internal - Do Not Assign)</field>
+        <field name="comment">This group is used to hide Apps menu from ALL users. Access is only via /action-39 URL.</field>
+        <!-- Intentionally NO user_ids - this makes the menu invisible to everyone -->
+    </record>
+</odoo>

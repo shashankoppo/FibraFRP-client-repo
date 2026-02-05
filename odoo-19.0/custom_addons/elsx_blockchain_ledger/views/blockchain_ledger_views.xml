@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_elsx_blockchain_log_tree" model="ir.ui.view">
+        <field name="name">elsx.blockchain.log.tree</field>
+        <field name="model">elsx.blockchain.log</field>
+        <field name="arch" type="xml">
+            <list string="Blockchain Audit Logs" create="false" edit="false">
+                <field name="timestamp"/>
+                <field name="model_name"/>
+                <field name="res_id"/>
+                <field name="operation"/>
+                <field name="current_hash" password="True"/>
+                <field name="is_verified" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_elsx_blockchain_log" model="ir.actions.act_window">
+        <field name="name">Blockchain Audit Ledger</field>
+        <field name="res_model">elsx.blockchain.log</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="menu_elsx_security_root" name="ELSX Security" sequence="100" web_icon="elsx_security,static/description/icon.png"/>
+    <menuitem id="menu_elsx_blockchain_ledger" name="Blockchain Ledger" parent="menu_elsx_security_root" action="action_elsx_blockchain_log"/>
+</odoo>

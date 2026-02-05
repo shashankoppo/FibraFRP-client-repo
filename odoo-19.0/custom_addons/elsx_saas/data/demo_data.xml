@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Demo SaaS Tenants -->
+        <record id="demo_tenant_startup" model="elsx.saas.tenant">
+            <field name="name">techstartup</field>
+            <field name="admin_email">admin@techstartup.com</field>
+            <field name="plan">starter</field>
+            <field name="state">active</field>
+            <field name="storage_quota_gb">10</field>
+            <field name="max_users">25</field>
+            <field name="custom_domain">erp.techstartup.com</field>
+        </record>
+
+        <record id="demo_tenant_enterprise" model="elsx.saas.tenant">
+            <field name="name">globalcorp</field>
+            <field name="admin_email">it@globalcorp.com</field>
+            <field name="plan">quantum</field>
+            <field name="state">active</field>
+            <field name="storage_quota_gb">500</field>
+            <field name="max_users">500</field>
+            <field name="custom_domain">elsx.globalcorp.com</field>
+        </record>
+
+        <record id="demo_tenant_luxury" model="elsx.saas.tenant">
+            <field name="name">luxurybrands</field>
+            <field name="admin_email">cto@luxurybrands.com</field>
+            <field name="plan">luxury</field>
+            <field name="state">active</field>
+            <field name="storage_quota_gb">100</field>
+            <field name="max_users">100</field>
+        </record>
+
+        <record id="demo_tenant_provisioning" model="elsx.saas.tenant">
+            <field name="name">newclient</field>
+            <field name="admin_email">admin@newclient.com</field>
+            <field name="plan">starter</field>
+            <field name="state">provisioning</field>
+            <field name="storage_quota_gb">5</field>
+            <field name="max_users">10</field>
+        </record>
+    </data>
+</odoo>

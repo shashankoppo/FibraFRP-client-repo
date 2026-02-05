@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_elsx_saas_tenant_tree" model="ir.ui.view">
+        <field name="name">elsx.saas.tenant.list</field>
+        <field name="model">elsx.saas.tenant</field>
+        <field name="arch" type="xml">
+            <list decoration-info="state == 'provisioning'" decoration-success="state == 'active'" decoration-muted="state == 'suspended'">
+                <field name="name"/>
+                <field name="db_name"/>
+                <field name="admin_email"/>
+                <field name="plan"/>
+                <field name="state"/>
+                <button name="action_provision" string="Provision" type="object" icon="fa-rocket" invisible="state != 'draft'" class="oe_highlight"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_elsx_saas_tenant_form" model="ir.ui.view">
+        <field name="name">elsx.saas.tenant.form</field>
+        <field name="model">elsx.saas.tenant</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_provision" string="Provision Database" type="object" invisible="state != 'draft'" class="oe_highlight"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,provisioning,active"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" placeholder="Subdomain (e.g. luxury-corp)"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Database Info">
+                            <field name="db_name"/>
+                            <field name="plan"/>
+                        </group>
+                        <group string="Admin Info">
+                            <field name="admin_email"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_elsx_saas_tenant" model="ir.actions.act_window">
+        <field name="name">SaaS Tenants</field>
+        <field name="res_model">elsx.saas.tenant</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first ELSX SaaS Tenant!
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_elsx_saas_root" name="ELSX SaaS" web_icon="elsx_saas,static/description/icon.png"/>
+    <menuitem id="menu_elsx_saas_tenant" name="Tenants" parent="menu_elsx_saas_root" action="action_elsx_saas_tenant"/>
+</odoo>

@@ -1,0 +1,120 @@
+:root {
+    --elsx-primary: #00DBDE;
+    --elsx-secondary: #714B67;
+    --elsx-dark: #1a1a1a;
+    --elsx-light: #f8f9fa;
+}
+
+/* Minimal Professional Theme - Compatible with all modules */
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Navbar - Clean and professional */
+.o_main_navbar {
+    background-color: var(--elsx-dark);
+    border-bottom: 2px solid var(--elsx-primary);
+}
+
+.o_main_navbar .o_menu_brand {
+    font-weight: 600;
+    color: #fff;
+    letter-spacing: 0.5px;
+}
+
+.o_main_navbar .o_nav_entry {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.o_main_navbar .o_nav_entry:hover {
+    color: var(--elsx-primary);
+}
+
+/* Buttons */
+.btn-primary {
+    background-color: var(--elsx-primary);
+    border-color: var(--elsx-primary);
+    font-weight: 500;
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+    background-color: #00b8bb;
+    border-color: #00b8bb;
+}
+
+/* Forms - Clean and readable */
+.o_form_sheet {
+    max-width: 1400px;
+    margin: 20px auto;
+    padding: 24px;
+}
+
+.o_form_label {
+    font-weight: 500;
+    color: #333;
+}
+
+/* List/Tree views - Better readability */
+.o_list_table thead {
+    background-color: #f8f9fa;
+}
+
+.o_list_table tbody tr:hover {
+    background-color: #f0f9ff;
+}
+
+/* Kanban cards */
+.o_kanban_record {
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Breadcrumbs */
+.o_control_panel .breadcrumb {
+    background: transparent;
+}
+
+.o_control_panel .breadcrumb-item a {
+    color: var(--elsx-primary);
+}
+
+/* Status badges */
+.badge-success {
+    background-color: #28a745;
+}
+
+.badge-info {
+    background-color: var(--elsx-primary);
+}
+
+.badge-warning {
+    background-color: #ffc107;
+}
+
+/* Scrollbar - Subtle */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .o_form_sheet {
+        padding: 16px;
+    }
+}

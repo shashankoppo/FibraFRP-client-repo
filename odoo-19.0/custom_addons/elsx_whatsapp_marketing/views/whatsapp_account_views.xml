@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- WhatsApp Account Tree View -->
+    <record id="view_whatsapp_account_tree" model="ir.ui.view">
+        <field name="name">whatsapp.account.tree</field>
+        <field name="model">whatsapp.account</field>
+        <field name="arch" type="xml">
+            <list string="WhatsApp Accounts">
+                <field name="name"/>
+                <field name="phone_number"/>
+                <field name="status" decoration-success="status=='connected'" decoration-danger="status=='error'"/>
+                <field name="message_count"/>
+                <field name="campaign_count"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- WhatsApp Account Form View -->
+    <record id="view_whatsapp_account_form" model="ir.ui.view">
+        <field name="name">whatsapp.account.form</field>
+        <field name="model">whatsapp.account</field>
+        <field name="arch" type="xml">
+            <form string="WhatsApp Account">
+                <header>
+                    <button name="action_test_connection" string="Test Connection" type="object" class="btn-primary"/>
+                    <button name="action_sync_templates" string="Sync Templates" type="object" class="btn-secondary" icon="fa-refresh" invisible="status != 'connected'"/>
+                    <field name="status" widget="statusbar" statusbar_visible="draft,connected"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="%(action_whatsapp_message)d" type="action" class="oe_stat_button" icon="fa-comments">
+                            <field name="message_count" widget="statinfo" string="Messages"/>
+                        </button>
+                        <button name="%(action_whatsapp_campaign)d" type="action" class="oe_stat_button" icon="fa-bullhorn">
+                            <field name="campaign_count" widget="statinfo" string="Campaigns"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" placeholder="Account Name"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Account Details">
+                            <field name="phone_number"/>
+                            <field name="phone_number_id"/>
+                            <field name="business_account_id"/>
+                            <field name="api_version"/>
+                            <field name="active"/>
+                        </group>
+                        <group string="API Configuration">
+                            <field name="access_token" password="True"/>
+                            <field name="webhook_url" readonly="1"/>
+                            <field name="webhook_verify_token"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Automation &amp; AI" name="automation_ai">
+                            <group>
+                                <group string="Traditional Auto-Reply">
+                                    <field name="auto_reply_enabled"/>
+                                    <field name="auto_reply_message" invisible="not auto_reply_enabled"/>
+                                </group>
+                                <group string="AI Smart Assistant">
+                                    <field name="ai_enabled"/>
+                                    <field name="ai_model" invisible="not ai_enabled"/>
+                                </group>
+                            </group>
+                            <group string="AI Business Context" invisible="not ai_enabled">
+                                <field name="ai_context" placeholder="Example: We are an e-commerce store selling premium coffee beans. Our shipping policy is 2-3 business days. We offer free returns within 30 days..."/>
+                            </group>
+                        </page>
+                        <page string="Messages" name="messages">
+                            <field name="message_ids" readonly="1">
+                                <list>
+                                    <field name="create_date"/>
+                                    <field name="phone_number"/>
+                                    <field name="direction"/>
+                                    <field name="message_type"/>
+                                    <field name="status"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Campaigns" name="campaigns">
+                            <field name="campaign_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="campaign_type"/>
+                                    <field name="state"/>
+                                    <field name="total_recipients"/>
+                                    <field name="sent_count"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- WhatsApp Account Action -->
+    <record id="action_whatsapp_account" model="ir.actions.act_window">
+        <field name="name">WhatsApp Accounts</field>
+        <field name="res_model">whatsapp.account</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first WhatsApp Business Account
+            </p>
+            <p>
+                Connect your WhatsApp Business API account to start sending messages and campaigns.
+            </p>
+        </field>
+    </record>
+</odoo>

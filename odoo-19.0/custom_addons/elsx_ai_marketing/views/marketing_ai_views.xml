@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_marketing_ai_form" model="ir.ui.view">
+        <field name="name">marketing.ai.form</field>
+        <field name="model">crm.lead</field>
+        <field name="inherit_id" ref="crm.crm_lead_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_generate_ai_reply" string="AI Smart Reply" type="object" class="btn-secondary"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

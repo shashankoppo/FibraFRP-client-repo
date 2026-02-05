@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Demo WhatsApp Templates -->
+    <record id="whatsapp_template_welcome" model="whatsapp.template">
+        <field name="name">Welcome Message</field>
+        <field name="category">marketing</field>
+        <field name="language">en</field>
+        <field name="body">Hello {{1}}! Welcome to our service. We're excited to have you with us!</field>
+        <field name="status">draft</field>
+    </record>
+</odoo>

@@ -1,0 +1,234 @@
+# -*- coding: utf-8 -*-
+from odoo import models, fields, api
+import requests
+import json
+import logging
+
+_logger = logging.getLogger(__name__)
+
+
+class WhatsAppAccount(models.Model):
+    _name = 'whatsapp.account'
+    _description = 'WhatsApp Business Account'
+    _rec_name = 'name'
+
+    name = fields.Char('Account Name', required=True)
+    phone_number = fields.Char('Phone Number', required=True, help='WhatsApp Business phone number with country code')
+    phone_number_id = fields.Char('Phone Number ID', required=True, help='WhatsApp Cloud API Phone Number ID')
+    business_account_id = fields.Char('Business Account ID', required=True)
+    access_token = fields.Char('Access Token', required=True, help='WhatsApp Cloud API Access Token')
+    api_version = fields.Char('API Version', default='v18.0')
+    
+    # Status
+    active = fields.Boolean('Active', default=True)
+    status = fields.Selection([
+        ('draft', 'Draft'),
+        ('connected', 'Connected'),
+        ('disconnected', 'Disconnected'),
+        ('error', 'Error'),
+    ], string='Status', default='draft')
+    
+    # Statistics
+    message_count = fields.Integer('Total Messages', compute='_compute_statistics')
+    campaign_count = fields.Integer('Total Campaigns', compute='_compute_statistics')
+    
+    # Relations
+    message_ids = fields.One2many('whatsapp.message', 'account_id', string='Messages')
+    campaign_ids = fields.One2many('whatsapp.campaign', 'account_id', string='Campaigns')
+    template_ids = fields.One2many('whatsapp.template', 'account_id', string='Templates')
+    
+    # Settings
+    auto_reply_enabled = fields.Boolean('Auto Reply Enabled', default=False)
+    auto_reply_message = fields.Text('Auto Reply Message')
+    webhook_url = fields.Char('Webhook URL', compute='_compute_webhook_url')
+    webhook_verify_token = fields.Char('Webhook Verify Token')
+
+    # AI & Automation
+    ai_enabled = fields.Boolean('AI Automation Enabled', default=True)
+    ai_model = fields.Selection([
+        ('gpt-4o', 'GPT-4o (Premium)'),
+        ('gpt-4-turbo', 'GPT-4 Turbo'),
+        ('claude-3-5-sonnet', 'Claude 3.5 Sonnet'),
+    ], string='AI Model', default='gpt-4o')
+    ai_context = fields.Text('AI Business Context', help='Tell the AI about your business to generate better replies.')
+    
+    # Template Sync
+    last_sync_date = fields.Datetime('Last Template Sync')
+    
+    @api.depends('message_ids', 'campaign_ids')
+    def _compute_statistics(self):
+        for record in self:
+            record.message_count = len(record.message_ids)
+            record.campaign_count = len(record.campaign_ids)
+    
+    def _compute_webhook_url(self):
+        base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
+        for record in self:
+            record.webhook_url = f"{base_url}/whatsapp/webhook/{record.id}"
+    
+    def action_test_connection(self):
+        """Test WhatsApp Cloud API connection"""
+        self.ensure_one()
+        try:
+            url = f"https://graph.facebook.com/{self.api_version}/{self.phone_number_id}"
+            headers = {
+                'Authorization': f'Bearer {self.access_token}',
+            }
+            response = requests.get(url, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                self.status = 'connected'
+                return {
+                    'type': 'ir.actions.client',
+                    'tag': 'display_notification',
+                    'params': {
+                        'title': 'Success!',
+                        'message': 'WhatsApp account connected successfully',
+                        'type': 'success',
+                        'sticky': False,
+                    }
+                }
+            else:
+                self.status = 'error'
+                raise Exception(f"API Error: {response.text}")
+                
+        except Exception as e:
+            self.status = 'error'
+            _logger.error(f"WhatsApp connection test failed: {str(e)}")
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Connection Failed',
+                    'message': str(e),
+                    'type': 'danger',
+                    'sticky': True,
+                }
+            }
+    
+    def action_sync_templates(self):
+        """Sync templates from Meta WhatsApp Business Account"""
+        self.ensure_one()
+        url = f"https://graph.facebook.com/{self.api_version}/{self.business_account_id}/message_templates"
+        headers = {'Authorization': f'Bearer {self.access_token}'}
+        
+        try:
+            response = requests.get(url, headers=headers, timeout=30)
+            if response.status_code == 200:
+                templates_data = response.json().get('data', [])
+                for t_data in templates_data:
+                    template = self.env['whatsapp.template'].search([
+                        ('name', '=', t_data.get('name')),
+                        ('account_id', '=', self.id)
+                    ], limit=1)
+                    
+                    vals = {
+                        'name': t_data.get('name'),
+                        'template_id': t_data.get('id'),
+                        'language': t_data.get('language'),
+                        'category': t_data.get('category').lower(),
+                        'status': t_data.get('status').lower(),
+                        'account_id': self.id,
+                    }
+                    
+                    # Extract body content
+                    for component in t_data.get('components', []):
+                        if component.get('type') == 'BODY':
+                            vals['body'] = component.get('text')
+                        elif component.get('type') == 'HEADER':
+                            vals['header_type'] = component.get('format').lower()
+                            if vals['header_type'] == 'text':
+                                vals['header_text'] = component.get('text')
+                        elif component.get('type') == 'FOOTER':
+                            vals['footer'] = component.get('text')
+                    
+                    if template:
+                        template.write(vals)
+                    else:
+                        self.env['whatsapp.template'].create(vals)
+                
+                self.last_sync_date = fields.Datetime.now()
+                return {
+                    'type': 'ir.actions.client',
+                    'tag': 'display_notification',
+                    'params': {
+                        'title': 'Templates Synced',
+                        'message': f'Successfully synced {len(templates_data)} templates from Meta.',
+                        'type': 'success',
+                    }
+                }
+            else:
+                raise Exception(f"Meta API Error: {response.text}")
+        except Exception as e:
+            _logger.error(f"Template sync failed: {str(e)}")
+            raise
+
+    def send_message(self, to_number, message_type='text', **kwargs):
+        """
+        Send WhatsApp message via Cloud API
+        
+        :param to_number: Recipient phone number
+        :param message_type: 'text', 'template', 'image', 'document', etc.
+        :param kwargs: Additional message parameters
+        :return: Message record
+        """
+        self.ensure_one()
+        
+        url = f"https://graph.facebook.com/{self.api_version}/{self.phone_number_id}/messages"
+        headers = {
+            'Authorization': f'Bearer {self.access_token}',
+            'Content-Type': 'application/json',
+        }
+        
+        # Build message payload
+        payload = {
+            'messaging_product': 'whatsapp',
+            'recipient_type': 'individual',
+            'to': to_number,
+        }
+        
+        if message_type == 'text':
+            payload['type'] = 'text'
+            payload['text'] = {'body': kwargs.get('body', '')}
+        elif message_type == 'template':
+            payload['type'] = 'template'
+            payload['template'] = kwargs.get('template', {})
+        elif message_type == 'image':
+            payload['type'] = 'image'
+            payload['image'] = kwargs.get('image', {})
+        
+        try:
+            response = requests.post(url, headers=headers, json=payload, timeout=30)
+            response_data = response.json()
+            
+            if response.status_code == 200:
+                # Create message record
+                message = self.env['whatsapp.message'].create({
+                    'account_id': self.id,
+                    'phone_number': to_number,
+                    'partner_id': kwargs.get('partner_id'),
+                    'message_type': message_type,
+                    'body': kwargs.get('body', ''),
+                    'direction': 'outbound',
+                    'status': 'sent',
+                    'message_id': response_data.get('messages', [{}])[0].get('id'),
+                })
+                return message
+            else:
+                _logger.error(f"WhatsApp send failed: {response_data}")
+                # Don't raise, just log to message history for better UX
+                message = self.env['whatsapp.message'].create({
+                    'account_id': self.id,
+                    'phone_number': to_number,
+                    'partner_id': kwargs.get('partner_id'),
+                    'message_type': message_type,
+                    'body': kwargs.get('body', ''),
+                    'direction': 'outbound',
+                    'status': 'failed',
+                    'error_message': str(response_data.get('error', {}).get('message', 'Unknown error')),
+                })
+                return message
+                
+        except Exception as e:
+            _logger.error(f"WhatsApp message send error: {str(e)}")
+            raise

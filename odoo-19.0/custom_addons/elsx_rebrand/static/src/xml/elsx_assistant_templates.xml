@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="elsx_rebrand.ELSXAssistant" owl="1">
+        <div class="o_elsx_assistant_container">
+            <div class="o_elsx_assistant_icon" t-on-click="toggle">
+                <i class="fa fa-shuttle-space" style="color: #00DBDE; font-size: 20px; text-shadow: 0 0 10px #00DBDE;"/>
+            </div>
+            <div t-if="state.isOpen" class="o_elsx_assistant_chat">
+                <div class="chat_header">
+                    <span>ELSX AI EVOLUTION</span>
+                    <i class="fa fa-close" t-on-click="toggle"/>
+                </div>
+                <div class="chat_body">
+                    <t t-foreach="state.messages" t-as="msg" t-key="msg_index">
+                        <div t-attf-class="message {{msg.role}}">
+                            <t t-esc="msg.content"/>
+                        </div>
+                    </t>
+                </div>
+                <div class="chat_footer">
+                    <input type="text" placeholder="Evolve..." t-model="state.userInput" t-on-keydown="(ev) => ev.key === 'Enter' &amp;&amp; sendMessage()"/>
+                    <i class="fa fa-paper-plane" t-on-click="sendMessage"/>
+                </div>
+            </div>
+        </div>
+    </t>
+</templates>

@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- WhatsApp Campaign Tree View -->
+    <record id="view_whatsapp_campaign_tree" model="ir.ui.view">
+        <field name="name">whatsapp.campaign.tree</field>
+        <field name="model">whatsapp.campaign</field>
+        <field name="arch" type="xml">
+            <list string="WhatsApp Campaigns" decoration-success="state=='completed'" decoration-info="state=='running'">
+                <field name="name"/>
+                <field name="account_id"/>
+                <field name="campaign_type"/>
+                <field name="total_recipients"/>
+                <field name="sent_count"/>
+                <field name="delivered_count"/>
+                <field name="read_count"/>
+                <field name="roi" widget="percentage"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- WhatsApp Campaign Form View -->
+    <record id="view_whatsapp_campaign_form" model="ir.ui.view">
+        <field name="name">whatsapp.campaign.form</field>
+        <field name="model">whatsapp.campaign</field>
+        <field name="arch" type="xml">
+            <form string="WhatsApp Campaign">
+                <header>
+                    <button name="action_load_recipients" string="Load Recipients" type="object" class="btn-secondary" invisible="state != 'draft'"/>
+                    <button name="action_generate_ai_content" string="Generate AI Content" type="object" class="btn-info" invisible="state != 'draft'"/>
+                    <button name="action_send_campaign" string="Send Campaign" type="object" class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_cancel" string="Cancel" type="object" class="btn-danger" invisible="state in ['completed', 'cancelled']"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,running,completed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" placeholder="Campaign Name"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Campaign Settings">
+                            <field name="account_id"/>
+                            <field name="campaign_type"/>
+                            <field name="schedule_type"/>
+                            <field name="schedule_date" invisible="schedule_type == 'immediate'" required="schedule_type == 'scheduled'"/>
+                        </group>
+                        <group string="Statistics">
+                            <field name="total_recipients"/>
+                            <field name="sent_count"/>
+                            <field name="delivered_count"/>
+                            <field name="read_count"/>
+                            <field name="failed_count"/>
+                            <field name="roi" widget="percentage"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Recipients" name="recipients">
+                            <group>
+                                <field name="target_type"/>
+                                <field name="domain_filter" invisible="target_type != 'segment'"/>
+                            </group>
+                            <field name="partner_ids" widget="many2many_tags">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="phone"/>
+                                    <field name="email"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Drip Steps" name="drip_steps" invisible="campaign_type != 'drip'">
+                            <field name="step_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="name"/>
+                                    <field name="delay_unit" string="After"/>
+                                    <field name="delay_type" string="Unit"/>
+                                    <field name="template_id"/>
+                                    <field name="condition_type"/>
+                                </list>
+                                <form>
+                                    <group>
+                                        <field name="name"/>
+                                        <field name="sequence"/>
+                                    </group>
+                                    <group string="Timing &amp; Content">
+                                        <field name="delay_unit"/>
+                                        <field name="delay_type"/>
+                                        <field name="template_id"/>
+                                        <field name="message_body"/>
+                                    </group>
+                                    <group string="Condition">
+                                        <field name="condition_type"/>
+                                    </group>
+                                </form>
+                            </field>
+                        </page>
+                        <page string="Message" name="message" invisible="campaign_type == 'drip'">
+                            <group>
+                                <field name="template_id"/>
+                                <field name="message_body" widget="text" placeholder="Use {{name}}, {{company}} for personalization"/>
+                            </group>
+                            <div class="alert alert-info" role="alert">
+                                <strong>Personalization Variables:</strong>
+                                <ul>
+                                    <li>{{name}} - Contact name</li>
+                                    <li>{{company}} - Company name</li>
+                                </ul>
+                            </div>
+                        </page>
+                        <page string="Messages" name="messages">
+                            <field name="message_ids" readonly="1">
+                                <list>
+                                    <field name="create_date"/>
+                                    <field name="partner_id"/>
+                                    <field name="phone_number"/>
+                                    <field name="status"/>
+                                    <field name="sent_date"/>
+                                    <field name="delivered_date"/>
+                                    <field name="read_date"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Analytics" name="analytics">
+                            <group>
+                                <group>
+                                    <field name="click_count"/>
+                                    <field name="conversion_count"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- WhatsApp Campaign Action -->
+    <record id="action_whatsapp_campaign" model="ir.actions.act_window">
+        <field name="name">WhatsApp Campaigns</field>
+        <field name="res_model">whatsapp.campaign</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first WhatsApp Campaign
+            </p>
+            <p>
+                Send targeted WhatsApp messages to your contacts and track performance.
+            </p>
+        </field>
+    </record>
+</odoo>

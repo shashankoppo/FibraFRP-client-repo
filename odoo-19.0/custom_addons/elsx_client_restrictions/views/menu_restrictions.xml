@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Menu Restrictions -->
+    <!-- All Apps-related menus are restricted to the empty group -->
+    <!-- This makes them invisible to ALL users (including admin) -->
+    <!-- Access is ONLY via /action-39 secret URL -->
+    
+<!--
+    <record id="base.menu_management" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [ref('elsx_client_restrictions.group_secret_apps_access')])]"/>
+    </record>
+
+    <record id="base.menu_apps" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [ref('elsx_client_restrictions.group_secret_apps_access')])]"/>
+    </record>
+    
+    <record id="base.menu_administration" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [ref('base.group_system')])]"/>
+    </record>
+-->
+</odoo>
+
