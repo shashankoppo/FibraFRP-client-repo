@@ -32,14 +32,20 @@ scp -r odoo-19.0 user@your-vm-ip:~/
 cd ~/odoo-19.0/odoo-19.0
 ```
 
-### 3. Build and Start Containers
+### 3. Set Permissions for Entrypoint Script
+Ensure the `entrypoint.sh` script is executable on the host:
+```bash
+chmod +x entrypoint.sh
+```
+
+### 4. Build and Start Containers
 Run the following command to build the Odoo image and start the PostgreSQL database.
 
 ```bash
 docker-compose up -d --build
 ```
 
-### 4. Verify the Deployment
+### 5. Verify the Deployment
 Check if the containers are running:
 ```bash
 docker-compose ps
@@ -94,12 +100,17 @@ If Odoo fails to connect to the database, ensure the `db` container is healthy:
 docker-compose logs db
 ```
 
-### Permission Denied
-If you encounter permission issues with the volumes, ensure the files have the correct permissions on the host:
+### Permission Denied (e.g. entrypoint.sh)
+If you see an error like `exec: "/opt/odoo/entrypoint.sh": permission denied`, run:
 ```bash
-sudo chown -R 101:101 .  # 101 is the default UID for Odoo in some images, but here we use root/user
-# Alternatively, ensure the current user has access
-sudo chmod -R 755 .
+chmod +x entrypoint.sh
+```
+This is required because the file is mounted from your VM host, and its permissions must allow execution.
+
+If you encounter other permission issues with volumes:
+```bash
+sudo chown -R $USER:$USER .
+chmod -R 755 .
 ```
 
 ### Port 8069 Already in Use
