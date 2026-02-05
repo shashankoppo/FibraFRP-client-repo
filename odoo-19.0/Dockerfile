@@ -35,7 +35,7 @@ COPY . .
 EXPOSE 8069
 
 # Set default configuration file environment variable
-ENV ODOO_RC /etc/odoo/odoo.conf
+ENV ODOO_RC=/etc/odoo/odoo.conf
 
 # Use entrypoint script
 RUN chmod +x entrypoint.sh
