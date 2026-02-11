@@ -8,7 +8,6 @@ _logger = logging.getLogger(__name__)
 class IrModuleModule(models.Model):
     _inherit = 'ir.module.module'
 
-    @api.model
     def button_immediate_install(self):
         """
         Override to auto-install dependencies
@@ -22,7 +21,6 @@ class IrModuleModule(models.Model):
         
         return super(IrModuleModule, self).button_immediate_install()
 
-    @api.model
     def update_list(self):
         """
         Override to auto-upgrade modules if needed
