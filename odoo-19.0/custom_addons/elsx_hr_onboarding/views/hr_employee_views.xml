@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Inherit HR Employee form to add Onboarding tab -->
+    <record id="view_hr_employee_form_onboarding" model="ir.ui.view">
+        <field name="name">hr.employee.form.inherit.elsx.onboarding</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_form"/>
+        <field name="arch" type="xml">
+            <notebook position="inside">
+                <page string="🚀 Onboarding" name="elsx_onboarding">
+                    <field name="onboarding_plan_ids">
+                        <list>
+                            <field name="name"/>
+                            <field name="start_date"/>
+                            <field name="progress" widget="progressbar"/>
+                            <field name="state" widget="badge"
+                                   decoration-success="state == 'done'"
+                                   decoration-warning="state == 'in_progress'"/>
+                        </list>
+                    </field>
+                    <div class="mt-2">
+                        <button name="%(elsx_hr_onboarding.action_elsx_onboarding_plan)d"
+                                string="Create New Onboarding Plan"
+                                type="action"
+                                class="btn btn-primary"/>
+                    </div>
+                </page>
+            </notebook>
+        </field>
+    </record>
+</odoo>

@@ -14,6 +14,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
     curl \
     node-less \
+    libmagic1 \
+    xz-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # Install wkhtmltopdf (using the version for bookworm)
@@ -42,4 +44,4 @@ COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh && chmod +x /usr/local/bin/entrypoint.sh
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-CMD ["python3", "odoo-bin", "-c", "/etc/odoo/odoo.conf"]
+CMD ["python3", "odoo-bin"]

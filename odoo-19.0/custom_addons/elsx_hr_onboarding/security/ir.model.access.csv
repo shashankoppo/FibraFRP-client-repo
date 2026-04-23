@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_elsx_onboarding_plan_hr,elsx.onboarding.plan.hr,model_elsx_onboarding_plan,hr.group_hr_manager,1,1,1,1
+access_elsx_onboarding_plan_user,elsx.onboarding.plan.user,model_elsx_onboarding_plan,base.group_user,1,0,0,0
+access_elsx_onboarding_task_hr,elsx.onboarding.task.hr,model_elsx_onboarding_task,hr.group_hr_manager,1,1,1,1
+access_elsx_onboarding_task_user,elsx.onboarding.task.user,model_elsx_onboarding_task,base.group_user,1,1,0,0

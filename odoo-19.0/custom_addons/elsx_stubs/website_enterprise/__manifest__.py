@@ -5,6 +5,5 @@
     'summary': 'Stub for website_enterprise to satisfy dependencies',
     'author': 'ELSX Evolution Engine',
     'installable': True,
-    'license': 'LGPL-3',
     'depends': ['base'],
 }

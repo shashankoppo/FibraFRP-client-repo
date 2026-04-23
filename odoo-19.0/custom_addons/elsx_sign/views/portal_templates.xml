@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <template id="document_already_signed_template" name="Document Signed">
+        <t t-call="web.frontend_layout">
+            <div class="container text-center mt-5 mb-5">
+                <i class="fa fa-check-circle text-success" style="font-size: 6rem;"></i>
+                <h1 class="mt-4">Document Already Signed</h1>
+                <p class="lead">Thank you, <t t-esc="sign_request.partner_id.name"/>. This document was securely signed on <t t-esc="sign_request.signed_date"/>.</p>
+            </div>
+        </t>
+    </template>
+
+    <template id="document_signing_portal_template" name="Sign Document">
+        <t t-call="web.frontend_layout">
+            <div class="container mt-4 mb-4" id="elsx_signature_portal_app">
+                <div class="row">
+                    <!-- Left: Document Preview -->
+                    <div class="col-lg-8 shadow-sm p-0 mb-3 bg-white rounded border">
+                        <div class="bg-primary text-white p-3 rounded-top">
+                            <h4><i class="fa fa-file-pdf-o"></i> Document Review: <t t-esc="sign_request.name"/></h4>
+                        </div>
+                        <iframe t-att-src="pdf_url" width="100%" height="800px" style="border: none;"></iframe>
+                    </div>
+                    
+                    <!-- Right: Signing Pad -->
+                    <div class="col-lg-4">
+                        <div class="card shadow-sm border-0 sticky-top" style="top: 20px;">
+                            <div class="card-body">
+                                <h3 class="card-title text-center text-primary mb-4">Sign Below</h3>
+                                
+                                <p class="text-muted small border-bottom pb-2">
+                                    By signing below, I, <strong><t t-esc="sign_request.partner_id.name"/></strong>, legally agree to the terms listed in the attached document. My IP and timestamp will be logged.
+                                </p>
+                                
+                                <!-- Canvas Container -->
+                                <div class="signature-pad-wrapper border rounded bg-light mb-3" style="position: relative; height: 300px;">
+                                    <canvas id="signature-pad" class="signature-pad" width="100%" height="100%" style="width: 100%; height: 100%;"></canvas>
+                                </div>
+                                
+                                <div class="d-grid gap-2">
+                                    <button class="btn btn-outline-secondary" id="action_clear_signature">
+                                        <i class="fa fa-eraser"></i> Clear Pad
+                                    </button>
+                                    <button class="btn btn-success btn-lg mt-2" id="action_submit_signature" 
+                                            t-att-data-request-id="sign_request.id" 
+                                            t-att-data-token="token">
+                                        <i class="fa fa-check-circle"></i> Finalize &amp; Sign
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+</odoo>

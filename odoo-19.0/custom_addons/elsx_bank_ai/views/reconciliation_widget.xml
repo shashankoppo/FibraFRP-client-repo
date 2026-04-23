@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- The Client Action that triggers the OWL Component -->
+    <record id="action_elsx_bank_reconciliation" model="ir.actions.client">
+        <field name="name">AI Bank Reconciliation</field>
+        <field name="tag">elsx_bank_reconciliation_client_action</field>
+    </record>
+
+    <!-- Menu Item to access the tool -->
+    <menuitem id="menu_elsx_bank_reconciliation"
+              name="AI Reconciliation"
+              parent="account.menu_finance_entries"
+              action="action_elsx_bank_reconciliation"
+              sequence="15"/>
+</odoo>

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Email Template for Signature Request Dispatch -->
+    <record id="mail_template_elsx_sign_request" model="mail.template">
+        <field name="name">ELSX: Signature Request Notification</field>
+        <field name="model_id" ref="elsx_sign.model_elsx_sign_request"/>
+        <field name="subject">Action Required: Please Sign - {{ object.name }}</field>
+        <field name="email_from">{{ (object.create_uid.email_formatted or user.email_formatted) }}</field>
+        <field name="email_to">{{ object.partner_id.email }}</field>
+        <field name="body_html" type="html">
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9f9f9; padding: 30px; border-radius: 8px;">
+                <div style="background: #1a1a2e; color: white; padding: 20px; border-radius: 6px 6px 0 0; text-align: center;">
+                    <h1 style="margin: 0; font-size: 22px;">✍ Signature Required</h1>
+                </div>
+                <div style="background: white; padding: 30px; border-radius: 0 0 6px 6px;">
+                    <p>Dear <strong><t t-out="object.partner_id.name"/></strong>,</p>
+                    <p>You have been requested to review and sign the following document:</p>
+                    <div style="background: #f0f4ff; border-left: 4px solid #4c6ef5; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                        <strong style="font-size: 16px;"><t t-out="object.name"/></strong>
+                    </div>
+                    <p>Please click the secure button below to review and sign the document. No login or account is required.</p>
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a t-att-href="'%s/sign/document/%s?token=%s' % (ctx.get('base_url', ''), object.id, object.access_token)"
+                           style="background: #4c6ef5; color: white; padding: 14px 40px; border-radius: 6px; text-decoration: none; font-size: 16px; font-weight: bold; display: inline-block;">
+                            📄 View &amp; Sign Document
+                        </a>
+                    </div>
+                    <p style="color: #888; font-size: 12px; text-align: center; margin-top: 20px;">
+                        This is a legally binding signature. Your IP address and signing timestamp will be recorded.
+                    </p>
+                </div>
+            </div>
+        </field>
+        <field name="auto_delete" eval="True"/>
+    </record>
+</odoo>
