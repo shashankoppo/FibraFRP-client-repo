@@ -165,22 +165,15 @@ class WhatsAppAccount(models.Model):
 
     def send_message(self, to_number, message_type='text', **kwargs):
         """
-        Send WhatsApp message via Cloud API
-        
-        :param to_number: Recipient phone number
-        :param message_type: 'text', 'template', 'image', 'document', etc.
-        :param kwargs: Additional message parameters
-        :return: Message record
+        Send WhatsApp message via Cloud API with support for Interactive messages
         """
         self.ensure_one()
-        
         url = f"https://graph.facebook.com/{self.api_version}/{self.phone_number_id}/messages"
         headers = {
             'Authorization': f'Bearer {self.access_token}',
             'Content-Type': 'application/json',
         }
         
-        # Build message payload
         payload = {
             'messaging_product': 'whatsapp',
             'recipient_type': 'individual',
@@ -196,39 +189,68 @@ class WhatsAppAccount(models.Model):
         elif message_type == 'image':
             payload['type'] = 'image'
             payload['image'] = kwargs.get('image', {})
+        elif message_type == 'interactive':
+            payload['type'] = 'interactive'
+            payload['interactive'] = kwargs.get('interactive', {})
         
         try:
             response = requests.post(url, headers=headers, json=payload, timeout=30)
             response_data = response.json()
             
+            vals = {
+                'account_id': self.id,
+                'phone_number': to_number,
+                'partner_id': kwargs.get('partner_id'),
+                'message_type': message_type,
+                'body': kwargs.get('body', ''),
+                'direction': 'outbound',
+                'raw_data': json.dumps(payload),
+            }
+
             if response.status_code == 200:
-                # Create message record
-                message = self.env['whatsapp.message'].create({
-                    'account_id': self.id,
-                    'phone_number': to_number,
-                    'partner_id': kwargs.get('partner_id'),
-                    'message_type': message_type,
-                    'body': kwargs.get('body', ''),
-                    'direction': 'outbound',
+                vals.update({
                     'status': 'sent',
                     'message_id': response_data.get('messages', [{}])[0].get('id'),
+                    'sent_date': fields.Datetime.now(),
                 })
-                return message
             else:
                 _logger.error(f"WhatsApp send failed: {response_data}")
-                # Don't raise, just log to message history for better UX
-                message = self.env['whatsapp.message'].create({
-                    'account_id': self.id,
-                    'phone_number': to_number,
-                    'partner_id': kwargs.get('partner_id'),
-                    'message_type': message_type,
-                    'body': kwargs.get('body', ''),
-                    'direction': 'outbound',
+                vals.update({
                     'status': 'failed',
                     'error_message': str(response_data.get('error', {}).get('message', 'Unknown error')),
                 })
-                return message
+            
+            return self.env['whatsapp.message'].create(vals)
                 
         except Exception as e:
             _logger.error(f"WhatsApp message send error: {str(e)}")
             raise
+
+    def action_send_interactive_buttons(self, to_number, body, buttons):
+        """
+        Helper to send interactive buttons
+        :param buttons: List of dicts [{'id': 'id1', 'title': 'Button 1'}, ...]
+        """
+        interactive_payload = {
+            "type": "button",
+            "body": {"text": body},
+            "action": {
+                "buttons": [{"type": "reply", "reply": b} for b in buttons]
+            }
+        }
+        return self.send_message(to_number, message_type='interactive', interactive=interactive_payload, body=body)
+
+    def action_send_list_menu(self, to_number, body, button_text, sections):
+        """
+        Helper to send list menu
+        :param sections: List of sections for the list
+        """
+        interactive_payload = {
+            "type": "list",
+            "body": {"text": body},
+            "action": {
+                "button": button_text,
+                "sections": sections
+            }
+        }
+        return self.send_message(to_number, message_type='interactive', interactive=interactive_payload, body=body)

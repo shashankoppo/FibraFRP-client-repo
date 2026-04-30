@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import http
+from odoo import http, fields
 from odoo.http import request
 import json
 import logging
@@ -25,14 +25,17 @@ class WhatsAppWebhook(http.Controller):
             _logger.warning(f'WhatsApp webhook verification failed for account {account_id}')
             return 'Verification failed', 403
 
-    @http.route('/whatsapp/webhook/<int:account_id>', type='jsonrpc', auth='public', methods=['POST'], csrf=False)
+    @http.route('/whatsapp/webhook/<int:account_id>', type='http', auth='public', methods=['POST'], csrf=False)
     def whatsapp_webhook_receive(self, account_id, **kwargs):
-        """Receive incoming WhatsApp messages"""
+        """Receive incoming WhatsApp messages (HTTP to handle raw Meta JSON)"""
         try:
-            data = json.loads(request.httprequest.data)
+            raw_data = request.httprequest.data.decode('utf-8')
+            data = json.loads(raw_data)
             _logger.info(f'WhatsApp webhook received: {data}')
             
             account = request.env['whatsapp.account'].sudo().browse(account_id)
+            if not account:
+                return 'Account not found', 404
             
             # Process webhook data
             if 'entry' in data:
@@ -43,103 +46,84 @@ class WhatsAppWebhook(http.Controller):
                         # Process incoming messages
                         if 'messages' in value:
                             for message in value['messages']:
-                                self._process_incoming_message(account, message, value)
+                                self._process_incoming_message(account, message, value, raw_data)
                         
                         # Process message status updates
                         if 'statuses' in value:
                             for status in value['statuses']:
                                 self._process_status_update(account, status)
             
-            return {'status': 'success'}
+            return 'OK', 200
             
         except Exception as e:
             _logger.error(f'WhatsApp webhook error: {str(e)}')
-            return {'status': 'error', 'message': str(e)}
+            return 'Internal Error', 500
     
-    def _process_incoming_message(self, account, message_data, value):
-        """Process incoming WhatsApp message"""
+    def _process_incoming_message(self, account, message_data, value, raw_json):
+        """Process incoming WhatsApp message including interactive types"""
         phone_number = message_data.get('from')
         message_id = message_data.get('id')
         message_type = message_data.get('type')
-        timestamp = message_data.get('timestamp')
         
-        # Get message body based on type
-        body = ''
-        if message_type == 'text':
-            body = message_data.get('text', {}).get('body', '')
-        elif message_type == 'image':
-            body = message_data.get('image', {}).get('caption', '')
-        
-        # Find or create partner
-        partner = request.env['res.partner'].sudo().search([
-            '|', ('mobile', '=', phone_number), ('phone', '=', phone_number)
-        ], limit=1)
-        
-        # Create message record
-        request.env['whatsapp.message'].sudo().create({
+        vals = {
             'account_id': account.id,
-            'partner_id': partner.id if partner else False,
             'phone_number': phone_number,
             'message_id': message_id,
             'message_type': message_type,
-            'body': body,
             'direction': 'inbound',
             'status': 'delivered',
-        })
+            'raw_data': raw_json,
+        }
+
+        # Get message content based on type
+        if message_type == 'text':
+            vals['body'] = message_data.get('text', {}).get('body', '')
+        elif message_type == 'image':
+            vals['caption'] = message_data.get('image', {}).get('caption', '')
+            # Future: Handle media download
+        elif message_type == 'button':
+            vals['body'] = message_data.get('button', {}).get('text', '')
+            vals['button_text'] = vals['body']
+            vals['button_payload'] = message_data.get('button', {}).get('payload', '')
+        elif message_type == 'interactive':
+            interactive = message_data.get('interactive', {})
+            if interactive.get('type') == 'button_reply':
+                reply = interactive.get('button_reply', {})
+                vals['body'] = reply.get('title', '')
+                vals['button_text'] = vals['body']
+                vals['button_payload'] = reply.get('id', '')
+            elif interactive.get('type') == 'list_reply':
+                reply = interactive.get('list_reply', {})
+                vals['body'] = reply.get('title', '')
+                vals['list_item_id'] = reply.get('id', '')
+                vals['list_item_title'] = reply.get('title', '')
         
+        # Find partner
+        partner = request.env['res.partner'].sudo().search([
+            '|', ('mobile', '=', phone_number), ('phone', '=', phone_number)
+        ], limit=1)
+        if partner:
+            vals['partner_id'] = partner.id
+        
+        # Create message record
+        request.env['whatsapp.message'].sudo().create(vals)
+        
+        # Automation & AI
         if account.auto_reply_enabled and account.auto_reply_message:
-            account.send_message(
-                to_number=phone_number,
-                message_type='text',
-                body=account.auto_reply_message
-            )
+            account.send_message(to_number=phone_number, message_type='text', body=account.auto_reply_message)
         elif account.ai_enabled:
-            # Trigger AI response
-            reply_text = self._get_ai_response(account, body, phone_number)
+            reply_text = self._get_ai_response(account, vals.get('body', ''), phone_number)
             if reply_text:
-                account.send_message(
-                    to_number=phone_number,
-                    message_type='text',
-                    body=reply_text
-                )
+                account.send_message(to_number=phone_number, message_type='text', body=reply_text)
 
     def _get_ai_response(self, account, user_message, phone_number):
-        """
-        Generate AI-driven response based on business context.
-        Uses ELSX AI Evolution Engine for context-aware replies.
-        """
-        _logger.info(f"Generating AI response for {phone_number} using model {account.ai_model}")
-        
-        try:
-            # Check if AI Marketing module is available
-            ai_model = request.env['elsx.marketing.ai'].sudo()
-            if ai_model:
-                # In a real scenario, we'd pass the conversation history and context
-                # For this enhanced version, we simulate the 'Future Proof' AI integration
-                prompt = f"""
-                Business Context: {account.ai_context or 'Professional Assistant'}
-                Customer Message: {user_message}
-                Format: Friendly, concise WhatsApp message.
-                """
-                
-                # Mocking the AI result but showing the intended integration path
-                # Ideally: response = ai_model.generate_prediction(prompt, model=account.ai_model)
-                
-                # Dynamic Logic based on message
-                msg = user_message.lower()
-                if any(word in msg for word in ['invoice', 'bill', 'pay']):
-                    return "I've found your latest invoice. Would you like me to send a payment link? 💳"
-                elif any(word in msg for word in ['track', 'where', 'delivery']):
-                    return "I can check your delivery status. Please provide your Order ID starting with 'SO'. 🚚"
-                elif any(word in msg for word in ['human', 'agent', 'support']):
-                    return "I'm alerting our support team right now. A human agent will jump into this chat shortly! 👨‍💻"
-                
-                return f"Thank you for contacting {account.name}! 🚀 Your message: '{user_message}' is being processed by our AI. How else can I assist you today?"
-            
-        except Exception as e:
-            _logger.error(f"AI response generation failed: {e}")
-        
-        return f"Hi! Thanks for your message. We've received it and will get back to you soon. (AI context error)"
+        """Simulate AI response generation"""
+        msg = user_message.lower()
+        if any(word in msg for word in ['invoice', 'bill', 'pay']):
+            return "I've found your latest invoice. Would you like me to send a payment link? 💳"
+        elif any(word in msg for word in ['track', 'where', 'delivery']):
+            return "I can check your delivery status. Please provide your Order ID. 🚚"
+        return f"Thank you for reaching out! We've received your message: '{user_message}'."
     
     def _process_status_update(self, account, status_data):
         """Process message status update"""
@@ -152,9 +136,9 @@ class WhatsAppWebhook(http.Controller):
         ], limit=1)
         
         if message:
-            message.write({'status': status})
-            
+            vals = {'status': status}
             if status == 'delivered':
-                message.delivered_date = fields.Datetime.now()
+                vals['delivered_date'] = fields.Datetime.now()
             elif status == 'read':
-                message.read_date = fields.Datetime.now()
+                vals['read_date'] = fields.Datetime.now()
+            message.write(vals)

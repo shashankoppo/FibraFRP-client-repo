@@ -1,6 +1,6 @@
 {
     'name': 'ELSX WhatsApp Marketing & Automation',
-    'version': '1.0.0',
+    'version': '19.0.1.0.4',
     'category': 'Marketing/WhatsApp',
     'summary': 'Next-Gen WhatsApp Business API & AI-Powered Marketing Automation',
     'description': '''
@@ -33,12 +33,14 @@
         'security/whatsapp_security.xml',
         'data/whatsapp_templates.xml',
         'views/whatsapp_message_views.xml',
-        'views/whatsapp_campaign_views.xml',
         'views/whatsapp_template_views.xml',
+        'wizard/send_whatsapp_wizard_views.xml',
+        'views/whatsapp_chat_views.xml',
+        'views/whatsapp_campaign_views.xml',
         'views/whatsapp_contact_views.xml',
         'views/whatsapp_account_views.xml',
         'views/whatsapp_menu.xml',
-        'wizard/send_whatsapp_wizard_views.xml',
+        'data/whatsapp_cron.xml',
     ],
     'assets': {
         'web.assets_backend': [

@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- WhatsApp Chat Kanban View (Inbox List) -->
+    <record id="view_whatsapp_chat_kanban" model="ir.ui.view">
+        <field name="name">whatsapp.chat.kanban</field>
+        <field name="model">whatsapp.chat</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_mobile" create="false" sample="1">
+                <field name="display_name"/>
+                <field name="last_message_date"/>
+                <field name="last_message_body"/>
+                <field name="unread_count"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="o_kanban_record_top mb-0">
+                            <div class="o_kanban_record_headings">
+                                <strong class="o_kanban_record_title">
+                                    <field name="display_name"/>
+                                </strong>
+                            </div>
+                            <span class="text-muted fs-6">
+                                <field name="last_message_date" widget="remaining_days"/>
+                            </span>
+                        </div>
+                        <div class="o_kanban_record_body">
+                            <p class="text-truncate mb-0" style="max-width: 250px;">
+                                <t t-esc="record.last_message_body.value"/>
+                            </p>
+                        </div>
+                        <div class="o_kanban_record_bottom mt-1">
+                            <div class="oe_kanban_bottom_left">
+                                <span t-if="record.unread_count.raw_value > 0" class="badge rounded-pill bg-danger">
+                                    <t t-esc="record.unread_count.raw_value"/>
+                                </span>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- WhatsApp Chat Form View (Conversation View) -->
+    <record id="view_whatsapp_chat_form" model="ir.ui.view">
+        <field name="name">whatsapp.chat.form</field>
+        <field name="model">whatsapp.chat</field>
+        <field name="arch" type="xml">
+            <form string="Conversation" create="false">
+                <header>
+                    <button name="action_open_send_wizard"
+                            string="Reply" type="object" class="btn-primary"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="display_name"/></h1>
+                        <h3><field name="phone_number"/></h3>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="account_id" readonly="1"/>
+                            <field name="partner_id"/>
+                        </group>
+                        <group>
+                            <field name="last_message_date" readonly="1"/>
+                            <field name="unread_count" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Messages" name="messages">
+                            <field name="message_ids" readonly="1">
+                                <list decoration-info="direction=='inbound'" decoration-muted="status=='failed'">
+                                    <field name="create_date" string="Time"/>
+                                    <field name="direction"/>
+                                    <field name="body"/>
+                                    <field name="status" widget="badge" decoration-success="status in ['delivered', 'read']"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Team Inbox Action -->
+    <record id="action_whatsapp_team_inbox" model="ir.actions.act_window">
+        <field name="name">Team Inbox</field>
+        <field name="res_model">whatsapp.chat</field>
+        <field name="view_mode">kanban,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No active conversations found.
+            </p>
+            <p>
+                Incoming WhatsApp messages will appear here.
+            </p>
+        </field>
+    </record>
+</odoo>

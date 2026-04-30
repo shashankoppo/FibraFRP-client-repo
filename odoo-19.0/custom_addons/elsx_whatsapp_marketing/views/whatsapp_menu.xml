@@ -20,11 +20,12 @@
         <field name="context">{'search_default_group_partner': 1, 'search_default_group_date': 1}</field>
     </record>
 
+    <!-- Shared Inbox Conversations (Team Inbox) -->
     <menuitem id="menu_whatsapp_conversations"
-              name="Conversations"
+              name="Team Inbox"
               parent="menu_whatsapp_root"
               sequence="5"
-              action="action_whatsapp_conversations"/>
+              action="action_whatsapp_team_inbox"/>
 
     <!-- Messages -->
     <menuitem id="menu_whatsapp_messages"

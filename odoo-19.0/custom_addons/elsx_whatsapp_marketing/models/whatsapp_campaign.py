@@ -110,7 +110,7 @@ class WhatsAppCampaign(models.Model):
         }
     
     def action_send_campaign(self):
-        """Send campaign messages to all recipients"""
+        """Send campaign messages or start drip sequence"""
         self.ensure_one()
         
         if not self.partner_ids:
@@ -118,33 +118,47 @@ class WhatsAppCampaign(models.Model):
         
         self.state = 'running'
         
-        # Create messages for each recipient
-        for partner in self.partner_ids:
-            phone = partner.mobile or partner.phone
-            if not phone:
-                continue
-            
-            # Personalize message
-            message_body = self.message_body
-            message_body = message_body.replace('{{name}}', partner.name or '')
-            message_body = message_body.replace('{{company}}', partner.company_name or '')
-            
-            # Create message
-            message = self.env['whatsapp.message'].create({
-                'account_id': self.account_id.id,
-                'partner_id': partner.id,
-                'phone_number': phone,
-                'message_type': 'text',
-                'body': message_body,
-                'campaign_id': self.id,
-                'direction': 'outbound',
-            })
-            
-            # Send message
-            try:
-                message.action_send()
-            except Exception as e:
-                _logger.error(f"Failed to send campaign message to {partner.name}: {str(e)}")
+        if self.campaign_type == 'broadcast':
+            # Create messages for each recipient
+            for partner in self.partner_ids:
+                phone = partner.mobile or partner.phone
+                if not phone:
+                    continue
+                
+                # Personalize message
+                message_body = self.message_body
+                message_body = message_body.replace('{{name}}', partner.name or '')
+                message_body = message_body.replace('{{company}}', partner.company_name or '')
+                
+                # Create and send message
+                message = self.env['whatsapp.message'].create({
+                    'account_id': self.account_id.id,
+                    'partner_id': partner.id,
+                    'phone_number': phone,
+                    'message_type': 'template' if self.template_id else 'text',
+                    'body': message_body,
+                    'campaign_id': self.id,
+                    'direction': 'outbound',
+                })
+                try:
+                    message.action_send()
+                except Exception as e:
+                    _logger.error(f"Failed to send campaign message to {partner.name}: {str(e)}")
+        
+        elif self.campaign_type == 'drip':
+            # Initialize drip campaign for participants
+            for partner in self.partner_ids:
+                existing = self.env['whatsapp.campaign.participant'].search([
+                    ('campaign_id', '=', self.id),
+                    ('partner_id', '=', partner.id)
+                ])
+                if not existing:
+                    self.env['whatsapp.campaign.participant'].create({
+                        'campaign_id': self.id,
+                        'partner_id': partner.id,
+                        'next_execution_date': fields.Datetime.now(),
+                        'state': 'running'
+                    })
         
         self.state = 'completed'
         

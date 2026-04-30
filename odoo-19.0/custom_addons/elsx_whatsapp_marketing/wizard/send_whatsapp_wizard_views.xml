@@ -7,8 +7,9 @@
             <form string="Send WhatsApp Message">
                 <group>
                     <field name="account_id"/>
+                    <field name="phone_number" placeholder="e.g. 917247558873 (with country code, no +)"/>
                     <field name="partner_ids" widget="many2many_tags"/>
-                    <field name="message_body" widget="text"/>
+                    <field name="message_body" widget="text" placeholder="Type your message here..."/>
                 </group>
                 <footer>
                     <button name="action_send" string="Send" type="object" class="btn-primary"/>
@@ -16,5 +17,11 @@
                 </footer>
             </form>
         </field>
+    </record>
+    <record id="action_send_whatsapp_wizard" model="ir.actions.act_window">
+        <field name="name">Send WhatsApp Message</field>
+        <field name="res_model">whatsapp.send.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
     </record>
 </odoo>
