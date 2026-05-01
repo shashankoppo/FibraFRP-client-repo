@@ -140,14 +140,19 @@ class WhatsAppMessage(models.Model):
 
             if record.message_type == 'text':
                 payload['type'] = 'text'
-                payload['text'] = {'body': record.body or ''}
+                payload['text'] = {'body': record.body or ' '}  # Meta requires non-empty body
             elif record.message_type == 'template':
                 payload['type'] = 'template'
-                # Template data should be stored in raw_data
-                payload['template'] = json.loads(record.raw_data or '{}')
+                try:
+                    payload['template'] = json.loads(record.raw_data or '{}')
+                except Exception:
+                    payload['template'] = {}
             elif record.message_type == 'interactive':
                 payload['type'] = 'interactive'
-                payload['interactive'] = json.loads(record.raw_data or '{}')
+                try:
+                    payload['interactive'] = json.loads(record.raw_data or '{}')
+                except Exception:
+                    payload['interactive'] = {}
 
             try:
                 response = requests.post(url, headers=headers, json=payload, timeout=30)

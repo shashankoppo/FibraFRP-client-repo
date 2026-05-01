@@ -41,7 +41,8 @@ class WhatsAppAccount(models.Model):
     auto_reply_enabled = fields.Boolean('Auto Reply Enabled', default=False)
     auto_reply_message = fields.Text('Auto Reply Message')
     webhook_url = fields.Char('Webhook URL', compute='_compute_webhook_url')
-    webhook_verify_token = fields.Char('Webhook Verify Token')
+    webhook_verify_token = fields.Char('Webhook Verify Token', default='elsx_verify_2024')
+    two_factor_pin = fields.Char('2FA PIN (for Registration)', help='6-digit PIN for two-step verification registration')
 
     # AI & Automation
     ai_enabled = fields.Boolean('AI Automation Enabled', default=True)
@@ -106,6 +107,58 @@ class WhatsAppAccount(models.Model):
                 }
             }
     
+    def action_register_phone(self):
+        """
+        Finalize registration to move phone number from 'Pending' to 'Connected'.
+        Requires a 6-digit PIN to be set on the account.
+        """
+        self.ensure_one()
+        if not self.two_factor_pin or len(self.two_factor_pin) != 6:
+            from odoo.exceptions import UserError
+            raise UserError("Please enter a valid 6-digit 2FA PIN.")
+
+        url = f"https://graph.facebook.com/{self.api_version}/{self.phone_number_id}/register"
+        headers = {
+            'Authorization': f'Bearer {self.access_token}',
+            'Content-Type': 'application/json',
+        }
+        payload = {
+            'messaging_product': 'whatsapp',
+            'pin': self.two_factor_pin,
+        }
+
+        try:
+            response = requests.post(url, headers=headers, json=payload, timeout=30)
+            response_data = response.json()
+
+            if response.status_code == 200:
+                self.status = 'connected'
+                return {
+                    'type': 'ir.actions.client',
+                    'tag': 'display_notification',
+                    'params': {
+                        'title': 'Registration Successful',
+                        'message': 'Your phone number is now registered and connected.',
+                        'type': 'success',
+                    }
+                }
+            else:
+                error = response_data.get('error', {})
+                msg = f"[{error.get('code', '?')}] {error.get('message', 'Unknown error')}"
+                return {
+                    'type': 'ir.actions.client',
+                    'tag': 'display_notification',
+                    'params': {
+                        'title': 'Registration Failed',
+                        'message': msg,
+                        'type': 'danger',
+                        'sticky': True,
+                    }
+                }
+        except Exception as e:
+            _logger.error(f"WhatsApp registration failed: {str(e)}")
+            raise
+
     def action_sync_templates(self):
         """Sync templates from Meta WhatsApp Business Account"""
         self.ensure_one()

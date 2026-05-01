@@ -19,6 +19,7 @@ class WhatsAppChat(models.Model):
     last_message_body = fields.Text('Last Message', compute='_compute_last_message', store=True)
     
     unread_count = fields.Integer('Unread Count', compute='_compute_unread_count')
+    quick_reply_text = fields.Text('Quick Reply')
     
     @api.depends('phone_number', 'partner_id')
     def _compute_display_name(self):
@@ -47,20 +48,46 @@ class WhatsAppChat(models.Model):
                 ('status', '!=', 'read')
             ])
 
+    def action_mark_as_read(self):
+        """Mark all inbound messages in this chat as read"""
+        for record in self:
+            messages = record.message_ids.filtered(lambda m: m.direction == 'inbound' and m.status != 'read')
+            messages.write({'status': 'read', 'read_date': fields.Datetime.now()})
+        return True
+
+    def action_send_quick_reply(self):
+        """Send a quick reply message and clear the text box"""
+        self.ensure_one()
+        if not self.quick_reply_text:
+            return
+        
+        # Create the message
+        message = self.env['whatsapp.message'].create({
+            'account_id': self.account_id.id,
+            'phone_number': self.phone_number,
+            'body': self.quick_reply_text,
+            'direction': 'outbound',
+            'message_type': 'text',
+            'chat_id_ref': self.id,
+        })
+        
+        # Send it
+        message.action_send()
+        
+        # Clear the box
+        self.quick_reply_text = False
+        return True
+
     def action_open_chat(self):
         self.ensure_one()
+        self.action_mark_as_read()
         return {
             'type': 'ir.actions.act_window',
             'name': f'Chat with {self.display_name}',
-            'res_model': 'whatsapp.message',
-            'view_mode': 'list,form',
-            'domain': [('chat_id_ref', '=', self.id)],
-            'context': {
-                'default_chat_id_ref': self.id,
-                'default_phone_number': self.phone_number,
-                'default_account_id': self.account_id.id,
-                'default_partner_id': self.partner_id.id,
-            }
+            'res_model': 'whatsapp.chat',
+            'view_mode': 'form',
+            'res_id': self.id,
+            'target': 'current',
         }
 
     def action_open_send_wizard(self):

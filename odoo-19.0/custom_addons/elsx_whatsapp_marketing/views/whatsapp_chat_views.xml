@@ -47,36 +47,73 @@
         <field name="arch" type="xml">
             <form string="Conversation" create="false">
                 <header>
-                    <button name="action_open_send_wizard"
-                            string="Reply" type="object" class="btn-primary"/>
+                    <button name="action_mark_as_read" string="Mark as Read" type="object" invisible="unread_count == 0"/>
+                    <button name="action_open_send_wizard" string="Send Template" type="object" class="btn-secondary"/>
                 </header>
                 <sheet>
-                    <div class="oe_title">
-                        <h1><field name="display_name"/></h1>
-                        <h3><field name="phone_number"/></h3>
+                    <div class="row">
+                        <div class="col-8" style="border-right: 1px solid #dee2e6; height: 80vh; display: flex; flex-direction: column;">
+                            <!-- Chat Header -->
+                            <div class="d-flex align-items-center mb-3 p-2 bg-light rounded">
+                                <div class="flex-shrink-0">
+                                    <span class="fa fa-user-circle fa-3x text-muted"/>
+                                </div>
+                                <div class="flex-grow-1 ms-3">
+                                    <h4 class="mb-0"><field name="display_name" readonly="1"/></h4>
+                                    <small class="text-muted"><field name="phone_number" readonly="1"/></small>
+                                </div>
+                            </div>
+                            
+                            <!-- Message History (Bubble Style) -->
+                            <div class="o_whatsapp_chat_history flex-grow-1 overflow-auto p-3 bg-white" style="background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); background-repeat: repeat;">
+                                <field name="message_ids" mode="kanban" readonly="1">
+                                    <kanban create="false" action="False">
+                                        <field name="direction"/>
+                                        <field name="body"/>
+                                        <field name="status"/>
+                                        <field name="create_date"/>
+                                        <templates>
+                                            <t t-name="card">
+                                                <div t-attf-class="d-flex mb-2 #{record.direction.raw_value == 'outbound' ? 'justify-content-end' : 'justify-content-start'}">
+                                                    <div t-attf-class="p-2 rounded shadow-sm #{record.direction.raw_value == 'outbound' ? 'bg-primary text-white' : 'bg-light text-dark'}" style="max-width: 75%;">
+                                                        <p class="mb-1"><field name="body"/></p>
+                                                        <div class="d-flex justify-content-between align-items-center">
+                                                            <small style="font-size: 0.7rem; opacity: 0.8;"><field name="create_date" widget="datetime"/></small>
+                                                            <span t-if="record.direction.raw_value == 'outbound'" class="ms-2">
+                                                                <i t-if="record.status.raw_value == 'sent'" class="fa fa-check"/>
+                                                                <i t-if="record.status.raw_value == 'delivered'" class="fa fa-check text-white-50"/>
+                                                                <i t-if="record.status.raw_value == 'read'" class="fa fa-check-circle text-info"/>
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </t>
+                                        </templates>
+                                    </kanban>
+                                </field>
+                            </div>
+                            
+                            <!-- Quick Reply Footer -->
+                            <div class="p-3 bg-light border-top">
+                                <group col="2">
+                                    <field name="quick_reply_text" nolabel="1" placeholder="Type a message..." style="width: 100%; border-radius: 20px; padding: 10px;"/>
+                                    <button name="action_send_quick_reply" string="Send" type="object" class="btn-primary" icon="fa-paper-plane" invisible="not quick_reply_text"/>
+                                </group>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <group string="Customer Details">
+                                <field name="partner_id"/>
+                                <field name="account_id" readonly="1"/>
+                                <field name="last_message_date" readonly="1"/>
+                                <field name="unread_count" readonly="1"/>
+                            </group>
+                            <hr/>
+                            <div class="alert alert-info">
+                                <i class="fa fa-info-circle"/> This conversation is synced with your Meta WhatsApp Business API.
+                            </div>
+                        </div>
                     </div>
-                    <group>
-                        <group>
-                            <field name="account_id" readonly="1"/>
-                            <field name="partner_id"/>
-                        </group>
-                        <group>
-                            <field name="last_message_date" readonly="1"/>
-                            <field name="unread_count" readonly="1"/>
-                        </group>
-                    </group>
-                    <notebook>
-                        <page string="Messages" name="messages">
-                            <field name="message_ids" readonly="1">
-                                <list decoration-info="direction=='inbound'" decoration-muted="status=='failed'">
-                                    <field name="create_date" string="Time"/>
-                                    <field name="direction"/>
-                                    <field name="body"/>
-                                    <field name="status" widget="badge" decoration-success="status in ['delivered', 'read']"/>
-                                </list>
-                            </field>
-                        </page>
-                    </notebook>
                 </sheet>
             </form>
         </field>

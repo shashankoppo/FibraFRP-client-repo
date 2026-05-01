@@ -1,6 +1,6 @@
 {
     'name': 'ELSX WhatsApp Marketing & Automation',
-    'version': '19.0.1.0.4',
+    'version': '19.0.1.0.6',
     'category': 'Marketing/WhatsApp',
     'summary': 'Next-Gen WhatsApp Business API & AI-Powered Marketing Automation',
     'description': '''

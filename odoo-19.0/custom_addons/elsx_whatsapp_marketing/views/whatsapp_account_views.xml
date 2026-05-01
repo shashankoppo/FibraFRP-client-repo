@@ -51,6 +51,8 @@
                         </group>
                         <group string="API Configuration">
                             <field name="access_token" password="True"/>
+                            <field name="two_factor_pin" password="1"/>
+                            <button name="action_register_phone" string="Register Phone" type="object" class="oe_highlight" invisible="not two_factor_pin"/>
                             <field name="webhook_url" readonly="1"/>
                             <field name="webhook_verify_token"/>
                         </group>
