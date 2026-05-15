@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_whatsapp_api_log_tree" model="ir.ui.view">
+        <field name="name">whatsapp.api.log.tree</field>
+        <field name="model">whatsapp.api.log</field>
+        <field name="arch" type="xml">
+            <list string="API Logs" decoration-danger="not success" decoration-success="success" create="false">
+                <field name="create_date" string="Time"/>
+                <field name="account_id"/>
+                <field name="endpoint"/>
+                <field name="status_code"/>
+                <field name="latency" widget="float_time" string="Latency (ms)"/>
+                <field name="template_name"/>
+                <field name="success"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_whatsapp_api_log_form" model="ir.ui.view">
+        <field name="name">whatsapp.api.log.form</field>
+        <field name="model">whatsapp.api.log</field>
+        <field name="arch" type="xml">
+            <form string="API Log Entry" create="false" edit="false">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="status_code" class="oe_inline"/>
+                            <span class="ms-2">-</span>
+                            <field name="endpoint" class="oe_inline ms-2"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="create_date"/>
+                            <field name="account_id"/>
+                            <field name="latency"/>
+                        </group>
+                        <group>
+                            <field name="method"/>
+                            <field name="template_name" invisible="not template_name"/>
+                            <field name="success" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Payload" name="payload">
+                            <group>
+                                <field name="request_body" widget="ace" options="{'mode': 'json'}"/>
+                            </group>
+                        </page>
+                        <page string="Response" name="response">
+                            <group>
+                                <field name="response_body" widget="ace" options="{'mode': 'json'}"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_whatsapp_api_log" model="ir.actions.act_window">
+        <field name="name">Outbound API Logs</field>
+        <field name="res_model">whatsapp.api.log</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No API logs found.
+            </p>
+            <p>
+                All outbound requests to Meta Cloud API will be logged here for debugging.
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_whatsapp_api_log"
+              name="Outbound API Logs"
+              parent="menu_whatsapp_analytics"
+              action="action_whatsapp_api_log"
+              sequence="20"/>
+</odoo>

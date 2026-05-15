@@ -10,9 +10,12 @@
                 <field name="account_id"/>
                 <field name="campaign_type"/>
                 <field name="total_recipients"/>
+                <field name="queued_count"/>
                 <field name="sent_count"/>
                 <field name="delivered_count"/>
                 <field name="read_count"/>
+                <field name="delivery_rate" widget="percentage"/>
+                <field name="read_rate" widget="percentage"/>
                 <field name="roi" widget="percentage"/>
                 <field name="state"/>
             </list>
@@ -24,13 +27,14 @@
         <field name="name">whatsapp.campaign.form</field>
         <field name="model">whatsapp.campaign</field>
         <field name="arch" type="xml">
-            <form string="WhatsApp Campaign">
+            <form string="WhatsApp Campaign" class="o_whatsapp_campaign_form">
                 <header>
                     <button name="action_load_recipients" string="Load Recipients" type="object" class="btn-secondary" invisible="state != 'draft'"/>
-                    <button name="action_generate_ai_content" string="Generate AI Content" type="object" class="btn-info" invisible="state != 'draft'"/>
-                    <button name="action_send_campaign" string="Send Campaign" type="object" class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_generate_ai_content" string="Draft Content" type="object" class="btn-secondary" invisible="state != 'draft'"/>
+                    <button name="action_send_campaign" string="Queue Campaign" type="object" class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_process_queue" string="Process Queue (Send 50)" type="object" class="btn-warning" invisible="state != 'running'"/>
                     <button name="action_cancel" string="Cancel" type="object" class="btn-danger" invisible="state in ['completed', 'cancelled']"/>
-                    <field name="state" widget="statusbar" statusbar_visible="draft,running,completed"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,scheduled,running,completed"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
@@ -38,6 +42,26 @@
                             <field name="name" placeholder="Campaign Name"/>
                         </h1>
                     </div>
+                    <!-- Smart Stats Dashboard -->
+                    <div class="wa-kpi-grid mb-4">
+                        <div class="wa-kpi-card">
+                            <span>Queued</span>
+                            <strong><field name="queued_count" readonly="1"/></strong>
+                        </div>
+                        <div class="wa-kpi-card">
+                            <span>Sent</span>
+                            <strong><field name="sent_count" readonly="1"/></strong>
+                        </div>
+                        <div class="wa-kpi-card">
+                            <span>Delivered</span>
+                            <strong><field name="delivery_rate" widget="percentage" readonly="1"/></strong>
+                        </div>
+                        <div class="wa-kpi-card">
+                            <span>Read</span>
+                            <strong><field name="read_rate" widget="percentage" readonly="1"/></strong>
+                        </div>
+                    </div>
+
                     <group>
                         <group string="Campaign Settings">
                             <field name="account_id"/>
@@ -45,20 +69,23 @@
                             <field name="schedule_type"/>
                             <field name="schedule_date" invisible="schedule_type == 'immediate'" required="schedule_type == 'scheduled'"/>
                         </group>
-                        <group string="Statistics">
-                            <field name="total_recipients"/>
-                            <field name="sent_count"/>
-                            <field name="delivered_count"/>
-                            <field name="read_count"/>
-                            <field name="failed_count"/>
-                            <field name="roi" widget="percentage"/>
+                        <group string="Configuration">
+                            <field name="target_type"/>
+                            <field name="total_recipients" readonly="1"/>
+                            <field name="queued_count" readonly="1"/>
+                            <field name="failed_count" readonly="1"/>
                         </group>
                     </group>
                     <notebook>
                         <page string="Recipients" name="recipients">
                             <group>
                                 <field name="target_type"/>
+                                <field name="segment_id" invisible="target_type != 'segment'" />
                                 <field name="domain_filter" invisible="target_type != 'segment'"/>
+                                <field name="crm_stage_id" invisible="target_type != 'crm_stage'"/>
+                                <field name="tag_ids" widget="many2many_tags" invisible="target_type != 'tags'"/>
+                                <field name="csv_filename" invisible="1"/>
+                                <field name="csv_file" filename="csv_filename" invisible="target_type != 'csv'" string="Upload Audience CSV" help="Upload a CSV with 'Phone' and 'Name' columns"/>
                             </group>
                             <field name="partner_ids" widget="many2many_tags">
                                 <list>
@@ -75,7 +102,7 @@
                                     <field name="name"/>
                                     <field name="delay_unit" string="After"/>
                                     <field name="delay_type" string="Unit"/>
-                                    <field name="template_id"/>
+                                    <field name="template_id" domain="[('account_id', '=', parent.account_id), ('status', '=', 'approved')]"/>
                                     <field name="condition_type"/>
                                 </list>
                                 <form>
@@ -86,7 +113,7 @@
                                     <group string="Timing &amp; Content">
                                         <field name="delay_unit"/>
                                         <field name="delay_type"/>
-                                        <field name="template_id"/>
+                                        <field name="template_id" domain="[('account_id', '=', parent.account_id), ('status', '=', 'approved')]"/>
                                         <field name="message_body"/>
                                     </group>
                                     <group string="Condition">
@@ -97,8 +124,8 @@
                         </page>
                         <page string="Message" name="message" invisible="campaign_type == 'drip'">
                             <group>
-                                <field name="template_id"/>
-                                <field name="message_body" widget="text" placeholder="Use {{name}}, {{company}} for personalization"/>
+                                <field name="template_id" domain="[('account_id', '=', account_id), ('status', '=', 'approved')]"/>
+                                <field name="message_body" widget="text" placeholder="Use {{1}}, {{2}} for personalization" required="not template_id"/>
                             </group>
                             <div class="alert alert-info" role="alert">
                                 <strong>Personalization Variables:</strong>
@@ -121,6 +148,41 @@
                                 </list>
                             </field>
                         </page>
+                        <page string="Participants" name="participants">
+                            <field name="participant_ids" readonly="1">
+                                <list>
+                                    <field name="partner_id"/>
+                                    <field name="current_step_id"/>
+                                    <field name="next_execution_date"/>
+                                    <field name="state"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="A/B Testing" name="ab_testing">
+                            <group>
+                                <field name="is_ab_test"/>
+                            </group>
+                            <group invisible="not is_ab_test">
+                                <group string="Version A (Standard)">
+                                    <field name="split_percentage"/>
+                                    <field name="template_id" domain="[('account_id', '=', account_id), ('status', '=', 'approved')]"/>
+                                    <field name="message_body"/>
+                                </group>
+                                <group string="Version B">
+                                    <label for="split_percentage" string="Split B %"/>
+                                    <div class="o_row">
+                                        <span class="oe_grey">Auto-calculated: </span>
+                                        <field name="split_percentage_b" class="fw-bold"/>
+                                        <span class="fw-bold">%</span>
+                                    </div>
+                                    <field name="template_id_b" domain="[('account_id', '=', account_id), ('status', '=', 'approved')]"/>
+                                    <field name="message_body_b"/>
+                                </group>
+                            </group>
+                            <group string="Results" invisible="not is_ab_test or state == 'draft'">
+                                <field name="ab_test_winner"/>
+                            </group>
+                        </page>
                         <page string="Analytics" name="analytics">
                             <group>
                                 <group>
@@ -135,11 +197,81 @@
         </field>
     </record>
 
+    <!-- WhatsApp Campaign Kanban View -->
+    <record id="view_whatsapp_campaign_kanban" model="ir.ui.view">
+        <field name="name">whatsapp.campaign.kanban</field>
+        <field name="model">whatsapp.campaign</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="state" class="o_kanban_mobile" sample="1">
+                <field name="name"/>
+                <field name="campaign_type"/>
+                <field name="state"/>
+                <field name="total_recipients"/>
+                <field name="queued_count"/>
+                <field name="sent_count"/>
+                <field name="delivered_count"/>
+                <field name="read_count"/>
+                <field name="read_rate"/>
+                <field name="roi"/>
+                <templates>
+                    <t t-name="card">
+                        <div t-attf-class="oe_kanban_global_click o_kanban_record_has_image_fill o_whatsapp_campaign_kanban">
+                            <div class="o_kanban_record_top mb-2">
+                                <div class="o_kanban_record_headings">
+                                    <strong class="o_kanban_record_title fw-bold fs-5"><field name="name"/></strong>
+                                </div>
+                                <div class="o_dropdown_kanban dropdown">
+                                    <a role="button" class="dropdown-toggle o-no-caret btn" data-bs-toggle="dropdown" href="#" aria-label="Dropdown menu" title="Dropdown menu">
+                                        <span class="fa fa-ellipsis-v"/>
+                                    </a>
+                                    <div class="dropdown-menu" role="menu">
+                                        <a role="menuitem" type="edit" class="dropdown-item">Edit</a>
+                                        <a role="menuitem" type="delete" class="dropdown-item">Delete</a>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="o_kanban_record_body">
+                                <div class="d-flex align-items-center mb-2">
+                                    <span t-attf-class="badge rounded-pill me-2 #{record.campaign_type.raw_value == 'broadcast' ? 'bg-primary' : 'bg-info'}">
+                                        <field name="campaign_type"/>
+                                    </span>
+                                    <span class="text-muted small"><i class="fa fa-users me-1" title="Recipients"/> <field name="total_recipients"/> Recipients</span>
+                                </div>
+                                
+                                <div class="row g-1 text-center mt-3">
+                                    <div class="col-4">
+                                        <div class="bg-light rounded p-1">
+                                            <div class="small fw-bold text-dark"><field name="queued_count"/></div>
+                                            <div class="text-muted" style="font-size: 0.65rem;">Queued</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-4">
+                                        <div class="bg-light rounded p-1">
+                                            <div class="small fw-bold text-success"><field name="sent_count"/></div>
+                                            <div class="text-muted" style="font-size: 0.65rem;">Sent</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-4">
+                                        <div class="bg-light rounded p-1">
+                                            <div class="small fw-bold text-info"><field name="read_rate" widget="percentage"/></div>
+                                            <div class="text-muted" style="font-size: 0.65rem;">Read</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
     <!-- WhatsApp Campaign Action -->
     <record id="action_whatsapp_campaign" model="ir.actions.act_window">
         <field name="name">WhatsApp Campaigns</field>
         <field name="res_model">whatsapp.campaign</field>
-        <field name="view_mode">list,form</field>
+        <field name="view_mode">kanban,list,form</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 Create your first WhatsApp Campaign

@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
+import logging
+
 from odoo import models, fields, api
+
+_logger = logging.getLogger(__name__)
 
 
 class SaleOrder(models.Model):
@@ -56,5 +60,9 @@ class SaleOrder(models.Model):
         # Send asynchronously/retry in background if needed
         try:
             message.action_send()
-        except Exception:
-            pass # Fails silently for now, status will be 'failed' in Odoo
+        except Exception as exc:
+            message.sudo().write({
+                'status': 'failed',
+                'error_message': str(exc),
+            })
+            _logger.exception("Failed to send WhatsApp order confirmation for %s", self.name)

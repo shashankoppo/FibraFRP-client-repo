@@ -6,10 +6,12 @@
         <field name="arch" type="xml">
             <form string="Send WhatsApp Message">
                 <group>
-                    <field name="account_id"/>
+                    <field name="account_id" options="{'no_create': True}"/>
+                    <field name="template_id" options="{'no_create': True}"/>
                     <field name="phone_number" placeholder="e.g. 917247558873 (with country code, no +)"/>
-                    <field name="partner_ids" widget="many2many_tags"/>
-                    <field name="message_body" widget="text" placeholder="Type your message here..."/>
+                    <field name="partner_ids" widget="many2many_tags" invisible="phone_number != False"/>
+                    <field name="media_file" filename="media_filename" invisible="template_id != False"/>
+                    <field name="message_body" widget="text" placeholder="Type message or optional media/voice caption..." invisible="template_id != False"/>
                 </group>
                 <footer>
                     <button name="action_send" string="Send" type="object" class="btn-primary"/>

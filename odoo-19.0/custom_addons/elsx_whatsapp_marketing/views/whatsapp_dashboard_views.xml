@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Custom Dashboard Action via Client Action -->
+    <!-- We will use a Server Action that returns a custom QWeb template rendering the dashboard -->
+    
+    <record id="action_whatsapp_dashboard_server" model="ir.actions.server">
+        <field name="name">WhatsApp Dashboard</field>
+        <field name="model_id" ref="model_whatsapp_analytics"/>
+        <field name="state">code</field>
+        <field name="code">
+action = {
+    'type': 'ir.actions.client',
+    'tag': 'whatsapp_marketing_dashboard',
+    'name': 'WhatsApp Analytics Dashboard',
+}
+        </field>
+    </record>
+
+    <!-- OWL Component Definition (We will register this in JS) -->
+    <!-- For simplicity in this module, we just declare the JS asset inclusion in the manifest later -->
+
+</odoo>

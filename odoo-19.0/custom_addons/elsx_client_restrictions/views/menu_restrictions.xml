@@ -7,11 +7,11 @@
     
     
     <record id="base.menu_management" model="ir.ui.menu">
-        <field name="group_ids" eval="[(6, 0, [ref('elsx_client_restrictions.group_secret_apps_access')])]"/>
+        <field name="group_ids" eval="[(4, ref('base.group_system'))]"/>
     </record>
 
     <record id="base.menu_apps" model="ir.ui.menu">
-        <field name="group_ids" eval="[(6, 0, [ref('elsx_client_restrictions.group_secret_apps_access')])]"/>
+        <field name="group_ids" eval="[(4, ref('base.group_system'))]"/>
     </record>
     
     <record id="base.menu_administration" model="ir.ui.menu">

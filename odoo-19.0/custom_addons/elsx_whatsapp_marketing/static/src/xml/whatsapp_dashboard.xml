@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="elsx_whatsapp_marketing.Dashboard" owl="1">
+        <div class="o_action_manager">
+            <div class="elsx-wa-dashboard container-fluid py-4 bg-light min-vh-100">
+                
+                <!-- Loading State -->
+                <div t-if="state.loading" class="text-center py-5">
+                    <div class="spinner-border text-success" role="status" style="width: 3rem; height: 3rem;">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <h5 class="mt-3 text-muted">Loading Analytics...</h5>
+                </div>
+
+                <div t-if="!state.loading">
+                    <!-- Header -->
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <div>
+                            <h2 class="mb-0 fw-bold text-dark">WhatsApp Analytics Overview</h2>
+                            <p class="text-muted mb-0">Track your messaging performance and team efficiency</p>
+                        </div>
+                        <div class="o_whatsapp_dash_header_actions d-flex gap-2">
+                            <button class="btn btn-whatsapp-meta d-flex align-items-center gap-2" t-on-click="openMetaManager">
+                                <i class="fa fa-facebook-square" style="color: #1877F2;"></i>
+                                <span>Meta Template Manager</span>
+                            </button>
+                            <button class="btn btn-primary" t-on-click="openNewChat">
+                                <i class="fa fa-plus me-1"></i> New Chat
+                            </button>
+                            <button class="btn btn-primary shadow-sm" t-on-click="reloadDashboard">
+                                <i class="fa fa-refresh me-1"></i> Refresh Data
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Top KPI Row -->
+                    <div class="row g-3 mb-4">
+                        <!-- Sent -->
+                        <div class="col-md-3">
+                            <div class="card border-0 shadow-sm rounded-4 h-100 elsx-kpi-card border-start border-4 border-primary">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="text-muted fw-semibold mb-1 text-uppercase small">Sent (7d)</h6>
+                                            <h3 class="mb-0 fw-bold text-dark"><t t-esc="state.data.kpis.sent_7d"/></h3>
+                                        </div>
+                                        <div class="bg-primary bg-opacity-10 p-3 rounded-circle text-primary">
+                                            <i class="fa fa-paper-plane fa-lg"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Delivered Rate -->
+                        <div class="col-md-3">
+                            <div class="card border-0 shadow-sm rounded-4 h-100 elsx-kpi-card border-start border-4 border-info">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="text-muted fw-semibold mb-1 text-uppercase small">Delivered Rate</h6>
+                                            <h3 class="mb-0 fw-bold text-dark"><t t-esc="state.data.kpis.delivered_rate"/>%</h3>
+                                        </div>
+                                        <div class="bg-info bg-opacity-10 p-3 rounded-circle text-info">
+                                            <i class="fa fa-check-circle fa-lg"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Read Rate -->
+                        <div class="col-md-3">
+                            <div class="card border-0 shadow-sm rounded-4 h-100 elsx-kpi-card border-start border-4 border-success">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="text-muted fw-semibold mb-1 text-uppercase small">Read Rate</h6>
+                                            <h3 class="mb-0 fw-bold text-dark"><t t-esc="state.data.kpis.read_rate"/>%</h3>
+                                        </div>
+                                        <div class="bg-success bg-opacity-10 p-3 rounded-circle text-success">
+                                            <i class="fa fa-eye fa-lg"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Open Chats -->
+                        <div class="col-md-3">
+                            <div class="card border-0 shadow-sm rounded-4 h-100 elsx-kpi-card border-start border-4 border-warning">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="text-muted fw-semibold mb-1 text-uppercase small">Open Chats</h6>
+                                            <h3 class="mb-0 fw-bold text-dark"><t t-esc="state.data.kpis.open_chats"/></h3>
+                                        </div>
+                                        <div class="bg-warning bg-opacity-10 p-3 rounded-circle text-warning">
+                                            <i class="fa fa-comments fa-lg"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Volume Trend Chart Row -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="card border-0 shadow-sm rounded-4">
+                                <div class="card-header bg-white border-0 pt-4 pb-0 d-flex justify-content-between align-items-center">
+                                    <h5 class="fw-bold text-dark mb-0">14-Day Message Volume Trend</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div style="height: 300px; width: 100%;">
+                                        <canvas t-ref="volumeChartCanvas"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Main Charts Row -->
+                    <div class="row g-3 mb-4">
+                        <!-- Top Templates -->
+                        <div class="col-md-6">
+                            <div class="card border-0 shadow-sm rounded-4 h-100">
+                                <div class="card-header bg-white border-0 pt-4 pb-0">
+                                    <h5 class="fw-bold text-dark mb-0">Top Performing Templates</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-borderless table-hover align-middle">
+                                            <thead class="text-muted small text-uppercase bg-light rounded">
+                                                <tr>
+                                                    <th class="rounded-start ps-3 py-2">Template Name</th>
+                                                    <th class="py-2">Sent</th>
+                                                    <th class="rounded-end py-2">Read Rate</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr t-foreach="state.data.top_templates" t-as="tpl" t-key="tpl.name" class="border-bottom">
+                                                    <td class="ps-3 fw-medium text-dark"><t t-esc="tpl.name"/></td>
+                                                    <td><t t-esc="tpl.usage"/></td>
+                                                    <td>
+                                                        <div class="d-flex align-items-center">
+                                                            <div class="progress flex-grow-1 me-2" style="height: 6px;">
+                                                                <div class="progress-bar bg-success rounded-pill" role="progressbar" t-attf-style="width: #{tpl.read_rate}%;"></div>
+                                                            </div>
+                                                            <span class="small fw-semibold"><t t-esc="tpl.read_rate"/>%</span>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                <tr t-if="state.data.top_templates.length === 0">
+                                                    <td colspan="3" class="text-center py-4 text-muted">No template data available</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Recent Campaigns -->
+                        <div class="col-md-6">
+                            <div class="card border-0 shadow-sm rounded-4 h-100">
+                                <div class="card-header bg-white border-0 pt-4 pb-0 d-flex justify-content-between align-items-center">
+                                    <h5 class="fw-bold text-dark mb-0">Recent Campaigns</h5>
+                                    <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3 py-2">
+                                        <t t-esc="state.data.kpis.active_campaigns"/> Active
+                                    </span>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-borderless table-hover align-middle">
+                                            <thead class="text-muted small text-uppercase bg-light rounded">
+                                                <tr>
+                                                    <th class="rounded-start ps-3 py-2">Campaign Name</th>
+                                                    <th class="py-2">Status</th>
+                                                    <th class="py-2">Sent</th>
+                                                    <th class="rounded-end py-2">Delivered</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr t-foreach="state.data.recent_campaigns" t-as="camp" t-key="camp.id" class="border-bottom" style="cursor: pointer;" t-on-click="() => this.openCampaign(camp.id)">
+                                                    <td class="ps-3 fw-medium text-dark"><t t-esc="camp.name"/></td>
+                                                    <td>
+                                                        <span t-attf-class="badge rounded-pill bg-#{camp.state === 'running' ? 'primary' : camp.state === 'completed' ? 'success' : camp.state === 'scheduled' ? 'warning' : 'secondary'}">
+                                                            <t t-esc="camp.state"/>
+                                                        </span>
+                                                    </td>
+                                                    <td class="fw-semibold"><t t-esc="camp.sent"/></td>
+                                                    <td class="text-success fw-semibold"><t t-esc="camp.delivered"/></td>
+                                                </tr>
+                                                <tr t-if="state.data.recent_campaigns.length === 0">
+                                                    <td colspan="4" class="text-center py-4 text-muted">No recent campaigns</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+
+</templates>

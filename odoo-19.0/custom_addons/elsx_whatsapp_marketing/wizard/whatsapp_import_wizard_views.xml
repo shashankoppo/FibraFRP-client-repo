@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_whatsapp_import_wizard_form" model="ir.ui.view">
+        <field name="name">whatsapp.import.wizard.form</field>
+        <field name="model">whatsapp.import.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Bulk Import WhatsApp Contacts">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="file" filename="file_name"/>
+                            <field name="file_name" invisible="1"/>
+                            <field name="file_type"/>
+                        </group>
+                        <group>
+                            <field name="account_id"/>
+                            <field name="campaign_id"/>
+                        </group>
+                    </group>
+                    <group string="Formatting Options">
+                        <group>
+                            <field name="auto_format_numbers"/>
+                            <field name="default_country_code" invisible="not auto_format_numbers"/>
+                        </group>
+                    </group>
+                    <footer>
+                        <button name="action_import" string="Import" type="object" class="btn-primary"/>
+                        <button string="Cancel" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_whatsapp_import_wizard" model="ir.actions.act_window">
+        <field name="name">Bulk Import Contacts</field>
+        <field name="res_model">whatsapp.import.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- Add to Menu -->
+    <menuitem id="menu_whatsapp_import" name="Bulk Import" parent="menu_whatsapp_config" action="action_whatsapp_import_wizard" sequence="30"/>
+</odoo>

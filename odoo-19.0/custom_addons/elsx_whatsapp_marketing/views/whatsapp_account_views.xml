@@ -24,10 +24,14 @@
             <form string="WhatsApp Account">
                 <header>
                     <button name="action_test_connection" string="Test Connection" type="object" class="btn-primary"/>
+                    <button name="action_perform_api_test_calls" string="Perform Meta Test Calls" type="object" class="btn-info" icon="fa-vial"/>
+                    <button name="action_test_sidecar" string="Test Sidecar" type="object" class="btn-secondary" icon="fa-heartbeat"/>
                     <button name="action_sync_templates" string="Sync Templates" type="object" class="btn-secondary" icon="fa-refresh" invisible="status != 'connected'"/>
+                    <button name="action_create_sample_templates" string="Load Sample Templates" type="object" class="btn-secondary" icon="fa-magic"/>
                     <field name="status" widget="statusbar" statusbar_visible="draft,connected"/>
                 </header>
                 <sheet>
+                    <field name="sandbox_warning" invisible="not is_sandbox"/>
                     <div class="oe_button_box" name="button_box">
                         <button name="%(action_whatsapp_message)d" type="action" class="oe_stat_button" icon="fa-comments">
                             <field name="message_count" widget="statinfo" string="Messages"/>
@@ -51,13 +55,46 @@
                         </group>
                         <group string="API Configuration">
                             <field name="access_token" password="True"/>
+                            <field name="is_sandbox"/>
                             <field name="two_factor_pin" password="1"/>
-                            <button name="action_register_phone" string="Register Phone" type="object" class="oe_highlight" invisible="not two_factor_pin"/>
+                            <button name="action_register_phone" string="Register Phone" type="object" class="oe_highlight"/>
                             <field name="webhook_url" readonly="1"/>
                             <field name="webhook_verify_token"/>
                         </group>
                     </group>
                     <notebook>
+                        <page string="Business Profile" name="business_profile">
+                            <header>
+                                <button name="action_get_business_profile" string="Sync from Meta" type="object" class="btn-secondary" icon="fa-refresh"/>
+                                <button name="action_update_business_profile" string="Save to Meta" type="object" class="btn-primary" icon="fa-cloud-upload"/>
+                            </header>
+                            <group>
+                                <group string="Public Info">
+                                    <field name="business_description" placeholder="Business description / About"/>
+                                    <field name="business_vertical"/>
+                                    <div class="o_td_label">
+                                        <label for="profile_image" string="Profile Picture"/>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <field name="profile_image" widget="image" class="oe_avatar" options="{'size': [120, 120]}"/>
+                                        <button name="action_sync_profile_picture" string="Refresh Picture" type="object" class="btn-xs btn-outline-primary" icon="fa-camera" invisible="status != 'connected'"/>
+                                    </div>
+                                </group>
+                                <group string="Account Health">
+                                    <field name="quality_rating" decoration-success="quality_rating == 'GREEN'" decoration-warning="quality_rating == 'YELLOW'" decoration-danger="quality_rating == 'RED'"/>
+                                    <field name="messaging_limit"/>
+                                </group>
+                                <group string="Contact Details">
+                                    <field name="business_email" widget="email"/>
+                                    <field name="business_address"/>
+                                    <field name="business_websites" placeholder="https://example.com, https://blog.example.com"/>
+                                </group>
+                            </group>
+                            <div class="alert alert-info mt-2" role="alert">
+                                <i class="fa fa-info-circle me-1" title="Information"/> 
+                                Changes made here will be visible to your customers on WhatsApp once you click <strong>Save to Meta</strong>.
+                            </div>
+                        </page>
                         <page string="Automation &amp; AI" name="automation_ai">
                             <group>
                                 <group string="Traditional Auto-Reply">
@@ -73,6 +110,13 @@
                                 <field name="ai_context" placeholder="Example: We are an e-commerce store selling premium coffee beans. Our shipping policy is 2-3 business days. We offer free returns within 30 days..."/>
                             </group>
                         </page>
+                        <page string="Notification Settings" name="notification_settings">
+                            <group>
+                                <field name="notification_enabled"/>
+                                <field name="notification_sound_receive"/>
+                                <field name="notification_sound_send"/>
+                            </group>
+                        </page>
                         <page string="Messages" name="messages">
                             <field name="message_ids" readonly="1">
                                 <list>
@@ -83,6 +127,45 @@
                                     <field name="status"/>
                                 </list>
                             </field>
+                        </page>
+                        <page string="API Test Panel" name="api_test">
+                            <group>
+                                <group string="Send Test Message">
+                                    <field name="test_phone_number" placeholder="e.g. 919876543210"/>
+                                    <field name="test_message_body" placeholder="Write something to test..."/>
+                                    <button name="action_send_test_message" string="Execute Test API Call" type="object" class="btn-primary" icon="fa-paper-plane"/>
+                                </group>
+                                <group string="Test Results">
+                                    <field name="test_api_status" widget="badge" decoration-success="test_api_status == 'success'" decoration-danger="test_api_status == 'failed'" decoration-info="test_api_status == 'none'"/>
+                                    <field name="test_api_response" widget="text" style="font-family: monospace; font-size: 0.8rem;"/>
+                                </group>
+                            </group>
+                            <div class="alert alert-warning mt-2" role="alert">
+                                <i class="fa fa-exclamation-triangle me-1" title="Warning"/>
+                                <strong>Note:</strong> Sending a test message will consume your Meta messaging quota. If in <strong>Sandbox Mode</strong>, ensure the recipient is a registered test number in the Meta Developer Portal.
+                            </div>
+                        </page>
+                        <page string="Webhook &amp; Advanced" name="webhook_advanced">
+                            <group>
+                                <group string="Webhook Health">
+                                    <field name="webhook_url" readonly="1" widget="copy_clipboard"/>
+                                    <field name="webhook_verify_token" password="True"/>
+                                    <field name="webhook_status" widget="badge" 
+                                           decoration-success="webhook_status == 'verified'" 
+                                           decoration-danger="webhook_status == 'failed'" 
+                                           decoration-info="webhook_status == 'none'"/>
+                                    <field name="webhook_last_error" invisible="not webhook_last_error" class="text-danger fw-bold"/>
+                                </group>
+                                <group string="Enterprise Reliability">
+                                    <field name="app_secret" password="True"/>
+                                    <field name="is_primary_webhook_db"/>
+                                    <field name="skip_webhook_hmac"/>
+                                </group>
+                            </group>
+                            <div class="alert alert-info mt-2" role="alert" invisible="not skip_webhook_hmac">
+                                <i class="fa fa-warning me-1" title="Warning"/>
+                                <strong>Debug Mode:</strong> Signature verification is disabled. Do not use this in production.
+                            </div>
                         </page>
                         <page string="Campaigns" name="campaigns">
                             <field name="campaign_ids" readonly="1">

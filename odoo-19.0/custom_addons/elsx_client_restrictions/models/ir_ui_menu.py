@@ -16,7 +16,9 @@ class IrUiMenu(models.Model):
         """
         menus = super(IrUiMenu, self).load_menus(debug)
         
-        # Get the Apps menu ID
+        # ALLOW Settings Administrators to see Apps (Safety Bypass)
+        if self.env.user.has_group('base.group_system'):
+            return menus
         try:
             apps_menu = self.env.ref('base.menu_apps', raise_if_not_found=False)
             management_menu = self.env.ref('base.menu_management', raise_if_not_found=False)

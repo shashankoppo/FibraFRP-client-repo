@@ -1,37 +1,67 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- WhatsApp Chat Kanban View (Inbox List) -->
+    <!-- WhatsApp Chat Kanban View (Industrial Team Inbox) -->
     <record id="view_whatsapp_chat_kanban" model="ir.ui.view">
         <field name="name">whatsapp.chat.kanban</field>
         <field name="model">whatsapp.chat</field>
         <field name="arch" type="xml">
-            <kanban class="o_kanban_mobile" create="false" sample="1">
+            <kanban class="o_whatsapp_inbox_kanban" create="false" sample="1" default_order="last_message_date desc">
                 <field name="display_name"/>
+                <field name="display_name_initial"/>
                 <field name="last_message_date"/>
                 <field name="last_message_body"/>
+                <field name="last_message_status"/>
+                <field name="last_message_direction"/>
                 <field name="unread_count"/>
+                <field name="state"/>
+                <field name="is_pinned"/>
+                <field name="id"/>
                 <templates>
                     <t t-name="card">
-                        <div class="o_kanban_record_top mb-0">
-                            <div class="o_kanban_record_headings">
-                                <strong class="o_kanban_record_title">
-                                    <field name="display_name"/>
-                                </strong>
+                        <div class="oe_kanban_global_click o_whatsapp_kanban_card d-flex align-items-center p-3 border-bottom position-relative"
+                             t-att-style="record.is_pinned.raw_value ? 'background: #f8fafc; border-left: 4px solid #00A884;' : 'border-left: 4px solid transparent;'">
+                            
+                            <!-- Left: Avatar -->
+                            <div class="o_whatsapp_avatar_container me-3 position-relative">
+                                <div class="o_whatsapp_avatar d-flex align-items-center justify-content-center rounded-circle shadow-sm"
+                                     style="width: 48px; height: 48px; background: linear-gradient(135deg, #00A884, #008F72); color: white; font-weight: bold; font-size: 1.2rem;">
+                                    <field name="display_name_initial"/>
+                                </div>
+                                <div t-if="record.state.raw_value == 'open'" class="position-absolute bg-success rounded-circle border border-2 border-white" 
+                                     style="width: 12px; height: 12px; bottom: 0; right: 0;" title="Open Conversation"/>
                             </div>
-                            <span class="text-muted fs-6">
-                                <field name="last_message_date" widget="remaining_days"/>
-                            </span>
-                        </div>
-                        <div class="o_kanban_record_body">
-                            <p class="text-truncate mb-0" style="max-width: 250px;">
-                                <t t-esc="record.last_message_body.value"/>
-                            </p>
-                        </div>
-                        <div class="o_kanban_record_bottom mt-1">
-                            <div class="oe_kanban_bottom_left">
-                                <span t-if="record.unread_count.raw_value > 0" class="badge rounded-pill bg-danger">
-                                    <t t-esc="record.unread_count.raw_value"/>
-                                </span>
+
+                            <!-- Center: Info -->
+                            <div class="flex-grow-1 overflow-hidden">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <h6 class="mb-0 fw-bold text-truncate" style="color: #111B21; font-size: 1rem;">
+                                        <t t-out="record.display_name.value"/>
+                                        <i t-if="record.is_pinned.raw_value" class="fa fa-thumb-tack ms-1 text-muted" title="Pinned" style="font-size: 0.7rem;"/>
+                                    </h6>
+                                    <span class="small text-muted" style="font-size: 0.75rem;">
+                                        <t t-out="record.last_message_date.value"/>
+                                    </span>
+                                </div>
+                                
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="small text-muted text-truncate d-flex align-items-center gap-1" style="font-size: 0.85rem;">
+                                        <t t-if="record.last_message_direction.raw_value == 'outbound'">
+                                            <t t-if="record.last_message_status.raw_value == 'read'">
+                                                <i class="fa fa-check text-info" title="Read" style="font-size: 0.7rem; margin-right: 2px;"/><i class="fa fa-check text-info" title="Read" style="font-size: 0.7rem; margin-left: -6px;"/>
+                                            </t>
+                                            <t t-elif="record.last_message_status.raw_value == 'delivered'">
+                                                <i class="fa fa-check text-muted" title="Delivered" style="font-size: 0.7rem; margin-right: 2px;"/><i class="fa fa-check text-muted" title="Delivered" style="font-size: 0.7rem; margin-left: -6px;"/>
+                                            </t>
+                                            <t t-else="">
+                                                <i class="fa fa-check text-muted" title="Sent" style="font-size: 0.7rem;"/>
+                                            </t>
+                                        </t>
+                                        <t t-out="record.last_message_body.value or 'No messages yet'"/>
+                                    </div>
+                                    <div t-if="record.unread_count.raw_value > 0" class="badge rounded-pill bg-success shadow-sm ms-2" style="padding: 4px 8px; font-size: 0.7rem;">
+                                        <t t-out="record.unread_count.value"/>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </t>
@@ -40,78 +70,449 @@
         </field>
     </record>
 
+
+    <!-- WhatsApp Chat List View (Bulk Management) -->
+    <record id="view_whatsapp_chat_list" model="ir.ui.view">
+        <field name="name">whatsapp.chat.list</field>
+        <field name="model">whatsapp.chat</field>
+        <field name="arch" type="xml">
+            <list decoration-info="state == 'open'" decoration-muted="state == 'resolved'" decoration-warning="state == 'snoozed'" sample="1">
+                <field name="is_pinned" widget="boolean_favorite" nolabel="1"/>
+                <field name="display_name" string="Contact"/>
+                <field name="phone_number"/>
+                <field name="assigned_user_id" widget="many2one_avatar_user"/>
+                <field name="last_message_body" string="Last Message"/>
+                <field name="last_message_date" widget="remaining_days"/>
+                <field name="unread_count" widget="badge" decoration-danger="unread_count > 0" invisible="unread_count == 0"/>
+                <field name="state" widget="badge" decoration-success="state == 'resolved'" decoration-info="state == 'open'"/>
+            </list>
+        </field>
+    </record>
+
     <!-- WhatsApp Chat Form View (Conversation View) -->
     <record id="view_whatsapp_chat_form" model="ir.ui.view">
         <field name="name">whatsapp.chat.form</field>
         <field name="model">whatsapp.chat</field>
         <field name="arch" type="xml">
-            <form string="Conversation" create="false">
-                <header>
-                    <button name="action_mark_as_read" string="Mark as Read" type="object" invisible="unread_count == 0"/>
-                    <button name="action_open_send_wizard" string="Send Template" type="object" class="btn-secondary"/>
-                </header>
+            <form string="Conversation" create="false" class="o_whatsapp_chat_form_view">
                 <sheet>
-                    <div class="row">
-                        <div class="col-8" style="border-right: 1px solid #dee2e6; height: 80vh; display: flex; flex-direction: column;">
-                            <!-- Chat Header -->
-                            <div class="d-flex align-items-center mb-3 p-2 bg-light rounded">
-                                <div class="flex-shrink-0">
-                                    <span class="fa fa-user-circle fa-3x text-muted"/>
+                    <div class="o_whatsapp_chat_container d-flex position-relative">
+                        <field name="unread_count" invisible="1"/>
+                        <!-- Hidden buttons for JS to trigger instant refresh/paging -->
+                        <button name="action_reload_chat" type="object" string="Refresh" class="wa-hidden-reload-btn d-none" style="position: absolute; left: -9999px; visibility: hidden;"/>
+                        <button name="action_load_more" type="object" string="Load More" class="wa-hidden-load-more-btn d-none" style="position: absolute; left: -9999px; visibility: hidden;"/>
+                        <field name="is_pinned" invisible="1"/>
+                        <field name="is_archived" invisible="1"/>
+                        <field name="lead_id" invisible="1"/>
+                        <field name="lead_state" invisible="1"/>
+                        <field name="state" invisible="1"/>
+                        <field name="assigned_user_id" invisible="1"/>
+                        <field name="partner_has_avatar" invisible="1"/>
+                        <field name="session_open" invisible="1"/>
+                        <field name="history_html" invisible="1"/>
+                        
+                        <!-- Sidebar: Real Chat List -->
+                        <div class="o_whatsapp_chat_sidebar wa-left-sidebar d-none d-lg-flex flex-column border-end">
+                                <div class="p-3 o_whatsapp_panel_header shadow-sm" style="background: var(--wa-header-bg); backdrop-filter: blur(10px);">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                         <div class="d-flex align-items-baseline gap-2">
+                                             <h4 class="mb-0 fw-bold">Chats</h4>
+                                             <button type="action" name="%(elsx_whatsapp_marketing.action_whatsapp_bot_flow)d" class="btn btn-sm btn-outline-success rounded-pill px-2 py-0 d-flex align-items-center" style="font-size: 0.7rem; transform: translateY(-1px);" title="Automation Flows">
+                                                 <i class="fa fa-code-fork me-1" title="Flows"/> Flows
+                                             </button>
+                                         </div>
+                                         <div class="d-flex gap-3 text-muted align-items-center">
+                                             <button name="action_open_meta_manager" type="object" class="btn btn-link p-0 text-success" title="Meta Template Manager">
+                                                 <i class="fa fa-facebook-square cursor-pointer" title="Meta Template Manager"/>
+                                             </button>
+                                             <button name="%(action_whatsapp_new_chat_wizard)d" type="action" class="btn btn-link p-0 text-muted" title="New Chat">
+                                                 <i class="fa fa-commenting-o cursor-pointer" title="New Chat"/>
+                                             </button>
+                                             <button name="%(action_whatsapp_account)d" type="action" class="btn btn-link p-0 text-muted" title="Accounts">
+                                                 <i class="fa fa-ellipsis-v cursor-pointer" title="Accounts"/>
+                                             </button>
+                                         </div>
+                                     </div>
+                                     <div class="position-relative mb-1">
+                                         <input type="text" class="o_whatsapp_search_box w-100 ps-5" placeholder="Search or start new chat"/>
+                                         <i class="fa fa-search position-absolute start-0 top-50 translate-middle-y ms-3 text-muted" title="Search" style="font-size: 0.9rem;"/>
+                                     </div>
+                                     <!-- Horizontal Filter Pills -->
+                                     <div class="d-flex gap-2 overflow-auto o_whatsapp_inbox_filters pb-0" style="scrollbar-width: none;">
+                                         <button class="badge rounded-pill bg-success text-white border-0 px-3 py-1">All</button>
+                                         <button class="badge rounded-pill bg-light text-muted border px-3 py-1">Open</button>
+                                         <button class="badge rounded-pill bg-light text-muted border px-3 py-1">Mine</button>
+                                         <button class="badge rounded-pill bg-light text-muted border px-3 py-1">Snoozed</button>
+                                         <button class="badge rounded-pill bg-light text-muted border px-3 py-1">Resolved</button>
+                                     </div>
                                 </div>
-                                <div class="flex-grow-1 ms-3">
-                                    <h4 class="mb-0"><field name="display_name" readonly="1"/></h4>
-                                    <small class="text-muted"><field name="phone_number" readonly="1"/></small>
-                                </div>
-                            </div>
-                            
-                            <!-- Message History (Bubble Style) -->
-                            <div class="o_whatsapp_chat_history flex-grow-1 overflow-auto p-3 bg-white" style="background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); background-repeat: repeat;">
-                                <field name="message_ids" mode="kanban" readonly="1">
-                                    <kanban create="false" action="False">
-                                        <field name="direction"/>
-                                        <field name="body"/>
-                                        <field name="status"/>
-                                        <field name="create_date"/>
-                                        <templates>
-                                            <t t-name="card">
-                                                <div t-attf-class="d-flex mb-2 #{record.direction.raw_value == 'outbound' ? 'justify-content-end' : 'justify-content-start'}">
-                                                    <div t-attf-class="p-2 rounded shadow-sm #{record.direction.raw_value == 'outbound' ? 'bg-primary text-white' : 'bg-light text-dark'}" style="max-width: 75%;">
-                                                        <p class="mb-1"><field name="body"/></p>
-                                                        <div class="d-flex justify-content-between align-items-center">
-                                                            <small style="font-size: 0.7rem; opacity: 0.8;"><field name="create_date" widget="datetime"/></small>
-                                                            <span t-if="record.direction.raw_value == 'outbound'" class="ms-2">
-                                                                <i t-if="record.status.raw_value == 'sent'" class="fa fa-check"/>
-                                                                <i t-if="record.status.raw_value == 'delivered'" class="fa fa-check text-white-50"/>
-                                                                <i t-if="record.status.raw_value == 'read'" class="fa fa-check-circle text-info"/>
-                                                            </span>
+                                <div class="flex-grow-1 overflow-auto border-top">
+                                    <field name="active_chat_ids" mode="kanban" readonly="1" nolabel="1">
+                                        <kanban create="false" class="o_whatsapp_sidebar_kanban">
+                                            <field name="display_name"/>
+                                            <field name="display_name_initial"/>
+                                            <field name="last_message_body"/>
+                                            <field name="last_message_date"/>
+                                            <field name="last_message_status"/>
+                                            <field name="last_message_direction"/>
+                                            <field name="unread_count"/>
+                                            <field name="is_pinned"/>
+                                            <field name="is_archived"/>
+                                            <field name="id"/>
+                                            <templates>
+                                                 <t t-name="card">
+                                                     <button type="object" name="action_open_chat" class="o_whatsapp_sidebar_btn p-0 border-0 bg-transparent w-100 text-start">
+                                                         <div t-attf-class="p-2 px-3 border-bottom cursor-pointer o_whatsapp_sidebar_item hover-bg-light position-relative" 
+                                                              t-att-data-chat-id="record.id.raw_value"
+                                                              style="transition: all 0.2s; border-left: 4px solid transparent;">
+                                                            <div class="d-flex align-items-center">
+                                                                <div class="o_whatsapp_avatar position-relative shadow-sm">
+                                                                    <t t-out="record.display_name_initial.value"/>
+                                                                    <div class="position-absolute bg-success rounded-circle border border-2 border-white animate-pulse" style="width: 12px; height: 12px; bottom: 0; right: 0;"/>
+                                                                </div>
+                                                                <div class="ms-3 flex-grow-1 overflow-hidden">
+                                                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                                                        <div class="fw-bold text-truncate o_whatsapp_chat_item_name" style="max-width: 140px; font-size: 1.05rem;"><t t-out="record.display_name.value"/></div>
+                                                                        <div class="small text-muted" style="font-size: 0.65rem;"><t t-out="record.last_message_date.value"/></div>
+                                                                    </div>
+                                                                    <div class="d-flex justify-content-between align-items-center">
+                                                                        <div class="small text-muted text-truncate d-flex align-items-center gap-1" style="max-width: 140px; font-size: 0.85rem;">
+                                                                            <t t-if="record.last_message_direction.raw_value == 'outbound'">
+                                                                                <t t-if="record.last_message_status.raw_value == 'sent'">
+                                                                                    <i class="fa fa-check text-muted" title="Sent" style="font-size: 0.7rem;"/>
+                                                                                </t>
+                                                                                <t t-if="record.last_message_status.raw_value == 'delivered'">
+                                                                                    <span class="d-flex align-items-center" style="margin-left: -2px;">
+                                                                                        <i class="fa fa-check text-muted" title="Delivered" style="font-size: 0.7rem;"/><i class="fa fa-check text-muted" title="Delivered" style="font-size: 0.7rem; margin-left: -4px;"/>
+                                                                                    </span>
+                                                                                </t>
+                                                                                <t t-if="record.last_message_status.raw_value == 'read'">
+                                                                                    <span class="d-flex align-items-center" style="margin-left: -2px;">
+                                                                                        <i class="fa fa-check text-info" title="Read" style="font-size: 0.7rem;"/><i class="fa fa-check text-info" title="Read" style="font-size: 0.7rem; margin-left: -4px;"/>
+                                                                                    </span>
+                                                                                </t>
+                                                                            </t>
+                                                                            <t t-out="record.last_message_body.value or 'No messages yet'"/>
+                                                                        </div>
+                                                                        <div class="d-flex align-items-center gap-1">
+                                                                            <i t-if="record.is_pinned.raw_value" class="fa fa-thumb-tack text-muted" title="Pinned" style="font-size: 0.7rem;"/>
+                                                                            <i t-if="record.is_archived.raw_value" class="fa fa-archive text-muted" title="Archived" style="font-size: 0.7rem;"/>
+                                                                            <div t-if="record.unread_count.raw_value &gt; 0" class="badge rounded-pill bg-success shadow-sm" style="padding: 4px 8px; font-size: 0.7rem;">
+                                                                                <t t-out="record.unread_count.value"/>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                </div>
-                                            </t>
-                                        </templates>
-                                    </kanban>
-                                </field>
+                                                    </button>
+                                                </t>
+                                            </templates>
+                                        </kanban>
+                                    </field>
+                                </div>
+                        </div>
+
+                        <!-- Main Chat Area -->
+                        <div class="o_whatsapp_chat_main d-flex flex-column flex-grow-1">
+                            <!-- Header — Premium Glassmorphic Design -->
+                            <div class="p-3 border-bottom d-flex align-items-center justify-content-between o_whatsapp_panel_header_premium" style="z-index: 10; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px);">
+                                <div class="d-flex align-items-center">
+                                    <div class="o_whatsapp_avatar o_whatsapp_avatar_header position-relative shadow-sm me-3" style="width: 45px; height: 45px; background: linear-gradient(135deg, #00A884, #008F72);">
+                                        <field name="display_name_initial"/>
+                                        <!-- Real-time Status Indicator Hook -->
+                                        <div id="whatsapp_socket_status" class="position-absolute bottom-0 end-0 bg-secondary border border-2 border-white rounded-circle" style="width: 14px; height: 14px;" title="Sidecar Status"/>
+                                    </div>
+                                    <div>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <h5 class="mb-0 fw-bold o_whatsapp_header_name" style="font-size: 1.1rem; color: #111B21;">
+                                                <field name="display_name" readonly="1"/>
+                                            </h5>
+                                            <field name="state" widget="badge" decoration-success="state == 'resolved'" decoration-info="state == 'open'" decoration-warning="state == 'snoozed'"/>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-2 mt-1">
+                                            <span class="small text-muted" style="font-size: 0.75rem;">
+                                                <i class="fa fa-phone me-1" title="Phone"/> <field name="phone_number"/>
+                                            </span>
+                                            <span invisible="not assigned_user_id" class="small text-primary" style="font-size: 0.75rem; background: #E3F2FD; padding: 1px 6px; border-radius: 4px;">
+                                                <i class="fa fa-user me-1" title="Assigned Agent"/> <field name="assigned_user_id"/>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-2 align-items-center">
+                                    <!-- Premium Action Buttons -->
+                                    <div class="btn-group shadow-sm rounded-pill p-1 bg-white border">
+                                        <button name="action_snooze" type="object" class="btn btn-sm text-muted rounded-circle border-0 d-flex align-items-center justify-content-center" style="width:34px;height:34px;" title="Snooze" invisible="state == 'snoozed'">
+                                            <i class="fa fa-clock-o" title="Snooze"/>
+                                        </button>
+                                        <button name="action_resolve" type="object" class="btn btn-sm text-muted rounded-circle border-0 d-flex align-items-center justify-content-center" style="width:34px;height:34px;" title="Resolve" invisible="state == 'resolved'">
+                                            <i class="fa fa-check-circle" title="Resolve"/>
+                                        </button>
+                                        <button name="action_reopen" type="object" class="btn btn-sm text-primary rounded-circle border-0 d-flex align-items-center justify-content-center" style="width:34px;height:34px;" title="Re-open" invisible="state == 'open'">
+                                            <i class="fa fa-undo" title="Re-open"/>
+                                        </button>
+                                    </div>
+                                    <div class="ms-2 d-flex gap-1 align-items-center">
+                                        <button name="action_open_send_wizard" type="object" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm d-flex align-items-center gap-1" title="Send Template">
+                                            <i class="fa fa-magic" title="Template"/> <span>Template</span>
+                                        </button>
+                                        <button name="action_view_partner" type="object" class="btn btn-outline-secondary btn-sm rounded-circle shadow-sm d-flex align-items-center justify-content-center" style="width:34px;height:34px;" title="View Contact">
+                                            <i class="fa fa-address-book" title="View Contact"/>
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
-                            
-                            <!-- Quick Reply Footer -->
-                            <div class="p-3 bg-light border-top">
-                                <group col="2">
-                                    <field name="quick_reply_text" nolabel="1" placeholder="Type a message..." style="width: 100%; border-radius: 20px; padding: 10px;"/>
-                                    <button name="action_send_quick_reply" string="Send" type="object" class="btn-primary" icon="fa-paper-plane" invisible="not quick_reply_text"/>
-                                </group>
+
+                            <!-- Messages Area — Surgical Zero-Flicker View -->
+                            <div class="o_whatsapp_chat_history flex-grow-1 overflow-auto d-flex flex-column" id="wa_chat_history">
+                                <div class="wa-chat-history-content-container p-3 d-flex flex-column gap-2 flex-grow-1">
+                                    <field name="history_html" invisible="1" class="wa-hidden-history-field"/>
+                                    <div id="wa-custom-history-mount" class="flex-grow-1 d-flex flex-column gap-2"></div>
+                                </div>
+                                <field name="message_ids" invisible="1"/>
+                            </div>
+
+
+                            <!-- Smart Chat Footer -->
+                            <div class="o_whatsapp_chat_footer">
+                                <field name="quick_media_filename" invisible="1"/>
+
+                                <!-- SESSION CLOSED: Show Template Picker (primary action) -->
+                                <div invisible="session_open" class="o_whatsapp_template_row">
+                                    <i class="fa fa-lock text-warning me-1" title="Session Closed" style="font-size:1rem;"/>
+                                    <span class="small fw-semibold text-muted me-2" style="white-space:nowrap;">Session closed — send a template:</span>
+                                    <div class="flex-grow-1">
+                                        <field name="quick_template_id" nolabel="1" placeholder="Select approved template..." options="{'no_create': True}" class="w-100"/>
+                                    </div>
+                                    <button name="action_send_quick_template" type="object" class="o_whatsapp_template_send_btn btn ms-2">
+                                        <i class="fa fa-paper-plane me-1" title="Send Template"/> Send Template
+                                    </button>
+                                    <button name="action_open_send_wizard" type="object" class="btn btn-outline-secondary btn-sm ms-1" title="Advanced options">
+                                        <i class="fa fa-cog" title="Advanced Options"/>
+                                    </button>
+                                </div>
+
+                                <!-- SESSION OPEN: Normal text + media input -->
+                                <div invisible="not session_open" class="wa-premium-footer-bar shadow-sm">
+                                    <div class="d-flex align-items-center gap-2 p-2">
+                                        <!-- Left Side Icons -->
+                                        <div class="d-flex align-items-center gap-1">
+                                            <!-- Emoji Picker -->
+                                            <button id="wa_emoji_trigger" type="button" class="wa-footer-icon-btn" title="Emojis">
+                                                <i class="fa fa-smile-o" title="Emojis"/>
+                                            </button>
+                                            
+                                            <!-- Attachment Button -->
+                                            <div class="wa-attachment-wrapper position-relative">
+                                                <i class="fa fa-paperclip wa-attachment-trigger-icon" title="Attach Media" style="font-size: 1.2rem; cursor: pointer; color: #64748b; padding: 8px;"/>
+                                                <field name="quick_media_file" filename="quick_media_filename" widget="binary" nolabel="1" options="{'accepted_file_extensions': 'image/*, video/*, audio/*, application/pdf'}" class="wa-hidden-binary" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;"/>
+                                            </div>
+
+                                            <!-- Template Quick Access -->
+                                            <button name="action_open_send_wizard" type="object" class="wa-footer-icon-btn d-none d-md-flex" title="Send Template">
+                                                <i class="fa fa-magic" title="Send Template"/>
+                                            </button>
+                                            <button name="action_generate_ai_reply" type="object" class="wa-footer-icon-btn d-none d-md-flex" title="Draft AI Reply">
+                                                <i class="fa fa-lightbulb-o" title="Draft AI Reply"/>
+                                            </button>
+                                        </div>
+
+                                        <!-- Text Input Area -->
+                                        <div class="flex-grow-1 position-relative d-flex flex-column">
+                                            <!-- Floating media preview if file selected -->
+                                            <div invisible="not quick_media_file" class="wa-floating-attachment-preview mb-1 p-2 bg-light rounded border d-flex align-items-center justify-content-between">
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <i class="fa fa-file-image-o text-success" title="Selected Media"/>
+                                                    <span class="text-truncate small fw-bold" style="max-width: 150px;"><field name="quick_media_filename"/></span>
+                                                </div>
+                                                <button name="action_clear_media" type="object" class="btn btn-sm btn-link p-0 text-danger" style="font-size: 0.9rem;">
+                                                    <i class="fa fa-times-circle" title="Remove Media"/>
+                                                </button>
+                                            </div>
+                                            <field name="quick_reply_text" widget="text" class="wa-premium-input" placeholder="Type a message..." nolabel="1"/>
+                                        </div>
+
+                                        <!-- Right Side Actions -->
+                                        <div class="d-flex align-items-center gap-2">
+                                            <!-- Internal Note -->
+                                            <button name="action_send_internal_note" type="object" class="wa-footer-icon-btn wa-note-btn" title="Internal Note">
+                                                <i class="fa fa-sticky-note-o" title="Internal Note"/>
+                                            </button>
+
+                                            <!-- Send Button -->
+                                            <button name="action_send_quick_reply" type="object" class="wa-main-send-btn shadow-sm" style="background: #00A884; color: white; width: 44px; height: 44px; border-radius: 50%; border: none;">
+                                                <i class="fa fa-send" title="Send"/>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div class="col-4">
-                            <group string="Customer Details">
-                                <field name="partner_id"/>
-                                <field name="account_id" readonly="1"/>
-                                <field name="last_message_date" readonly="1"/>
-                                <field name="unread_count" readonly="1"/>
-                            </group>
-                            <hr/>
-                            <div class="alert alert-info">
-                                <i class="fa fa-info-circle"/> This conversation is synced with your Meta WhatsApp Business API.
+
+                        <!-- Right Sidebar: Contact Info & Profile -->
+                        <div class="o_whatsapp_chat_sidebar wa-right-sidebar flex-shrink-0 border-start overflow-auto p-4 d-none d-lg-block" style="width: 320px;">
+                            <div class="text-center mb-4">
+                                <field name="partner_avatar_128" widget="image" class="rounded-circle shadow-sm mx-auto mb-3 d-block" options="{'size': [100, 100]}" invisible="not partner_has_avatar"/>
+                                <div invisible="partner_has_avatar" class="o_whatsapp_profile_pic_large mx-auto mb-3 d-flex align-items-center justify-content-center bg-light text-primary fw-bold rounded-circle shadow-sm" style="width: 100px; height: 100px; font-size: 2.5rem;">
+                                    <field name="display_name_initial"/>
+                                </div>
+                                <h4 class="mb-1 fw-bold"><field name="display_name"/></h4>
+                                <div class="text-muted small mb-2"><i class="fa fa-phone me-1" title="Phone"/> <field name="phone_number"/></div>
+                                <div invisible="not whatsapp_profile_about" class="badge p-2 w-100 text-wrap fw-normal o_whatsapp_profile_about" style="font-size: 0.85rem;">
+                                    <i class="fa fa-quote-left me-1 opacity-50" title="About"/> <field name="whatsapp_profile_about"/>
+                                </div>
                             </div>
+
+                            <div class="mb-4">
+                                <h6 class="text-uppercase text-muted fw-bold mb-3" style="font-size: 0.75rem; letter-spacing: 1px;">WhatsApp Profile</h6>
+                                <div class="bg-light p-3 rounded-3 border">
+                                    <div class="mb-2">
+                                        <span class="o_form_label text-muted small d-block">Public Name</span>
+                                        <span class="fw-bold"><field name="whatsapp_profile_name" placeholder="Unknown"/></span>
+                                    </div>
+                                    <div>
+                                        <span class="o_form_label text-muted small d-block">Business Status</span>
+                                        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">Verified API Account</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- CRM & Contact Context Cards -->
+                            <div class="wa-sidebar-card mb-3 p-3 shadow-sm" style="background: white; border-radius: 12px; border: 1px solid #edf2f7;">
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <i class="fa fa-id-card text-primary" title="CRM Context"/>
+                                    <h6 class="mb-0 fw-bold">CRM Context</h6>
+                                </div>
+                                <div class="small text-muted mb-2">Lead Information</div>
+                                <div class="p-2 rounded bg-light mb-2">
+                                    <div class="fw-bold text-dark"><field name="lead_id"/></div>
+                                    <div class="badge bg-info mt-1"><field name="lead_state"/></div>
+                                </div>
+                                <button name="action_view_partner" type="object" class="btn btn-sm btn-outline-primary w-100 mt-1">
+                                    <i class="fa fa-external-link me-1" title="View in Odoo"/> View in Odoo
+                                </button>
+                            </div>
+
+                            <div class="wa-sidebar-card mb-3 p-3 shadow-sm" style="background: white; border-radius: 12px; border: 1px solid #edf2f7;">
+                                <div class="d-flex align-items-center gap-2 mb-3">
+                                    <i class="fa fa-user-circle text-success" title="Contact Details"/>
+                                    <h6 class="mb-0 fw-bold">Contact Details</h6>
+                                </div>
+                                <div class="d-flex flex-column gap-3">
+                                    <div class="d-flex align-items-start gap-2">
+                                        <i class="fa fa-envelope text-muted mt-1" title="Email" style="width: 16px;"/>
+                                        <div class="flex-grow-1 overflow-hidden">
+                                            <div class="text-muted small">Email</div>
+                                            <div class="text-truncate fw-semibold"><field name="partner_id_email"/></div>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex align-items-start gap-2">
+                                        <i class="fa fa-briefcase text-muted mt-1" title="Job Title" style="width: 16px;"/>
+                                        <div class="flex-grow-1">
+                                            <div class="text-muted small">Job Title</div>
+                                            <div class="fw-semibold"><field name="partner_job_title"/></div>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex align-items-start gap-2">
+                                        <i class="fa fa-globe text-muted mt-1" title="Website" style="width: 16px;"/>
+                                        <div class="flex-grow-1">
+                                            <div class="text-muted small">Website</div>
+                                            <div class="text-primary text-truncate"><field name="partner_website"/></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- ADVANCED BUSINESS FEATURES (LABELS, NOTES, STATS) -->
+                            <div class="mb-4">
+                                <h6 class="text-uppercase text-muted fw-bold mb-3" style="font-size: 0.75rem; letter-spacing: 1px;">WhatsApp Labels</h6>
+                                <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" placeholder="Add customer labels..." class="w-100"/>
+                            </div>
+                            
+                            <div class="mb-4" invisible="not partner_id">
+                                <h6 class="text-uppercase text-muted fw-bold mb-3" style="font-size: 0.75rem; letter-spacing: 1px;">Business Data</h6>
+                                <div class="d-flex gap-2">
+                                    <div class="bg-light p-2 rounded-3 text-center w-50 border border-primary border-opacity-25 shadow-sm">
+                                        <div class="fs-4 fw-bold text-primary"><field name="sale_order_count" readonly="1"/></div>
+                                        <div class="small text-muted fw-bold">Orders</div>
+                                    </div>
+                                    <div class="bg-light p-2 rounded-3 text-center w-50 border border-success border-opacity-25 shadow-sm">
+                                        <div class="fs-4 fw-bold text-success"><field name="invoice_count" readonly="1"/></div>
+                                        <div class="small text-muted fw-bold">Invoices</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <h6 class="text-uppercase text-muted fw-bold mb-3" style="font-size: 0.75rem; letter-spacing: 1px;">Internal Notes</h6>
+                                <field name="note_ids" nolabel="1">
+                                    <list editable="bottom" create="1" delete="1">
+                                        <field name="create_date" string="Time" readonly="1" widget="datetime" options="{'format': 'MMM d, HH:mm'}"/>
+                                        <field name="assigned_user_id" string="Agent" readonly="1" widget="many2one_avatar_user"/>
+                                        <field name="body" string="Note"/>
+                                    </list>
+                                </field>
+                            </div>
+
+                            <div class="mb-4">
+                                <h6 class="text-uppercase text-muted fw-bold mb-3" style="font-size: 0.75rem; letter-spacing: 1px;">Automation</h6>
+                                <div class="d-grid gap-2">
+                                    <button name="action_mark_as_read" type="object" class="btn btn-sm btn-outline-success text-start px-3 py-2">
+                                        <i class="fa fa-check-circle me-2" title="Mark all as Read"/> Mark all as Read
+                                    </button>
+                                    <button name="%(action_whatsapp_contact)d" type="action" class="btn btn-sm btn-outline-info text-start px-3 py-2">
+                                        <i class="fa fa-address-book me-2" title="Marketing List"/> Marketing List
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <h6 class="text-uppercase text-muted fw-bold mb-3" style="font-size: 0.75rem; letter-spacing: 1px;">Chat Management</h6>
+                                
+                                <!-- State & Assignment -->
+                                <div class="d-flex align-items-center mb-2 bg-light p-2 rounded border border-secondary border-opacity-10">
+                                    <div class="text-muted small me-2" style="width: 60px;">Status</div>
+                                    <field name="state" widget="badge" decoration-success="state == 'resolved'" decoration-info="state == 'open'" decoration-warning="state == 'snoozed'"/>
+                                </div>
+                                <div class="d-flex align-items-center mb-3 bg-light p-2 rounded border border-secondary border-opacity-10">
+                                    <div class="text-muted small me-2" style="width: 60px;">Agent</div>
+                                    <field name="assigned_user_id" widget="many2one_avatar_user" class="fw-bold flex-grow-1"/>
+                                </div>
+
+                                <div class="d-grid gap-2">
+                                    <!-- Resolution Actions -->
+                                    <button name="action_resolve" type="object" class="btn btn-sm text-start px-3 py-2 btn-success text-white shadow-sm" invisible="state == 'resolved'">
+                                        <i class="fa fa-check-circle me-2" title="Resolve Chat"/> Resolve Chat
+                                    </button>
+                                    <button name="action_snooze" type="object" class="btn btn-sm text-start px-3 py-2 btn-warning text-white shadow-sm" invisible="state == 'snoozed' or state == 'resolved'">
+                                        <i class="fa fa-clock-o me-2" title="Snooze"/> Snooze
+                                    </button>
+                                    <button name="action_reopen" type="object" class="btn btn-sm text-start px-3 py-2 btn-outline-info shadow-sm" invisible="state == 'open'">
+                                        <i class="fa fa-reply me-2" title="Reopen Chat"/> Reopen Chat
+                                    </button>
+                                    
+                                    <hr class="my-1 border-secondary opacity-25"/>
+                                    
+                                    <!-- Pin / Archive Actions -->
+                                    <button name="action_toggle_pin" type="object" class="btn btn-sm text-start px-3 py-2 btn-outline-warning" invisible="is_pinned">
+                                        <i class="fa fa-thumb-tack me-2" title="Pin Chat"/> Pin Chat
+                                    </button>
+                                    <button name="action_toggle_pin" type="object" class="btn btn-sm text-start px-3 py-2 btn-warning text-white" invisible="not is_pinned">
+                                        <i class="fa fa-thumb-tack me-2" title="Unpin Chat"/> Unpin Chat
+                                    </button>
+                                    <button name="action_toggle_archive" type="object" class="btn btn-sm text-start px-3 py-2 btn-outline-secondary" invisible="is_archived">
+                                        <i class="fa fa-archive me-2" title="Archive Chat"/> Archive Chat
+                                    </button>
+                                    <button name="action_toggle_archive" type="object" class="btn btn-sm text-start px-3 py-2 btn-secondary" invisible="not is_archived">
+                                        <i class="fa fa-archive me-2" title="Unarchive Chat"/> Unarchive Chat
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <button name="action_open_contact" type="object" class="btn btn-primary w-100 py-2 shadow-sm mt-2">
+                                <i class="fa fa-user me-2" title="Open Contact"/> Open Contact
+                            </button>
                         </div>
                     </div>
                 </sheet>
@@ -123,14 +524,32 @@
     <record id="action_whatsapp_team_inbox" model="ir.actions.act_window">
         <field name="name">Team Inbox</field>
         <field name="res_model">whatsapp.chat</field>
-        <field name="view_mode">kanban,form</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="context">{'active_test': False}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
-                No active conversations found.
+                Industrial Team Inbox is ready!
             </p>
-            <p>
-                Incoming WhatsApp messages will appear here.
-            </p>
+            <p>Manage your enterprise conversations with real-time zero-latency synchronization.</p>
+        </field>
+    </record>
+
+    <!-- Server Action to open the most recent chat directly in the Console (Form view) -->
+    <record id="action_whatsapp_console_direct" model="ir.actions.server">
+        <field name="name">WhatsApp Console</field>
+        <field name="model_id" ref="model_whatsapp_chat"/>
+        <field name="state">code</field>
+        <field name="code">
+last_chat = env['whatsapp.chat'].search([], limit=1, order='last_message_date desc')
+if last_chat:
+    action = last_chat.action_open_chat()
+else:
+    action = env.ref('elsx_whatsapp_marketing.action_whatsapp_team_inbox').read()[0]
+action['target'] = 'current'
+action['context'] = {'active_test': False}
+action.pop('flags', None) # Remove any flags that might interfere with top-level action
+action['view_mode'] = 'form,kanban' # Ensure form view is primary
+action = action
         </field>
     </record>
 </odoo>

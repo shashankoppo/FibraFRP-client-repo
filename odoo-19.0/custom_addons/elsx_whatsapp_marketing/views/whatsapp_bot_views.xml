@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Bot Rules List View -->
+    <record id="view_whatsapp_bot_rule_list" model="ir.ui.view">
+        <field name="name">whatsapp.bot.rule.list</field>
+        <field name="model">whatsapp.bot.rule</field>
+        <field name="arch" type="xml">
+            <list string="Bot Rules" editable="bottom">
+                <header>
+                    <button name="%(elsx_whatsapp_marketing.whatsapp_bot_flow_action)d" type="action" class="btn btn-primary" icon="fa-code-fork" string="Open Visual Flow Builder"/>
+                </header>
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="trigger_type"/>
+                <field name="keywords"/>
+                <field name="action_type"/>
+                <field name="account_id"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Bot Rules Form View -->
+    <record id="view_whatsapp_bot_rule_form" model="ir.ui.view">
+        <field name="name">whatsapp.bot.rule.form</field>
+        <field name="model">whatsapp.bot.rule</field>
+        <field name="arch" type="xml">
+            <form string="Bot Rule">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="Rule Name (e.g. Greeting Response)"/></h1>
+                    </div>
+                    <group>
+                        <group string="Trigger">
+                            <field name="sequence"/>
+                            <field name="account_id"/>
+                            <field name="trigger_type"/>
+                            <field name="keywords" invisible="trigger_type != 'keyword'" placeholder="hello, hi, start, hola"/>
+                        </group>
+                        <group string="Action">
+                            <field name="action_type"/>
+                            <field name="reply_text" invisible="action_type != 'text'" placeholder="Hi {{name}}! Welcome to ELSX. How can we help you today?"/>
+                            <field name="template_id" invisible="action_type != 'template'"/>
+                            <field name="assign_user_id" invisible="action_type != 'transfer'"/>
+                            <field name="tag_id" invisible="action_type != 'assign_label'"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info mt-2" role="alert">
+                        <strong>Tip:</strong> Rules are evaluated in <em>Priority</em> order (lowest number first). The first matching rule fires and stops evaluation. Use <code>{{name}}</code> in reply text to personalize.
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Bot Rules Action -->
+    <record id="action_whatsapp_bot_rules" model="ir.actions.act_window">
+        <field name="name">Bot Rules</field>
+        <field name="res_model">whatsapp.bot.rule</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Quick Replies List View -->
+    <record id="view_whatsapp_quick_reply_list" model="ir.ui.view">
+        <field name="name">whatsapp.quick.reply.list</field>
+        <field name="model">whatsapp.quick.reply</field>
+        <field name="arch" type="xml">
+            <list string="Quick Replies" editable="bottom">
+                <field name="shortcut"/>
+                <field name="name"/>
+                <field name="message"/>
+                <field name="account_id"/>
+                <field name="use_count" string="Uses"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Quick Replies Action -->
+    <record id="action_whatsapp_quick_replies" model="ir.actions.act_window">
+        <field name="name">Quick Replies</field>
+        <field name="res_model">whatsapp.quick.reply</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api
 from datetime import timedelta
+import logging
+
+_logger = logging.getLogger(__name__)
 
 class WhatsAppCampaignParticipant(models.Model):
     _name = 'whatsapp.campaign.participant'
     _description = 'WhatsApp Campaign Participant'
     
-    print("DEBUG: Loading WhatsAppCampaignParticipant model")
-
     campaign_id = fields.Many2one('whatsapp.campaign', string='Campaign', required=True, ondelete='cascade')
     partner_id = fields.Many2one('res.partner', string='Contact', required=True)
     current_step_id = fields.Many2one('whatsapp.campaign.step', string='Current Step')
@@ -18,38 +19,54 @@ class WhatsAppCampaignParticipant(models.Model):
         ('paused', 'Paused'),
         ('stopped', 'Stopped'),
     ], string='Status', default='running')
-
     def process_drip_campaigns(self):
-        """Cron job to process drip campaigns"""
+        """Cron job to process drip campaigns for all participants"""
         participants = self.search([
             ('state', '=', 'running'),
             ('next_execution_date', '<=', fields.Datetime.now())
         ])
         
         for participant in participants:
-            # Find next step
+            # Find next step based on sequence
             next_step = self.env['whatsapp.campaign.step'].search([
                 ('campaign_id', '=', participant.campaign_id.id),
                 ('sequence', '>', participant.current_step_id.sequence if participant.current_step_id else -1)
             ], order='sequence', limit=1)
             
             if next_step:
-                # Send message
-                participant.campaign_id.account_id.send_message(
-                    to_number=participant.partner_id.mobile or participant.partner_id.phone,
-                    message_type='template' if next_step.template_id else 'text',
-                    body=next_step.message_body,
-                    template=next_step.template_id.name if next_step.template_id else False,
-                    partner_id=participant.partner_id.id
-                )
+                # Resolve attributes/variables for template if needed
+                body = next_step.message_body
                 
-                # Calculate next execution
+                # Send message via the account's standard send method
+                try:
+                    phone = participant.partner_id.mobile or participant.partner_id.phone
+                    if not phone:
+                        raise ValueError("Participant has no phone number")
+                    send_vals = {
+                        'to_number': phone,
+                        'message_type': 'template' if next_step.template_id else 'text',
+                        'body': body,
+                        'partner_id': participant.partner_id.id,
+                        'campaign_id': participant.campaign_id.id,
+                    }
+                    if next_step.template_id:
+                        send_vals['template_record'] = next_step.template_id
+                    participant.campaign_id.account_id.send_message(**send_vals)
+                except Exception as e:
+                    _logger.error(f"Drip Campaign step failed for {participant.partner_id.name}: {e}")
+                    participant.write({
+                        'next_execution_date': fields.Datetime.now() + timedelta(minutes=15),
+                    })
+                    continue
+                
+                # Calculate next execution date based on step delay
                 delay = participant._get_delay_timedelta(next_step)
                 participant.write({
                     'current_step_id': next_step.id,
                     'next_execution_date': fields.Datetime.now() + delay
                 })
             else:
+                # No more steps found, mark as completed
                 participant.state = 'completed'
 
     def _get_delay_timedelta(self, step):

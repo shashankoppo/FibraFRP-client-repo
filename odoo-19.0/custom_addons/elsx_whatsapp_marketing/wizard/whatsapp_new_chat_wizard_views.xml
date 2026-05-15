@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_whatsapp_new_chat_wizard_form" model="ir.ui.view">
+        <field name="name">whatsapp.new.chat.wizard.form</field>
+        <field name="model">whatsapp.new.chat.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Start New WhatsApp Conversation">
+                <group>
+                    <field name="account_id" options="{'no_create': True}"/>
+                    <field name="partner_id" options="{'no_create': True}"/>
+                    <field name="phone_number" placeholder="e.g. 919876543210"/>
+                </group>
+                <footer>
+                    <button name="action_start_chat" string="Start Chat" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_whatsapp_new_chat_wizard" model="ir.actions.act_window">
+        <field name="name">New WhatsApp Conversation</field>
+        <field name="res_model">whatsapp.new.chat.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

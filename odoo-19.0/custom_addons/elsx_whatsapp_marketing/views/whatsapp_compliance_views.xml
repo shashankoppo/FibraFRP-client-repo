@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Compliance Policy Views -->
+    <record id="whatsapp_compliance_policy_view_form" model="ir.ui.view">
+        <field name="name">whatsapp.compliance.policy.form</field>
+        <field name="model">whatsapp.compliance.policy</field>
+        <field name="arch" type="xml">
+            <form string="Compliance Policy">
+                <sheet>
+                    <h1><field name="name" placeholder="Policy Name"/></h1>
+                    <field name="description" placeholder="Describe this compliance policy..."/>
+                    
+                    <group string="Basic Settings">
+                        <field name="account_id" required="1"/>
+                        <field name="region"/>
+                        <field name="active"/>
+                    </group>
+                    
+                    <group string="GDPR Compliance">
+                        <field name="require_opt_in"/>
+                        <field name="require_consent_timestamp"/>
+                        <field name="consent_retention_days" invisible="not require_consent_timestamp"/>
+                    </group>
+                    
+                    <group string="Do Not Contact">
+                        <field name="respect_dnd_list"/>
+                        <field name="dnd_contact_ids" nolabel="1" widget="many2many_tags"
+                               invisible="not respect_dnd_list"/>
+                    </group>
+                    
+                    <group string="Message Retention Policy">
+                        <field name="message_retention_type"/>
+                        <field name="message_retention_value"/>
+                        <field name="auto_delete_messages"/>
+                    </group>
+                    
+                    <group string="Data Privacy">
+                        <field name="encrypt_sensitive_data"/>
+                        <field name="mask_phone_numbers"/>
+                        <field name="anonymize_old_data"/>
+                    </group>
+                    
+                    <group string="Consent Management">
+                        <field name="consent_text" nolabel="1"/>
+                    </group>
+                    
+                    <group string="Audit &amp; Logging">
+                        <field name="audit_all_messages"/>
+                        <field name="audit_sensitive_operations"/>
+                        <field name="audit_retention_days"/>
+                    </group>
+                    
+                    <group string="Data Processing Agreement">
+                        <field name="dpa_enabled"/>
+                        <field name="processor_name" invisible="not dpa_enabled"/>
+                        <field name="dpa_text" nolabel="1" invisible="not dpa_enabled"/>
+                    </group>
+                    
+                    <group string="Review Schedule">
+                        <field name="last_reviewed_date"/>
+                        <field name="next_review_date"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="whatsapp_compliance_policy_view_tree" model="ir.ui.view">
+        <field name="name">whatsapp.compliance.policy.tree</field>
+        <field name="model">whatsapp.compliance.policy</field>
+        <field name="arch" type="xml">
+            <list string="Compliance Policies">
+                <field name="name"/>
+                <field name="account_id"/>
+                <field name="region"/>
+                <field name="active"/>
+                <field name="next_review_date"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="whatsapp_compliance_policy_action" model="ir.actions.act_window">
+        <field name="name">Compliance Policies</field>
+        <field name="res_model">whatsapp.compliance.policy</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Consent Log Views -->
+    <record id="whatsapp_consent_log_view_tree" model="ir.ui.view">
+        <field name="name">whatsapp.consent.log.tree</field>
+        <field name="model">whatsapp.consent.log</field>
+        <field name="arch" type="xml">
+            <list string="Consent Log">
+                <field name="partner_id"/>
+                <field name="consent_type"/>
+                <field name="status"/>
+                <field name="source"/>
+                <field name="consent_date"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="whatsapp_consent_log_view_form" model="ir.ui.view">
+        <field name="name">whatsapp.consent.log.form</field>
+        <field name="model">whatsapp.consent.log</field>
+        <field name="arch" type="xml">
+            <form string="Consent Log Entry">
+                <sheet>
+                    <h1><field name="partner_id"/></h1>
+                    <group>
+                        <field name="account_id" readonly="1"/>
+                        <field name="consent_type"/>
+                        <field name="status"/>
+                        <field name="source"/>
+                    </group>
+                    <group>
+                        <field name="consent_date" readonly="1"/>
+                        <field name="ip_address"/>
+                        <field name="user_agent"/>
+                    </group>
+                    <group invisible="status != 'revoked'">
+                        <field name="revoked_date" readonly="1"/>
+                        <field name="revoked_by" readonly="1"/>
+                        <field name="revoked_reason"/>
+                    </group>
+                    <field name="notes" nolabel="1"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="whatsapp_consent_log_action" model="ir.actions.act_window">
+        <field name="name">Consent Log</field>
+        <field name="res_model">whatsapp.consent.log</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Team Member Views -->
+    <record id="whatsapp_team_member_view_tree" model="ir.ui.view">
+        <field name="name">whatsapp.team.member.tree</field>
+        <field name="model">whatsapp.team.member</field>
+        <field name="arch" type="xml">
+            <list string="Team Members">
+                <field name="user_id"/>
+                <field name="account_id"/>
+                <field name="role" widget="badge" decoration-info="role == 'admin'" decoration-success="role == 'manager'"/>
+                <field name="is_available" widget="boolean_toggle"/>
+                <field name="max_active_chats"/>
+                <field name="assigned_chats"/>
+                <field name="resolved_count"/>
+                <field name="response_time_avg"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="whatsapp_team_member_view_form" model="ir.ui.view">
+        <field name="name">whatsapp.team.member.form</field>
+        <field name="model">whatsapp.team.member</field>
+        <field name="arch" type="xml">
+            <form string="Team Member">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="user_id"/></h1>
+                    </div>
+                    <group>
+                        <group string="Configuration">
+                            <field name="account_id" required="1"/>
+                            <field name="role"/>
+                            <field name="is_available"/>
+                            <field name="max_active_chats"/>
+                        </group>
+                        <group string="Performance">
+                            <field name="assigned_chats" readonly="1"/>
+                            <field name="resolved_count" readonly="1"/>
+                            <field name="response_time_avg" readonly="1"/>
+                        </group>
+                    </group>
+                    
+                    <group string="Working Hours">
+                        <field name="working_hours_start"/>
+                        <field name="working_hours_end"/>
+                        <field name="timezone_id" readonly="1"/>
+                    </group>
+                    
+                    <group string="Permissions">
+                        <field name="can_send_messages"/>
+                        <field name="can_send_campaigns"/>
+                        <field name="can_manage_templates"/>
+                        <field name="can_manage_team"/>
+                        <field name="can_view_analytics"/>
+                        <field name="can_manage_contacts"/>
+                        <field name="can_transfer_chats"/>
+                        <field name="can_delete_messages"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="whatsapp_team_member_action" model="ir.actions.act_window">
+        <field name="name">Team Members</field>
+        <field name="res_model">whatsapp.team.member</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

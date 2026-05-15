@@ -25,8 +25,21 @@ services:
     volumes:
       - .:/opt/odoo
       - ./odoo.docker.conf:/etc/odoo/odoo.conf
+      - odoo-web-data:/root/.local/share/Odoo
     depends_on:
       - db
+    networks:
+      - odoo-network
+
+  sidecar:
+    image: node:18-alpine
+    container_name: whatsapp_sidecar
+    working_dir: /app
+    volumes:
+      - ./custom_addons/elsx_whatsapp_marketing/sidecar:/app
+    command: sh -c "npm install && npm start"
+    ports:
+      - "3000:3000"
     networks:
       - odoo-network
 
@@ -36,3 +49,4 @@ networks:
 
 volumes:
   odoo-db-data:
+  odoo-web-data:

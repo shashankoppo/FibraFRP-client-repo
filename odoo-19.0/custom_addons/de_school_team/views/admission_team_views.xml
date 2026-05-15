@@ -61,7 +61,7 @@
                                     <field name="email"/>
                                     <field name="avatar_128"/>
                                     <templates>
-                                        <t t-name="kanban-box">
+                                        <t t-name="card">
                                             <div class="oe_kanban_card oe_kanban_global_click">
                                                 <div class="o_kanban_card_content d-flex">
                                                     <div>

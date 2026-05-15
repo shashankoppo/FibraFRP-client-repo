@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <data>
+    <data noupdate="1">
         <record id="ir_cron_process_whatsapp_drip_campaigns" model="ir.cron">
             <field name="name">WhatsApp: Process Drip Campaigns</field>
             <field name="model_id" ref="elsx_whatsapp_marketing.model_whatsapp_campaign_participant"/>
@@ -10,5 +10,70 @@
             <field name="interval_type">minutes</field>
             <field name="active" eval="True"/>
         </record>
+        
+        <record id="ir_cron_process_whatsapp_queue" model="ir.cron">
+            <field name="name">WhatsApp: Process Broadcast Queue</field>
+            <field name="model_id" ref="elsx_whatsapp_marketing.model_whatsapp_campaign"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_process_global_queue()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">minutes</field>
+            <field name="active" eval="True"/>
+        </record>
+
+        <!-- PHASE 2: Process Scheduled Messages (NEW) -->
+        <record id="ir_cron_process_scheduled_messages" model="ir.cron">
+            <field name="name">WhatsApp: Process Scheduled Messages</field>
+            <field name="model_id" ref="elsx_whatsapp_marketing.model_whatsapp_scheduled_message"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_send_scheduled()</field>
+            <field name="interval_number">5</field>
+            <field name="interval_type">minutes</field>
+            <field name="active" eval="True"/>
+        </record>
+
+        <!-- PHASE 2: Cleanup Old Webhook Logs (NEW) -->
+        <record id="ir_cron_cleanup_webhook_logs" model="ir.cron">
+            <field name="name">WhatsApp: Cleanup Old Webhook Logs</field>
+            <field name="model_id" ref="elsx_whatsapp_marketing.model_whatsapp_webhook_log"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_cleanup_old_logs()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active" eval="True"/>
+        </record>
+
+        <!-- PHASE 2: Retry Failed Messages with Exponential Backoff (NEW) -->
+        <record id="ir_cron_retry_failed_messages" model="ir.cron">
+            <field name="name">WhatsApp: Retry Failed Messages</field>
+            <field name="model_id" ref="elsx_whatsapp_marketing.model_whatsapp_message"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_retry_failed()</field>
+            <field name="interval_number">2</field>
+            <field name="interval_type">minutes</field>
+            <field name="active" eval="True"/>
+        </record>
+        <!-- PHASE 2: Cleanup Old API Logs (NEW) -->
+        <record id="ir_cron_cleanup_api_logs" model="ir.cron">
+            <field name="name">WhatsApp: Cleanup Old API Logs</field>
+            <field name="model_id" ref="elsx_whatsapp_marketing.model_whatsapp_api_log"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_cleanup_old_logs()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active" eval="True"/>
+        </record>
+
+        <!-- A/B Test Winner Auto-Evaluation -->
+        <record id="ir_cron_evaluate_ab_tests" model="ir.cron">
+            <field name="name">WhatsApp: Evaluate A/B Test Winners</field>
+            <field name="model_id" ref="elsx_whatsapp_marketing.model_whatsapp_campaign"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_evaluate_ab_tests()</field>
+            <field name="interval_number">30</field>
+            <field name="interval_type">minutes</field>
+            <field name="active" eval="True"/>
+        </record>
     </data>
 </odoo>
+

@@ -1,69 +1,352 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Main WhatsApp Menu -->
+    <!-- =====================================================
+         ROOT MENU: WhatsApp Marketing
+         ===================================================== -->
     <menuitem id="menu_whatsapp_root"
               name="WhatsApp Marketing"
               sequence="50"
               web_icon="elsx_whatsapp_marketing,static/description/icon.png"/>
 
-    <!-- Dashboard -->
-    <menuitem id="menu_whatsapp_dashboard"
-              name="Dashboard"
+    <!-- =====================================================
+         SECTION 1: ENGAGE (Sequence 1-25)
+         Core messaging and conversation features
+         ===================================================== -->
+
+    <menuitem id="menu_whatsapp_engage"
+              name="Engage"
               parent="menu_whatsapp_root"
               sequence="1"/>
 
-    <!-- Shared Inbox Conversations Action -->
-    <record id="action_whatsapp_conversations" model="ir.actions.act_window">
-        <field name="name">Conversations</field>
-        <field name="res_model">whatsapp.message</field>
-        <field name="view_mode">list,form</field>
-        <field name="context">{'search_default_group_partner': 1, 'search_default_group_date': 1}</field>
+    <!-- 1. Team Inbox (Industrial Messaging Console) -->
+    <record id="action_whatsapp_chat" model="ir.actions.act_window">
+        <field name="name">Team Inbox</field>
+        <field name="res_model">whatsapp.chat</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="context">{'search_default_unresolved': 1, 'active_test': False}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Welcome to the Industrial Team Inbox!
+            </p>
+            <p>Manage conversations across all agents with zero-latency synchronization.</p>
+        </field>
     </record>
 
-    <!-- Shared Inbox Conversations (Team Inbox) -->
-    <menuitem id="menu_whatsapp_conversations"
+    <menuitem id="menu_whatsapp_chat"
               name="Team Inbox"
-              parent="menu_whatsapp_root"
+              parent="menu_whatsapp_engage"
               sequence="5"
-              action="action_whatsapp_team_inbox"/>
+              action="action_whatsapp_chat"/>
 
-    <!-- Messages -->
+    <!-- 2. Messages -->
+    <record id="action_whatsapp_message" model="ir.actions.act_window">
+        <field name="name">Messages</field>
+        <field name="res_model">whatsapp.message</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_group_direction': 1}</field>
+    </record>
+
     <menuitem id="menu_whatsapp_messages"
-              name="Messages"
-              parent="menu_whatsapp_root"
+              name="All Messages"
+              parent="menu_whatsapp_engage"
               sequence="10"
               action="action_whatsapp_message"/>
 
-    <!-- Campaigns -->
-    <menuitem id="menu_whatsapp_campaigns"
-              name="Campaigns"
-              parent="menu_whatsapp_root"
-              sequence="20"
-              action="action_whatsapp_campaign"/>
+    <!-- 3. Scheduled Messages -->
+    <record id="action_whatsapp_scheduled_message" model="ir.actions.act_window">
+        <field name="name">Scheduled Messages</field>
+        <field name="res_model">whatsapp.scheduled.message</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Schedule messages for later with timezone support
+            </p>
+        </field>
+    </record>
 
-    <!-- Templates -->
-    <menuitem id="menu_whatsapp_templates"
-              name="Templates"
-              parent="menu_whatsapp_root"
-              sequence="30"
-              action="action_whatsapp_template"/>
+    <menuitem id="menu_whatsapp_scheduled"
+              name="Scheduled"
+              parent="menu_whatsapp_engage"
+              sequence="15"
+              action="action_whatsapp_scheduled_message"/>
 
-    <!-- Contacts -->
-    <menuitem id="menu_whatsapp_contacts"
+    <!-- 4. Contacts (quick access — action defined in whatsapp_contact_views.xml) -->
+    <menuitem id="menu_whatsapp_contacts_engage"
               name="Contacts"
-              parent="menu_whatsapp_root"
-              sequence="40"
+              parent="menu_whatsapp_engage"
+              sequence="20"
               action="action_whatsapp_contact"/>
 
-    <!-- Configuration -->
+    <!-- =====================================================
+         SECTION 2: CAMPAIGNS (Sequence 30-45)
+         ===================================================== -->
+
+    <menuitem id="menu_whatsapp_campaigns_section"
+              name="Campaigns"
+              parent="menu_whatsapp_root"
+              sequence="30"/>
+
+    <record id="action_whatsapp_campaign" model="ir.actions.act_window">
+        <field name="name">Campaigns</field>
+        <field name="res_model">whatsapp.campaign</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_active': 1}</field>
+    </record>
+
+    <menuitem id="menu_whatsapp_campaigns"
+              name="All Campaigns"
+              parent="menu_whatsapp_campaigns_section"
+              sequence="31"
+              action="action_whatsapp_campaign"/>
+
+    <!-- Contact Segments -->
+    <record id="action_whatsapp_segment" model="ir.actions.act_window">
+        <field name="name">Contact Segments</field>
+        <field name="res_model">whatsapp.contact.segment</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="menu_whatsapp_segment"
+              name="Audience Segments"
+              parent="menu_whatsapp_campaigns_section"
+              sequence="35"
+              action="action_whatsapp_segment"/>
+
+    <!-- Scheduled Campaigns -->
+    <record id="action_whatsapp_scheduled_campaign" model="ir.actions.act_window">
+        <field name="name">Scheduled Campaigns</field>
+        <field name="res_model">whatsapp.scheduled.campaign</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="menu_whatsapp_scheduled_campaign"
+              name="Scheduled Campaigns"
+              parent="menu_whatsapp_campaigns_section"
+              sequence="37"
+              action="action_whatsapp_scheduled_campaign"/>
+
+    <!-- Templates -->
+    <record id="action_whatsapp_template" model="ir.actions.act_window">
+        <field name="name">Message Templates</field>
+        <field name="res_model">whatsapp.template</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_approved': 1}</field>
+    </record>
+
+    <menuitem id="menu_whatsapp_templates"
+              name="My Templates"
+              parent="menu_whatsapp_campaigns_section"
+              sequence="40"
+              action="action_whatsapp_template"/>
+
+    <menuitem id="menu_whatsapp_sample_templates"
+              name="Template Library"
+              parent="menu_whatsapp_campaigns_section"
+              sequence="45"
+              action="action_whatsapp_sample_templates"/>
+
+    <!-- Link to Meta Template Creation -->
+    <record id="action_meta_template_creation" model="ir.actions.act_url">
+        <field name="name">Create Meta Template</field>
+        <field name="url">https://business.facebook.com/wa/manage/message-templates/</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem id="menu_meta_template_creation"
+              name="Create Template (Meta)"
+              parent="menu_whatsapp_campaigns_section"
+              sequence="41"
+              action="action_meta_template_creation"/>
+
+    <!-- =====================================================
+         SECTION 3: AUTOMATION (Sequence 50-65)
+         ===================================================== -->
+
+    <menuitem id="menu_whatsapp_automation"
+              name="Automation"
+              parent="menu_whatsapp_root"
+              sequence="50"/>
+
+    <!-- Bot Flows -->
+    <record id="action_whatsapp_bot_flow" model="ir.actions.act_window">
+        <field name="name">Bot Flows</field>
+        <field name="res_model">whatsapp.bot.flow</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_active': 1}</field>
+    </record>
+
+    <menuitem id="menu_whatsapp_bot_flow"
+              name="Flow Builder"
+              parent="menu_whatsapp_automation"
+              sequence="51"
+              action="whatsapp_bot_flow_action"/>
+
+    <!-- Bot Rules -->
+    <menuitem id="menu_whatsapp_bot_rules"
+              name="Bot Rules"
+              parent="menu_whatsapp_automation"
+              sequence="55"
+              action="action_whatsapp_bot_rules"/>
+
+    <!-- Quick Replies -->
+    <record id="action_whatsapp_quick_reply" model="ir.actions.act_window">
+        <field name="name">Quick Replies</field>
+        <field name="res_model">whatsapp.quick.reply</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="menu_whatsapp_quick_replies_auto"
+              name="Quick Replies"
+              parent="menu_whatsapp_automation"
+              sequence="60"
+              action="action_whatsapp_quick_replies"/>
+
+    <!-- =====================================================
+         SECTION 4: ANALYTICS (Sequence 70-80)
+         ===================================================== -->
+
+    <menuitem id="menu_whatsapp_analytics_section"
+              name="Analytics"
+              parent="menu_whatsapp_root"
+              sequence="70"/>
+
+    <record id="action_whatsapp_analytics" model="ir.actions.act_window">
+        <field name="name">Analytics Dashboard</field>
+        <field name="res_model">whatsapp.analytics</field>
+        <field name="view_mode">graph,pivot</field>
+        <field name="context">{'search_default_this_month': 1}</field>
+    </record>
+
+    <menuitem id="menu_whatsapp_analytics"
+              name="Dashboard"
+              parent="menu_whatsapp_analytics_section"
+              sequence="71"
+              action="action_whatsapp_dashboard_server"/>
+
+    <!-- Media Library -->
+    <record id="action_whatsapp_media_library" model="ir.actions.act_window">
+        <field name="name">Media Library</field>
+        <field name="res_model">whatsapp.media.library</field>
+        <field name="view_mode">kanban,list,form</field>
+    </record>
+
+    <menuitem id="menu_whatsapp_media_library"
+              name="Media Library"
+              parent="menu_whatsapp_analytics_section"
+              sequence="75"
+              action="action_whatsapp_media_library"/>
+
+    <!-- =====================================================
+         SECTION 5: COMPLIANCE (Sequence 85-92)
+         ===================================================== -->
+
+    <menuitem id="menu_whatsapp_compliance_section"
+              name="Compliance"
+              parent="menu_whatsapp_root"
+              sequence="85"
+              groups="base.group_system"/>
+
+    <record id="action_whatsapp_compliance" model="ir.actions.act_window">
+        <field name="name">Compliance &amp; Consent</field>
+        <field name="res_model">whatsapp.compliance.policy</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="menu_whatsapp_compliance"
+              name="Policies"
+              parent="menu_whatsapp_compliance_section"
+              sequence="86"
+              action="action_whatsapp_compliance"/>
+
+    <record id="action_whatsapp_consent_log" model="ir.actions.act_window">
+        <field name="name">Consent Log</field>
+        <field name="res_model">whatsapp.consent.log</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="menu_whatsapp_consent_log"
+              name="Consent Log"
+              parent="menu_whatsapp_compliance_section"
+              sequence="87"
+              action="action_whatsapp_consent_log"/>
+
+    <!-- Team Members action moved to Configuration below -->
+
+    <!-- =====================================================
+         SECTION 6: CONFIGURATION (Sequence 100+)
+         Admin-only settings
+         ===================================================== -->
+
     <menuitem id="menu_whatsapp_config"
               name="Configuration"
               parent="menu_whatsapp_root"
-              sequence="100"/>
+              sequence="100"
+              groups="base.group_system"/>
+
+    <!-- WhatsApp Accounts -->
+    <record id="action_whatsapp_account" model="ir.actions.act_window">
+        <field name="name">WhatsApp Accounts</field>
+        <field name="res_model">whatsapp.account</field>
+        <field name="view_mode">list,form</field>
+    </record>
 
     <menuitem id="menu_whatsapp_accounts"
               name="WhatsApp Accounts"
               parent="menu_whatsapp_config"
               sequence="10"
               action="action_whatsapp_account"/>
+
+    <!-- Team Setup / Members -->
+    <record id="action_whatsapp_team_member" model="ir.actions.act_window">
+        <field name="name">Team Setup</field>
+        <field name="res_model">whatsapp.team.member</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="menu_whatsapp_team_member"
+              name="Team Setup"
+              parent="menu_whatsapp_config"
+              sequence="20"
+              action="action_whatsapp_team_member"/>
+
+    <!-- Contact Tags -->
+    <record id="action_whatsapp_contact_tag" model="ir.actions.act_window">
+        <field name="name">Contact Tags</field>
+        <field name="res_model">whatsapp.contact.tag</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="menu_whatsapp_contact_tags"
+              name="Contact Tags"
+              parent="menu_whatsapp_config"
+              sequence="25"
+              action="action_whatsapp_contact_tag"/>
+
+    <!-- Webhook Logs -->
+    <record id="action_whatsapp_webhook_log" model="ir.actions.act_window">
+        <field name="name">Webhook Event Log</field>
+        <field name="res_model">whatsapp.webhook.log</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_error_only': 0}</field>
+    </record>
+
+    <menuitem id="menu_whatsapp_webhook_logs"
+              name="Webhook Logs"
+              parent="menu_whatsapp_config"
+              sequence="90"
+              action="action_whatsapp_webhook_log"/>
+
+    <!-- Settings — opens Global App Settings -->
+    <record id="action_whatsapp_configuration" model="ir.actions.act_window">
+        <field name="name">Settings</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="context">{'module': 'elsx_whatsapp_marketing'}</field>
+    </record>
+
+    <menuitem id="menu_whatsapp_settings"
+              name="Settings"
+              parent="menu_whatsapp_config"
+              sequence="95"
+              action="action_whatsapp_configuration"/>
 </odoo>

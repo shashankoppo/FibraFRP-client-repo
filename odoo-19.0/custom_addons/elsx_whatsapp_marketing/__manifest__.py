@@ -1,54 +1,53 @@
+# -*- coding: utf-8 -*-
 {
-    'name': 'ELSX WhatsApp Marketing & Automation',
-    'version': '19.0.1.0.6',
+    'name': "ELSX WhatsApp Premium Business",
+    'summary': "High-Fidelity WhatsApp Business Console with API & CRM Integration",
+    'version': '19.0.3.0.0',
     'category': 'Marketing/WhatsApp',
-    'summary': 'Next-Gen WhatsApp Business API & AI-Powered Marketing Automation',
-    'description': '''
-        ELSX WhatsApp Evolution
-        =======================
-        
-        The planet's most advanced WhatsApp Business integration for Odoo.
-        
-        **Elite Features:**
-        *   **Meta Cloud API Sync**: Real-time synchronization with Meta Business Suite.
-        *   **AI Smart Reply**: GPT-4o powered autonomous customer engagement.
-        *   **Deep CRM Sync**: Automatic lead nurturing via WhatsApp.
-        *   **Blockchain Logging**: Every message verified on the ELSX Immutable Ledger.
-        *   **Dynamic Templates**: Interactive buttons, lists, and catalog support.
-        *   **ROI Dashboard**: Real-time conversion tracking and analytics.
-    ''',
-    'author': 'ELSX Evolution Engine',
-    'website': 'https://elsx-erp.com',
-    'depends': [
-        'base',
-        'web',
-        'crm',
-        'sale',
-        'mail',
-        'contacts',
-        'account',
-    ],
+    'author': "ELSX Global",
+    'depends': ['base', 'crm', 'contacts', 'mail', 'sale', 'account', 'base_setup'],
     'data': [
-        'security/ir.model.access.csv',
         'security/whatsapp_security.xml',
+        'security/ir.model.access.csv',
+        'data/whatsapp_cron.xml',
         'data/whatsapp_templates.xml',
         'views/whatsapp_message_views.xml',
         'views/whatsapp_template_views.xml',
+        'views/whatsapp_bot_views.xml',
+        'views/whatsapp_webhook_log_views.xml',
+        'views/whatsapp_api_log_views.xml',
         'wizard/send_whatsapp_wizard_views.xml',
-        'views/whatsapp_chat_views.xml',
+        'wizard/whatsapp_import_wizard_views.xml',
+        'wizard/whatsapp_new_chat_wizard_views.xml',
         'views/whatsapp_campaign_views.xml',
         'views/whatsapp_contact_views.xml',
         'views/whatsapp_account_views.xml',
+        'views/whatsapp_chat_views.xml',
+        'views/whatsapp_contact_segment_views.xml',
+        'views/whatsapp_analytics_views.xml',
+        'views/whatsapp_media_library_views.xml',
+        'views/whatsapp_bot_flow_views.xml',
+        'views/whatsapp_scheduling_views.xml',
+        'views/whatsapp_compliance_views.xml',
+        'views/whatsapp_sample_template_views.xml',
+        'views/whatsapp_dashboard_views.xml',
+        'views/res_config_settings_views.xml',
         'views/whatsapp_menu.xml',
-        'data/whatsapp_cron.xml',
     ],
     'assets': {
         'web.assets_backend': [
+            'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap',
+            'https://cdn.socket.io/4.7.2/socket.io.min.js',
             'elsx_whatsapp_marketing/static/src/css/whatsapp.css',
+            'elsx_whatsapp_marketing/static/src/css/whatsapp_bot_flow_builder.css',
+            'elsx_whatsapp_marketing/static/src/js/notification_tones.js',
             'elsx_whatsapp_marketing/static/src/js/whatsapp_widget.js',
+            'elsx_whatsapp_marketing/static/src/js/whatsapp_bot_flow_builder.js',
+            'elsx_whatsapp_marketing/static/src/js/whatsapp_dashboard.js',
+            'elsx_whatsapp_marketing/static/src/xml/whatsapp_dashboard.xml',
         ],
     },
-    'installable': True,
-    'application': True,
-    'auto_install': False,
+    'pre_init_hook': 'pre_init_hook',
+    'post_init_hook': 'post_init_hook',
+    'license': 'LGPL-3',
 }

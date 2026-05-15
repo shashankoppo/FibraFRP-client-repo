@@ -1,7 +1,10 @@
-# -*- coding: utf-8 -*-
-from odoo import http, fields
+import odoo
+from odoo import http, fields, api
 from odoo.http import request, Response
+from odoo.modules.registry import Registry
 import json
+import hashlib
+import hmac
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -9,161 +12,858 @@ _logger = logging.getLogger(__name__)
 FALLBACK_VERIFY_TOKEN = 'elsx_verify_2024'
 
 
+def _get_env(db_name=None):
+    """Get a fresh Odoo environment for webhook context (no request session)"""
+    db_name = db_name or request.session.db or getattr(request, 'db', None)
+    
+    from odoo.service import db as db_service
+    dbs = db_service.list_dbs()
+    
+    # 1. Try specified/guessed DB
+    if db_name and db_name in dbs:
+        try:
+            registry = Registry(db_name)
+            if 'whatsapp.account' in registry.models:
+                cr = registry.cursor()
+                return api.Environment(cr, odoo.SUPERUSER_ID, {}), cr, db_name
+        except Exception:
+            pass
+
+    # 2. Iterate through all DBs, looking for the marked "Primary Webhook DB"
+    for db in dbs:
+        try:
+            registry = Registry(db)
+            if 'whatsapp.account' in registry.models:
+                cr = registry.cursor()
+                env = api.Environment(cr, odoo.SUPERUSER_ID, {})
+                # Check if this DB is marked as primary
+                primary_acc = env['whatsapp.account'].sudo().search([('is_primary_webhook_db', '=', True)], limit=1)
+                if primary_acc:
+                    return env, cr, db
+                cr.close()
+        except Exception:
+            continue
+
+    # 3. Final fallback: search for ANY DB with our model
+    for db in dbs:
+        try:
+            registry = Registry(db)
+            if 'whatsapp.account' in registry.models:
+                cr = registry.cursor()
+                return api.Environment(cr, odoo.SUPERUSER_ID, {}), cr, db
+        except Exception:
+            continue
+
+    # 4. Critical failure
+    return None, None, None
+
+
+def _find_account(env, account_id, payload):
+    """Find the matching WhatsApp account from the payload"""
+    if account_id:
+        account = env['whatsapp.account'].sudo().browse(int(account_id))
+        if account.exists():
+            return account
+
+    # Try metadata phone_number_id
+    try:
+        meta = payload.get('entry', [{}])[0].get('changes', [{}])[0].get('value', {}).get('metadata', {})
+        phone_number_id = meta.get('phone_number_id')
+        if phone_number_id:
+            account = env['whatsapp.account'].sudo().search([('phone_number_id', '=', phone_number_id)], limit=1)
+            if account.exists():
+                return account
+    except Exception:
+        pass
+
+    # Fallback: first active account
+    return env['whatsapp.account'].sudo().search([('active', '=', True)], limit=1)
+
+
 class WhatsAppWebhook(http.Controller):
 
-    @http.route('/whatsapp/webhook/<int:account_id>', type='http', auth='public', methods=['GET'], csrf=False)
-    def whatsapp_webhook_verify(self, account_id, **kwargs):
-        """Webhook verification for WhatsApp Cloud API"""
-        mode = kwargs.get('hub.mode')
-        token = kwargs.get('hub.verify_token')
-        challenge = kwargs.get('hub.challenge')
+    # =========================================================
+    # MAIN ROUTE — Handles ALL Meta webhook calls
+    # =========================================================
+    @http.route([
+        '/whatsapp/webhook/<int:account_id>',
+        '/whatsapp/webhook',
+    ], type='http', auth='none', methods=['GET', 'POST'], csrf=False)
+    def whatsapp_webhook(self, account_id=None, **kwargs):
+        """Unified handler: GET = hub.verify, POST = event dispatch"""
+        _logger.info(f'[WH-HIT] Method={request.httprequest.method} Path={request.httprequest.path} AccountID={account_id}')
+        if request.httprequest.method == 'GET':
+            return self._handle_verification(account_id)
+        return self._handle_post(account_id)
 
-        _logger.info(f'Webhook verify attempt: mode={mode}, token={token}, account={account_id}')
+    # =========================================================
+    # GET — Webhook Verification (hub.challenge handshake)
+    # =========================================================
+    def _handle_verification(self, account_id):
+        params = request.params
+        mode = params.get('hub.mode') or params.get('hub_mode', '')
+        token = params.get('hub.verify_token') or params.get('hub_verify_token', '')
+        challenge = params.get('hub.challenge') or params.get('hub_challenge', '')
 
-        account = request.env['whatsapp.account'].sudo().browse(account_id)
+        _logger.info(f'[WH-VERIFY] mode={mode} token={token} account_id={account_id}')
 
-        # Accept the hardcoded fallback OR the token set on the account
-        account_token = (account and account.webhook_verify_token) or ''
-        valid_tokens = [t for t in [account_token, FALLBACK_VERIFY_TOKEN] if t]
+        if mode != 'subscribe' or not token or not challenge:
+            return request.make_response('Bad Request', status=400)
 
-        if mode == 'subscribe' and token in valid_tokens:
-            _logger.info(f'WhatsApp webhook verified for account {account_id}')
-            # Auto-save the token if not set
-            if account and not account.webhook_verify_token:
-                account.sudo().write({'webhook_verify_token': token})
-            return Response(challenge, status=200)
-        else:
-            _logger.warning(f'Webhook verification FAILED. Got: {token}, Expected one of: {valid_tokens}')
-            return Response('Verification failed', status=403)
+        # 1. Instant accept on fallback token
+        if token == FALLBACK_VERIFY_TOKEN:
+            _logger.info('[WH-VERIFY] Accepted via fallback token')
+            return request.make_response(challenge, headers=[('Content-Type', 'text/plain')])
 
-    @http.route('/whatsapp/webhook/<int:account_id>', type='http', auth='public', methods=['POST'], csrf=False)
-    def whatsapp_webhook_receive(self, account_id, **kwargs):
-        """Receive incoming WhatsApp messages"""
+        # 2. DB lookup
+        try:
+            env, cr, _ = _get_env()
+            try:
+                domain = [('webhook_verify_token', '=', token), ('active', '=', True)]
+                if account_id:
+                    domain.append(('id', '=', account_id))
+                account = env['whatsapp.account'].sudo().search(domain, limit=1)
+                if account.exists():
+                    _logger.info(f'[WH-VERIFY] Accepted for account {account.id} ({account.name})')
+                    account.sudo().write({'webhook_status': 'verified', 'webhook_last_error': False})
+                    return request.make_response(challenge, headers=[('Content-Type', 'text/plain')])
+            finally:
+                cr.close()
+        except Exception as e:
+            _logger.error(f'[WH-VERIFY] DB lookup failed: {e}')
+
+        _logger.warning(f'[WH-VERIFY] REJECTED — no matching account for token {token}')
+        return request.make_response('Verification Failed', status=403)
+
+    # =========================================================
+    # POST — Event Dispatch
+    # =========================================================
+    def _handle_post(self, account_id):
         try:
             raw_data = request.httprequest.data.decode('utf-8')
-            data = json.loads(raw_data)
-            _logger.info(f'WhatsApp webhook received for account {account_id}')
+            _logger.debug(f'[WH-POST] Raw payload: {raw_data[:500]}')
+            payload = json.loads(raw_data)
 
-            account = request.env['whatsapp.account'].sudo().browse(account_id)
-            if not account.exists():
-                _logger.error(f'Account {account_id} not found')
-                return Response('Account not found', status=404)
+            # Must be whatsapp_business_account object
+            if payload.get('object') != 'whatsapp_business_account':
+                return request.make_response('OK', status=200)
 
-            if 'entry' in data:
-                for entry in data['entry']:
-                    for change in entry.get('changes', []):
-                        value = change.get('value', {})
+            env, cr, _ = _get_env()
+            if not cr:
+                return request.make_response('Database Unavailable', status=503)
 
-                        # Incoming messages
-                        if 'messages' in value:
-                            for message in value['messages']:
-                                self._process_incoming_message(account, message, value, raw_data)
+            try:
+                with cr:
+                    account = _find_account(env, account_id, payload)
+                    
+                    # HMAC SIGNATURE VERIFICATION (Production Strict)
+                    if account and account.app_secret:
+                        signature = request.httprequest.headers.get('X-Hub-Signature-256', '')
+                        if signature:
+                            expected_sig = 'sha256=' + hmac.new(
+                                account.app_secret.encode(),
+                                raw_data.encode('utf-8'),
+                                hashlib.sha256
+                            ).hexdigest()
+                            
+                            if not hmac.compare_digest(signature, expected_sig):
+                                _logger.warning(f'[WH-HMAC] Invalid signature for account {account.id}')
+                                account.sudo().write({'webhook_status': 'failed', 'webhook_last_error': 'Invalid HMAC Signature'})
+                                return request.make_response('Invalid signature', status=403)
+                        else:
+                            _logger.warning(f'[WH-HMAC] Missing X-Hub-Signature-256 header for account {account.id}')
+                            account.sudo().write({'webhook_status': 'failed', 'webhook_last_error': 'Missing X-Hub-Signature-256 header'})
+                            return request.make_response('Missing signature header', status=400)
+                    elif account and not account.app_secret:
+                        _logger.error(f'[WH-HMAC] App Secret missing for account {account.id}; cannot verify signature!')
+                        return request.make_response('Configuration Error', status=500)
 
-                        # Status updates (sent/delivered/read)
-                        if 'statuses' in value:
-                            for status in value['statuses']:
-                                self._process_status_update(account, status)
+                    for entry in payload.get('entry', []):
+                        for change in entry.get('changes', []):
+                            field = change.get('field', '')
+                            value = change.get('value') or {}
+                            self._dispatch_change(env, account, field, value, raw_data)
 
-            return Response('OK', status=200)
+                    cr.commit()
+                return request.make_response('OK', status=200)
+            finally:
+                cr.close()
 
+        except json.JSONDecodeError:
+            _logger.error('[WH-POST] Invalid JSON body')
+            return request.make_response('Bad JSON', status=400)
         except Exception as e:
-            _logger.error(f'WhatsApp webhook error: {str(e)}', exc_info=True)
-            return Response('Internal Error', status=500)
+            _logger.error(f'[WH-POST] Fatal error: {e}', exc_info=True)
+            return request.make_response('Internal Error', status=500)
 
-    def _process_incoming_message(self, account, message_data, value, raw_json):
-        """Process and store an incoming WhatsApp message"""
-        phone_number = message_data.get('from', '')
-        message_id = message_data.get('id', '')
-        message_type = message_data.get('type', 'text')
+    # =========================================================
+    # DISPATCHER — Routes each "field" type to its handler
+    # =========================================================
+    def _dispatch_change(self, env, account, field, value, raw_data):
+        """Route each webhook change to the right processor"""
+        _logger.info(f'[WH-DISPATCH] field={field} account={account.id if account else None}')
 
-        # Prevent duplicate messages
-        existing = request.env['whatsapp.message'].sudo().search([
-            ('message_id', '=', message_id)
-        ], limit=1)
-        if existing:
-            _logger.info(f'Duplicate message {message_id}, skipping')
+        # Log every event for audit
+        self._log_event(env, account, field, value, raw_data)
+
+        handlers = {
+            'messages': self._handle_messages_field,
+            'typing': self._handle_typing_event,
+            'account_alerts': self._handle_account_alerts,
+            'account_review_update': self._handle_account_review_update,
+            'account_update': self._handle_account_update,
+            'business_capability_update': self._handle_business_capability_update,
+            'message_template_status_update': self._handle_template_status_update,
+            'message_template_quality_update': self._handle_template_quality_update,
+            'message_template_components_update': self._handle_template_components_update,
+            'phone_number_name_update': self._handle_phone_name_update,
+            'phone_number_quality_update': self._handle_phone_quality_update,
+            'security': self._handle_security_event,
+            'template_category_update': self._handle_template_category_update,
+        }
+
+        handler = handlers.get(field)
+        if handler:
+            try:
+                handler(env, account, value)
+            except Exception as e:
+                _logger.error(f'[WH-DISPATCH] Handler for field={field} failed: {e}', exc_info=True)
+                self._update_log_error(env, field, value, str(e))
+        else:
+            _logger.info(f'[WH-DISPATCH] No handler for field={field}, ignoring')
+
+    # =========================================================
+    # HANDLER: messages field — contains inbound msgs + statuses
+    # =========================================================
+    def _handle_messages_field(self, env, account, value):
+        """Process the 'messages' field: inbound messages + delivery statuses"""
+        contacts = {c['wa_id']: c.get('profile', {}).get('name', '') for c in value.get('contacts', [])}
+
+        # --- Inbound messages ---
+        for msg_data in value.get('messages', []):
+            try:
+                self._process_inbound_message(env, account, msg_data, contacts, value)
+            except Exception as e:
+                _logger.error(f'[WH-MSG] Processing message failed: {e}', exc_info=True)
+
+        # --- Delivery status updates ---
+        for status_data in value.get('statuses', []):
+            try:
+                self._process_status_update(env, account, status_data)
+            except Exception as e:
+                _logger.error(f'[WH-STATUS] Processing status failed: {e}', exc_info=True)
+
+        # --- Value-level errors (system errors) ---
+        for error in value.get('errors', []):
+            _logger.error(f'[WH-ERROR] System error from Meta: {error}')
+
+        for typing_data in value.get('typing', []):
+            self._handle_typing_event(env, account, {'typing': [typing_data], 'metadata': value.get('metadata', {})})
+
+    # =========================================================
+    # INBOUND MESSAGE PROCESSOR (all types)
+    # =========================================================
+    def _process_inbound_message(self, env, account, msg_data, contacts, value):
+        phone_number = msg_data.get('from', '')
+        wamid = msg_data.get('id', '')
+        msg_type = msg_data.get('type', 'text')
+        timestamp = msg_data.get('timestamp')
+
+        if not account:
+            _logger.error('[WH-MSG] No WhatsApp account matched inbound payload; skipping message %s', wamid)
             return
 
-        body = ''
+        phone_number = env['whatsapp.message'].sudo()._normalize_phone(phone_number, account=account, strict=False)
+
+        # --- Duplicate guard ---
+        if wamid and env['whatsapp.message'].sudo().search_count([('message_id', '=', wamid)]):
+            _logger.info(f'[WH-MSG] Duplicate wamid={wamid}, skipping')
+            return
+
+        # --- Resolve or create partner ---
+        contact_name = contacts.get(phone_number, phone_number)
+        partner = env['whatsapp.message'].sudo()._find_partner_by_phone(phone_number)
+        if not partner and contact_name and contact_name != phone_number:
+            create_vals = {'name': contact_name, 'phone': phone_number}
+            if 'mobile' in env['res.partner']._fields:
+                create_vals['mobile'] = phone_number
+            partner = env['res.partner'].sudo().create(create_vals)
+            _logger.info(f'[WH-MSG] Auto-created partner "{contact_name}" for {phone_number}')
+
+        # --- Build base vals ---
         vals = {
             'account_id': account.id,
             'phone_number': phone_number,
-            'message_id': message_id,
-            'message_type': message_type,
+            'message_id': wamid,
+            'message_type': msg_type if msg_type in ('text', 'image', 'video', 'document', 'audio', 'template', 'interactive') else 'text',
             'direction': 'inbound',
             'status': 'delivered',
-            'raw_data': raw_json,
+            'raw_data': json.dumps(msg_data),
         }
-
-        if message_type == 'text':
-            body = message_data.get('text', {}).get('body', '')
-            vals['body'] = body
-        elif message_type == 'image':
-            body = message_data.get('image', {}).get('caption', '[Image]')
-            vals['body'] = body
-            vals['caption'] = body
-        elif message_type == 'video':
-            body = '[Video]'
-            vals['body'] = body
-        elif message_type == 'audio':
-            body = '[Audio]'
-            vals['body'] = body
-        elif message_type == 'document':
-            body = message_data.get('document', {}).get('filename', '[Document]')
-            vals['body'] = body
-        elif message_type == 'button':
-            body = message_data.get('button', {}).get('text', '')
-            vals['body'] = body
-            vals['button_text'] = body
-            vals['button_payload'] = message_data.get('button', {}).get('payload', '')
-        elif message_type == 'interactive':
-            interactive = message_data.get('interactive', {})
-            if interactive.get('type') == 'button_reply':
-                reply = interactive.get('button_reply', {})
-                body = reply.get('title', '')
-                vals['body'] = body
-                vals['button_text'] = body
-                vals['button_payload'] = reply.get('id', '')
-            elif interactive.get('type') == 'list_reply':
-                reply = interactive.get('list_reply', {})
-                body = reply.get('title', '')
-                vals['body'] = body
-                vals['list_item_id'] = reply.get('id', '')
-                vals['list_item_title'] = body
-        else:
-            vals['body'] = f'[{message_type}]'
-
-        # Link to existing contact
-        partner = request.env['res.partner'].sudo().search([
-            '|', ('mobile', '=', phone_number), ('phone', '=', phone_number)
-        ], limit=1)
         if partner:
             vals['partner_id'] = partner.id
 
-        request.env['whatsapp.message'].sudo().create(vals)
-        _logger.info(f'Saved inbound message from {phone_number}: {body[:50]}')
+        # (Profile update happens after message creation so chat is guaranteed to exist)
 
-        # Auto-reply logic
-        if account.auto_reply_enabled and account.auto_reply_message:
-            account.send_message(to_number=phone_number, message_type='text', body=account.auto_reply_message)
+        # --- Replied-to context ---
+        context = msg_data.get('context', {})
+        if context:
+            parent_wamid = context.get('id')
+            if parent_wamid:
+                vals['parent_message_id'] = parent_wamid
+                parent = env['whatsapp.message'].sudo().search([('message_id', '=', parent_wamid)], limit=1)
+                if parent:
+                    vals['parent_id'] = parent.id
 
-    def _process_status_update(self, account, status_data):
-        """Update message delivery status from Meta webhook"""
-        message_id = status_data.get('id')
-        new_status = status_data.get('status')
+        # --- Parse body by type ---
+        body = self._extract_body(msg_data, msg_type, vals)
+        vals['body'] = body
 
-        if not message_id or not new_status:
+        # --- Special type: reaction ---
+        if msg_type == 'reaction':
+            reaction = msg_data.get('reaction', {})
+            emoji = reaction.get('emoji', '')
+            reacted_to_wamid = reaction.get('message_id', '')
+            vals['body'] = f'[Reaction: {emoji}]'
+            vals['button_payload'] = reacted_to_wamid
+            reacted_msg = env['whatsapp.message'].sudo().search([('message_id', '=', reacted_to_wamid)], limit=1)
+            if reacted_msg:
+                vals['parent_id'] = reacted_msg.id
+
+        # --- Special type: location ---
+        elif msg_type == 'location':
+            loc = msg_data.get('location', {})
+            lat = loc.get('latitude', '')
+            lng = loc.get('longitude', '')
+            name = loc.get('name', '')
+            address = loc.get('address', '')
+            vals['body'] = f'[Location: {name or ""}] {address or ""} ({lat},{lng})'
+
+        # --- Special type: contacts shared ---
+        elif msg_type == 'contacts':
+            shared_contacts = msg_data.get('contacts', [])
+            names = [c.get('name', {}).get('formatted_name', 'Unknown') for c in shared_contacts]
+            vals['body'] = f'[Contacts shared: {", ".join(names)}]'
+
+        # --- Special type: sticker ---
+        elif msg_type == 'sticker':
+            sticker = msg_data.get('sticker', {})
+            vals['body'] = '[Sticker]'
+            vals['media_url'] = sticker.get('id', '')
+
+        # --- Special type: order ---
+        elif msg_type == 'order':
+            order = msg_data.get('order', {})
+            catalog_id = order.get('catalog_id', '')
+            items = order.get('product_items', [])
+            vals['body'] = f'[Order from catalog {catalog_id}: {len(items)} item(s)]'
+
+        # --- Special type: unsupported ---
+        elif msg_type == 'unsupported':
+            errors = msg_data.get('errors', [])
+            err_desc = errors[0].get('title', 'Unsupported message') if errors else 'Unsupported message type'
+            vals['body'] = f'[Unsupported: {err_desc}]'
+
+        # --- Special type: system ---
+        elif msg_type == 'system':
+            sys_data = msg_data.get('system', {})
+            vals['body'] = f'[System: {sys_data.get("body", "event")}]'
+
+        # --- Special type: revoke (deleted) ---
+        elif msg_type == 'revoke':
+            revoke = msg_data.get('revoke', {})
+            revoked_wamid = revoke.get('id', '')
+            vals['body'] = '[Message deleted]'
+            # Mark the original message
+            orig = env['whatsapp.message'].sudo().search([('message_id', '=', revoked_wamid)], limit=1)
+            if orig:
+                orig.sudo().write({'body': '[Message deleted]', 'status': 'failed'})
+            return  # Don't save a new message record for deletions
+
+        # --- Special type: edit ---
+        elif msg_type == 'edit':
+            edit_data = msg_data.get('edit', {})
+            edited_wamid = edit_data.get('id', '')
+            new_text = edit_data.get('text', {}).get('body', '')
+            orig = env['whatsapp.message'].sudo().search([('message_id', '=', edited_wamid)], limit=1)
+            if orig:
+                orig.sudo().write({'body': f'{new_text} (edited)', 'error_message': 'Edited by sender'})
+            return  # Don't save a new record
+
+        # --- Create the message record ---
+        msg_record = env['whatsapp.message'].sudo().create(vals)
+        _logger.info(f'[WH-MSG] Saved inbound {msg_type} from {phone_number} wamid={wamid}')
+
+        # --- Download media if applicable ---
+        if msg_type in ('image', 'video', 'document', 'audio'):
+            msg_record.sudo().queue_media_download()
+
+        # --- Send read receipt back to Meta ---
+        try:
+            self._send_read_receipt(account, wamid)
+        except Exception as e:
+            _logger.warning(f'[WH-MSG] Read receipt failed: {e}')
+
+        # --- Mark chat as open (re-opens if resolved/snoozed) ---
+        chat_id = False
+        if msg_record.chat_id_ref:
+            chat = msg_record.chat_id_ref
+            chat_id = chat.id
+            if chat.state in ('snoozed', 'resolved'):
+                chat.sudo().write({'state': 'open'})
+            
+            # Industrial Assignment Guard: Ensure chat has an owner
+            if not chat.assigned_user_id:
+                chat.sudo()._auto_assign_agent()
+
+        # --- Trigger WebSockets / Zero-Delay Push ---
+        env['bus.bus']._sendone('elsx_whatsapp_channel', 'elsx_whatsapp_channel', {
+            'chat_id': chat_id,
+            'message_id': msg_record.id,
+            'type': 'new_message'
+        })
+
+        # --- Update Chat & Partner Profile from Meta contacts data ---
+        profile_name = contacts.get(phone_number, '')
+        if profile_name and msg_record.chat_id_ref:
+            update_vals = {'whatsapp_profile_name': profile_name}
+            msg_record.chat_id_ref.sudo().write(update_vals)
+            # Also update partner name if it was auto-created from phone (name == phone)
+            if msg_record.partner_id:
+                p = msg_record.partner_id
+                if p.name == phone_number or p.name == ('+' + phone_number):
+                    p.sudo().write({'name': profile_name})
+            _logger.info(f'[WH-MSG] Updated profile name "{profile_name}" for {phone_number}')
+
+        # --- Fire bot rules ---
+        bot_rule_fired = False
+        try:
+            bot_rules = env['whatsapp.bot.rule'].sudo().search([
+                ('active', '=', True),
+                '|', ('account_id', '=', account.id), ('account_id', '=', False)
+            ], order='sequence asc')
+            for rule in bot_rules:
+                fired = rule.check_and_fire(
+                    env, account, phone_number, body,
+                    partner_id=vals.get('partner_id'),
+                    chat_id=msg_record.chat_id_ref.id if msg_record.chat_id_ref else None
+                )
+                if fired:
+                    _logger.info(f'[BOT] Rule "{rule.name}" fired for {phone_number}')
+                    bot_rule_fired = True
+                    break
+        except Exception as e:
+            _logger.error(f'[BOT] Rule engine error: {e}')
+
+        if not bot_rule_fired:
+            try:
+                flow = env['whatsapp.bot.flow'].sudo().trigger_for_message(msg_record)
+                if flow:
+                    _logger.info(f'[BOT-FLOW] Flow "{flow.name}" triggered for {phone_number}')
+            except Exception as e:
+                _logger.error(f'[BOT-FLOW] Flow engine error: {e}')
+
+    def _handle_typing_event(self, env, account, value):
+        """Relay typing notifications to the live inbox when present in an upstream payload."""
+        typing_items = value.get('typing') if isinstance(value, dict) else []
+        for item in typing_items or []:
+            phone_number = item.get('from') or item.get('phone_number') or ''
+            if not phone_number:
+                continue
+            chat = env['whatsapp.chat'].sudo().search([
+                ('account_id', '=', account.id if account else False),
+                ('phone_number', '=', env['whatsapp.message'].sudo()._normalize_phone(phone_number, account=account, strict=False)),
+            ], limit=1)
+            env['bus.bus']._sendone('elsx_whatsapp_channel', 'whatsapp_typing', {
+                'chat_id': chat.id if chat else False,
+                'phone_number': phone_number,
+                'is_typing': item.get('status', 'typing') == 'typing',
+            })
+
+    def _extract_body(self, msg_data, msg_type, vals):
+        """Extract textual body and media metadata from a message payload"""
+        if msg_type == 'text':
+            return msg_data.get('text', {}).get('body', '')
+
+        elif msg_type == 'image':
+            img = msg_data.get('image', {})
+            vals['media_url'] = img.get('id', '')
+            return img.get('caption', '[Image]')
+
+        elif msg_type == 'video':
+            vid = msg_data.get('video', {})
+            vals['media_url'] = vid.get('id', '')
+            return vid.get('caption', '[Video]')
+
+        elif msg_type == 'audio':
+            aud = msg_data.get('audio', {})
+            vals['media_url'] = aud.get('id', '')
+            return '[Voice Note]' if aud.get('voice') else '[Audio]'
+
+        elif msg_type == 'document':
+            doc = msg_data.get('document', {})
+            vals['media_url'] = doc.get('id', '')
+            vals['media_filename'] = doc.get('filename', 'document')
+            return doc.get('caption', f'[Document: {doc.get("filename", "")}]')
+
+        elif msg_type == 'button':
+            btn = msg_data.get('button', {})
+            vals['button_text'] = btn.get('text', '')
+            vals['button_payload'] = btn.get('payload', '')
+            return btn.get('text', '[Button]')
+
+        elif msg_type == 'interactive':
+            inter = msg_data.get('interactive', {})
+            itype = inter.get('type', '')
+            if itype == 'button_reply':
+                reply = inter.get('button_reply', {})
+                vals['button_text'] = reply.get('title', '')
+                vals['button_payload'] = reply.get('id', '')
+                return reply.get('id', reply.get('title', '[Button Reply]'))  # Prefer ID for bot triggers
+            elif itype == 'list_reply':
+                reply = inter.get('list_reply', {})
+                vals['list_item_id'] = reply.get('id', '')
+                vals['list_item_title'] = reply.get('title', '')
+                return reply.get('id', reply.get('title', '[List Reply]'))  # Prefer ID for bot triggers
+            elif itype == 'nfm_reply':
+                nfm = inter.get('nfm_reply', {})
+                return f'[Flow Response: {nfm.get("name", "")}]'
+            return f'[Interactive: {itype}]'
+
+        elif msg_type == 'template':
+            tmpl = msg_data.get('template', {})
+            return f'[Template: {tmpl.get("name", "")}]'
+
+        return f'[{msg_type}]'
+
+    # =========================================================
+    # STATUS UPDATE PROCESSOR
+    # =========================================================
+    def _process_status_update(self, env, account, status_data):
+        """Update outbound message delivery status from Meta"""
+        wamid = status_data.get('id')
+        new_status = status_data.get('status')  # sent | delivered | read | failed | deleted
+        recipient_id = status_data.get('recipient_id', '')
+        timestamp = status_data.get('timestamp')
+
+        # Pricing / conversation info
+        pricing = status_data.get('pricing', {})
+        conversation = status_data.get('conversation', {})
+        conv_origin = conversation.get('origin', {}).get('type', '')  # service | marketing | utility | authentication
+
+        errors = status_data.get('errors', [])
+
+        if not wamid or not new_status:
             return
 
-        message = request.env['whatsapp.message'].sudo().search([
-            ('message_id', '=', message_id),
-        ], limit=1)
+        msg = env['whatsapp.message'].sudo().search([('message_id', '=', wamid)], limit=1)
+        if not msg:
+            _logger.debug(f'[WH-STATUS] No message found for wamid={wamid}')
+            return
 
-        if message:
-            update_vals = {'status': new_status}
-            if new_status == 'delivered':
-                update_vals['delivered_date'] = fields.Datetime.now()
-            elif new_status == 'read':
-                update_vals['read_date'] = fields.Datetime.now()
-            message.sudo().write(update_vals)
-            _logger.info(f'Message {message_id} status updated to {new_status}')
+        update_vals = {'status': new_status}
+        if new_status == 'delivered':
+            update_vals['delivered_date'] = fields.Datetime.now()
+        elif new_status == 'read':
+            update_vals['read_date'] = fields.Datetime.now()
+        elif new_status == 'failed':
+            if errors:
+                err = errors[0]
+                update_vals['error_message'] = f"[{err.get('code')}] {err.get('title', '')} — {err.get('message', '')}"
+            else:
+                update_vals['error_message'] = 'Message delivery failed'
+        elif new_status == 'deleted':
+            update_vals['body'] = '[Message deleted by sender]'
+
+        msg.sudo().write(update_vals)
+        _logger.info(f'[WH-STATUS] wamid={wamid} → {new_status} (conversation_type={conv_origin})')
+
+        # ENTERPRISE LOGIC: Trigger Real-Time UI Update for Status (Blue Ticks)
+        try:
+            if msg.chat_id_ref:
+                env['bus.bus']._sendone(
+                    'elsx_whatsapp_channel',
+                    'whatsapp_status_update',
+                    {'chat_id': msg.chat_id_ref.id, 'message_id': msg.id, 'status': new_status}
+                )
+        except Exception as e:
+            _logger.error(f'[WH-STATUS] Bus notification failed: {e}')
+
+    # =========================================================
+    # READ RECEIPT SENDER
+    # =========================================================
+    def _send_read_receipt(self, account, wamid):
+        """Send a Mark as Read receipt to Meta for incoming messages"""
+        import requests
+        url = f'https://graph.facebook.com/{account.api_version}/{account.phone_number_id}/messages'
+        headers = {
+            'Authorization': f'Bearer {account.access_token}',
+            'Content-Type': 'application/json',
+        }
+        payload = {
+            'messaging_product': 'whatsapp',
+            'status': 'read',
+            'message_id': wamid,
+        }
+        resp = requests.post(url, headers=headers, json=payload, timeout=5)
+        if resp.status_code != 200:
+            _logger.warning(f'[READ-RECEIPT] Failed for {wamid}: {resp.text}')
+
+    # =========================================================
+    # ACCOUNT / SYSTEM EVENT HANDLERS
+    # =========================================================
+    def _handle_account_alerts(self, env, account, value):
+        """Handle account_alerts — policy violations, WAB bans, etc."""
+        alert_type = value.get('alert_type', 'UNKNOWN')
+        notification_text = value.get('notification_text', '')
+        _logger.warning(f'[WH-ALERT] Account Alert: type={alert_type} msg="{notification_text}" account={account.id if account else None}')
+
+        if account:
+            # Optionally downgrade quality rating on critical alerts
+            if 'DISABLED' in alert_type.upper() or 'BANNED' in alert_type.upper():
+                account.sudo().write({'status': 'error', 'quality_rating': 'RED'})
+
+    def _handle_account_review_update(self, env, account, value):
+        """Handle account_review_update — business verification status"""
+        decision = value.get('decision', '')
+        _logger.info(f'[WH-REVIEW] Account review decision: {decision}')
+        if account and decision == 'APPROVED':
+            account.sudo().write({'status': 'connected'})
+        elif account and decision in ('REJECTED', 'DISABLED'):
+            account.sudo().write({'status': 'error'})
+
+    def _handle_account_update(self, env, account, value):
+        """Handle account_update — display name, messaging limits, quality changes"""
+        event = value.get('event', '')
+        _logger.info(f'[WH-ACCT-UPDATE] Event: {event}')
+        if not account:
+            return
+        if event == 'PHONE_NUMBER_NAME_UPDATE':
+            new_name = value.get('display_phone_number', '')
+            if new_name:
+                account.sudo().write({'phone_number': new_name})
+        elif 'MESSAGING_LIMIT' in event:
+            limit = value.get('new_tier', '')
+            if limit:
+                account.sudo().write({'messaging_limit': limit})
+
+    def _handle_business_capability_update(self, env, account, value):
+        """Handle business_capability_update — messaging window changes"""
+        _logger.info(f'[WH-BUSI-CAP] Business capability update: {value}')
+
+    def _handle_template_status_update(self, env, account, value):
+        """Handle message_template_status_update — template approved/rejected/paused"""
+        template_name = value.get('message_template_name', '')
+        template_id_meta = str(value.get('message_template_id', ''))
+        event = value.get('event', '')
+        reason = value.get('reason', '')
+
+        _logger.info(f'[WH-TPL-STATUS] Template "{template_name}" event={event} reason={reason}')
+
+        # Map Meta event to Odoo template status
+        status_map = {
+            'APPROVED': 'approved',
+            'REJECTED': 'rejected',
+            'PENDING_DELETION': 'paused',
+            'FLAGGED': 'paused',
+            'PAUSED': 'paused',
+            'DISABLED': 'rejected',
+        }
+        odoo_status = status_map.get(event)
+
+        if odoo_status:
+            template = env['whatsapp.template'].sudo().search([
+                '|', ('name', '=', template_name),
+                ('template_id', '=', template_id_meta),
+            ], limit=1)
+            if template:
+                template.sudo().write({'status': odoo_status})
+                if reason:
+                    template.sudo().write({'rejection_reason': reason})
+
+    def _handle_template_quality_update(self, env, account, value):
+        """Handle message_template_quality_update — quality score changes"""
+        template_name = value.get('message_template_name', '')
+        quality = value.get('new_quality_score', '')
+        _logger.info(f'[WH-TPL-QUALITY] Template "{template_name}" new quality={quality}')
+
+    def _handle_template_components_update(self, env, account, value):
+        """Handle message_template_components_update — auto-fill updates"""
+        _logger.info(f'[WH-TPL-COMP] Template components updated: {value}')
+
+    def _handle_phone_name_update(self, env, account, value):
+        """Handle phone_number_name_update — display name review result"""
+        decision = value.get('decision', '')
+        display_phone = value.get('display_phone_number', '')
+        _logger.info(f'[WH-PHONE-NAME] Phone name update: {display_phone} decision={decision}')
+
+    def _handle_phone_quality_update(self, env, account, value):
+        """Handle phone_number_quality_update — account quality rating change"""
+        quality = value.get('current_limit', value.get('current_quality', ''))
+        _logger.info(f'[WH-PHONE-QUALITY] Account quality update: {quality}')
+        if account and quality:
+            quality_map = {'HIGH': 'GREEN', 'MEDIUM': 'YELLOW', 'LOW': 'RED', 'UNKNOWN': 'UNKNOWN'}
+            new_quality = quality_map.get(quality.upper(), 'UNKNOWN')
+            account.sudo().write({'quality_rating': new_quality})
+
+    def _handle_security_event(self, env, account, value):
+        """Handle security webhook events — e.g. user_identity_changed"""
+        event = value.get('event', '')
+        _logger.warning(f'[WH-SECURITY] Security event: {event} | {value}')
+
+    def _handle_template_category_update(self, env, account, value):
+        """Handle template_category_update — Meta re-categorises a template"""
+        template_name = value.get('message_template_name', '')
+        new_category = value.get('new_category', '')
+        _logger.info(f'[WH-TPL-CAT] Template "{template_name}" re-categorised to {new_category}')
+        if template_name and new_category:
+            template = env['whatsapp.template'].sudo().search([('name', '=', template_name)], limit=1)
+            if template:
+                template.sudo().write({'template_category': new_category.lower()})
+
+    # =========================================================
+    # AUDIT LOG HELPERS
+    # =========================================================
+    def _log_event(self, env, account, field, value, raw_data):
+        """Write a webhook log record for every received event"""
+        try:
+            phone = ''
+            wamid = ''
+            msgs = value.get('messages', [])
+            if msgs:
+                phone = msgs[0].get('from', '')
+                wamid = msgs[0].get('id', '')
+            statuses = value.get('statuses', [])
+            if statuses:
+                wamid = statuses[0].get('id', '')
+                phone = statuses[0].get('recipient_id', '')
+
+            env['whatsapp.webhook.log'].sudo().create({
+                'account_id': account.id if account and account.exists() else False,
+                'event_type': field,
+                'field_type': field,
+                'phone_number': phone,
+                'message_id': wamid,
+                'status': 'processed',
+                'raw_payload': raw_data[:5000],
+            })
+        except Exception as e:
+            _logger.warning(f'[WH-LOG] Failed to write webhook log: {e}')
+
+    def _update_log_error(self, env, field, value, error_msg):
+        """Update the most recent log entry for a field to error status"""
+        try:
+            log = env['whatsapp.webhook.log'].sudo().search(
+                [('event_type', '=', field)], order='create_date desc', limit=1
+            )
+            if log:
+                log.sudo().write({'status': 'error', 'error_detail': error_msg[:2000]})
+        except Exception:
+            pass
+
+    # =========================================================
+    # MEDIA PROXY — Serves Meta media via Odoo
+    # =========================================================
+    @http.route('/whatsapp/media/<string:media_id>', type='http', auth='user')
+    def whatsapp_media_proxy(self, media_id, **kwargs):
+        """Fetch media from Meta and serve it to the browser"""
+        try:
+            env, cr, _ = _get_env()
+            with cr:
+                account = env['whatsapp.account'].sudo().search([('active', '=', True)], limit=1)
+                if not account:
+                    return request.not_found()
+
+                import requests
+                # 1. Get media URL from ID
+                meta_url = f"https://graph.facebook.com/{account.api_version}/{media_id}"
+                headers = {'Authorization': f'Bearer {account.access_token}'}
+                resp = requests.get(meta_url, headers=headers, timeout=10)
+                if resp.status_code != 200:
+                    return request.not_found()
+
+                download_url = resp.json().get('url')
+                if not download_url:
+                    return request.not_found()
+
+                # 2. Download the actual binary
+                media_resp = requests.get(download_url, headers=headers, timeout=30)
+                if media_resp.status_code != 200:
+                    return request.not_found()
+
+                return request.make_response(
+                    media_resp.content,
+                    headers=[
+                        ('Content-Type', media_resp.headers.get('Content-Type', 'image/jpeg')),
+                        ('Cache-Control', 'max-age=86400'),
+                    ]
+                )
+        except Exception as e:
+            _logger.error(f'[WH-MEDIA] Proxy failed: {e}')
+            return request.not_found()
+
+    # =========================================================
+    # SIDECAR CALLBACK — Zero-Latency Asynchronous Ingress
+    # =========================================================
+    @http.route('/whatsapp/sidecar/receive', type='http', auth='none', methods=['POST'], csrf=False)
+    def sidecar_receive(self, **kwargs):
+        """
+        Industrial Callback from Sidecar.
+        Used when Sidecar receives Meta Webhook FIRST and forwards to Odoo.
+        """
+        secret = request.httprequest.headers.get('x-sidecar-key')
+        
+        # We need a valid environment to check config parameters in auth='none'
+        env, cr, _ = _get_env()
+        if not env:
+            _logger.error('[SIDECAR-IN] Could not initialize environment for security check')
+            return request.make_json_response({'status': 'error', 'message': 'System Initialization Error'}, status=500)
+            
+        try:
+            expected_secret = env['ir.config_parameter'].sudo().get_param('whatsapp.sidecar.secret', 'elsx_sidecar_secure_2024')
+            if secret != expected_secret:
+                _logger.warning('[SIDECAR-IN] Unauthorized access attempt with secret: %s', secret)
+                return request.make_json_response({'status': 'error', 'message': 'Unauthorized'}, status=403)
+        finally:
+            cr.close()
+            
+        try:
+            payload = json.loads(request.httprequest.data.decode('utf-8') or '{}')
+        except json.JSONDecodeError:
+            return request.make_json_response({'status': 'error', 'message': 'Invalid JSON'}, status=400)
+        _logger.info('[SIDECAR-IN] Received payload for processing')
+        
+        # We reuse the POST logic by calling _handle_post with raw JSON
+        # Since _handle_post normally reads from request.httprequest.data,
+        # we'll create a small helper.
+        result = self._process_payload_direct(payload)
+        status = 200 if result.get('status') in ('success', 'ignored') else 500
+        return request.make_json_response(result, status=status)
+
+    def _process_payload_direct(self, payload):
+        """Helper to process a JSON payload directly without re-reading from request"""
+        if payload.get('object') != 'whatsapp_business_account':
+            return {'status': 'ignored'}
+            
+        env, cr, _ = _get_env()
+        with cr:
+            # We'll use the same processing logic as _handle_post
+            # but we need to pass the payload object
+            try:
+                # Find account
+                account = _find_account(env, None, payload)
+                if not account:
+                    return {'status': 'error', 'message': 'No matching account'}
+                
+                # Process entries
+                for entry in payload.get('entry', []):
+                    for change in entry.get('changes', []):
+                        field = change.get('field')
+                        value = change.get('value') or {}
+                        # Call standard dispatcher
+                        self._dispatch_change(env, account, field, value, json.dumps(payload))
+                cr.commit()
+                return {'status': 'success'}
+            except Exception as e:
+                _logger.error(f'[SIDECAR-IN] Processing failed: {e}')
+                return {'status': 'error', 'message': str(e)}

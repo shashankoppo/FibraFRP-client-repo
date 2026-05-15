@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="whatsapp_sample_template_view_kanban" model="ir.ui.view">
+        <field name="name">whatsapp.sample.template.kanban</field>
+        <field name="model">whatsapp.sample.template</field>
+        <field name="arch" type="xml">
+            <kanban create="0" delete="0" class="elsx_whatsapp_sample_kanban">
+                <field name="name"/>
+                <field name="display_name_clean"/>
+                <field name="industry"/>
+                <field name="category"/>
+                <field name="preview_html"/>
+                <field name="variable_count"/>
+                <field name="description"/>
+                <field name="is_imported"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="oe_kanban_global_click o_kanban_record elsx_sample_card" t-att-class="record.is_imported.raw_value ? 'elsx_imported' : ''">
+                            
+                            <!-- Badges Header -->
+                            <div class="elsx_sample_badges">
+                                <span t-attf-class="badge rounded-pill elsx_badge_#{record.category.raw_value}">
+                                    <t t-out="record.category.value"/>
+                                </span>
+                                <span class="badge rounded-pill text-bg-light border text-muted">
+                                    <t t-out="record.industry.value"/>
+                                </span>
+                            </div>
+
+                            <!-- Title -->
+                            <h4 class="elsx_sample_title mt-2 mb-1">
+                                <t t-out="record.display_name_clean.value"/>
+                            </h4>
+                            
+                            <!-- Variable Count -->
+                            <div class="text-muted small mb-3">
+                                <i class="fa fa-code me-1" title="Variables"></i> <t t-out="record.variable_count.value"/> Variables
+                            </div>
+
+                            <!-- Preview Bubble -->
+                            <div class="elsx_sample_preview_wrapper mb-3">
+                                <t t-out="record.preview_html.raw_value"/>
+                            </div>
+
+                            <!-- Description -->
+                            <p class="text-muted small mb-3 flex-grow-1" style="line-height: 1.3;">
+                                <t t-out="record.description.value"/>
+                            </p>
+
+                            <!-- Action Footer -->
+                            <div class="elsx_sample_footer mt-auto pt-2 border-top">
+                                <button type="object" name="action_import_to_templates" 
+                                        class="btn btn-primary w-100 fw-bold" 
+                                        t-if="!record.is_imported.raw_value">
+                                    <i class="fa fa-download me-1" title="Use Template"></i> Use Template
+                                </button>
+                                <button class="btn btn-outline-secondary w-100 disabled" t-if="record.is_imported.raw_value">
+                                    <i class="fa fa-check me-1" title="Imported"></i> Imported
+                                </button>
+                            </div>
+
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- Action -->
+    <record id="action_whatsapp_sample_templates" model="ir.actions.act_window">
+        <field name="name">Template Library</field>
+        <field name="res_model">whatsapp.sample.template</field>
+        <field name="view_mode">kanban</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Welcome to the Template Library!
+            </p>
+            <p>
+                Browse enterprise-grade WhatsApp templates categorized by industry. 
+                Click 'Use Template' to copy it to your account and submit it to Meta for approval.
+            </p>
+        </field>
+    </record>
+
+</odoo>

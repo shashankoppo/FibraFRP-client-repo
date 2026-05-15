@@ -1,11 +1,67 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Demo WhatsApp Templates -->
+    <!-- 1. Welcome Message (Marketing) -->
     <record id="whatsapp_template_welcome" model="whatsapp.template">
-        <field name="name">Welcome Message</field>
+        <field name="name">welcome_message_pro</field>
         <field name="category">marketing</field>
-        <field name="language">en</field>
-        <field name="body">Hello {{1}}! Welcome to our service. We're excited to have you with us!</field>
+        <field name="language">en_US</field>
+        <field name="header_type">image</field>
+        <field name="header_media_url">https://dummyimage.com/600x400/000/fff.jpg</field>
+        <field name="body">Hello {{1}}! Welcome to our premium community! We're excited to have you on board. Check out our latest products.</field>
+        <field name="footer">Powered by ELSX</field>
+        <field name="has_buttons" eval="True"/>
+        <field name="button_type">call_to_action</field>
+        <field name="cta_url_text">Visit Website</field>
+        <field name="cta_url_link">https://www.example.com</field>
         <field name="status">draft</field>
+        <field name="variable_ids" eval="[(0, 0, {'name': '{{1}}', 'field_type': 'text', 'sample_value': 'John', 'odoo_field': 'partner_id.name'})]"/>
+    </record>
+
+    <!-- 2. Order Confirmation (Utility) -->
+    <record id="whatsapp_template_order_conf" model="whatsapp.template">
+        <field name="name">order_confirmation_v1</field>
+        <field name="category">utility</field>
+        <field name="language">en_US</field>
+        <field name="header_type">text</field>
+        <field name="header_text">Order Confirmed</field>
+        <field name="body">Hi {{1}}, your order #{{2}} has been successfully placed. Total amount: {{3}}. It will be shipped soon.</field>
+        <field name="footer">Thank you for shopping with us.</field>
+        <field name="has_buttons" eval="True"/>
+        <field name="button_type">quick_reply</field>
+        <field name="button_text_1">Track Order</field>
+        <field name="status">draft</field>
+        <field name="variable_ids" eval="[
+            (0, 0, {'name': '{{1}}', 'field_type': 'text', 'sample_value': 'Alice', 'odoo_field': 'partner_id.name'}),
+            (0, 0, {'name': '{{2}}', 'field_type': 'text', 'sample_value': 'ORD-9988', 'odoo_field': 'name'}),
+            (0, 0, {'name': '{{3}}', 'field_type': 'currency', 'sample_value': '$199.00', 'odoo_field': 'amount_total'})
+        ]"/>
+    </record>
+
+    <!-- 3. Abandoned Cart (Marketing) -->
+    <record id="whatsapp_template_abandoned_cart" model="whatsapp.template">
+        <field name="name">abandoned_cart_reminder</field>
+        <field name="category">marketing</field>
+        <field name="language">en_US</field>
+        <field name="body">Hey {{1}}! You left some amazing items in your cart. Complete your checkout now and get 10% off using code: SAVE10</field>
+        <field name="has_buttons" eval="True"/>
+        <field name="button_type">call_to_action</field>
+        <field name="cta_url_text">Checkout Now</field>
+        <field name="cta_url_link">https://www.example.com/cart</field>
+        <field name="status">draft</field>
+        <field name="variable_ids" eval="[(0, 0, {'name': '{{1}}', 'field_type': 'text', 'sample_value': 'Bob', 'odoo_field': 'partner_id.name'})]"/>
+    </record>
+
+    <!-- 4. Support Ticket Resolution (Utility) -->
+    <record id="whatsapp_template_ticket_resolved" model="whatsapp.template">
+        <field name="name">ticket_resolved_alert</field>
+        <field name="category">utility</field>
+        <field name="language">en_US</field>
+        <field name="body">Hello {{1}}, your support ticket #{{2}} has been marked as resolved by our team. If you need further assistance, please reply to this message.</field>
+        <field name="footer">ELSX Support Team</field>
+        <field name="status">draft</field>
+        <field name="variable_ids" eval="[
+            (0, 0, {'name': '{{1}}', 'field_type': 'text', 'sample_value': 'Charlie', 'odoo_field': 'partner_id.name'}),
+            (0, 0, {'name': '{{2}}', 'field_type': 'text', 'sample_value': 'TK-5566', 'odoo_field': 'name'})
+        ]"/>
     </record>
 </odoo>

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Graph View for Analytics -->
+    <record id="whatsapp_analytics_view_graph" model="ir.ui.view">
+        <field name="name">whatsapp.analytics.graph</field>
+        <field name="model">whatsapp.analytics</field>
+        <field name="arch" type="xml">
+            <graph string="WhatsApp Analytics" type="bar" sample="1">
+                <field name="period_start" interval="day"/>
+                <field name="outbound_count" type="measure"/>
+                <field name="inbound_count" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <!-- Pivot View for Analytics -->
+    <record id="whatsapp_analytics_view_pivot" model="ir.ui.view">
+        <field name="name">whatsapp.analytics.pivot</field>
+        <field name="model">whatsapp.analytics</field>
+        <field name="arch" type="xml">
+            <pivot string="WhatsApp Analytics" sample="1">
+                <field name="period_start" interval="day" type="row"/>
+                <field name="total_messages" type="measure"/>
+                <field name="sent_count" type="measure"/>
+                <field name="delivered_count" type="measure"/>
+                <field name="read_count" type="measure"/>
+                <field name="failed_count" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+
+
+
+</odoo>

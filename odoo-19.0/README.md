@@ -1,37 +1,93 @@
-# Odoo
+# FibraFRP — Odoo 19.0 Enterprise Architecture Blueprint
 
-[![Build Status](https://runbot.odoo.com/runbot/badge/flat/1/master.svg)](https://runbot.odoo.com/runbot)
-[![Tech Doc](https://img.shields.io/badge/master-docs-875A7B.svg?style=flat&colorA=8F8F8F)](https://www.odoo.com/documentation/master)
-[![Help](https://img.shields.io/badge/master-help-875A7B.svg?style=flat&colorA=8F8F8F)](https://www.odoo.com/forum/help-1)
-[![Nightly Builds](https://img.shields.io/badge/master-nightly-875A7B.svg?style=flat&colorA=8F8F8F)](https://nightly.odoo.com/)
+Welcome to the central repository for the FibraFRP custom Odoo 19.0 deployment. This document outlines the technical architecture, custom module ecosystem, connection points, and workflow required to maintain and develop this system.
 
-Odoo is a suite of web based open source business apps.
+---
 
-The main Odoo Apps include an [Open Source CRM](https://www.odoo.com/page/crm),
-[Website Builder](https://www.odoo.com/app/website),
-[eCommerce](https://www.odoo.com/app/ecommerce),
-[Warehouse Management](https://www.odoo.com/app/inventory),
-[Project Management](https://www.odoo.com/app/project),
-[Billing &amp; Accounting](https://www.odoo.com/app/accounting),
-[Point of Sale](https://www.odoo.com/app/point-of-sale-shop),
-[Human Resources](https://www.odoo.com/app/employees),
-[Marketing](https://www.odoo.com/app/social-marketing),
-[Manufacturing](https://www.odoo.com/app/manufacturing),
-[...](https://www.odoo.com/)
+## 🏗️ System Architecture & Tech Stack
 
-Odoo Apps can be used as stand-alone applications, but they also integrate seamlessly so you get
-a full-featured [Open Source ERP](https://www.odoo.com) when you install several Apps.
+This project is a hybrid system utilizing Odoo 19.0 as the core ERP and CRM engine, augmented by real-time microservices for high-performance communication.
 
-## Getting started with Odoo
+### Core Technologies
+- **Backend ERP**: Odoo 19.0 Enterprise (Dockerized)
+- **Database**: PostgreSQL 16
+- **Real-Time Engine**: Node.js Sidecar + Socket.io (Zero-latency WebSocket server)
+- **Frontend Framework**: OWL 2.0 (Odoo Web Library) & Native JS
+- **API Integrations**: Meta / WhatsApp Cloud API v19.0+
 
-For a standard installation please follow the [Setup instructions](https://www.odoo.com/documentation/master/administration/install/install.html)
-from the documentation.
+### Key Connection Points
+1. **Node.js Sidecar (`node_sidecar:3000`)**: 
+   - Acts as a high-speed relay between Odoo and the browser.
+   - Listens to Odoo's internal `bus.bus` for outbound messages and pushes them instantly to the user's browser via WebSockets.
+   - Connected via `whatsapp.sidecar.url` and `whatsapp.sidecar.secret` in the Global Settings.
+2. **Meta Cloud Webhooks**:
+   - Meta sends inbound messages and status updates (delivered/read) directly to `controllers/whatsapp_webhook.py`.
+   - The webhook parses the JSON, validates the SHA256 signature, and triggers the Node.js sidecar for real-time UI updates.
+3. **Local Partner Autocomplete**:
+   - Replaces Odoo's default paid IAP credit system. Intercepts `/iap/autocomplete` requests and routes them through a local fuzzy-search database.
 
-To learn the software, we recommend the [Odoo eLearning](https://www.odoo.com/slides),
-or [Scale-up, the business game](https://www.odoo.com/page/scale-up-business-game).
-Developers can start with [the developer tutorials](https://www.odoo.com/documentation/master/developer/howtos.html).
+---
 
-## Security
+## 📦 Custom Module Ecosystem
 
-If you believe you have found a security issue, check our [Responsible Disclosure page](https://www.odoo.com/security-report)
-for details and get in touch with us via email.
+The `custom_addons` directory contains the proprietary logic developed specifically for FibraFRP. 
+
+### 1. `elsx_whatsapp_marketing` (Flagship Module)
+The enterprise-grade WhatsApp Business console. Built to rival dedicated platforms like WATI.io or Intercom.
+
+**Directory Breakdown**:
+- `models/`: Python logic.
+  - `whatsapp_account.py`: API Credentials & Webhook settings.
+  - `whatsapp_message.py` & `whatsapp_chat.py`: Core messaging loop, data normalization, and attachment handling.
+  - `whatsapp_webhook_log.py`: Security and payload auditing.
+  - `whatsapp_compliance.py`: Team Member routing, GDPR rules, and quiet hours.
+  - `res_config_settings.py`: Global application settings.
+- `controllers/`: 
+  - `whatsapp_webhook.py`: The high-throughput HTTP endpoint for Meta API.
+- `static/src/`:
+  - `js/whatsapp_widget.js`: The OWL/JS hybrid engine rendering the real-time Team Inbox.
+  - `js/notification_tones.js`: Native Web Audio API synthesis for zero-dependency sound alerts.
+- `views/`: XML definitions for menus, kanban boards, and forms. Note that the `whatsapp_menu.xml` is the entry point for all UI navigation.
+
+### 2. `elsx_partner_autocomplete` (Infrastructure Module)
+A highly optimized override for Odoo's default autocomplete behavior.
+- **Why it exists**: Odoo 19 charges IAP credits for basic contact creation lookups. This module overrides `IapAutocompleteApi._request_partner_autocomplete`.
+- **How it works**: Performs local regex and fuzzy matching against existing `res.partner` records (by VAT, name, or domain) before falling back to free public APIs, bypassing Odoo's billing entirely.
+
+---
+
+## ⚙️ Development Workflow & How to Work Here
+
+When making changes to the system, strictly follow this workflow to ensure data integrity and cache invalidation.
+
+### 1. Modifying Python Files (Backend)
+If you change logic in `models/` or `controllers/`:
+1. Save the file.
+2. **Recompile Python Cache**: Run `python -m compileall odoo-19.0/custom_addons/` (If outside Docker).
+3. **Restart Docker Container**: The Python backend loads into RAM. You must restart the Odoo container:
+   ```bash
+   docker compose restart odoo
+   ```
+
+### 2. Modifying XML Views or Menus
+If you change layout XML files in `views/` or add fields:
+1. Save the XML file.
+2. **Increment Module Version**: Open `__manifest__.py` and bump the version number (e.g., `19.0.2.7.0` -> `19.0.2.8.0`).
+3. **Upgrade via UI**: 
+   - Turn on Developer Mode in Odoo.
+   - Go to Apps -> Update Apps List.
+   - Find the module and click **Upgrade**.
+
+### 3. Modifying JavaScript/CSS (Frontend)
+If you change OWL components, JS widgets, or CSS:
+1. Save the asset file.
+2. Ensure the asset is listed in the `'assets'` dictionary inside `__manifest__.py`.
+3. Hard refresh your browser (`Ctrl + F5` or `Cmd + Shift + R`). Odoo automatically recompiles JS/CSS bundles in Developer Mode (with Assets). If not, restart the Docker container.
+
+---
+
+## 🔒 Security & Best Practices
+
+- **Never** modify core Odoo files inside the `addons/` directory. Always use model inheritance (`_inherit`) inside `custom_addons/`.
+- **Media Attachments**: Ensure outbound media is attached via `media_file` binary fields, which automatically generate `ir.attachment` records for real-time preview rendering.
+- **Database Safety**: When writing raw SQL queries using `self.env.cr.execute`, always use parameterized inputs (`%s`) to prevent SQL injection.
