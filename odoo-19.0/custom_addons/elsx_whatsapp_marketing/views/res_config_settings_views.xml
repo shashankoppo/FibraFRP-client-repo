@@ -24,9 +24,12 @@
                         </setting>
                     </block>
 
-                    <block title="Automation &amp; Bots" id="whatsapp_automation_setting">
+                    <block title="Automation &amp; Bots / CRM Integration" id="whatsapp_automation_setting">
                         <setting id="whatsapp_enable_bot_setting" help="Process incoming messages through the visual Flow Builder and Bot Rules.">
                             <field name="whatsapp_enable_bot"/>
+                        </setting>
+                        <setting id="whatsapp_crm_won_template_setting" help="Select a template to automatically send when a CRM Opportunity is marked as Won. If empty, a default plain text message will be used.">
+                            <field name="whatsapp_crm_won_template_id" context="{'default_status': 'approved'}"/>
                         </setting>
                     </block>
 

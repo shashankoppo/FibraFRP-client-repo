@@ -115,6 +115,7 @@ class WhatsAppChat(models.Model):
     ], string='SLA Status', compute='_compute_sla_status')
     sla_timer_minutes = fields.Integer('Wait Time (Mins)', compute='_compute_sla_status')
     
+    @api.depends('last_inbound_date')
     def _compute_session_status(self):
         now = fields.Datetime.now()
         for record in self:
@@ -189,16 +190,14 @@ class WhatsAppChat(models.Model):
     @api.depends('state')
     def _compute_chat_categories(self):
         """Populate the three pane Many2many fields with chats grouped by state.
-        This is a simple implementation for UI rendering; in production you may replace
-        with a more efficient lazy‑loaded approach.
+        This is a simple implementation for UI rendering.
+        Note: The modern UI implementation (JS) manages its own lists via API routes,
+        so this logic has been optimized to prevent N+1 queries.
         """
-        active_chats = self.env['whatsapp.chat'].search([('state', '=', 'open')])
-        request_chats = self.env['whatsapp.chat'].search([('state', '=', 'snoozed')])
-        intervened_chats = self.env['whatsapp.chat'].search([('state', '=', 'resolved')])
         for rec in self:
-            rec.active_chat_ids = active_chats
-            rec.request_chat_ids = request_chats
-            rec.intervened_chat_ids = intervened_chats
+            rec.active_chat_ids = False
+            rec.request_chat_ids = False
+            rec.intervened_chat_ids = False
 
     @api.depends('message_ids.create_date', 'message_ids.body', 'message_ids.status', 'message_ids.direction', 'message_ids.message_type')
     def _compute_last_message(self):
@@ -312,9 +311,9 @@ class WhatsAppChat(models.Model):
                 record.lead_id = False
 
     def _sync_message_to_lead_chatter(self, message):
-        """Mirror a new inbound WhatsApp message into the linked CRM lead chatter."""
+        """Mirror a new WhatsApp message into the linked CRM lead chatter."""
         for chat in self:
-            if not message or message.direction != 'inbound':
+            if not message:
                 continue
 
             lead = chat.lead_id
@@ -326,7 +325,7 @@ class WhatsAppChat(models.Model):
             if not lead:
                 continue
 
-            marker = f'data-wa-message-id="{message.id}"'
+            marker = f'href="#wa-message-id-{message.id}"'
             already_posted = self.env['mail.message'].sudo().search_count([
                 ('model', '=', 'crm.lead'),
                 ('res_id', '=', lead.id),
@@ -338,11 +337,15 @@ class WhatsAppChat(models.Model):
             sender = message.partner_id.display_name or chat.display_name or message.phone_number
             content = message.body or message.caption or f"[{message.message_type}]"
             content_html = Markup('<br/>').join(escape(line) for line in content.splitlines()) or Markup('&nbsp;')
+            
+            direction_label = "inbound from" if message.direction == 'inbound' else "outbound to"
+            
             body = Markup(
-                '<div data-wa-message-id="%s">'
-                '<strong>WhatsApp inbound from %s</strong><br/>%s'
+                '<div>'
+                '<a href="#wa-message-id-%s" style="display: none;"></a>'
+                '<strong>WhatsApp %s %s</strong><br/>%s'
                 '</div>'
-            ) % (message.id, escape(sender), content_html)
+            ) % (message.id, direction_label, escape(sender), content_html)
 
             try:
                 lead.sudo().message_post(

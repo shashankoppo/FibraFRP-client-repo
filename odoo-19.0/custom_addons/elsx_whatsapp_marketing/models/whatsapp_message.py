@@ -229,6 +229,8 @@ class WhatsAppMessage(models.Model):
 
             if msg.direction == 'inbound' and msg.chat_id_ref:
                 msg.chat_id_ref.sudo()._sync_message_to_lead_chatter(msg)
+            elif msg.direction == 'outbound' and msg.chat_id_ref:
+                msg.chat_id_ref.sudo()._sync_message_to_lead_chatter(msg)
 
         # Notify real-time sidecar
         for record in messages:
@@ -243,7 +245,7 @@ class WhatsAppMessage(models.Model):
             for record in self:
                 notify_sidecar_background(self.env, record.id, event_type='message_update')
         if vals.get('chat_id_ref'):
-            for record in self.filtered(lambda msg: msg.direction == 'inbound' and msg.chat_id_ref):
+            for record in self.filtered(lambda msg: msg.chat_id_ref):
                 record.chat_id_ref.sudo()._sync_message_to_lead_chatter(record)
         return res
 

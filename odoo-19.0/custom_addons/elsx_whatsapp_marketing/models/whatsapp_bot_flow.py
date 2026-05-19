@@ -4,6 +4,7 @@ from odoo.exceptions import ValidationError
 import logging
 import json
 import requests
+import time
 
 _logger = logging.getLogger(__name__)
 
@@ -1101,9 +1102,10 @@ class WhatsAppBotFlow(models.Model):
             return {'stop': False}  # FIXED: Added return
 
         elif step.action_type == 'delay':
-            # Don't block execution, just log the delay
+            # Block execution for the specified duration to pace the bot
             if step.delay_seconds:
                 _logger.info(f"Flow delay: {step.delay_seconds}s for {message.phone_number}")
+                time.sleep(step.delay_seconds)
             return {'stop': False}  # FIXED: Added return
 
         elif step.action_type == 'end':

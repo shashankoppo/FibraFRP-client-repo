@@ -639,23 +639,32 @@ class WhatsAppCampaign(models.Model):
 
         sent_a = len(msgs_a.filtered(lambda m: m.status in ('sent', 'delivered', 'read')))
         read_a = len(msgs_a.filtered(lambda m: m.status == 'read'))
+        delivered_a = len(msgs_a.filtered(lambda m: m.status in ('delivered', 'read')))
         
         sent_b = len(msgs_b.filtered(lambda m: m.status in ('sent', 'delivered', 'read')))
         read_b = len(msgs_b.filtered(lambda m: m.status == 'read'))
+        delivered_b = len(msgs_b.filtered(lambda m: m.status in ('delivered', 'read')))
 
-        rate_a = (read_a / sent_a * 100) if sent_a > 0 else 0
-        rate_b = (read_b / sent_b * 100) if sent_b > 0 else 0
+        read_rate_a = (read_a / sent_a * 100) if sent_a > 0 else 0
+        read_rate_b = (read_b / sent_b * 100) if sent_b > 0 else 0
+        
+        deliv_rate_a = (delivered_a / sent_a * 100) if sent_a > 0 else 0
+        deliv_rate_b = (delivered_b / sent_b * 100) if sent_b > 0 else 0
 
         _logger.info(
-            f"[A/B] Campaign {self.name}: A={rate_a:.1f}% read ({read_a}/{sent_a}), "
-            f"B={rate_b:.1f}% read ({read_b}/{sent_b})"
+            f"[A/B] Campaign {self.name}: A={read_rate_a:.1f}% read ({read_a}/{sent_a}), "
+            f"B={read_rate_b:.1f}% read ({read_b}/{sent_b})"
         )
 
-        # Only declare winner if there's a meaningful difference (>2%)
-        if abs(rate_a - rate_b) < 2.0:
+        # Primary metric: Read rate
+        if abs(read_rate_a - read_rate_b) >= 2.0:
+            winner = 'a' if read_rate_a >= read_rate_b else 'b'
+        # Fallback metric: Delivered rate (if read receipts are disabled by recipients)
+        elif abs(deliv_rate_a - deliv_rate_b) >= 2.0:
+            winner = 'a' if deliv_rate_a >= deliv_rate_b else 'b'
+        else:
             return False
 
-        winner = 'a' if rate_a >= rate_b else 'b'
         self.write({'ab_test_winner': winner})
         return winner
 

@@ -25,6 +25,13 @@ class ResConfigSettings(models.TransientModel):
         help="The default account used for outbound messages if none is specified"
     )
     
+    whatsapp_crm_won_template_id = fields.Many2one(
+        'whatsapp.template',
+        string='CRM Won Template',
+        config_parameter='whatsapp.crm.won.template.id',
+        help="Template to send automatically when a CRM Opportunity is marked as Won."
+    )
+    
     # Automation & Bots
     whatsapp_enable_bot = fields.Boolean(
         string='Enable Bot Engine',
