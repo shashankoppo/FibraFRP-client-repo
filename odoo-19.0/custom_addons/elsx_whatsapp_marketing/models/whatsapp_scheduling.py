@@ -115,10 +115,48 @@ class WhatsAppScheduledMessage(models.Model):
             else:
                 record.next_execution_date = False
     
+    def _get_next_recurring_date(self, base_date):
+        self.ensure_one()
+        interval = self.recurring_interval or 1
+        if self.recurring_type == 'daily':
+            return base_date + timedelta(days=interval)
+        elif self.recurring_type == 'weekly':
+            return base_date + timedelta(weeks=interval)
+        elif self.recurring_type == 'monthly':
+            year = base_date.year
+            month = base_date.month + interval
+            day = base_date.day
+            while month > 12:
+                month -= 12
+                year += 1
+            import calendar
+            max_day = calendar.monthrange(year, month)[1]
+            if day > max_day:
+                day = max_day
+            return base_date.replace(year=year, month=month, day=day)
+        elif self.recurring_type == 'custom':
+            if self.cron_expression:
+                try:
+                    from croniter import croniter
+                    cron = croniter(self.cron_expression, base_date)
+                    return cron.get_next(datetime)
+                except Exception:
+                    pass
+            return base_date + timedelta(days=1)
+        return False
+
     def action_schedule(self):
         """Schedule the message"""
-        if any(record.schedule_type == 'recurring' for record in self):
-            raise UserError("Recurring scheduled messages are not implemented yet.")
+        for record in self:
+            if record.schedule_type == 'recurring':
+                if not record.recurring_type:
+                    raise UserError("Please select a recurrence type for recurring scheduled messages.")
+                if record.recurring_interval <= 0:
+                    raise UserError("Recurrence interval must be greater than zero.")
+                if record.recurring_type == 'custom' and not record.cron_expression:
+                    raise UserError("Please provide a cron expression for custom recurrence.")
+            if not record.scheduled_date:
+                raise UserError("Please specify a scheduled date/time.")
         self.write({'status': 'scheduled'})
         
         return {
@@ -244,16 +282,36 @@ class WhatsAppScheduledMessage(models.Model):
         # Find scheduled messages that are ready to send
         scheduled_msgs = self.search([
             ('status', '=', 'scheduled'),
-            ('schedule_type', '=', 'once'),
+
             ('scheduled_date', '<=', now)
         ])
         
         sent_count = 0
         for msg in scheduled_msgs:
             try:
-                msg._execute_send()
-                msg.write({'status': 'completed', 'last_execution_date': now})
-                sent_count += 1
+                with self.env.cr.savepoint():
+                    msg._execute_send()
+                    if msg.schedule_type == 'recurring' and msg.recurring_type:
+                        next_date = msg._get_next_recurring_date(msg.scheduled_date)
+                        if next_date and (not msg.recurrence_end_date or next_date <= msg.recurrence_end_date):
+                            msg.write({
+                                'scheduled_date': next_date,
+                                'last_execution_date': now,
+                                'execution_count': msg.execution_count + 1,
+                            })
+                        else:
+                            msg.write({
+                                'status': 'completed',
+                                'last_execution_date': now,
+                                'execution_count': msg.execution_count + 1,
+                            })
+                    else:
+                        msg.write({
+                            'status': 'completed',
+                            'last_execution_date': now,
+                            'execution_count': msg.execution_count + 1,
+                        })
+                    sent_count += 1
             except Exception as e:
                 _logger.error(f"Failed to send scheduled message {msg.id}: {e}")
                 msg.write({'status': 'failed'})
@@ -287,19 +345,138 @@ class WhatsAppScheduledCampaign(models.Model):
         ('running', 'Running'),
         ('completed', 'Completed'),
         ('cancelled', 'Cancelled'),
+        ('failed', 'Failed'),
     ], default='draft')
+
+    # Recurrence options
+    schedule_type = fields.Selection([
+        ('once', 'Send Once'),
+        ('recurring', 'Recurring'),
+    ], default='once')
     
+    recurring_type = fields.Selection([
+        ('daily', 'Daily'),
+        ('weekly', 'Weekly'),
+        ('monthly', 'Monthly'),
+        ('custom', 'Custom (Cron)'),
+    ], string='Repeat')
+    
+    recurring_interval = fields.Integer('Every (days/weeks/months)', default=1)
+    recurrence_end_date = fields.Datetime('Recurrence End Date')
+    cron_expression = fields.Char('Cron Expression', help='e.g. 0 9 * * 1 for 9 AM every Monday')
+    
+    last_execution_date = fields.Datetime('Last Execution', readonly=True)
+    next_execution_date = fields.Datetime('Next Execution', compute='_compute_next_execution', store=True)
+    execution_count = fields.Integer('Times Executed', readonly=True, default=0)
+
+    @api.depends('scheduled_date', 'recurring_type', 'recurrence_end_date')
+    def _compute_next_execution(self):
+        for record in self:
+            if record.status in ['completed', 'cancelled', 'failed']:
+                record.next_execution_date = False
+            elif record.status == 'scheduled':
+                record.next_execution_date = record.scheduled_date
+            else:
+                record.next_execution_date = False
+    
+    def _get_next_recurring_date(self, base_date):
+        self.ensure_one()
+        interval = self.recurring_interval or 1
+        if self.recurring_type == 'daily':
+            return base_date + timedelta(days=interval)
+        elif self.recurring_type == 'weekly':
+            return base_date + timedelta(weeks=interval)
+        elif self.recurring_type == 'monthly':
+            year = base_date.year
+            month = base_date.month + interval
+            day = base_date.day
+            while month > 12:
+                month -= 12
+                year += 1
+            import calendar
+            max_day = calendar.monthrange(year, month)[1]
+            if day > max_day:
+                day = max_day
+            return base_date.replace(year=year, month=month, day=day)
+        elif self.recurring_type == 'custom':
+            if self.cron_expression:
+                try:
+                    from croniter import croniter
+                    cron = croniter(self.cron_expression, base_date)
+                    return cron.get_next(datetime)
+                except Exception:
+                    pass
+            return base_date + timedelta(days=1)
+        return False
+
     def action_schedule(self):
         """Schedule the campaign"""
+        for record in self:
+            if record.schedule_type == 'recurring':
+                if not record.recurring_type:
+                    raise UserError("Please select a recurrence type for recurring scheduled campaigns.")
+                if record.recurring_interval <= 0:
+                    raise UserError("Recurrence interval must be greater than zero.")
+                if record.recurring_type == 'custom' and not record.cron_expression:
+                    raise UserError("Please provide a cron expression for custom recurrence.")
+            if not record.scheduled_date:
+                raise UserError("Please specify a scheduled date/time.")
         self.write({'status': 'scheduled'})
     
     def action_send(self):
         """Execute the campaign"""
-        if self.campaign_id.state not in ['draft', 'scheduled']:
-            raise Exception('Campaign must be in draft or scheduled state')
+        # Force reload recipients to capture any dynamic updates
+        self.campaign_id.action_load_recipients()
         
+        # Reset campaign state to draft temporarily to bypass state checks
+        if self.campaign_id.state in ['running', 'completed', 'scheduled']:
+            self.campaign_id.state = 'draft'
+            
         self.campaign_id.action_send_campaign()
-        self.write({'status': 'completed'})
+
+    @api.model
+    def _cron_process_scheduled_campaigns(self):
+        """Cron job to process scheduled campaigns that are due"""
+        now = fields.Datetime.now()
+        scheduled_campaigns = self.search([
+            ('status', '=', 'scheduled'),
+            ('scheduled_date', '<=', now)
+        ])
+        
+        processed_count = 0
+        for sc in scheduled_campaigns:
+            try:
+                with self.env.cr.savepoint():
+                    sc.action_send()
+                    
+                    if sc.schedule_type == 'recurring' and sc.recurring_type:
+                        next_date = sc._get_next_recurring_date(sc.scheduled_date)
+                        if next_date and (not sc.recurrence_end_date or next_date <= sc.recurrence_end_date):
+                            sc.write({
+                                'scheduled_date': next_date,
+                                'last_execution_date': now,
+                                'execution_count': sc.execution_count + 1,
+                                'status': 'scheduled',
+                            })
+                        else:
+                            sc.write({
+                                'status': 'completed',
+                                'last_execution_date': now,
+                                'execution_count': sc.execution_count + 1,
+                            })
+                    else:
+                        sc.write({
+                            'status': 'completed',
+                            'last_execution_date': now,
+                            'execution_count': sc.execution_count + 1,
+                        })
+                    processed_count += 1
+            except Exception as e:
+                _logger.error(f"Failed to process scheduled campaign {sc.id}: {e}")
+                sc.write({'status': 'failed'})
+                
+        if processed_count > 0:
+            _logger.info(f"[CRON] Processed {processed_count} scheduled campaigns")
 
 
 class WhatsAppCampaignScheduleWizard(models.TransientModel):
@@ -321,6 +498,17 @@ class WhatsAppCampaignScheduleWizard(models.TransientModel):
     # Time zone considerations
     respect_contact_timezone = fields.Boolean('Respect Contact Timezone', default=True,
                                             help='Send to each contact at the same local time')
+                                            
+    recurring_type = fields.Selection([
+        ('daily', 'Daily'),
+        ('weekly', 'Weekly'),
+        ('monthly', 'Monthly'),
+        ('custom', 'Custom (Cron)'),
+    ], string='Repeat')
+    
+    recurring_interval = fields.Integer('Every (days/weeks/months)', default=1)
+    recurrence_end_date = fields.Datetime('Recurrence End Date')
+    cron_expression = fields.Char('Cron Expression', help='e.g. 0 9 * * 1 for 9 AM every Monday')
     
     def action_schedule(self):
         """Apply the schedule"""
@@ -331,13 +519,49 @@ class WhatsAppCampaignScheduleWizard(models.TransientModel):
         elif self.schedule_type == 'scheduled':
             if not self.scheduled_date:
                 raise UserError("Please select a scheduled date.")
+            
+            # Create a once-off scheduled campaign record
+            self.env['whatsapp.scheduled.campaign'].create({
+                'campaign_id': self.campaign_id.id,
+                'scheduled_date': self.scheduled_date,
+                'timezone_id': self.timezone_id,
+                'status': 'scheduled',
+                'schedule_type': 'once',
+            })
+            # Mark campaign state as scheduled
             self.campaign_id.write({
                 'schedule_type': 'scheduled',
                 'schedule_date': self.scheduled_date,
+                'state': 'scheduled',
             })
-            self.campaign_id.action_send_campaign()
         elif self.schedule_type == 'recurring':
-            raise UserError("Recurring campaigns are not implemented yet.")
+            if not self.scheduled_date:
+                raise UserError("Please select a scheduled date (start date).")
+            if not self.recurring_type:
+                raise UserError("Please select a recurrence type.")
+            if self.recurring_interval <= 0:
+                raise UserError("Recurrence interval must be greater than zero.")
+            if self.recurring_type == 'custom' and not self.cron_expression:
+                raise UserError("Please specify a cron expression.")
+                
+            # Create a recurring scheduled campaign record
+            self.env['whatsapp.scheduled.campaign'].create({
+                'campaign_id': self.campaign_id.id,
+                'scheduled_date': self.scheduled_date,
+                'timezone_id': self.timezone_id,
+                'status': 'scheduled',
+                'schedule_type': 'recurring',
+                'recurring_type': self.recurring_type,
+                'recurring_interval': self.recurring_interval,
+                'recurrence_end_date': self.recurrence_end_date,
+                'cron_expression': self.cron_expression,
+            })
+            # Mark campaign state as scheduled
+            self.campaign_id.write({
+                'schedule_type': 'scheduled',
+                'schedule_date': self.scheduled_date,
+                'state': 'scheduled',
+            })
         
         return {
             'type': 'ir.actions.client',

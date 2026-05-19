@@ -101,6 +101,102 @@
         </field>
     </record>
 
+    <!-- Scheduled Campaign Views -->
+    <record id="whatsapp_scheduled_campaign_view_tree" model="ir.ui.view">
+        <field name="name">whatsapp.scheduled.campaign.tree</field>
+        <field name="model">whatsapp.scheduled.campaign</field>
+        <field name="arch" type="xml">
+            <list string="Scheduled Campaigns">
+                <field name="campaign_id"/>
+                <field name="scheduled_date"/>
+                <field name="timezone_id"/>
+                <field name="schedule_type"/>
+                <field name="recurring_type"/>
+                <field name="status"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="whatsapp_scheduled_campaign_view_form" model="ir.ui.view">
+        <field name="name">whatsapp.scheduled.campaign.form</field>
+        <field name="model">whatsapp.scheduled.campaign</field>
+        <field name="arch" type="xml">
+            <form string="Scheduled Campaign">
+                <header>
+                    <button name="action_send" type="object" string="Execute Now" class="btn-primary"
+                            invisible="status not in ['draft', 'scheduled']"/>
+                    <button name="action_schedule" type="object" string="Schedule"
+                            invisible="status != 'draft'"/>
+                    <field name="status" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="campaign_id" options="{'no_create': True}"/></h1>
+                    </div>
+                    <group>
+                        <group string="Scheduling">
+                            <field name="schedule_type"/>
+                            <field name="scheduled_date"/>
+                            <field name="timezone_id"/>
+                        </group>
+                        <group string="Execution Stats">
+                            <field name="execution_count" readonly="1"/>
+                            <field name="last_execution_date" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Recurrence Options" invisible="schedule_type != 'recurring'">
+                        <field name="recurring_type"/>
+                        <field name="recurring_interval"/>
+                        <field name="recurrence_end_date"/>
+                        <field name="cron_expression" invisible="recurring_type != 'custom'"/>
+                    </group>
+                    <group string="A/B Testing Settings">
+                        <field name="variant_a_template" readonly="1"/>
+                        <field name="variant_b_template" readonly="1"/>
+                        <field name="split_percentage" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
     <!-- Menu Item -->
+
+    <record id="whatsapp_campaign_schedule_wizard_view_form" model="ir.ui.view">
+        <field name="name">whatsapp.campaign.schedule.wizard.form</field>
+        <field name="model">whatsapp.campaign.schedule.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Schedule Campaign">
+                <sheet>
+                    <group>
+                        <field name="campaign_id" readonly="1"/>
+                        <field name="schedule_type" widget="radio"/>
+                    </group>
+                    <group invisible="schedule_type == 'immediate'">
+                        <field name="scheduled_date" required="schedule_type in ['scheduled', 'recurring']"/>
+                        <field name="timezone_id" required="1"/>
+                        <field name="respect_contact_timezone"/>
+                    </group>
+                    <group string="Recurrence Settings" invisible="schedule_type != 'recurring'">
+                        <field name="recurring_type" required="schedule_type == 'recurring'"/>
+                        <field name="recurring_interval" required="schedule_type == 'recurring'"/>
+                        <field name="recurrence_end_date"/>
+                        <field name="cron_expression" invisible="recurring_type != 'custom'" required="recurring_type == 'custom'"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_schedule" string="Confirm" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_whatsapp_campaign_schedule_wizard" model="ir.actions.act_window">
+        <field name="name">Schedule Campaign</field>
+        <field name="res_model">whatsapp.campaign.schedule.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
 
 </odoo>

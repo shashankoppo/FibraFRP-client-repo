@@ -31,7 +31,7 @@
                 <header>
                     <button name="action_load_recipients" string="Load Recipients" type="object" class="btn-secondary" invisible="state != 'draft'"/>
                     <button name="action_generate_ai_content" string="Draft Content" type="object" class="btn-secondary" invisible="state != 'draft'"/>
-                    <button name="action_send_campaign" string="Queue Campaign" type="object" class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="%(elsx_whatsapp_marketing.action_whatsapp_campaign_schedule_wizard)d" string="Schedule / Send" type="action" class="btn-primary" invisible="state != 'draft'" context="{'default_campaign_id': active_id}"/>
                     <button name="action_process_queue" string="Process Queue (Send 50)" type="object" class="btn-warning" invisible="state != 'running'"/>
                     <button name="action_cancel" string="Cancel" type="object" class="btn-danger" invisible="state in ['completed', 'cancelled']"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,scheduled,running,completed"/>

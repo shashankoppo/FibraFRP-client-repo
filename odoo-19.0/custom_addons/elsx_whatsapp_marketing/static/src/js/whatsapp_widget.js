@@ -389,6 +389,9 @@ export class WhatsAppChatHandler {
             const sysParam = await this._rpc('whatsapp.chat', 'get_sidecar_url', []);
             if (sysParam) {
                 socketUrl = sysParam;
+                if (socketUrl.includes('sidecar')) {
+                    socketUrl = socketUrl.replace('sidecar', window.location.hostname);
+                }
             } else {
                 const origin = window.location.origin;
                 if (!origin.includes('localhost')) {
@@ -679,9 +682,29 @@ export class WhatsAppChatHandler {
 
     // Helper: refresh all sidebar panes from offset 0
     _refreshAllPanes() {
+        this._updateSidebarCounts();
         Object.keys(this._paneIds).forEach(paneKey => {
             this._fetchAndRenderSidebar(paneKey, 0, false);
         });
+    }
+
+    async _updateSidebarCounts() {
+        try {
+            const counts = await this._rpc('whatsapp.chat', 'get_sidebar_counts', [], {
+                filter_type: this._sidebarFilter,
+                search_query: this._sidebarQuery,
+            });
+            if (counts) {
+                Object.entries(counts).forEach(([paneKey, count]) => {
+                    const badge = document.querySelector(`.wa-pane-count-${paneKey}`);
+                    if (badge) {
+                        badge.textContent = count;
+                    }
+                });
+            }
+        } catch (e) {
+            console.warn('[WhatsApp] Failed to fetch sidebar counts:', e);
+        }
     }
 
     // Fetch and render sidebar for a specific pane
@@ -725,12 +748,6 @@ export class WhatsAppChatHandler {
 
             this._hasMoreSidebar[paneKey] = chats.length === limit;
             this._sidebarOffsets[paneKey] += chats.length;
-
-            const badge = document.querySelector(`.wa-pane-count-${paneKey}`);
-            if (badge) {
-                const totalLoaded = this._sidebarOffsets[paneKey];
-                badge.textContent = totalLoaded + (this._hasMoreSidebar[paneKey] ? '+' : '');
-            }
 
             let html = '';
             chats.forEach(chat => {
@@ -1082,7 +1099,7 @@ export class WhatsAppChatHandler {
     async _updateSidebarForChat(chatId) {
         if (!chatId) return;
         try {
-            const res = await this._rpc('whatsapp.chat', 'read', [[parseInt(chatId)], ['last_message_body', 'last_message_date', 'unread_count']]);
+            const res = await this._rpc('whatsapp.chat', 'read', [[parseInt(chatId)], ['last_message_body', 'last_message_date_str', 'unread_count']]);
             if (!res || !res[0]) return;
             const data = res[0];
 
@@ -1092,7 +1109,7 @@ export class WhatsAppChatHandler {
                 const bodyEl = sidebarItem.querySelector('.text-muted.text-truncate.d-flex');
                 if (bodyEl) bodyEl.innerHTML = data.last_message_body || 'No messages yet';
                 const dateEl = sidebarItem.querySelector('.d-flex.flex-column.align-items-end .small.text-muted');
-                if (dateEl) dateEl.innerText = data.last_message_date || '';
+                if (dateEl) dateEl.innerText = data.last_message_date_str || '';
                 // Move to top of its pane
                 const btnContainer = sidebarItem.closest('button.o_whatsapp_sidebar_btn');
                 if (btnContainer) {

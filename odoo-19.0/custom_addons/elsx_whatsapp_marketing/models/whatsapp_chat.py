@@ -199,6 +199,9 @@ class WhatsAppChat(models.Model):
             rec.active_chat_ids = active_chats
             rec.request_chat_ids = request_chats
             rec.intervened_chat_ids = intervened_chats
+
+    @api.depends('message_ids.create_date', 'message_ids.body', 'message_ids.status', 'message_ids.direction', 'message_ids.message_type')
+    def _compute_last_message(self):
         for record in self:
             last = record.message_ids.sorted('create_date', reverse=True)[:1]
             if last:
@@ -406,6 +409,51 @@ class WhatsAppChat(models.Model):
                 'state': chat.state,
             })
         return result
+
+    @api.model
+    def get_sidebar_counts(self, filter_type='all', search_query='', **kwargs):
+        """Returns the actual database counts of chats in the three panes (active, request, intervened)"""
+        counts = {
+            'active': 0,
+            'request': 0,
+            'intervened': 0,
+        }
+        
+        base_domain = [('is_archived', '=', False)]
+        
+        if filter_type == 'open':
+            import datetime
+            cutoff = fields.Datetime.now() - datetime.timedelta(days=1)
+            base_domain.append(('last_inbound_date', '>=', cutoff))
+            base_domain.append(('state', '=', 'open'))
+        elif filter_type == 'unread':
+            base_domain.append(('unread_count', '>', 0))
+        elif filter_type == 'resolved':
+            base_domain.append(('state', '=', 'resolved'))
+        elif filter_type == 'snoozed':
+            base_domain.append(('state', '=', 'snoozed'))
+
+        if search_query:
+            base_domain.append('|')
+            base_domain.append(('display_name', 'ilike', search_query))
+            base_domain.append(('phone_number', 'ilike', search_query))
+
+        # Count active (Mine)
+        domain_active = base_domain + [('assigned_user_id', '=', self.env.user.id)]
+        counts['active'] = self.search_count(domain_active)
+
+        # Count request (Unassigned)
+        domain_request = base_domain + [('assigned_user_id', '=', False)]
+        counts['request'] = self.search_count(domain_request)
+
+        # Count intervened (All other assigned users)
+        domain_intervened = base_domain + [
+            ('assigned_user_id', '!=', False),
+            ('assigned_user_id', '!=', self.env.user.id)
+        ]
+        counts['intervened'] = self.search_count(domain_intervened)
+
+        return counts
 
     def action_send_quick_reply(self):
         self.ensure_one()
