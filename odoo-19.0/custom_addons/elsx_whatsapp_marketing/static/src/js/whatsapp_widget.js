@@ -1244,6 +1244,67 @@ export class WhatsAppChatHandler {
             return;
         }
 
+        // Resolve Intercept
+        const resolveBtn = e.target.closest('button[name="action_resolve"]');
+        if (resolveBtn) {
+            e.preventDefault(); e.stopPropagation();
+            const chatId = this._getActiveChatId();
+            if (chatId) {
+                this._rpc('whatsapp.chat', 'action_resolve', [[chatId]]).then(() => {
+                    this._lastChatId = null;
+                    this._selectedChatId = null;
+                    sessionStorage.removeItem('wa_selected_chat_id');
+                    this._refreshAllPanes();
+                    if (window.innerWidth <= 991) {
+                        const sidebar = document.querySelector('.wa-left-sidebar');
+                        const main = document.querySelector('.o_whatsapp_chat_main');
+                        if (sidebar) { sidebar.classList.remove('d-none'); sidebar.classList.add('d-flex'); }
+                        if (main) main.classList.add('d-none');
+                    }
+                    this._hardRefresh();
+                });
+            }
+            return;
+        }
+
+        // Snooze Intercept
+        const snoozeBtn = e.target.closest('button[name="action_snooze"]');
+        if (snoozeBtn) {
+            e.preventDefault(); e.stopPropagation();
+            const chatId = this._getActiveChatId();
+            if (chatId) {
+                this._rpc('whatsapp.chat', 'action_snooze', [[chatId]]).then(() => {
+                    this._lastChatId = null;
+                    this._selectedChatId = null;
+                    sessionStorage.removeItem('wa_selected_chat_id');
+                    this._refreshAllPanes();
+                    if (window.innerWidth <= 991) {
+                        const sidebar = document.querySelector('.wa-left-sidebar');
+                        const main = document.querySelector('.o_whatsapp_chat_main');
+                        if (sidebar) { sidebar.classList.remove('d-none'); sidebar.classList.add('d-flex'); }
+                        if (main) main.classList.add('d-none');
+                    }
+                    this._hardRefresh();
+                });
+            }
+            return;
+        }
+
+        // Reopen Intercept
+        const reopenBtn = e.target.closest('button[name="action_reopen"]');
+        if (reopenBtn) {
+            e.preventDefault(); e.stopPropagation();
+            const chatId = this._getActiveChatId();
+            if (chatId) {
+                this._rpc('whatsapp.chat', 'action_reopen', [[chatId]]).then(() => {
+                    this._refreshAllPanes();
+                    this._surgicalRefresh(chatId);
+                });
+            }
+            return;
+        }
+
+
         // Send message
         const sendBtn = e.target.closest('button[name="action_send_quick_reply"]');
         if (sendBtn) {
