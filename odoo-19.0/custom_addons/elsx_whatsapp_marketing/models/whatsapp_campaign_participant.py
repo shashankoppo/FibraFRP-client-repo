@@ -9,10 +9,9 @@ class WhatsAppCampaignParticipant(models.Model):
     _name = 'whatsapp.campaign.participant'
     _description = 'WhatsApp Campaign Participant'
     
-    _campaign_partner_unique = models.Constraint(
-        'unique(campaign_id, partner_id)',
-        'A contact can only be added once per campaign.',
-    )
+    _sql_constraints = [
+        ('campaign_partner_unique', 'unique(campaign_id, partner_id)', 'A contact can only be added once per campaign.')
+    ]
     
     campaign_id = fields.Many2one('whatsapp.campaign', string='Campaign', required=True, ondelete='cascade')
     partner_id = fields.Many2one('res.partner', string='Contact', required=True)
@@ -32,9 +31,17 @@ class WhatsAppCampaignParticipant(models.Model):
         ])
         
         for participant in participants:
+            # Check opt-in status dynamically before executing any steps
+            contact = self.env['whatsapp.contact'].sudo().search([('partner_id', '=', participant.partner_id.id)], limit=1)
+            if contact and not contact.opt_in:
+                participant.write({'state': 'stopped'})
+                _logger.info(f"Drip Campaign stopped for {participant.partner_id.name} due to opt-out.")
+                continue
+
             # Find next step based on sequence
             next_step = self.env['whatsapp.campaign.step'].search([
                 ('campaign_id', '=', participant.campaign_id.id),
+
                 ('sequence', '>', participant.current_step_id.sequence if participant.current_step_id else -1)
             ], order='sequence', limit=1)
             
