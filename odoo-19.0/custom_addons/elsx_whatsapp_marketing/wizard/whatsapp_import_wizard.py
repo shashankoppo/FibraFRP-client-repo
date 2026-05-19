@@ -5,6 +5,7 @@ import csv
 import io
 import xlrd
 import logging
+import re
 from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
@@ -24,7 +25,16 @@ class WhatsAppImportWizard(models.TransientModel):
     campaign_id = fields.Many2one('whatsapp.campaign', string='Add to Campaign')
     
     auto_format_numbers = fields.Boolean('Auto-format Phone Numbers', default=True, help="Removes spaces, dashes, and ensures country code.")
-    default_country_code = fields.Char('Default Country Code', default='91', help="e.g. 91 for India")
+    default_country_code = fields.Char(
+        'Default Country Code',
+        default=lambda self: self.env['whatsapp.account'].search([('active', '=', True)], limit=1).default_country_code or '91',
+        help="e.g. 91 for India",
+    )
+
+    @api.onchange('account_id')
+    def _onchange_account_id(self):
+        if self.account_id and self.account_id.default_country_code:
+            self.default_country_code = self.account_id.default_country_code
 
     def action_import(self):
         self.ensure_one()
@@ -77,14 +87,18 @@ class WhatsAppImportWizard(models.TransientModel):
                 })
 
         created_partners = self.env['res.partner']
+        normalizer = self.env['whatsapp.message']
+        default_cc = ''.join(ch for ch in (self.default_country_code or '') if ch.isdigit())
         for data in contacts_data:
             phone = str(data['phone']).strip()
             if self.auto_format_numbers:
-                # Remove common non-numeric chars
-                for char in [' ', '-', '(', ')', '+', '.0']:
-                    phone = phone.replace(char, '')
-                if not phone.startswith(self.default_country_code) and len(phone) <= 10:
-                    phone = self.default_country_code + phone
+                phone = re.sub(r'\D', '', phone)
+                if default_cc and len(phone) == 10 and not phone.startswith(default_cc):
+                    phone = default_cc + phone
+
+            phone = normalizer._normalize_phone(phone, account=self.account_id, strict=False)
+            if not phone:
+                continue
             
             # Find or create partner safely
             search_domain = [('phone', '=', phone)]

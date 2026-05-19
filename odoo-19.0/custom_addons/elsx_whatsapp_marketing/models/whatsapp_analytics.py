@@ -42,6 +42,9 @@ class WhatsAppAnalytics(models.Model):
     delivery_rate = fields.Float('Delivery Rate %')
     read_rate = fields.Float('Read Rate %')
     failure_rate = fields.Float('Failure Rate %')
+    avg_latency = fields.Float('Avg Latency (ms)')
+    total_spend = fields.Float('Total Spend')
+    opt_out_count = fields.Integer('Opt-outs')
     
     # Engagement
     unique_contacts = fields.Integer('Unique Contacts')
@@ -81,6 +84,9 @@ class WhatsAppAnalytics(models.Model):
                     CASE WHEN m.status IN ('delivered', 'read') THEN 1 ELSE 0 END AS delivered_count,
                     CASE WHEN m.status = 'read' THEN 1 ELSE 0 END AS read_count,
                     CASE WHEN m.status = 'failed' THEN 1 ELSE 0 END AS failed_count,
+                    m.latency_ms AS avg_latency,
+                    m.message_cost AS total_spend,
+                    CASE WHEN m.is_opt_out THEN 1 ELSE 0 END AS opt_out_count,
                     0.0 AS delivery_rate,
                     0.0 AS read_rate,
                     0.0 AS failure_rate,

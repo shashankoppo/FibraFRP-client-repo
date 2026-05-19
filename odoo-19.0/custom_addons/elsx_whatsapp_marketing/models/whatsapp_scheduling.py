@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api
+from odoo.exceptions import UserError
 from datetime import datetime, timedelta
 import pytz
 import logging
+import json
 
 _logger = logging.getLogger(__name__)
 
@@ -115,6 +117,8 @@ class WhatsAppScheduledMessage(models.Model):
     
     def action_schedule(self):
         """Schedule the message"""
+        if any(record.schedule_type == 'recurring' for record in self):
+            raise UserError("Recurring scheduled messages are not implemented yet.")
         self.write({'status': 'scheduled'})
         
         return {
@@ -161,7 +165,7 @@ class WhatsAppScheduledMessage(models.Model):
         """Send the message to recipients"""
         # Determine recipients
         if self.recipient_type == 'single':
-            recipients = [self.partner_id]
+            recipients = self.partner_id
         elif self.recipient_type == 'multiple':
             recipients = self.partner_ids
         elif self.recipient_type == 'segment':
@@ -170,27 +174,61 @@ class WhatsAppScheduledMessage(models.Model):
             recipients = self.campaign_id.partner_ids
         else:
             return
-        
+
+        recipients = recipients.filtered(lambda partner: partner)
+        if not recipients:
+            raise UserError("Please select at least one scheduled recipient.")
+
         for partner in recipients:
-            phone = partner.mobile or partner.phone
+            phone = getattr(partner, 'mobile', False) or partner.phone
             if not phone:
                 continue
-            
-            vals = {
-                'account_id': self.account_id.id,
-                'phone_number': phone,
-                'partner_id': partner.id,
-                'message_type': self.message_type,
-                'direction': 'outbound',
-            }
-            
+
             if self.message_type == 'text':
-                vals['body'] = self.message_body
+                vals = {
+                    'account_id': self.account_id.id,
+                    'phone_number': phone,
+                    'partner_id': partner.id,
+                    'message_type': 'text',
+                    'body': self.message_body,
+                    'direction': 'outbound',
+                    'is_automated': True,
+                }
             elif self.message_type == 'template':
-                vals['template_id'] = self.template_id.id
+                if not self.template_id:
+                    raise UserError("Please select a template for scheduled template messages.")
+                payload = self.template_id._prepare_send_payload(partner=partner)
+                vals = {
+                    'account_id': self.account_id.id,
+                    'phone_number': phone,
+                    'partner_id': partner.id,
+                    'message_type': 'template',
+                    'body': self.template_id.body,
+                    'template_id': self.template_id.id,
+                    'template_name': self.template_id._get_send_template_name(),
+                    'template_language': self.template_id._get_send_language_code(),
+                    'raw_data': json.dumps(payload),
+                    'direction': 'outbound',
+                    'is_automated': True,
+                }
             elif self.message_type == 'media':
-                vals['media_id'] = self.media_id.id
-            
+                if not self.media_id:
+                    raise UserError("Please select media for scheduled media messages.")
+                vals = {
+                    'account_id': self.account_id.id,
+                    'phone_number': phone,
+                    'partner_id': partner.id,
+                    'message_type': self.media_id.media_type,
+                    'body': self.message_body,
+                    'caption': self.message_body,
+                    'media_file': self.media_id.media_file,
+                    'media_filename': self.media_id.media_filename,
+                    'direction': 'outbound',
+                    'is_automated': True,
+                }
+            else:
+                continue
+
             message = self.env['whatsapp.message'].create(vals)
             message.action_send()
     
@@ -206,6 +244,7 @@ class WhatsAppScheduledMessage(models.Model):
         # Find scheduled messages that are ready to send
         scheduled_msgs = self.search([
             ('status', '=', 'scheduled'),
+            ('schedule_type', '=', 'once'),
             ('scheduled_date', '<=', now)
         ])
         
@@ -290,10 +329,15 @@ class WhatsAppCampaignScheduleWizard(models.TransientModel):
         if self.schedule_type == 'immediate':
             self.campaign_id.action_send_campaign()
         elif self.schedule_type == 'scheduled':
+            if not self.scheduled_date:
+                raise UserError("Please select a scheduled date.")
             self.campaign_id.write({
                 'schedule_type': 'scheduled',
                 'schedule_date': self.scheduled_date,
             })
+            self.campaign_id.action_send_campaign()
+        elif self.schedule_type == 'recurring':
+            raise UserError("Recurring campaigns are not implemented yet.")
         
         return {
             'type': 'ir.actions.client',

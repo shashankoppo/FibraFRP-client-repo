@@ -7,6 +7,8 @@ import logging
 import base64
 import io
 import mimetypes
+import random
+from datetime import timedelta
 
 _logger = logging.getLogger(__name__)
 
@@ -135,6 +137,14 @@ class WhatsAppAccount(models.Model):
     quality_rating = fields.Char('Quality Rating', readonly=True)
     messaging_limit = fields.Char('Messaging Limit', readonly=True)
     
+    # Industrial Tier & Compliance
+    opt_out_keywords = fields.Char('Opt-out Keywords', default='STOP,UNSUBSCRIBE,OFF', 
+                                  help="Comma-separated keywords that trigger automatic blacklisting.")
+    daily_message_count = fields.Integer('Daily Message Count', default=0, readonly=True)
+    max_daily_limit = fields.Integer('Max Daily Limit', default=1000, 
+                                    help="Meta messaging tier limit (e.g., 1000, 10000).")
+    is_limit_reached = fields.Boolean('Limit Reached', compute='_compute_limit_reached', store=True)
+    
     # API Test Fields
     test_phone_number = fields.Char('Test Recipient')
     test_message_body = fields.Text('Test Body')
@@ -142,6 +152,11 @@ class WhatsAppAccount(models.Model):
     test_api_response = fields.Text('Last API Response')
     is_sandbox = fields.Boolean('Sandbox Mode', default=False)
     sandbox_warning = fields.Text('Sandbox Notice', compute='_compute_sandbox_warning')
+
+    @api.depends('is_sandbox', 'daily_message_count', 'max_daily_limit')
+    def _compute_limit_reached(self):
+        for rec in self:
+            rec.is_limit_reached = rec.daily_message_count >= rec.max_daily_limit
 
     @api.depends('is_sandbox')
     def _compute_sandbox_warning(self):
@@ -250,15 +265,22 @@ class WhatsAppAccount(models.Model):
             if response.status_code == 200:
                 templates_data = response.json().get('data', [])
                 for t_data in templates_data:
+                    template_name = t_data.get('name')
+                    language_code = t_data.get('language') or 'en_US'
                     template = self.env['whatsapp.template'].search([
-                        ('name', '=', t_data.get('name')),
-                        ('account_id', '=', self.id)
+                        ('account_id', '=', self.id),
+                        ('language_code', '=', language_code),
+                        '|',
+                            ('meta_template_name', '=', template_name),
+                            ('name', '=', template_name),
                     ], limit=1)
                     
                     vals = {
-                        'name': t_data.get('name'),
+                        'name': template_name,
+                        'meta_template_name': template_name,
                         'template_id': t_data.get('id'),
-                        'language_code': t_data.get('language'),
+                        'language_code': language_code,
+                        'language': self.env['whatsapp.template']._normalize_language_selection(language_code),
                         'category': self._map_template_category(t_data.get('category')),
                         'status': self._map_template_status(t_data.get('status')),
                         'account_id': self.id,
@@ -283,6 +305,7 @@ class WhatsAppAccount(models.Model):
                 
                 self.last_sync_date = fields.Datetime.now()
                 return True
+            raise UserError(_("Meta template sync failed: %s") % (response.text or response.status_code))
         except Exception as e:
             _logger.error(f"Sync failed: {e}")
             raise
@@ -304,6 +327,12 @@ class WhatsAppAccount(models.Model):
         }
         return status_map.get(status, 'draft')
 
+    @api.model
+    def _cron_reset_daily_counters(self):
+        """Reset daily message counters for all accounts at midnight UTC."""
+        self.search([]).write({'daily_message_count': 0})
+        _logger.info("WhatsApp daily message counters reset successfully.")
+
     def _consume_rate_limit_token(self):
         """Consume 1 token from the bucket using atomic SQL to prevent SerializationFailure.
         
@@ -315,7 +344,11 @@ class WhatsAppAccount(models.Model):
         now = fields.Datetime.now()
         if not self.token_bucket_last_fill:
             # First-time initialization — safe to use ORM since it's a one-time write
-            self.sudo().write({'token_bucket_last_fill': now, 'token_bucket_level': self.rate_limit_capacity})
+            self.sudo().write({
+                'token_bucket_last_fill': now,
+                'token_bucket_level': max((self.rate_limit_capacity or 1.0) - 1.0, 0.0),
+                'daily_message_count': self.daily_message_count + 1,
+            })
             return True
 
         diff_seconds = (now - self.token_bucket_last_fill).total_seconds()
@@ -330,11 +363,12 @@ class WhatsAppAccount(models.Model):
                 UPDATE whatsapp_account
                 SET token_bucket_level = %s,
                     token_bucket_last_fill = %s,
+                    daily_message_count = daily_message_count + 1,
                     write_date = NOW() AT TIME ZONE 'UTC'
                 WHERE id = %s
             """, (new_level - 1.0, now, self.id))
             # Invalidate the ORM cache so subsequent reads see the new values
-            self.invalidate_recordset(['token_bucket_level', 'token_bucket_last_fill'])
+            self.invalidate_recordset(['token_bucket_level', 'token_bucket_last_fill', 'daily_message_count'])
             return True
         except Exception:
             _logger.warning(f"Token bucket contention on account {self.id}, will retry next cycle")
@@ -347,6 +381,17 @@ class WhatsAppAccount(models.Model):
         """
         self.ensure_one()
         to_number = self.env['whatsapp.message']._normalize_phone(to_number, account=self, strict=True)
+        existing_msg = kwargs.get('existing_message')
+        if not existing_msg and not kwargs.get('skip_compliance'):
+            self.env['whatsapp.message'].new({
+                'account_id': self.id,
+                'phone_number': to_number,
+                'partner_id': kwargs.get('partner_id'),
+                'campaign_id': kwargs.get('campaign_id'),
+                'message_type': message_type,
+                'direction': 'outbound',
+                'is_automated': bool(kwargs.get('is_automated') or kwargs.get('campaign_id')),
+            })._check_compliance()
         url = f"https://graph.facebook.com/{self.api_version}/{self.phone_number_id}/messages"
         headers = {
             'Authorization': f'Bearer {self.access_token}',
@@ -364,7 +409,7 @@ class WhatsAppAccount(models.Model):
             if len(body) > TEXT_MESSAGE_LIMIT:
                 raise UserError(_("WhatsApp text messages cannot exceed %s characters.") % TEXT_MESSAGE_LIMIT)
             payload['type'] = 'text'
-            payload['text'] = {'body': body}
+            payload['text'] = {'body': body, 'preview_url': True}
         
         elif message_type == 'template':
             payload['type'] = 'template'
@@ -382,9 +427,9 @@ class WhatsAppAccount(models.Model):
                 }
             
             if template_payload:
-                # Ensure components key exists for Meta API stability
-                if 'components' not in template_payload:
-                    template_payload['components'] = []
+                # Ensure components key is omitted entirely if empty for Meta API stability (Prevents 131009 error)
+                if 'components' in template_payload and not template_payload['components']:
+                    del template_payload['components']
                 payload['template'] = template_payload
             else:
                 raise UserError(_("Template messages require a template payload, template record, or template name."))
@@ -408,6 +453,10 @@ class WhatsAppAccount(models.Model):
                 payload['video'] = {'id': media_id}
             else:
                 payload['video'] = kwargs.get('video') or self._prepare_media_reference(kwargs.get('media_url'), 'video')
+            if kwargs.get('caption'):
+                if len(kwargs['caption']) > CAPTION_LIMIT:
+                    raise UserError(_("WhatsApp media captions cannot exceed %s characters.") % CAPTION_LIMIT)
+                payload['video']['caption'] = kwargs['caption']
 
         elif message_type == 'document':
             payload['type'] = 'document'
@@ -418,6 +467,10 @@ class WhatsAppAccount(models.Model):
                 payload['document'] = kwargs.get('document') or self._prepare_media_reference(kwargs.get('media_url'), 'document')
             if kwargs.get('media_filename'):
                 payload['document']['filename'] = kwargs['media_filename']
+            if kwargs.get('caption'):
+                if len(kwargs['caption']) > CAPTION_LIMIT:
+                    raise UserError(_("WhatsApp media captions cannot exceed %s characters.") % CAPTION_LIMIT)
+                payload['document']['caption'] = kwargs['caption']
 
         elif message_type == 'audio':
             payload['type'] = 'audio'
@@ -429,23 +482,53 @@ class WhatsAppAccount(models.Model):
 
         elif message_type == 'interactive':
             payload['type'] = 'interactive'
-            payload['interactive'] = kwargs.get('interactive', {})
-        
+            interactive_payload = kwargs.get('interactive')
+            if not isinstance(interactive_payload, dict) or not interactive_payload:
+                raise UserError(_("Interactive messages require a valid interactive payload."))
+            if not interactive_payload.get('type'):
+                raise UserError(_("Interactive payload is missing its type."))
+            payload['interactive'] = interactive_payload
+        else:
+            raise UserError(_("Unsupported WhatsApp message type: %s") % message_type)
+
+        context_message_id = kwargs.get('context_message_id')
+        if context_message_id:
+            payload['context'] = {'message_id': context_message_id}
+
+        biz_opaque = kwargs.get('biz_opaque_callback_data') or (f"campaign_{kwargs.get('campaign_id')}" if kwargs.get('campaign_id') else False)
+        if biz_opaque:
+            payload['biz_opaque_callback_data'] = str(biz_opaque)
+
         # Rate Limiting Check
         if not self._consume_rate_limit_token():
             import time
             time.sleep(0.5) # Quick retry wait
             if not self._consume_rate_limit_token():
                 _logger.warning(f"WhatsApp Rate Limit Exceeded for {self.name}")
-                existing_msg = kwargs.get('existing_message')
+                retry_delay = 60 + random.uniform(0, 15)
+                next_retry_at = fields.Datetime.now() + timedelta(seconds=retry_delay)
                 if existing_msg:
                     existing_msg.write({
                         'status': 'queued',
                         'error_message': 'Rate limit exceeded; queued for retry.',
-                        'next_retry_at': fields.Datetime.now(),
+                        'next_retry_at': next_retry_at,
                     })
                     return existing_msg
-                return {'status': 'failed', 'error': 'Rate limit exceeded'}
+                queued_vals = {
+                    'account_id': self.id,
+                    'phone_number': to_number,
+                    'partner_id': kwargs.get('partner_id'),
+                    'campaign_id': kwargs.get('campaign_id'),
+                    'flow_id': kwargs.get('flow_id'),
+                    'message_type': message_type,
+                    'body': kwargs.get('body') or payload.get('text', {}).get('body') or f"Media: {message_type}",
+                    'direction': 'outbound',
+                    'status': 'queued',
+                    'next_retry_at': next_retry_at,
+                    'error_message': 'Rate limit exceeded; queued for retry.',
+                    'raw_data': json.dumps(payload),
+                }
+                return self.env['whatsapp.message'].create(queued_vals)
 
         import time
         start_time = time.time()
@@ -481,27 +564,53 @@ class WhatsAppAccount(models.Model):
                 'phone_number': to_number,
                 'partner_id': kwargs.get('partner_id'),
                 'campaign_id': kwargs.get('campaign_id'),
+                'flow_id': kwargs.get('flow_id'),
                 'message_type': message_type,
                 'body': kwargs.get('body') or (payload.get('text', {}).get('body')) or f"Media: {message_type}",
                 'direction': 'outbound',
                 'raw_data': json.dumps(payload),
             }
 
-            if response.status_code == 200:
+            if response.status_code in (200, 201):
                 vals.update({
                     'status': 'sent',
                     'message_id': response_data.get('messages', [{}])[0].get('id'),
                     'sent_date': fields.Datetime.now(),
                     'error_message': False,
+                    'latency_ms': latency,
+                    'retry_count': 0,
+                    'next_retry_at': False,
                 })
             else:
-                _logger.error(f"WhatsApp send failed: {response_data}")
+                error_msg = str(response_data.get('error', {}).get('message', 'Unknown error'))
+                error_code = response_data.get('error', {}).get('code')
+                
+                _logger.error(f"WhatsApp send failed (Code {error_code}): {error_msg}")
+                
                 vals.update({
                     'status': 'failed',
-                    'error_message': str(response_data.get('error', {}).get('message', 'Unknown error')),
+                    'error_message': error_msg,
                 })
-            
-            existing_msg = kwargs.get('existing_message')
+                retryable_codes = {4, 17, 32, 613, 130429, 131048, 131056}
+                retryable = response.status_code in (408, 425, 429, 500, 502, 503, 504) or error_code in retryable_codes
+                if retryable:
+                    current_retry = existing_msg.retry_count if existing_msg else 0
+                    retry_delay = min(3600, 60 * (2 ** min(current_retry, 5))) + random.uniform(0, 10)
+                    vals.update({
+                        'retry_count': current_retry + 1,
+                        'next_retry_at': fields.Datetime.now() + timedelta(seconds=retry_delay),
+                    })
+                else:
+                    vals['next_retry_at'] = False
+
+                # Handle Authentication Errors (190) specifically for Enterprise Stability
+                if error_code == 190:
+                    self.sudo().write({
+                        'status': 'disconnected',
+                        'webhook_status': 'failed',
+                        'webhook_last_error': f"Authentication Failed (190): {error_msg}"
+                    })
+
             if existing_msg:
                 existing_msg.write(vals)
                 return existing_msg
@@ -511,6 +620,31 @@ class WhatsAppAccount(models.Model):
                 
         except Exception as e:
             _logger.error(f"WhatsApp message send error: {str(e)}")
+            if existing_msg:
+                try:
+                    existing_msg.write({
+                        'status': 'failed',
+                        'error_message': str(e),
+                    })
+                except Exception:
+                    _logger.exception("Failed to persist send error on existing message %s", existing_msg.id)
+            else:
+                try:
+                    self.env['whatsapp.message'].create({
+                        'account_id': self.id,
+                        'phone_number': to_number,
+                        'partner_id': kwargs.get('partner_id'),
+                        'campaign_id': kwargs.get('campaign_id'),
+                        'flow_id': kwargs.get('flow_id'),
+                        'message_type': message_type,
+                        'body': kwargs.get('body') or payload.get('text', {}).get('body') or f"Media: {message_type}",
+                        'direction': 'outbound',
+                        'status': 'failed',
+                        'error_message': str(e),
+                        'raw_data': json.dumps(payload),
+                    })
+                except Exception:
+                    _logger.exception("Failed to create failed-send message log for account %s", self.id)
             raise
 
     def _prepare_media_reference(self, media_reference, media_type):
@@ -580,7 +714,7 @@ class WhatsAppAccount(models.Model):
             response = requests.post(url, headers=headers, files=files, data=data, timeout=60)
             resp_json = response.json() if response.content else {}
             
-            if response.status_code == 200:
+            if response.status_code in (200, 201):
                 return resp_json.get('id')
             else:
                 error_msg = resp_json.get('error', {}).get('message', 'Upload failed')
@@ -675,7 +809,11 @@ class WhatsAppAccount(models.Model):
         if not self.test_phone_number or not self.test_message_body:
             return False
         try:
-            msg = self.send_message(self.test_phone_number, body=self.test_message_body)
+            msg = self.send_message(
+                self.test_phone_number,
+                message_type='text',
+                body=self.test_message_body,
+            )
             if msg.status == 'sent':
                 self.test_api_status = 'success'
             else:

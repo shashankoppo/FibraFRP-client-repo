@@ -5,7 +5,11 @@ class WhatsAppNewChatWizard(models.TransientModel):
     _name = 'whatsapp.new.chat.wizard'
     _description = 'Start New WhatsApp Conversation'
 
-    account_id = fields.Many2one('whatsapp.account', string='WhatsApp Account', required=True)
+    @api.model
+    def _default_account_id(self):
+        return self.env['whatsapp.account'].search([('active', '=', True)], limit=1)
+
+    account_id = fields.Many2one('whatsapp.account', string='WhatsApp Account', required=True, default=_default_account_id)
     partner_id = fields.Many2one('res.partner', string='Select Contact')
     phone_number = fields.Char('Phone Number', help='Enter phone number with country code if not selecting a contact')
 

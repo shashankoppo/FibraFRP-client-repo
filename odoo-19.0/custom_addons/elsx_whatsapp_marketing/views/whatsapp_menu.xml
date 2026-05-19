@@ -36,7 +36,7 @@
               name="Team Inbox"
               parent="menu_whatsapp_engage"
               sequence="5"
-              action="action_whatsapp_chat"/>
+              action="action_whatsapp_console_direct"/>
 
     <!-- 2. Messages -->
     <record id="action_whatsapp_message" model="ir.actions.act_window">
@@ -188,18 +188,11 @@
               sequence="55"
               action="action_whatsapp_bot_rules"/>
 
-    <!-- Quick Replies -->
-    <record id="action_whatsapp_quick_reply" model="ir.actions.act_window">
-        <field name="name">Quick Replies</field>
-        <field name="res_model">whatsapp.quick.reply</field>
-        <field name="view_mode">list,form</field>
-    </record>
-
-    <menuitem id="menu_whatsapp_quick_replies_auto"
+    <menuitem id="menu_whatsapp_quick_replies"
               name="Quick Replies"
               parent="menu_whatsapp_automation"
               sequence="60"
-              action="action_whatsapp_quick_replies"/>
+              action="action_whatsapp_quick_reply"/>
 
     <!-- =====================================================
          SECTION 4: ANALYTICS (Sequence 70-80)

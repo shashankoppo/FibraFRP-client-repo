@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import re
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
 
@@ -25,6 +26,92 @@ class WhatsAppSendWizard(models.TransientModel):
     media_file = fields.Binary('Media / Voice File')
     media_filename = fields.Char('Media Filename')
     message_body = fields.Text('Message', help="Leave empty to use template body or send media without a caption")
+    template_preview_html = fields.Html(
+        string='Template Live Preview',
+        compute='_compute_template_preview_html',
+    )
+
+    @api.depends('template_id')
+    def _compute_template_preview_html(self):
+        for record in self:
+            if not record.template_id:
+                record.template_preview_html = False
+                continue
+            
+            t = record.template_id
+            
+            # Header
+            header_html = ""
+            if t.header_type == 'text' and t.header_text:
+                header_html = f'<div style="font-weight: bold; font-size: 0.95rem; color: #111B21; margin-bottom: 4px;">{t.header_text}</div>'
+            elif t.header_type == 'image':
+                header_html = '<div style="background: #E9EDEF; border-radius: 6px; height: 120px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; color: #667781;"><i class="fa fa-image fa-2x" title="Header Image"></i></div>'
+            elif t.header_type == 'video':
+                header_html = '<div style="background: #E9EDEF; border-radius: 6px; height: 120px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; color: #667781;"><i class="fa fa-video-camera fa-2x" title="Header Video"></i></div>'
+            elif t.header_type == 'document':
+                header_html = '<div style="background: #E9EDEF; border-radius: 6px; height: 60px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; color: #667781;"><i class="fa fa-file-pdf-o fa-lg me-2" title="Header Document"></i><span>Document Preview</span></div>'
+
+            # Body (replace variables with beautiful highlighting, e.g. {{1}} -> [Var 1])
+            body_text = t.body or ""
+            # Escape HTML in body
+            body_text = body_text.replace("<", "&lt;").replace(">", "&gt;").replace("\\n", "<br/>")
+            # Highlight placeholders like {{1}}, {{2}} in vibrant modern badges
+            body_text = re.sub(
+                r'\\{\\{(\d+)\\}\\}', 
+                r'<span class="badge rounded-pill bg-light text-primary border px-2 py-1 mx-1" style="font-weight: 500;">[Var \g<1>]</span>', 
+                body_text
+            )
+
+            # Footer
+            footer_html = ""
+            if t.footer:
+                footer_html = f'<div style="font-size: 0.75rem; color: #667781; margin-top: 6px;">{t.footer}</div>'
+
+            # Buttons
+            buttons_html = ""
+            if t.has_buttons:
+                buttons_list = []
+                if t.button_type == 'quick_reply':
+                    if t.button_text_1: buttons_list.append(t.button_text_1)
+                    if t.button_text_2: buttons_list.append(t.button_text_2)
+                    if t.button_text_3: buttons_list.append(t.button_text_3)
+                elif t.button_type == 'call_to_action':
+                    if t.cta_url_text: buttons_list.append(f'<i class="fa fa-external-link me-1"></i>{t.cta_url_text}')
+                    if t.cta_phone_text: buttons_list.append(f'<i class="fa fa-phone me-1"></i>{t.cta_phone_text}')
+                elif t.button_type == 'copy_code':
+                    buttons_list.append('<i class="fa fa-copy me-1"></i>Copy Code')
+
+                if buttons_list:
+                    btn_elements = []
+                    for btn in buttons_list:
+                        btn_elements.append(f'''
+                            <div style="background: #FFFFFF; color: #00A884; font-weight: 600; text-align: center; padding: 10px; font-size: 0.85rem; border-top: 1px solid #E9EDEF; cursor: pointer; flex: 1 1 auto; display: flex; align-items: center; justify-content: center;">
+                                {btn}
+                            </div>
+                        ''')
+                    
+                    buttons_html = f'<div style="display: flex; flex-direction: column; margin-top: 8px; border-radius: 0 0 8px 8px; overflow: hidden;">{"".join(btn_elements)}</div>'
+
+            # Combine into a premium, hyper-realistic WhatsApp chat bubble!
+            record.template_preview_html = f'''
+                <div class="d-flex justify-content-start align-items-end p-3 rounded" style="background: #efeae2; background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); background-repeat: repeat; background-size: 200px; min-height: 200px;">
+                    <div style="background: #FFFFFF; border-radius: 8px; box-shadow: 0 1px 0.5px rgba(11,20,26,.13); max-width: 85%; width: 100%; position: relative; border-top-left-radius: 0;">
+                        <!-- WhatsApp bubble tail -->
+                        <div style="position: absolute; left: -8px; top: 0; width: 0; height: 0; border-top: 8px solid #FFFFFF; border-left: 8px solid transparent;"></div>
+                        
+                        <!-- Content container -->
+                        <div style="padding: 8px 10px 8px 12px;">
+                            {header_html}
+                            <div style="font-size: 0.9rem; line-height: 1.4; color: #111B21; white-space: pre-wrap; word-wrap: break-word;">{body_text}</div>
+                            {footer_html}
+                            <div style="font-size: 0.65rem; color: #667781; text-align: right; margin-top: 2px;">
+                                {fields.Datetime.now().strftime('%I:%M %p')}
+                            </div>
+                        </div>
+                        {buttons_html}
+                    </div>
+                </div>
+            '''
 
     def _normalize_phone(self, phone):
         """Normalize and validate recipient numbers before calling Meta."""

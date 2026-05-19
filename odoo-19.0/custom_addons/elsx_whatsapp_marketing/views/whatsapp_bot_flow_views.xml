@@ -25,6 +25,7 @@
         <field name="arch" type="xml">
             <form string="Bot Flow">
                 <header>
+                    <button name="action_open_visual_builder" type="object" string="Open Visual Builder" class="btn-primary" icon="fa-sitemap"/>
                     <button name="action_test_flow" type="object" string="Test Flow" class="btn-primary"/>
                     <button name="action_view_logs" type="object" string="View Logs" class="btn-secondary"/>
                 </header>
@@ -75,8 +76,52 @@
                                     <field name="step_number"/>
                                     <field name="name"/>
                                     <field name="action_type"/>
-                                    <field name="condition_type"/>
+                                    <field name="next_step_id"/>
                                 </list>
+                                <form string="Flow Step">
+                                    <group>
+                                        <group>
+                                            <field name="step_number"/>
+                                            <field name="name"/>
+                                            <field name="action_type"/>
+                                            <field name="next_step_id"/>
+                                        </group>
+                                        <group>
+                                            <field name="message_text" invisible="action_type not in ['send_text', 'send_buttons', 'send_media', 'create_lead']"/>
+                                            <field name="template_id" invisible="action_type != 'send_template'" domain="[('account_id', '=', parent.account_id), ('status', '=', 'approved')]"/>
+                                            <field name="media_id" invisible="action_type != 'send_media'" domain="[('account_id', '=', parent.account_id)]"/>
+                                            <field name="assign_user_id" invisible="action_type != 'transfer'"/>
+                                            <field name="assign_tag_id" invisible="action_type != 'assign_tag'"/>
+                                            <field name="delay_seconds" invisible="action_type != 'delay'"/>
+                                        </group>
+                                    </group>
+                                    <group string="Condition" invisible="action_type != 'condition'">
+                                        <field name="condition_type"/>
+                                        <field name="condition_value"/>
+                                        <field name="condition_true_step"/>
+                                        <field name="condition_false_step"/>
+                                    </group>
+                                    <group string="HTTP Request" invisible="action_type != 'http_request'">
+                                        <field name="http_method"/>
+                                        <field name="http_url"/>
+                                        <field name="http_payload"/>
+                                    </group>
+                                    <group string="Variables" invisible="action_type not in ['set_variable', 'wait_response']">
+                                        <field name="save_response" invisible="action_type != 'wait_response'"/>
+                                        <field name="response_variable" invisible="action_type != 'wait_response'"/>
+                                        <field name="variable_name" invisible="action_type != 'set_variable'"/>
+                                        <field name="variable_value" invisible="action_type != 'set_variable'"/>
+                                    </group>
+                                    <group string="Quick Reply Buttons" invisible="action_type != 'send_buttons'">
+                                        <field name="button_ids" nolabel="1">
+                                            <list editable="bottom">
+                                                <field name="name"/>
+                                                <field name="button_id"/>
+                                                <field name="next_step_id"/>
+                                            </list>
+                                        </field>
+                                    </group>
+                                </form>
                             </field>
                         </page>
 
@@ -108,5 +153,10 @@
             </p>
             <p>Design visual chatbot flows with drag-and-drop nodes.</p>
         </field>
+    </record>
+
+    <record id="action_whatsapp_bot_flow_builder_client" model="ir.actions.client">
+        <field name="name">Visual Flow Builder</field>
+        <field name="tag">elsx_whatsapp_flow_builder</field>
     </record>
 </odoo>

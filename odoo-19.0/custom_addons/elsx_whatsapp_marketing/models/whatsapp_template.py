@@ -284,7 +284,8 @@ class WhatsAppTemplate(models.Model):
         # Meta API sometimes requires 'id' to be an integer (e.g. v19.0 JSON schema)
         if media_value.isdigit():
             return {"type": media_type, media_type: {"id": int(media_value)}}
-        return {"type": media_type, media_type: {"id": media_value}}
+        # If it's a non-digit handle string (e.g. resumable upload handle), return it as 'handle'
+        return {"type": media_type, media_type: {"handle": media_value}}
 
     def _format_variable_value(self, value):
         if value is False or value is None:
@@ -511,76 +512,117 @@ class WhatsAppTemplate(models.Model):
                 elif rec.button_type == 'copy_code':
                     buttons_html += f"<div style='{button_styles}'><i class='fa fa-copy'></i> Copy code</div>"
 
-            # 5. Assemble Smartphone UI
+            # 5. Assemble Premium Smartphone UI (iPhone 15 Pro Style)
             device_shell = f"""
             <div style='
-                width: 320px; 
+                width: 340px; 
                 margin: 0 auto; 
-                background: #111b21; 
-                border-radius: 36px; 
+                background: #000; 
+                border-radius: 50px; 
                 padding: 12px; 
-                box-shadow: 0 20px 40px rgba(0,0,0,0.15); 
+                box-shadow: 0 30px 60px rgba(0,0,0,0.3); 
                 position: sticky; 
-                top: 20px;'>
+                top: 20px;
+                border: 4px solid #333;
+                height: 700px;
+                display: flex;
+                flex-direction: column;'>
                 
+                <!-- Inner Screen -->
                 <div style='
                     background-color: #efeae2; 
                     background-image: url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png"); 
-                    height: 550px; 
-                    border-radius: 28px; 
-                    overflow-y: auto; 
+                    flex-grow: 1;
+                    border-radius: 38px; 
+                    overflow: hidden; 
                     display: flex; 
-                    flex-direction: column;'>
+                    flex-direction: column;
+                    position: relative;'>
                     
+                    <!-- Dynamic Island (Notch) -->
+                    <div style='
+                        position: absolute;
+                        top: 10px;
+                        left: 50%;
+                        transform: translateX(-50%);
+                        width: 100px;
+                        height: 25px;
+                        background: #000;
+                        border-radius: 20px;
+                        z-index: 100;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;'>
+                        <div style='width: 6px; height: 6px; border-radius: 50%; background: #1a1a1a; margin-right: 40px;'></div>
+                    </div>
+
                     <!-- App Bar -->
-                    <div style='background: #008069; color: white; padding: 12px 16px; display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 10;'>
-                        <i class='fa fa-arrow-left'></i>
-                        <div style='width: 36px; height: 36px; background: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #008069;'>
-                            <i class='fa fa-building'></i>
+                    <div style='background: #f0f2f5; color: #111b21; padding: 40px 16px 12px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #d1d7db;'>
+                        <i class='fa fa-chevron-left' style='color: #008069;'></i>
+                        <div style='width: 40px; height: 40px; background: #dfe5e7; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #54656f;'>
+                            <i class='fa fa-user fa-lg'></i>
                         </div>
                         <div style='flex: 1;'>
-                            <div style='font-weight: 600; font-size: 15px;'>Business Name</div>
+                            <div style='font-weight: 700; font-size: 16px;'>{rec.account_id.name or 'Business Account'}</div>
+                            <div style='font-size: 11px; color: #667781;'>Business Account</div>
                         </div>
+                        <i class='fa fa-video-camera' style='color: #008069;'></i>
+                        <i class='fa fa-phone' style='color: #008069;'></i>
                     </div>
                     
                     <!-- Chat Area -->
-                    <div style='padding: 16px; display: flex; flex-direction: column; gap: 12px;'>
-                        <!-- Message Bubble -->
-                        <div style='
-                            background: white; 
-                            border-radius: 0 8px 8px 8px; 
-                            padding: 8px; 
-                            box-shadow: 0 1px 0.5px rgba(11,20,26,.13); 
-                            align-self: flex-start; 
-                            max-width: 90%; 
-                            position: relative;'>
-                            
-                            <!-- Tail -->
-                            <div style='position: absolute; top: 0; left: -8px; width: 8px; height: 13px;'>
-                                <svg viewBox="0 0 8 13" width="8" height="13" style='fill: white;'><path d="M5.188 1H0v11.156L5.188 1z"/></svg>
+                    <div style='padding: 16px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; flex-grow: 1;'>
+                        <!-- Message Bubble Container -->
+                        <div style='display: flex; flex-direction: column; gap: 2px;'>
+                            <div style='
+                                background: white; 
+                                border-radius: 0 12px 12px 12px; 
+                                padding: 8px; 
+                                box-shadow: 0 1px 2px rgba(11,20,26,.15); 
+                                align-self: flex-start; 
+                                max-width: 85%; 
+                                position: relative;'>
+                                
+                                <!-- Tail -->
+                                <div style='position: absolute; top: 0; left: -10px; width: 10px; height: 13px;'>
+                                    <svg viewBox="0 0 8 13" width="10" height="13" style='fill: white;'><path d="M5.188 1H0v11.156L5.188 1z"/></svg>
+                                </div>
+                                
+                                {header_html}
+                                {body_html}
+                                {footer_html}
                             </div>
                             
-                            {header_html}
-                            {body_html}
-                            {footer_html}
+                            <!-- Buttons (Attached to Bubble) -->
+                            <t t-if="has_buttons">
+                                <div style='
+                                    background: rgba(255,255,255,0.7); 
+                                    backdrop-filter: blur(4px);
+                                    border-radius: 12px; 
+                                    box-shadow: 0 1px 2px rgba(11,20,26,.1); 
+                                    align-self: flex-start; 
+                                    width: 85%; 
+                                    margin-top: 4px;
+                                    display: flex; 
+                                    flex-direction: column;
+                                    overflow: hidden;'>
+                                    {buttons_html}
+                                </div>
+                            </t>
                         </div>
-                        
-                        <!-- Buttons -->
-                        <div style='
-                            background: white; 
-                            border-radius: 8px; 
-                            box-shadow: 0 1px 0.5px rgba(11,20,26,.13); 
-                            align-self: flex-start; 
-                            width: 90%; 
-                            display: flex; 
-                            flex-direction: column;'>
-                            {buttons_html}
-                        </div>
+                    </div>
+
+                    <!-- Input Bar (Fake) -->
+                    <div style='background: #f0f2f5; padding: 10px 16px; display: flex; align-items: center; gap: 12px;'>
+                        <i class='fa fa-plus' style='color: #008069;'></i>
+                        <div style='flex: 1; background: white; border-radius: 20px; padding: 8px 16px; font-size: 14px; color: #8696a0;'>Message</div>
+                        <i class='fa fa-camera' style='color: #008069;'></i>
+                        <i class='fa fa-microphone' style='color: #008069;'></i>
                     </div>
                 </div>
                 
                 <!-- Home Indicator -->
-                <div style='width: 100px; height: 4px; background: rgba(255,255,255,0.4); border-radius: 4px; margin: 8px auto 0;'></div>
+                <div style='width: 120px; height: 5px; background: rgba(255,255,255,0.3); border-radius: 5px; margin: 15px auto 5px;'></div>
             </div>
             """
             
@@ -657,7 +699,7 @@ class WhatsAppTemplate(models.Model):
         try:
             response = requests.post(url, headers=headers, files=files, data=data, timeout=60)
             resp_data = response.json() if response.content else {}
-            if response.status_code == 200:
+            if response.status_code in (200, 201):
                 media_handle = resp_data.get('id')
                 self.header_media_url = media_handle
                 _logger.info(f"Header media uploaded: {media_handle}")
@@ -702,11 +744,21 @@ class WhatsAppTemplate(models.Model):
                 raise UserError("URL buttons must start with http:// or https://.")
         if self.button_type == 'copy_code' and self.category != 'authentication':
             raise UserError("Copy-code OTP buttons are only valid for Authentication templates.")
+        if self.is_carousel and not self.card_ids:
+            raise UserError("Carousel templates require at least one card.")
+        if self.is_carousel and len(self.card_ids) > 10:
+            raise UserError("Meta allows a maximum of 10 cards per carousel template.")
 
         if self.header_type in ['image', 'video', 'document'] and not self.header_media_url:
             media_handle = self._upload_header_media()
             if not media_handle:
                 raise UserError("Failed to upload header media. Please try again or provide a valid media file.")
+        if self.is_carousel:
+            for card in self.card_ids:
+                if card.header_media_file and not card.header_media_url:
+                    handle = card._upload_media_to_meta(self.account_id)
+                    if not handle:
+                        raise UserError(f"Failed to upload carousel media for card '{card.body[:30] or card.id}'.")
 
         url = f"https://graph.facebook.com/{self.account_id.api_version}/{self.account_id.business_account_id}/message_templates"
         headers = {
@@ -747,6 +799,8 @@ class WhatsAppTemplate(models.Model):
                         card_buttons.append({"type": "QUICK_REPLY", "text": card.button_text_1})
                     else:
                         card_buttons.append({"type": "URL", "text": card.button_text_1, "url": card.button_url_1 or "https://example.com"})
+                if card.button_text_2:
+                    card_buttons.append({"type": "QUICK_REPLY", "text": card.button_text_2})
                 if card_buttons:
                     card_components.append({"type": "BUTTONS", "buttons": card_buttons})
                 carousel_cards.append({"components": card_components})
@@ -829,7 +883,7 @@ class WhatsAppTemplate(models.Model):
             response = requests.post(url, headers=headers, json=payload, timeout=30)
             response_data = response.json() if response.content else {}
 
-            if response.status_code == 200:
+            if response.status_code in (200, 201):
                 self.write({
                     'status': 'pending',
                     'template_id': response_data.get('id')
@@ -915,4 +969,21 @@ class WhatsAppTemplateCard(models.Model):
     ], string='Button 1 Type', default='quick_reply')
     
     button_url_1 = fields.Char('Button 1 URL')
+
+    def _upload_media_to_meta(self, account):
+        """Upload card media and return Meta media handle."""
+        self.ensure_one()
+        if not account:
+            raise UserError("A WhatsApp account is required to upload carousel media.")
+        if not self.header_media_file:
+            raise UserError("Carousel card media file is missing.")
+
+        extension = '.jpg' if self.header_type == 'image' else '.mp4'
+        filename = self.header_media_filename or f"carousel_card_{self.id or 'new'}{extension}"
+        if extension and not filename.lower().endswith(extension):
+            filename = f"{filename}{extension}"
+
+        media_id = account._upload_media_to_meta(self.header_media_file, filename, self.header_type)
+        self.write({'header_media_url': media_id})
+        return media_id
 

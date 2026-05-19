@@ -8,6 +8,10 @@ _logger = logging.getLogger(__name__)
 class WhatsAppCampaignParticipant(models.Model):
     _name = 'whatsapp.campaign.participant'
     _description = 'WhatsApp Campaign Participant'
+    _campaign_partner_unique = models.Constraint(
+        'unique(campaign_id, partner_id)',
+        'A contact can only be added once per campaign.',
+    )
     
     campaign_id = fields.Many2one('whatsapp.campaign', string='Campaign', required=True, ondelete='cascade')
     partner_id = fields.Many2one('res.partner', string='Contact', required=True)
@@ -34,12 +38,18 @@ class WhatsAppCampaignParticipant(models.Model):
             ], order='sequence', limit=1)
             
             if next_step:
+                if not participant._condition_matches_step(next_step):
+                    participant.write({
+                        'next_execution_date': fields.Datetime.now() + timedelta(minutes=15),
+                    })
+                    continue
+
                 # Resolve attributes/variables for template if needed
                 body = next_step.message_body
                 
                 # Send message via the account's standard send method
                 try:
-                    phone = participant.partner_id.mobile or participant.partner_id.phone
+                    phone = getattr(participant.partner_id, 'mobile', False) or participant.partner_id.phone
                     if not phone:
                         raise ValueError("Participant has no phone number")
                     send_vals = {
@@ -76,3 +86,20 @@ class WhatsAppCampaignParticipant(models.Model):
             return timedelta(hours=step.delay_unit)
         else:
             return timedelta(days=step.delay_unit)
+
+    def _condition_matches_step(self, step):
+        self.ensure_one()
+        if not step or step.condition_type in (False, 'none'):
+            return True
+
+        last_campaign_message = self.env['whatsapp.message'].search([
+            ('campaign_id', '=', self.campaign_id.id),
+            ('partner_id', '=', self.partner_id.id),
+            ('direction', '=', 'outbound'),
+        ], order='create_date desc', limit=1)
+
+        if step.condition_type == 'last_read':
+            return bool(last_campaign_message and last_campaign_message.status == 'read')
+        if step.condition_type == 'last_not_read':
+            return bool(last_campaign_message and last_campaign_message.status != 'read')
+        return True

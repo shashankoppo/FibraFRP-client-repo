@@ -38,6 +38,10 @@ access_whatsapp_media_tag_manager,whatsapp.media.tag.manager,model_whatsapp_medi
 access_whatsapp_media_bulk_wizard_user,whatsapp.media.bulk.wizard.user,model_whatsapp_media_bulk_wizard,base.group_user,1,1,1,1
 access_whatsapp_bot_flow_user,whatsapp.bot.flow.user,model_whatsapp_bot_flow,base.group_user,1,1,1,0
 access_whatsapp_bot_flow_manager,whatsapp.bot.flow.manager,model_whatsapp_bot_flow,base.group_system,1,1,1,1
+access_whatsapp_bot_node_user,whatsapp.bot.node.user,model_whatsapp_bot_node,base.group_user,1,1,1,0
+access_whatsapp_bot_node_manager,whatsapp.bot.node.manager,model_whatsapp_bot_node,base.group_system,1,1,1,1
+access_whatsapp_bot_edge_user,whatsapp.bot.edge.user,model_whatsapp_bot_edge,base.group_user,1,1,1,0
+access_whatsapp_bot_edge_manager,whatsapp.bot.edge.manager,model_whatsapp_bot_edge,base.group_system,1,1,1,1
 access_whatsapp_bot_flow_step_user,whatsapp.bot.flow.step.user,model_whatsapp_bot_flow_step,base.group_user,1,1,1,0
 access_whatsapp_bot_flow_step_manager,whatsapp.bot.flow.step.manager,model_whatsapp_bot_flow_step,base.group_system,1,1,1,1
 access_whatsapp_bot_flow_button_user,whatsapp.bot.flow.button.user,model_whatsapp_bot_flow_button,base.group_user,1,1,1,0

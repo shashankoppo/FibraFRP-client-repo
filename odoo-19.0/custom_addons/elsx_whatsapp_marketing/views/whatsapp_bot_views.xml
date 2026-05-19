@@ -70,7 +70,6 @@
                 <field name="name"/>
                 <field name="message"/>
                 <field name="account_id"/>
-                <field name="use_count" string="Uses"/>
                 <field name="active" widget="boolean_toggle"/>
             </list>
         </field>

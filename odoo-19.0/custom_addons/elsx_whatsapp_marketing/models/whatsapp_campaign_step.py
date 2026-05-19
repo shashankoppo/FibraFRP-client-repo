@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api
+from odoo.exceptions import ValidationError
 
 
 class WhatsAppCampaignStep(models.Model):
@@ -29,3 +30,13 @@ class WhatsAppCampaignStep(models.Model):
         ('last_read', 'If Last Message Was Read'),
         ('last_not_read', 'If Last Message Was NOT Read'),
     ], string='Condition', default='none')
+
+    @api.constrains('delay_unit', 'template_id', 'message_body')
+    def _check_step_configuration(self):
+        for step in self:
+            if step.delay_unit < 0:
+                raise ValidationError("Drip step delay must be zero or greater.")
+            if not step.template_id and not (step.message_body or '').strip():
+                raise ValidationError(
+                    f'Drip step "{step.name}" requires either a template or message body.'
+                )

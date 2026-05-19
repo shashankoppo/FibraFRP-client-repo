@@ -5,17 +5,41 @@
         <field name="model">whatsapp.send.wizard</field>
         <field name="arch" type="xml">
             <form string="Send WhatsApp Message">
-                <group>
-                    <field name="account_id" options="{'no_create': True}"/>
-                    <field name="template_id" options="{'no_create': True}"/>
-                    <field name="phone_number" placeholder="e.g. 917247558873 (with country code, no +)"/>
-                    <field name="partner_ids" widget="many2many_tags" invisible="phone_number != False"/>
-                    <field name="media_file" filename="media_filename" invisible="template_id != False"/>
-                    <field name="message_body" widget="text" placeholder="Type message or optional media/voice caption..." invisible="template_id != False"/>
-                </group>
+                <div class="row p-3">
+                    <!-- Left Column: Form Fields -->
+                    <div class="col-lg-7 border-end pe-4">
+                        <div class="text-muted small mb-3 text-uppercase fw-bold" style="letter-spacing: 1px;">Message Configuration</div>
+                        <group>
+                            <field name="account_id" options="{'no_create': True}"/>
+                            <field name="template_id" options="{'no_create': True}"/>
+                            <field name="phone_number" placeholder="e.g. 917247558873 (with country code, no +)"/>
+                            <field name="partner_ids" widget="many2many_tags" invisible="phone_number != False"/>
+                            <field name="media_file" filename="media_filename" invisible="template_id != False"/>
+                            <field name="message_body" widget="text" placeholder="Type message or optional media/voice caption..." invisible="template_id != False"/>
+                        </group>
+                    </div>
+                    
+                    <!-- Right Column: Live Premium WhatsApp Preview -->
+                    <div class="col-lg-5 ps-4">
+                        <div class="text-muted small mb-3 text-uppercase fw-bold" style="letter-spacing: 1px;">Live Preview</div>
+                        
+                        <div invisible="template_id != False" class="d-flex flex-column align-items-center justify-content-center h-100 text-center" style="background: #F8F9FA; border-radius: 12px; border: 2px dashed #E9EDEF; min-height: 250px;">
+                            <div class="mb-3">
+                                <i class="fa fa-magic fa-3x" style="color: #00A884; opacity: 0.5;" title="Preview Icon"/>
+                            </div>
+                            <h6 class="text-muted fw-bold">No Template Selected</h6>
+                            <p class="small text-muted px-4">Select an approved Meta template on the left to see exactly how it will appear to your customers.</p>
+                        </div>
+                        
+                        <div invisible="template_id == False" class="wa-template-preview-container" style="box-shadow: 0 4px 12px rgba(0,0,0,0.05); border-radius: 12px; overflow: hidden; border: 1px solid #e0e0e0;">
+                            <field name="template_preview_html" nolabel="1" widget="html" readonly="1" options="{'codeview': true}"/>
+                        </div>
+                    </div>
+                </div>
+
                 <footer>
-                    <button name="action_send" string="Send" type="object" class="btn-primary"/>
-                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                    <button name="action_send" string="Send Message" type="object" class="btn-success fw-bold px-4 rounded" style="background: #00A884; border: none;"/>
+                    <button string="Cancel" class="btn-light" special="cancel"/>
                 </footer>
             </form>
         </field>

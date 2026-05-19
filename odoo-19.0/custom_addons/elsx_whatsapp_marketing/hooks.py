@@ -30,6 +30,18 @@ def pre_init_hook(env):
     """)
 
 
+def _sync_cron_records(env):
+    """Keep repaired cron targets correct even when XML records are noupdate."""
+    cron = env.ref('elsx_whatsapp_marketing.ir_cron_process_whatsapp_queue', raise_if_not_found=False)
+    campaign_model = env.ref('elsx_whatsapp_marketing.model_whatsapp_campaign', raise_if_not_found=False)
+    if cron and campaign_model:
+        cron.sudo().write({
+            'model_id': campaign_model.id,
+            'code': 'model._cron_process_global_queue()',
+        })
+
+
 def post_init_hook(env):
     """Odoo 19 passes an Environment object to post-init hooks."""
     env['whatsapp.sample.template'].sudo()._seed_sample_templates()
+    _sync_cron_records(env)

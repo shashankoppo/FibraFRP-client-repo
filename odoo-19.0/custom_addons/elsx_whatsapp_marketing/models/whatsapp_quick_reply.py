@@ -1,21 +1,20 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api
-import logging
-
-_logger = logging.getLogger(__name__)
-
 
 class WhatsAppQuickReply(models.Model):
-    """Saved Quick Replies (canned responses) for agents"""
+    """Canned responses for agents to use in chat"""
     _name = 'whatsapp.quick.reply'
-    _description = 'WhatsApp Quick Reply Template'
-    _rec_name = 'shortcut'
+    _description = 'WhatsApp Quick Reply (Canned Response)'
     _order = 'shortcut'
 
-    shortcut = fields.Char('Shortcut', required=True, help='e.g. /greeting, /payment')
-    name = fields.Char('Name', required=True)
-    message = fields.Text('Message', required=True)
-    account_id = fields.Many2one('whatsapp.account', string='Account', help='Leave blank for global')
-    user_id = fields.Many2one('res.users', string='Owner', default=lambda self: self.env.user)
+    name = fields.Char('Response Title', required=True)
+    shortcut = fields.Char('Shortcut (e.g. /greet)', required=True, help="Keyword prefix for agents")
+    message = fields.Text('Response Message', required=True)
+    account_id = fields.Many2one('whatsapp.account', string='Account Filter', 
+                                help="If set, this reply only appears for this account.")
     active = fields.Boolean('Active', default=True)
-    use_count = fields.Integer('Use Count', default=0)
+    
+    _shortcut_unique = models.Constraint(
+        'unique(shortcut)',
+        'The shortcut must be unique!',
+    )

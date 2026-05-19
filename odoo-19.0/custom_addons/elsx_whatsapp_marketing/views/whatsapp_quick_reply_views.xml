@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_whatsapp_quick_reply_tree" model="ir.ui.view">
+        <field name="name">whatsapp.quick.reply.tree</field>
+        <field name="model">whatsapp.quick.reply</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="shortcut"/>
+                <field name="name"/>
+                <field name="message"/>
+                <field name="account_id" optional="show"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_whatsapp_quick_reply_form" model="ir.ui.view">
+        <field name="name">whatsapp.quick.reply.form</field>
+        <field name="model">whatsapp.quick.reply</field>
+        <field name="arch" type="xml">
+            <form string="Quick Reply">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="shortcut" placeholder="e.g. /greet"/>
+                            <field name="name" placeholder="Greeting"/>
+                            <field name="account_id"/>
+                        </group>
+                        <group>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <group string="Response Message">
+                        <field name="message" nolabel="1" placeholder="Hello! How can we help you today?"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_whatsapp_quick_reply" model="ir.actions.act_window">
+        <field name="name">Quick Replies</field>
+        <field name="res_model">whatsapp.quick.reply</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create canned responses for your agents.
+            </p>
+            <p>
+                Agents can use these shortcuts (e.g. /greet) to quickly reply to customers in the Team Inbox.
+            </p>
+        </field>
+    </record>
+</odoo>

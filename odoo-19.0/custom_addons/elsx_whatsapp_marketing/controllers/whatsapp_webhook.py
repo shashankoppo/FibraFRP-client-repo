@@ -135,20 +135,55 @@ class WhatsAppWebhook(http.Controller):
         _logger.warning(f'[WH-VERIFY] REJECTED — no matching account for token {token}')
         return request.make_response('Verification Failed', status=403)
 
+    def _verify_meta_signature(self, account, raw_body, signature):
+        """Validate Meta X-Hub-Signature-256 against the exact raw request body."""
+        if not account:
+            return False, 'No matching account', 403
+        if account.skip_webhook_hmac:
+            _logger.warning('[WH-HMAC] Signature check skipped for account %s (debug mode).', account.id)
+            return True, None, None
+        if not account.app_secret:
+            account.sudo().write({
+                'webhook_status': 'failed',
+                'webhook_last_error': 'Missing Meta app secret for HMAC verification',
+            })
+            return False, 'Missing Meta app secret', 403
+        if not signature:
+            account.sudo().write({
+                'webhook_status': 'failed',
+                'webhook_last_error': 'Missing X-Hub-Signature-256 header',
+            })
+            return False, 'Missing signature header', 400
+
+        if isinstance(raw_body, str):
+            raw_body = raw_body.encode('utf-8')
+        expected_sig = 'sha256=' + hmac.new(
+            account.app_secret.encode('utf-8'),
+            raw_body or b'',
+            hashlib.sha256
+        ).hexdigest()
+        if not hmac.compare_digest(signature, expected_sig):
+            account.sudo().write({
+                'webhook_status': 'failed',
+                'webhook_last_error': 'Invalid HMAC Signature',
+            })
+            return False, 'Invalid signature', 403
+        return True, None, None
+
     # =========================================================
     # POST — Event Dispatch
     # =========================================================
     def _handle_post(self, account_id):
         try:
-            raw_data = request.httprequest.data.decode('utf-8')
-            _logger.debug(f'[WH-POST] Raw payload: {raw_data[:500]}')
+            raw_body = request.httprequest.data or b''
+            raw_data = raw_body.decode('utf-8')
             payload = json.loads(raw_data)
 
             # Must be whatsapp_business_account object
             if payload.get('object') != 'whatsapp_business_account':
                 return request.make_response('OK', status=200)
 
-            env, cr, _ = _get_env()
+            env, cr, db_name = _get_env()
             if not cr:
                 return request.make_response('Database Unavailable', status=503)
 
@@ -156,36 +191,61 @@ class WhatsAppWebhook(http.Controller):
                 with cr:
                     account = _find_account(env, account_id, payload)
                     
-                    # HMAC SIGNATURE VERIFICATION (Production Strict)
-                    if account and account.app_secret:
-                        signature = request.httprequest.headers.get('X-Hub-Signature-256', '')
-                        if signature:
-                            expected_sig = 'sha256=' + hmac.new(
-                                account.app_secret.encode(),
-                                raw_data.encode('utf-8'),
-                                hashlib.sha256
-                            ).hexdigest()
-                            
-                            if not hmac.compare_digest(signature, expected_sig):
-                                _logger.warning(f'[WH-HMAC] Invalid signature for account {account.id}')
-                                account.sudo().write({'webhook_status': 'failed', 'webhook_last_error': 'Invalid HMAC Signature'})
-                                return request.make_response('Invalid signature', status=403)
-                        else:
-                            _logger.warning(f'[WH-HMAC] Missing X-Hub-Signature-256 header for account {account.id}')
-                            account.sudo().write({'webhook_status': 'failed', 'webhook_last_error': 'Missing X-Hub-Signature-256 header'})
-                            return request.make_response('Missing signature header', status=400)
-                    elif account and not account.app_secret:
-                        _logger.error(f'[WH-HMAC] App Secret missing for account {account.id}; cannot verify signature!')
-                        return request.make_response('Configuration Error', status=500)
+                    ok, message, status = self._verify_meta_signature(
+                        account,
+                        raw_body,
+                        request.httprequest.headers.get('X-Hub-Signature-256', ''),
+                    )
+                    if not ok:
+                        return request.make_response(message, status=status)
 
-                    for entry in payload.get('entry', []):
-                        for change in entry.get('changes', []):
-                            field = change.get('field', '')
-                            value = change.get('value') or {}
-                            self._dispatch_change(env, account, field, value, raw_data)
-
+                    # 1. Instantly log the webhook for queuing (WABA Best Practice)
+                    # We store it as 'received' and instantly return 200 OK.
+                    log_record = env['whatsapp.webhook.log'].sudo().create({
+                        'account_id': account.id if account else False,
+                        'event_type': 'waba_webhook',
+                        'raw_payload': raw_data,
+                        'status': 'received'
+                    })
+                    log_id = log_record.id
                     cr.commit()
+
+                # 2. Spawn a background thread to process it with zero-latency
+                # This ensures Meta NEVER receives a timeout, even if Odoo takes 5 seconds to download a 4k Video.
+                import threading
+                def process_webhook_thread(db_name, log_id, account_id):
+                    try:
+                        registry = Registry(db_name)
+                        with registry.cursor() as thread_cr:
+                            thread_env = api.Environment(thread_cr, odoo.SUPERUSER_ID, {})
+                            thread_log = thread_env['whatsapp.webhook.log'].browse(log_id)
+                            thread_acc = thread_env['whatsapp.account'].browse(account_id) if account_id else None
+                            payload_json = json.loads(thread_log.raw_payload)
+                            
+                            for entry in payload_json.get('entry', []):
+                                for change in entry.get('changes', []):
+                                    field = change.get('field', '')
+                                    value = change.get('value') or {}
+                                    try:
+                                        self._dispatch_change(thread_env, thread_acc, field, value, thread_log.raw_payload)
+                                    except Exception as dispatch_err:
+                                        _logger.error(f'[WH-DISPATCH-THREAD] Failure: {dispatch_err}', exc_info=True)
+                            
+                            thread_log.sudo().write({'status': 'processed'})
+                            thread_cr.commit()
+                    except Exception as e:
+                        _logger.error(f'[WH-THREAD-CRASH] Webhook processing failed: {e}', exc_info=True)
+
+                thread = threading.Thread(target=process_webhook_thread, args=(db_name, log_id, account.id if account else None))
+                thread.daemon = True
+                thread.start()
+
+                # 3. Return 200 OK instantly (< 50ms)
                 return request.make_response('OK', status=200)
+
+            except Exception as inner_err:
+                _logger.error(f'[WH-INNER] Fatal processing error: {inner_err}', exc_info=True)
+                return request.make_response('Processing Error', status=500)
             finally:
                 cr.close()
 
@@ -409,8 +469,8 @@ class WhatsAppWebhook(http.Controller):
         if msg_record.chat_id_ref:
             chat = msg_record.chat_id_ref
             chat_id = chat.id
-            if chat.state in ('snoozed', 'resolved'):
-                chat.sudo().write({'state': 'open'})
+            if chat.state in ('snoozed', 'resolved') or chat.is_archived:
+                chat.sudo().write({'state': 'open', 'is_archived': False})
             
             # Industrial Assignment Guard: Ensure chat has an owner
             if not chat.assigned_user_id:
@@ -435,9 +495,40 @@ class WhatsAppWebhook(http.Controller):
                     p.sudo().write({'name': profile_name})
             _logger.info(f'[WH-MSG] Updated profile name "{profile_name}" for {phone_number}')
 
+        # --- Automatic Opt-out Keyword Detection ---
+        if body and account.opt_out_keywords:
+            keywords = [k.strip().lower() for k in account.opt_out_keywords.split(',') if k.strip()]
+            if body.strip().lower() in keywords:
+                _logger.info(f'[COMPLIANCE] Opt-out keyword detected from {phone_number}')
+                msg_record.sudo().write({'is_opt_out': True})
+                if msg_record.partner_id:
+                    if 'whatsapp_opt_in' in msg_record.partner_id._fields:
+                        msg_record.partner_id.sudo().write({'whatsapp_opt_in': False})
+                    env['whatsapp.consent.log'].sudo()._opt_out_partner(
+                        msg_record.partner_id, account, reason=f"Keyword trigger: {body.strip()}"
+                    )
+                if msg_record.chat_id_ref:
+                    msg_record.chat_id_ref.sudo().write({
+                        'state': 'resolved',
+                        'tag_ids': [(4, env.ref('elsx_whatsapp_marketing.whatsapp_tag_opted_out', raise_if_not_found=False).id)] if env.ref('elsx_whatsapp_marketing.whatsapp_tag_opted_out', raise_if_not_found=False) else []
+                    })
+                return # Stop further processing (bots, etc) for opt-out messages
+
+        # --- Resume pending flow conversations first ---
+        pending_flow_resumed = False
+        try:
+            resumed_flow = env['whatsapp.bot.flow'].sudo().resume_for_message(msg_record)
+            if resumed_flow:
+                pending_flow_resumed = True
+                _logger.info(f'[BOT-FLOW] Flow "{resumed_flow.name}" resumed for {phone_number}')
+        except Exception as e:
+            _logger.error(f'[BOT-FLOW] Flow resume error: {e}')
+
         # --- Fire bot rules ---
         bot_rule_fired = False
         try:
+            if pending_flow_resumed:
+                return
             bot_rules = env['whatsapp.bot.rule'].sudo().search([
                 ('active', '=', True),
                 '|', ('account_id', '=', account.id), ('account_id', '=', False)
@@ -562,7 +653,9 @@ class WhatsAppWebhook(http.Controller):
             return
 
         update_vals = {'status': new_status}
-        if new_status == 'delivered':
+        if new_status == 'sent':
+            update_vals['sent_date'] = fields.Datetime.now()
+        elif new_status == 'delivered':
             update_vals['delivered_date'] = fields.Datetime.now()
         elif new_status == 'read':
             update_vals['read_date'] = fields.Datetime.now()
@@ -574,6 +667,15 @@ class WhatsAppWebhook(http.Controller):
                 update_vals['error_message'] = 'Message delivery failed'
         elif new_status == 'deleted':
             update_vals['body'] = '[Message deleted by sender]'
+
+        if conversation.get('id'):
+            update_vals['conversation_id'] = conversation.get('id')
+        if conv_origin:
+            update_vals['conversation_type'] = conv_origin
+        if pricing.get('category'):
+            update_vals['pricing_category'] = pricing.get('category')
+        if pricing.get('pricing_model'):
+            update_vals['pricing_model'] = pricing.get('pricing_model')
 
         msg.sudo().write(update_vals)
         _logger.info(f'[WH-STATUS] wamid={wamid} → {new_status} (conversation_type={conv_origin})')
@@ -684,8 +786,28 @@ class WhatsAppWebhook(http.Controller):
     def _handle_template_quality_update(self, env, account, value):
         """Handle message_template_quality_update — quality score changes"""
         template_name = value.get('message_template_name', '')
+        template_id_meta = str(value.get('message_template_id', '') or '')
         quality = value.get('new_quality_score', '')
         _logger.info(f'[WH-TPL-QUALITY] Template "{template_name}" new quality={quality}')
+        quality_map = {
+            'GREEN': 'green',
+            'HIGH': 'green',
+            'YELLOW': 'yellow',
+            'MEDIUM': 'yellow',
+            'RED': 'red',
+            'LOW': 'red',
+            'UNKNOWN': 'unknown',
+        }
+        quality_score = quality_map.get((quality or '').upper(), 'unknown')
+        domain = []
+        if account:
+            domain.append(('account_id', '=', account.id))
+        if template_id_meta:
+            domain += ['|', ('template_id', '=', template_id_meta)]
+        domain += ['|', ('meta_template_name', '=', template_name), ('name', '=', template_name)]
+        template = env['whatsapp.template'].sudo().search(domain, limit=1)
+        if template:
+            template.sudo().write({'quality_score': quality_score})
 
     def _handle_template_components_update(self, env, account, value):
         """Handle message_template_components_update — auto-fill updates"""
@@ -827,8 +949,10 @@ class WhatsAppWebhook(http.Controller):
         finally:
             cr.close()
             
+        raw_body = request.httprequest.data or b''
+        signature = request.httprequest.headers.get('X-Hub-Signature-256', '')
         try:
-            payload = json.loads(request.httprequest.data.decode('utf-8') or '{}')
+            payload = json.loads(raw_body.decode('utf-8') or '{}')
         except json.JSONDecodeError:
             return request.make_json_response({'status': 'error', 'message': 'Invalid JSON'}, status=400)
         _logger.info('[SIDECAR-IN] Received payload for processing')
@@ -836,11 +960,11 @@ class WhatsAppWebhook(http.Controller):
         # We reuse the POST logic by calling _handle_post with raw JSON
         # Since _handle_post normally reads from request.httprequest.data,
         # we'll create a small helper.
-        result = self._process_payload_direct(payload)
-        status = 200 if result.get('status') in ('success', 'ignored') else 500
+        result = self._process_payload_direct(payload, raw_body=raw_body, signature=signature)
+        status = result.get('http_status') or (200 if result.get('status') in ('success', 'ignored') else 500)
         return request.make_json_response(result, status=status)
 
-    def _process_payload_direct(self, payload):
+    def _process_payload_direct(self, payload, raw_body=None, signature=None):
         """Helper to process a JSON payload directly without re-reading from request"""
         if payload.get('object') != 'whatsapp_business_account':
             return {'status': 'ignored'}
@@ -854,6 +978,11 @@ class WhatsAppWebhook(http.Controller):
                 account = _find_account(env, None, payload)
                 if not account:
                     return {'status': 'error', 'message': 'No matching account'}
+
+                if raw_body is not None:
+                    ok, message, status = self._verify_meta_signature(account, raw_body, signature or '')
+                    if not ok:
+                        return {'status': 'error', 'message': message, 'http_status': status}
                 
                 # Process entries
                 for entry in payload.get('entry', []):

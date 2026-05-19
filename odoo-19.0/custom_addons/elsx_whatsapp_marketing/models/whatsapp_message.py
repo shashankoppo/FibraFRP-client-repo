@@ -10,6 +10,8 @@ import re
 import base64
 from datetime import timedelta
 import threading
+import random
+import pytz
 
 _logger = logging.getLogger(__name__)
 
@@ -68,9 +70,10 @@ class WhatsAppMessage(models.Model):
     _order = 'create_date desc'
     _rec_name = 'phone_number'
     
-    _sql_constraints = [
-        ('message_id_unique', 'unique(message_id)', 'Duplicate WhatsApp Message ID (wamid) detected. Data integrity enforced.'),
-    ]
+    _message_id_unique = models.Constraint(
+        'unique(message_id)',
+        'Duplicate WhatsApp Message ID (wamid) detected. Data integrity enforced.',
+    )
     
     _message_id_idx = models.Index(
         "(message_id) WHERE message_id IS NOT NULL",
@@ -144,16 +147,26 @@ class WhatsAppMessage(models.Model):
     
     # Campaign relation
     campaign_id = fields.Many2one('whatsapp.campaign', string='Campaign', ondelete='set null')
+    flow_id = fields.Many2one('whatsapp.bot.flow', string='Auto-Start Flow', ondelete='set null')
     ab_test_version = fields.Selection([
         ('a', 'Version A'),
         ('b', 'Version B'),
     ], string='A/B Version')
 
-    # Timestamps
+    # Timestamps & Analytics
     sent_date = fields.Datetime('Sent Date')
     delivered_date = fields.Datetime('Delivered Date')
     read_date = fields.Datetime('Read Date')
-
+    latency_ms = fields.Float('API Latency (ms)', readonly=True)
+    message_cost = fields.Float('Message Cost', digits=(16, 4), help="Estimated cost based on conversation type.")
+    conversation_id = fields.Char('Meta Conversation ID')
+    conversation_type = fields.Char('Conversation Type')
+    pricing_category = fields.Char('Pricing Category')
+    pricing_model = fields.Char('Pricing Model')
+    
+    # Compliance & Safety
+    is_opt_out = fields.Boolean('Opt-out Message', default=False, help="True if this message triggered a STOP request.")
+    
     # Automation
     is_automated = fields.Boolean('Automated Message', default=False)
     trigger_event = fields.Char('Trigger Event')
@@ -249,8 +262,12 @@ class WhatsAppMessage(models.Model):
             cc = '91'
             if account and getattr(account, 'default_country_code', False):
                 cc = account.default_country_code
-            elif hasattr(self, 'account_id') and self.account_id and self.account_id.default_country_code:
-                cc = self.account_id.default_country_code
+            else:
+                active_account = self.env['whatsapp.account'].search([], limit=1)
+                if active_account and active_account.default_country_code:
+                    cc = active_account.default_country_code
+                elif hasattr(self, 'account_id') and self.account_id and self.account_id.default_country_code:
+                    cc = self.account_id.default_country_code
             clean = cc + clean
         if strict and not re.fullmatch(r'[1-9]\d{7,14}', clean or ''):
             raise ValidationError(_(
@@ -261,14 +278,44 @@ class WhatsAppMessage(models.Model):
 
     @api.model
     def _find_partner_by_phone(self, phone):
-        """Finds a partner by normalized phone number"""
+        """Finds a partner by normalized phone number, accounting for spaces/symbols/prefixes"""
         if not phone:
             return False
         normalized = self._normalize_phone(phone)
+        if not normalized:
+            return False
+        
+        # 1. Try exact normalized match first
         domain = [('phone', '=', normalized)]
         if 'mobile' in self.env['res.partner']._fields:
             domain = ['|', ('phone', '=', normalized), ('mobile', '=', normalized)]
-        return self.env['res.partner'].sudo().search(domain, limit=1)
+        partner = self.env['res.partner'].sudo().search(domain, limit=1)
+        if partner:
+            return partner
+            
+        # 2. Try normalized match with prepended '+'
+        plus_normalized = '+' + normalized
+        domain = [('phone', '=', plus_normalized)]
+        if 'mobile' in self.env['res.partner']._fields:
+            domain = ['|', ('phone', '=', plus_normalized), ('mobile', '=', plus_normalized)]
+        partner = self.env['res.partner'].sudo().search(domain, limit=1)
+        if partner:
+            return partner
+
+        # 3. Clean and search using suffix (last 10 digits for common mobile numbers like India/US)
+        if len(normalized) >= 10:
+            suffix = normalized[-10:]
+            domain = [('phone', 'like', suffix)]
+            if 'mobile' in self.env['res.partner']._fields:
+                domain = ['|', ('phone', 'like', suffix), ('mobile', 'like', suffix)]
+            partners = self.env['res.partner'].sudo().search(domain)
+            for p in partners:
+                # Strip all non-digits from partner's phone/mobile to see if it matches normalized suffix
+                p_phone = re.sub(r'\D', '', p.phone or '')
+                p_mobile = re.sub(r'\D', '', p.mobile or '')
+                if p_phone.endswith(suffix) or p_mobile.endswith(suffix):
+                    return p
+        return False
 
     def _coerce_interactive_button(self, button, index):
         title = False
@@ -501,6 +548,82 @@ class WhatsAppMessage(models.Model):
 
             self.env.cr.postcommit.add(_after_commit)
 
+    def _get_active_compliance_policy(self):
+        self.ensure_one()
+        if not self.account_id:
+            return self.env['whatsapp.compliance.policy']
+        return self.env['whatsapp.compliance.policy'].sudo().search([
+            ('account_id', '=', self.account_id.id),
+            ('active', '=', True),
+        ], limit=1)
+
+    def _current_quiet_hour(self, policy):
+        self.ensure_one()
+        if not policy:
+            return False
+
+        quiet_hours = self.env['whatsapp.quiet.hours'].sudo().search([
+            ('policy_id', '=', policy.id),
+            ('active', '=', True),
+        ])
+        now_utc = fields.Datetime.to_datetime(fields.Datetime.now())
+        if now_utc.tzinfo is None:
+            now_utc = pytz.utc.localize(now_utc)
+
+        for quiet in quiet_hours:
+            try:
+                tz = pytz.timezone(quiet.timezone or 'UTC')
+            except pytz.UnknownTimeZoneError:
+                tz = pytz.utc
+            local_now = now_utc.astimezone(tz)
+            weekday = local_now.weekday()
+            if quiet.days_of_week == 'weekdays' and weekday >= 5:
+                continue
+            if quiet.days_of_week == 'weekends' and weekday < 5:
+                continue
+
+            current_hour = local_now.hour + (local_now.minute / 60.0) + (local_now.second / 3600.0)
+            start = quiet.start_time or 0.0
+            end = quiet.end_time or 0.0
+            if start <= end:
+                in_window = start <= current_hour < end
+            else:
+                in_window = current_hour >= start or current_hour < end
+            if in_window:
+                return quiet
+        return False
+
+    def _check_compliance(self):
+        """Verify if the recipient can receive this outbound WhatsApp message."""
+        self.ensure_one()
+        # 1. Tier Limit Check
+        if self.account_id.is_limit_reached:
+            raise ValidationError(_("Daily messaging limit reached for account %s.") % self.account_id.name)
+
+        policy = self._get_active_compliance_policy()
+
+        # 2. Opt-in / Opt-out / DND Checks
+        if self.partner_id:
+            if 'whatsapp_opt_in' in self.partner_id._fields and not self.partner_id.whatsapp_opt_in:
+                raise ValidationError(_("Partner %s has not opted in to WhatsApp messages.") % self.partner_id.name)
+
+            consent = self.env['whatsapp.consent.log'].sudo().search([
+                ('partner_id', '=', self.partner_id.id),
+                ('account_id', '=', self.account_id.id),
+                ('status', 'in', ['opted_out', 'revoked'])
+            ], limit=1)
+            if consent:
+                raise ValidationError(_("Partner %s has opted out of WhatsApp messages.") % self.partner_id.name)
+
+            if policy and policy.respect_dnd_list and self.partner_id.id in policy.dnd_contact_ids.ids:
+                raise ValidationError(_("Partner %s is on the WhatsApp do-not-contact list.") % self.partner_id.name)
+
+        if policy and (self.is_automated or self.campaign_id):
+            quiet = self._current_quiet_hour(policy)
+            if quiet:
+                raise ValidationError(_("Quiet hours are active for policy %s.") % policy.name)
+        return True
+
     def action_send(self):
         """
         Sends the message via Meta Cloud API using account_id.send_message.
@@ -510,12 +633,16 @@ class WhatsAppMessage(models.Model):
             if record.direction == 'inbound' or record.status in ['sent', 'delivered', 'read']:
                 continue
             
+            # Compliance Check before attempting send
+            record._check_compliance()
+
             payload = {}
             # 1. Start with raw_data if available (contains pre-calculated components)
             if record.raw_data:
                 try:
                     payload = json.loads(record.raw_data)
-                except: pass
+                except Exception:
+                    pass
 
             # 2. Extract specific payload segment if nested under 'template' or 'interactive'
             if record.message_type == 'template' and 'template' in payload:
@@ -536,19 +663,30 @@ class WhatsAppMessage(models.Model):
                 'partner_id': record.partner_id.id if record.partner_id else False,
                 'body': record.body,
             }
+            context_message_id = record.parent_message_id or (record.parent_id.message_id if record.parent_id else False)
+            if context_message_id:
+                send_kwargs['context_message_id'] = context_message_id
             if record.campaign_id:
                 send_kwargs['campaign_id'] = record.campaign_id.id
+            if record.flow_id:
+                send_kwargs['flow_id'] = record.flow_id.id
 
             if record.message_type == 'template':
                 if payload and payload.get('name') and payload.get('language'):
                     send_kwargs['template'] = payload
+                elif record.template_id:
+                    send_kwargs['template_record'] = record.template_id
                 elif record.template_name:
                     send_kwargs['template_name'] = record.template_name
                     send_kwargs['language_code'] = record.template_language or 'en_US'
                     if payload and payload.get('components'):
                         send_kwargs['components'] = payload.get('components')
             elif record.message_type == 'interactive':
-                send_kwargs['interactive'] = payload if payload else None
+                if not isinstance(payload, dict) or not payload:
+                    raise ValidationError(
+                        _("Interactive message %s is missing interactive payload data.") % record.id
+                    )
+                send_kwargs['interactive'] = payload
             elif record.message_type == 'text':
                 send_kwargs['body'] = payload.get('body', record.body) if payload else record.body
             elif record.message_type in ('image', 'video', 'document', 'audio'):
@@ -581,64 +719,98 @@ class WhatsAppMessage(models.Model):
         self.search([('create_date', '<', limit_date)]).unlink()
 
     @api.model
+    def _cron_process_broadcast_queue(self, limit=100):
+        """
+        High-priority processor for the broadcast campaign queue.
+        Processes newly 'queued' messages that haven't failed yet.
+        """
+        now = fields.Datetime.now()
+        queued_msgs = self.search([
+            ('status', '=', 'queued'),
+            ('retry_count', '=', 0),
+            ('campaign_id', '=', False),
+            '|', ('next_retry_at', '=', False), ('next_retry_at', '<=', now)
+        ], limit=limit, order='create_date asc')
+        
+        sent_count = 0
+        for msg in queued_msgs:
+            try:
+                with self.env.cr.savepoint():
+                    msg.action_send()
+                if msg.status in ('sent', 'delivered', 'read'):
+                    sent_count += 1
+            except Exception as e:
+                _logger.error(f"[CRON-BROADCAST] Message {msg.id} failed: {e}")
+                vals = {
+                    'status': 'failed',
+                    'error_message': str(e),
+                    'next_retry_at': False,
+                }
+                if not isinstance(e, ValidationError):
+                    backoff_seconds = min(3600, 60 * (2 ** min(msg.retry_count, 5)))
+                    vals.update({
+                        'retry_count': msg.retry_count + 1,
+                        'next_retry_at': fields.Datetime.now() + timedelta(seconds=backoff_seconds + random.uniform(0, 10)),
+                    })
+                msg.write(vals)
+        
+        if sent_count > 0:
+            _logger.info(f"[CRON-BROADCAST] Successfully processed {sent_count} messages from queue.")
+        return sent_count
+
+    @api.model
     def _cron_retry_failed(self):
         """
         Cron job to retry failed messages with exponential backoff.
-        Uses savepoints per message to prevent one failure from rolling back
-        the entire batch (fixes SerializationFailure crashes).
-        
-        Retry schedule:
-        - Attempt 1: immediate
-        - Attempt 2: after 1s
-        - Attempt 3: after 4s
-        - Attempt 4: after 16s
-        - Attempt 5: after 64s → then permanent failure
         """
-        from datetime import timedelta
-        import random
-        
         now = fields.Datetime.now()
         
-        # Find messages ready for retry (next_retry_at <= now)
+        # Failed-only retry path. Queued messages are handled by their queue processors.
         retry_msgs = self.search([
-            ('status', 'in', ['failed', 'queued']),
+            ('status', '=', 'failed'),
             ('retry_count', '<', 5),
-            '|', ('next_retry_at', '=', False), ('next_retry_at', '<=', now)
+            ('next_retry_at', '!=', False),
+            ('next_retry_at', '<=', now),
         ], limit=50, order='next_retry_at asc, create_date asc')
         
         retried_count = 0
         for msg in retry_msgs:
-            # Use a savepoint so one message failure doesn't kill the whole batch
             try:
-                cr = self.env.cr
-                cr.execute("SAVEPOINT retry_msg_%s", (msg.id,))
-                msg.action_send()
-                cr.execute("RELEASE SAVEPOINT retry_msg_%s", (msg.id,))
-                retried_count += 1
+                with self.env.cr.savepoint():
+                    msg.action_send()
+                if msg.status in ('sent', 'delivered', 'read'):
+                    retried_count += 1
+                    flow = msg.flow_id or (msg.campaign_id.flow_id if msg.campaign_id else False)
+                    if flow:
+                        try:
+                            flow.sudo().start_flow_for_participant(False, msg)
+                        except Exception as flow_err:
+                            _logger.error("[CRON-RETRY] Failed to auto-start flow %s: %s", flow.name, flow_err)
+                    if msg.campaign_id and not self.search_count([
+                        ('campaign_id', '=', msg.campaign_id.id),
+                        '|',
+                            ('status', 'in', ['draft', 'queued']),
+                            '&', '&', ('status', '=', 'failed'), ('retry_count', '<', 5), ('next_retry_at', '!=', False),
+                    ]):
+                        msg.campaign_id.state = 'completed'
             except Exception as e:
-                cr.execute("ROLLBACK TO SAVEPOINT retry_msg_%s", (msg.id,))
-                
-                # Calculate next retry time with exponential backoff + jitter
-                backoff_seconds = (2 ** msg.retry_count) if msg.retry_count > 0 else 0
-                jitter = random.uniform(0, 0.5)
-                next_retry_seconds = backoff_seconds + jitter
-                
                 try:
-                    msg.write({
-                        'retry_count': msg.retry_count + 1,
-                        'next_retry_at': now + timedelta(seconds=next_retry_seconds),
+                    vals = {
                         'error_message': str(e)[:500],
                         'status': 'failed',
-                    })
+                        'next_retry_at': False,
+                    }
+                    if not isinstance(e, ValidationError):
+                        backoff_seconds = min(3600, 60 * (2 ** min(msg.retry_count, 5)))
+                        jitter = random.uniform(0, 10)
+                        vals.update({
+                            'retry_count': msg.retry_count + 1,
+                            'next_retry_at': now + timedelta(seconds=backoff_seconds + jitter),
+                        })
+                    msg.write(vals)
                 except Exception:
                     _logger.error(f"[CRON-RETRY] Could not update message {msg.id} after failure")
-                
-                _logger.warning(
-                    f"[CRON-RETRY] Message {msg.id} retry {msg.retry_count+1}/5 "
-                    f"scheduled for +{next_retry_seconds:.1f}s: {e}"
-                )
         
         if retried_count > 0:
             _logger.info(f"[CRON-RETRY] Successfully resent {retried_count} failed messages")
-        
         return retried_count

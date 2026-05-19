@@ -232,6 +232,7 @@ class WhatsAppContactSegment(models.Model):
 
     def action_add_contacts(self):
         """Add contacts manually to this segment"""
+        self.ensure_one()
         return {
             'name': 'Add Contacts',
             'type': 'ir.actions.act_window',
@@ -243,6 +244,7 @@ class WhatsAppContactSegment(models.Model):
 
     def action_refresh_contacts(self):
         """Refresh the computed contact list and show the resulting count."""
+        self.ensure_one()
         self.invalidate_recordset(['contact_ids', 'contact_count'])
         self._compute_contacts()
         self._compute_contact_count()

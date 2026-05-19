@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
-from odoo import models, fields, api
+import logging
+
+from odoo import models, fields
+
+_logger = logging.getLogger(__name__)
 
 
 class AccountMove(models.Model):
@@ -41,14 +45,23 @@ class AccountMove(models.Model):
             f"{self.company_id.name}"
         )
 
-        # Create message record
-        self.env['whatsapp.message'].create({
-            'account_id': account.id,
-            'partner_id': partner.id,
-            'phone_number': phone,
-            'message_type': 'text',
-            'body': message_body,
-            'direction': 'outbound',
-            'is_automated': True,
-            'trigger_event': 'Invoice Posted',
-        }).action_send()
+        try:
+            # Create message record
+            message = self.env['whatsapp.message'].create({
+                'account_id': account.id,
+                'partner_id': partner.id,
+                'phone_number': phone,
+                'message_type': 'text',
+                'body': message_body,
+                'direction': 'outbound',
+                'is_automated': True,
+                'trigger_event': 'Invoice Posted',
+            })
+            message.action_send()
+        except Exception as exc:
+            if 'message' in locals():
+                message.sudo().write({
+                    'status': 'failed',
+                    'error_message': str(exc),
+                })
+            _logger.exception("Failed to send WhatsApp invoice notification for %s", self.name)

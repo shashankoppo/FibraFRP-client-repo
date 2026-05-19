@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api
+from odoo.exceptions import UserError, ValidationError
+from odoo.tools.safe_eval import safe_eval
 import logging
 import json
+import random
+from datetime import timedelta
 
 _logger = logging.getLogger(__name__)
 
@@ -43,7 +47,7 @@ class WhatsAppCampaign(models.Model):
     
     # Message content
     template_id = fields.Many2one('whatsapp.template', string='Message Template')
-    message_body = fields.Text('Message Body', required=True)
+    message_body = fields.Text('Message Body')
     
     # A/B Testing
     is_ab_test = fields.Boolean('Enable A/B Testing')
@@ -99,11 +103,16 @@ class WhatsAppCampaign(models.Model):
     conversion_count = fields.Integer('Conversions', default=0)
     roi = fields.Float('ROI %', compute='_compute_roi')
     
+    # Enterprise Logic
+    batch_size = fields.Integer('Batch Size', default=50, help="Number of messages to send per batch")
+    batch_interval = fields.Integer('Batch Interval (Min)', default=5, help="Minutes between batches")
+    flow_id = fields.Many2one('whatsapp.bot.flow', string='Auto-Start Flow', help="Link recipients to this flow upon delivery")
+    
     @api.depends('partner_ids', 'message_ids.status')
     def _compute_statistics(self):
         for record in self:
             record.total_recipients = len(record.partner_ids)
-            record.queued_count = len(record.message_ids.filtered(lambda m: m.status == 'draft'))
+            record.queued_count = len(record.message_ids.filtered(lambda m: m.status in ['draft', 'queued']))
             record.sent_count = len(record.message_ids.filtered(lambda m: m.status in ['sent', 'delivered', 'read']))
             record.delivered_count = len(record.message_ids.filtered(lambda m: m.status in ['delivered', 'read']))
             record.read_count = len(record.message_ids.filtered(lambda m: m.status == 'read'))
@@ -125,12 +134,26 @@ class WhatsAppCampaign(models.Model):
             else:
                 record.roi = 0.0
 
+    @api.constrains('split_percentage', 'schedule_type', 'schedule_date', 'campaign_type', 'step_ids', 'template_id', 'message_body')
+    def _check_campaign_configuration(self):
+        for record in self:
+            if record.split_percentage < 0 or record.split_percentage > 100:
+                raise ValidationError("A/B split percentage must be between 0 and 100.")
+            if record.schedule_type == 'scheduled' and not record.schedule_date:
+                raise ValidationError("Scheduled campaigns require a schedule date.")
+            if record.campaign_type == 'drip' and not record.step_ids:
+                raise ValidationError("Drip campaigns require at least one step.")
+            if record.campaign_type == 'broadcast' and not (record.template_id or (record.message_body or '').strip()):
+                raise ValidationError("Broadcast campaigns require a template or message body.")
+
     def _render_body_for_partner(self, body, partner, template=False):
-        if not body: return ''
+        if not body:
+            return ''
         body = body.replace('{{name}}', partner.name or '')
         body = body.replace('{{company}}', partner.company_name or '' if hasattr(partner, 'company_name') else '')
         if template:
-            for idx, var in enumerate(template.variable_ids, start=1):
+            sorted_variables = template.variable_ids.sorted(lambda var: var.sequence or 0)
+            for idx, var in enumerate(sorted_variables, start=1):
                 val = template._resolve_variable_value(var, partner)
                 body = body.replace(f'{{{{{idx}}}}}', str(val))
         return body
@@ -152,9 +175,25 @@ class WhatsAppCampaign(models.Model):
         if self.target_type == 'all':
             partners = Partner.search(self._partner_phone_domain())
         elif self.target_type == 'segment' and self.domain_filter:
-            partners = Partner.search(eval(self.domain_filter))
-        elif self.target_type == 'crm_stage' and 'crm.lead' in self.env:
-            leads = self.env['crm.lead'].search([('stage_id', '!=', False), ('partner_id', '!=', False)])
+            try:
+                custom_domain = safe_eval(self.domain_filter)
+                if not isinstance(custom_domain, (list, tuple)):
+                    raise ValueError("Domain filter must be a list or tuple.")
+            except Exception as e:
+                raise UserError(f"Invalid recipient domain filter: {e}")
+            partners = Partner.search(list(custom_domain))
+        elif self.target_type == 'segment' and self.segment_id:
+            self.segment_id.action_refresh_contacts()
+            partners = self.segment_id.contact_ids
+        elif self.target_type == 'manual':
+            partners = self.partner_ids
+        elif self.target_type == 'crm_stage' and 'crm.lead' in self.env.registry.models:
+            lead_domain = [('partner_id', '!=', False)]
+            if self.crm_stage_id:
+                lead_domain.append(('stage_id', '=', self.crm_stage_id.id))
+            else:
+                lead_domain.append(('stage_id', '!=', False))
+            leads = self.env['crm.lead'].sudo().search(lead_domain)
             partners = leads.mapped('partner_id')
         elif self.target_type == 'tags' and self.tag_ids:
             partners = Partner.search(self._partner_phone_domain() + [('category_id', 'in', self.tag_ids.ids)])
@@ -238,6 +277,11 @@ class WhatsAppCampaign(models.Model):
             and self.schedule_date > now
         )
         target_state = 'scheduled' if scheduled_for_later else 'running'
+
+        if self.campaign_type == 'broadcast' and not (self.template_id or (self.message_body or '').strip()):
+            raise UserError('Please set a message template or message body before queuing this campaign.')
+        if self.campaign_type == 'drip' and not self.step_ids:
+            raise UserError('Please configure at least one drip step before launching this campaign.')
         
         if self.campaign_type == 'broadcast':
             messages_to_create = []
@@ -288,30 +332,17 @@ class WhatsAppCampaign(models.Model):
                     'template_language': current_template._get_send_language_code() if current_template else False,
                     'body': message_body,
                     'raw_data': raw_data,
-                    'status': 'draft',
+                    'status': 'queued',
+                    'next_retry_at': self.schedule_date if scheduled_for_later else fields.Datetime.now(),
                     'direction': 'outbound',
+                    'flow_id': self.flow_id.id if self.flow_id else False,
                 })
             
             if messages_to_create:
-                messages = self.env['whatsapp.message'].create(messages_to_create)
-                
-                # CRITICAL FIX: Actually send or schedule messages
-                if scheduled_for_later:
-                    self.state = 'scheduled'
-                    _logger.info(f"Campaign {self.name} scheduled for {self.schedule_date}")
-                else:
-                    # Send immediately with safe rate limiting
-                    self.state = 'running'
-                    for message in messages:
-                        try:
-                            message.action_send()
-                        except Exception as e:
-                            _logger.error(f"Failed to send message {message.id}: {e}")
-                            message.write({'status': 'failed', 'error_message': str(e)})
-                    remaining = messages.filtered(lambda m: m.status in ('draft', 'queued'))
-                    self.state = 'running' if remaining else 'completed'
+                self.env['whatsapp.message'].create(messages_to_create)
+                self.state = 'scheduled' if scheduled_for_later else 'running'
+                _logger.info(f"Campaign {self.name} queued {len(messages_to_create)} messages for background processing.")
             else:
-                from odoo.exceptions import UserError
                 raise UserError('No valid recipients with phone numbers were found.')
                 
         elif self.campaign_type == 'drip':
@@ -390,11 +421,12 @@ class WhatsAppCampaign(models.Model):
             self.state = 'running'
 
         now = fields.Datetime.now()
+        batch_size = self.batch_size or 50
         draft_messages = self.message_ids.filtered(
             lambda m: m.status == 'draft' or (
                 m.status == 'queued' and (not m.next_retry_at or m.next_retry_at <= now)
             )
-        )[:50]
+        )[:batch_size]
         
         if not draft_messages:
             self.state = 'completed'
@@ -412,18 +444,45 @@ class WhatsAppCampaign(models.Model):
         queued = 0
         for msg in draft_messages:
             try:
-                msg.action_send()
-                if msg.status in ('sent', 'delivered', 'read'):
-                    sent += 1
-                elif msg.status == 'queued':
-                    queued += 1
+                with self.env.cr.savepoint():
+                    msg.action_send()
+                    if msg.status in ('sent', 'delivered', 'read'):
+                        sent += 1
+                        # Enterprise Logic: Auto-Start Bot Flow
+                        flow = msg.flow_id or self.flow_id
+                        if flow:
+                            try:
+                                flow.sudo().start_flow_for_participant(False, msg)
+                            except Exception as flow_err:
+                                _logger.error(f"Failed to auto-start flow {flow.name}: {flow_err}")
+                    elif msg.status == 'queued':
+                        queued += 1
             except Exception as e:
-                msg.status = 'failed'
-                msg.error_message = str(e)
+                try:
+                    with self.env.cr.savepoint():
+                        vals = {
+                            'status': 'failed',
+                            'error_message': str(e),
+                            'next_retry_at': False,
+                        }
+                        if not isinstance(e, ValidationError):
+                            backoff_seconds = min(3600, 60 * (2 ** min(msg.retry_count, 5)))
+                            vals.update({
+                                'retry_count': msg.retry_count + 1,
+                                'next_retry_at': fields.Datetime.now() + timedelta(seconds=backoff_seconds + random.uniform(0, 10)),
+                            })
+                        msg.write(vals)
+                except Exception as db_err:
+                    _logger.error(f"Could not save failed state for message {msg.id}: {db_err}")
                 _logger.error(f"Failed to process queued message: {e}")
                 
         # Optional: update state to completed if done
-        if len(self.message_ids.filtered(lambda m: m.status in ('draft', 'queued'))) == 0:
+        if not self.env['whatsapp.message'].search_count([
+            ('campaign_id', '=', self.id),
+            '|',
+                ('status', 'in', ['draft', 'queued']),
+                '&', '&', ('status', '=', 'failed'), ('retry_count', '<', 5), ('next_retry_at', '!=', False),
+        ]):
             self.state = 'completed'
             
         return {
@@ -456,22 +515,49 @@ class WhatsAppCampaign(models.Model):
 
         for msg in messages:
             try:
-                campaign = msg.campaign_id
-                if campaign and campaign.state == 'scheduled':
-                    if campaign.schedule_date and campaign.schedule_date > fields.Datetime.now():
-                        continue
-                    campaign.state = 'running'
+                with self.env.cr.savepoint():
+                    campaign = msg.campaign_id
+                    if campaign and campaign.state == 'scheduled':
+                        if campaign.schedule_date and campaign.schedule_date > fields.Datetime.now():
+                            continue
+                        campaign.state = 'running'
 
-                msg.action_send()
+                    msg.action_send()
+                    # Enterprise Logic: Auto-Start Bot Flow
+                    flow = msg.flow_id or (campaign.flow_id if campaign else False)
+                    if flow and msg.status in ('sent', 'delivered', 'read'):
+                        try:
+                            flow.sudo().start_flow_for_participant(False, msg)
+                        except Exception as flow_err:
+                            _logger.error(f"Failed to auto-start flow {flow.name} via cron: {flow_err}")
             except Exception as e:
-                msg.status = 'failed'
-                msg.error_message = str(e)
+                try:
+                    with self.env.cr.savepoint():
+                        vals = {
+                            'status': 'failed',
+                            'error_message': str(e),
+                            'next_retry_at': False,
+                        }
+                        if not isinstance(e, ValidationError):
+                            backoff_seconds = min(3600, 60 * (2 ** min(msg.retry_count, 5)))
+                            vals.update({
+                                'retry_count': msg.retry_count + 1,
+                                'next_retry_at': fields.Datetime.now() + timedelta(seconds=backoff_seconds + random.uniform(0, 10)),
+                            })
+                        msg.write(vals)
+                except Exception as db_err:
+                    _logger.error(f"Could not save failed state for cron message {msg.id}: {db_err}")
                 _logger.error(f"Failed to process queued message {msg.id}: {e}")
                 
         # Check if campaigns have finished their drafts
         campaigns = messages.mapped('campaign_id')
         for campaign in campaigns:
-            if not self.env['whatsapp.message'].search_count([('campaign_id', '=', campaign.id), ('status', 'in', ['draft', 'queued'])]):
+            if not self.env['whatsapp.message'].search_count([
+                ('campaign_id', '=', campaign.id),
+                '|',
+                    ('status', 'in', ['draft', 'queued']),
+                    '&', '&', ('status', '=', 'failed'), ('retry_count', '<', 5), ('next_retry_at', '!=', False),
+            ]):
                 campaign.state = 'completed'
 
     def action_generate_ai_content(self):

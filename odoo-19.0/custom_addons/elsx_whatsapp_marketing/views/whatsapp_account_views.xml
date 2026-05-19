@@ -110,6 +110,29 @@
                                 <field name="ai_context" placeholder="Example: We are an e-commerce store selling premium coffee beans. Our shipping policy is 2-3 business days. We offer free returns within 30 days..."/>
                             </group>
                         </page>
+                        <page string="Compliance &amp; Health" name="compliance_health">
+                            <group>
+                                <group string="Messaging Tier &amp; Limits">
+                                    <label for="daily_message_count" string="Daily Usage"/>
+                                    <div class="o_row">
+                                        <field name="daily_message_count"/> / <field name="max_daily_limit"/>
+                                        <field name="is_limit_reached" invisible="1"/>
+                                        <span class="badge rounded-pill text-bg-danger ms-2" invisible="not is_limit_reached">LIMIT REACHED</span>
+                                    </div>
+                                    <field name="messaging_limit"/>
+                                    <field name="quality_rating" widget="state_selection" 
+                                           decoration-success="quality_rating == 'GREEN'" 
+                                           decoration-warning="quality_rating == 'YELLOW'" 
+                                           decoration-danger="quality_rating == 'RED'"/>
+                                </group>
+                                <group string="Safety &amp; Opt-out">
+                                    <field name="opt_out_keywords" placeholder="STOP, UNSUBSCRIBE, OFF"/>
+                                    <div class="alert alert-warning" role="alert" colspan="2">
+                                        <i class="fa fa-shield me-1"/> Incoming messages matching these keywords will automatically blacklist the contact.
+                                    </div>
+                                </group>
+                            </group>
+                        </page>
                         <page string="Notification Settings" name="notification_settings">
                             <group>
                                 <field name="notification_enabled"/>

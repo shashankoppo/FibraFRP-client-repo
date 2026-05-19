@@ -60,6 +60,10 @@
                             <span>Read</span>
                             <strong><field name="read_rate" widget="percentage" readonly="1"/></strong>
                         </div>
+                        <div class="wa-kpi-card">
+                            <span>ROI</span>
+                            <strong><field name="roi" widget="percentage" readonly="1"/></strong>
+                        </div>
                     </div>
 
                     <group>
@@ -68,6 +72,11 @@
                             <field name="campaign_type"/>
                             <field name="schedule_type"/>
                             <field name="schedule_date" invisible="schedule_type == 'immediate'" required="schedule_type == 'scheduled'"/>
+                        </group>
+                        <group string="Enterprise Logistics">
+                            <field name="batch_size"/>
+                            <field name="batch_interval"/>
+                            <field name="flow_id" options="{'no_create': True}"/>
                         </group>
                         <group string="Configuration">
                             <field name="target_type"/>

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api
 import logging
+import json
 
 _logger = logging.getLogger(__name__)
 
@@ -50,8 +51,12 @@ class WhatsAppBotRule(models.Model):
             count = env['whatsapp.message'].sudo().search_count([
                 ('account_id', '=', account.id),
                 ('phone_number', '=', phone_number),
+                ('direction', '=', 'inbound'),
             ])
             matched = count <= 1
+        elif self.trigger_type == 'no_reply_24h':
+            _logger.info("Bot rule '%s' no_reply_24h trigger has no runtime scheduler yet.", self.name)
+            matched = False
         elif self.trigger_type == 'any':
             matched = True
 
@@ -74,14 +79,18 @@ class WhatsAppBotRule(models.Model):
                 msg.action_send()
 
             elif self.action_type == 'template' and self.template_id:
+                partner = env['res.partner'].sudo().browse(partner_id) if partner_id else False
+                template_payload = self.template_id._prepare_send_payload(partner=partner)
                 msg = env['whatsapp.message'].sudo().create({
                     'account_id': account.id,
                     'phone_number': phone_number,
                     'partner_id': partner_id,
                     'message_type': 'template',
                     'body': self.template_id.body,
+                    'template_id': self.template_id.id,
                     'template_name': self.template_id._get_send_template_name(),
                     'template_language': self.template_id._get_send_language_code(),
+                    'raw_data': json.dumps(template_payload),
                     'direction': 'outbound',
                     'chat_id_ref': chat_id,
                     'is_automated': True,

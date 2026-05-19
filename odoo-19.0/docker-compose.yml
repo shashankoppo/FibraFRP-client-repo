@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   db:
     image: postgres:15
@@ -40,6 +39,8 @@ services:
     command: sh -c "npm install && npm start"
     ports:
       - "3000:3000"
+    depends_on:
+      - odoo
     networks:
       - odoo-network
 

@@ -141,6 +141,19 @@ class WhatsAppConsentLog(models.Model):
     revoked_reason = fields.Char('Revoked Reason')
     revoked_by = fields.Many2one('res.users', 'Revoked By', readonly=True)
 
+    @api.model
+    def _opt_out_partner(self, partner, account, reason=None):
+        """Helper to record an opt-out event and block future messages."""
+        return self.create({
+            'partner_id': partner.id,
+            'account_id': account.id,
+            'consent_type': 'all',
+            'status': 'opted_out',
+            'source': 'whatsapp_message',
+            'notes': reason or 'User requested opt-out via WhatsApp',
+            'revoked_date': fields.Datetime.now(),
+        })
+
 
 class WhatsAppTeamMember(models.Model):
     """Team Collaboration - Assign team members to conversations"""
@@ -221,7 +234,9 @@ class WhatsAppConversationAssignment(models.Model):
     # Transfer history
     previous_user_id = fields.Many2one('res.users', 'Previously Assigned To')
     transfer_reason = fields.Selection([
+        ('initial', 'Initial Assignment'),
         ('availability', 'Agent Unavailable'),
+        ('bot', 'Bot Transfer'),
         ('expertise', 'Expertise Required'),
         ('customer_request', 'Customer Request'),
         ('workload', 'Workload Balancing'),

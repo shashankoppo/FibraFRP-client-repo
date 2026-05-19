@@ -45,24 +45,25 @@ class SaleOrder(models.Model):
             f"Thank you for choosing ELSX ERP!"
         )
 
-        # Create message record
-        message = self.env['whatsapp.message'].create({
-            'account_id': account.id,
-            'partner_id': partner.id,
-            'phone_number': phone,
-            'message_type': 'text',
-            'body': message_body,
-            'direction': 'outbound',
-            'is_automated': True,
-            'trigger_event': 'Order Confirmation',
-        })
-
-        # Send asynchronously/retry in background if needed
         try:
+            # Create message record
+            message = self.env['whatsapp.message'].create({
+                'account_id': account.id,
+                'partner_id': partner.id,
+                'phone_number': phone,
+                'message_type': 'text',
+                'body': message_body,
+                'direction': 'outbound',
+                'is_automated': True,
+                'trigger_event': 'Order Confirmation',
+            })
+
+            # Send asynchronously/retry in background if needed
             message.action_send()
         except Exception as exc:
-            message.sudo().write({
-                'status': 'failed',
-                'error_message': str(exc),
-            })
+            if 'message' in locals():
+                message.sudo().write({
+                    'status': 'failed',
+                    'error_message': str(exc),
+                })
             _logger.exception("Failed to send WhatsApp order confirmation for %s", self.name)

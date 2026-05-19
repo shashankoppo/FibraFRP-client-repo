@@ -5,12 +5,18 @@ const cors = require('cors');
 const axios = require('axios');
 const dotenv = require('dotenv');
 const { createClient } = require('redis');
+const crypto = require('crypto');
 
 dotenv.config();
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: process.env.JSON_LIMIT || '10mb' }));
+app.use(express.json({
+    limit: process.env.JSON_LIMIT || '10mb',
+    verify: (req, res, buf) => {
+        req.rawBody = Buffer.from(buf);
+    },
+}));
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -24,6 +30,7 @@ const PORT = process.env.PORT || 3000;
 const SIDECAR_SECRET = process.env.SIDECAR_SECRET || 'elsx_sidecar_secure_2024';
 const ODOO_URL = process.env.ODOO_URL || 'http://odoo:8069';
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN || 'elsx_verify_2024';
+const META_APP_SECRET = process.env.META_APP_SECRET || process.env.APP_SECRET || '';
 const REDIS_URL = process.env.REDIS_URL || '';
 const QUEUE_KEY = process.env.REDIS_QUEUE_KEY || 'elsx:whatsapp:webhook:queue';
 const DEAD_KEY = process.env.REDIS_DEAD_KEY || 'elsx:whatsapp:webhook:dead';
@@ -79,11 +86,13 @@ async function initRedis() {
     }
 }
 
-function makeQueueItem(payload, source = 'meta') {
+function makeQueueItem(payload, source = 'meta', meta = {}) {
     return {
         id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
         payload,
         source,
+        rawBodyBase64: meta.rawBody ? meta.rawBody.toString('base64') : null,
+        metaSignature: meta.metaSignature || null,
         attempts: 0,
         createdAt: Date.now(),
         nextAttemptAt: Date.now(),
@@ -91,8 +100,8 @@ function makeQueueItem(payload, source = 'meta') {
     };
 }
 
-async function enqueueWebhook(payload, source = 'meta') {
-    const item = makeQueueItem(payload, source);
+async function enqueueWebhook(payload, source = 'meta', meta = {}) {
+    const item = makeQueueItem(payload, source, meta);
     const serialized = JSON.stringify(item);
     if (redisReady) {
         try {
@@ -154,13 +163,43 @@ async function dequeueWebhook() {
 }
 
 async function forwardToOdoo(item) {
-    await axios.post(`${ODOO_URL}/whatsapp/sidecar/receive`, item.payload, {
+    const body = item.rawBodyBase64
+        ? Buffer.from(item.rawBodyBase64, 'base64')
+        : Buffer.from(JSON.stringify(item.payload || {}));
+    const headers = {
+        'x-sidecar-key': SIDECAR_SECRET,
+        'Content-Type': 'application/json',
+    };
+    if (item.metaSignature) {
+        headers['X-Hub-Signature-256'] = item.metaSignature;
+    }
+    await axios.post(`${ODOO_URL}/whatsapp/sidecar/receive`, body, {
         headers: {
-            'x-sidecar-key': SIDECAR_SECRET,
-            'Content-Type': 'application/json',
+            ...headers,
         },
         timeout: 10000,
     });
+}
+
+function verifyMetaSignature(req) {
+    if (!META_APP_SECRET) {
+        console.warn('[SIDECAR] META_APP_SECRET not configured; Meta HMAC verification skipped');
+        return true;
+    }
+
+    const signature = req.headers['x-hub-signature-256'] || '';
+    if (!signature) return false;
+
+    const rawBody = req.rawBody || Buffer.from(JSON.stringify(req.body || {}));
+    const expected = `sha256=${crypto
+        .createHmac('sha256', META_APP_SECRET)
+        .update(rawBody)
+        .digest('hex')}`;
+
+    const actualBuffer = Buffer.from(signature);
+    const expectedBuffer = Buffer.from(expected);
+    return actualBuffer.length === expectedBuffer.length
+        && crypto.timingSafeEqual(actualBuffer, expectedBuffer);
 }
 
 async function processQueue() {
@@ -257,10 +296,18 @@ app.post('/webhook', async (req, res) => {
     const body = req.body;
     console.log('[SIDECAR] Incoming webhook from Meta');
 
+    if (!verifyMetaSignature(req)) {
+        console.warn('[SIDECAR] Rejected webhook with invalid Meta signature');
+        return res.status(403).send('Invalid signature');
+    }
+
     res.status(200).send('EVENT_RECEIVED');
 
-    io.emit('whatsapp_webhook_event', body);
-    await enqueueWebhook(body, 'meta');
+    io.emit('sync_required', { reason: 'webhook_received' });
+    await enqueueWebhook(body, 'meta', {
+        rawBody: req.rawBody,
+        metaSignature: req.headers['x-hub-signature-256'] || null,
+    });
 });
 
 app.post('/relay/new-message', async (req, res) => {
