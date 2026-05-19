@@ -214,7 +214,7 @@
               name="Dashboard"
               parent="menu_whatsapp_analytics_section"
               sequence="71"
-              action="action_whatsapp_dashboard_server"/>
+              action="action_whatsapp_dashboard_client"/>
 
     <!-- Media Library -->
     <record id="action_whatsapp_media_library" model="ir.actions.act_window">
