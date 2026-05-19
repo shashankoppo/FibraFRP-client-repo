@@ -96,7 +96,7 @@
                                 <field name="csv_filename" invisible="1"/>
                                 <field name="csv_file" filename="csv_filename" invisible="target_type != 'csv'" string="Upload Audience CSV" help="Upload a CSV with 'Phone' and 'Name' columns"/>
                             </group>
-                            <field name="partner_ids" widget="many2many_tags">
+                            <field name="partner_ids">
                                 <list>
                                     <field name="name"/>
                                     <field name="phone"/>

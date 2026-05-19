@@ -8,6 +8,7 @@ _logger = logging.getLogger(__name__)
 class WhatsAppCampaignParticipant(models.Model):
     _name = 'whatsapp.campaign.participant'
     _description = 'WhatsApp Campaign Participant'
+    
     _campaign_partner_unique = models.Constraint(
         'unique(campaign_id, partner_id)',
         'A contact can only be added once per campaign.',

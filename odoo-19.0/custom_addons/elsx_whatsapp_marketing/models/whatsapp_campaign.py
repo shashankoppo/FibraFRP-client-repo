@@ -238,6 +238,15 @@ class WhatsAppCampaign(models.Model):
             partners = self.env['res.partner']
 
         partners = partners.filtered(lambda p: p.phone or getattr(p, 'mobile', False))
+        
+        # Enforce compliance: Exclude partners who have a linked opted-out whatsapp.contact
+        opted_out = self.env['whatsapp.contact'].sudo().search([
+            ('partner_id', 'in', partners.ids),
+            ('opt_in', '=', False)
+        ]).mapped('partner_id')
+        if opted_out:
+            partners = partners - opted_out
+
         self.partner_ids = [(6, 0, partners.ids)]
         if not partners:
             return {

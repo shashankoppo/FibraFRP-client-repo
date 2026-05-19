@@ -273,7 +273,8 @@ class WhatsAppTemplate(models.Model):
 
     def _get_send_template_name(self):
         self.ensure_one()
-        return self.meta_template_name or self.name
+        name = self.meta_template_name or self.name
+        return name.lower().replace(' ', '_')
 
     def _media_parameter(self, media_type, media_value):
         if not media_value:
@@ -475,10 +476,19 @@ class WhatsAppTemplate(models.Model):
             elif rec.header_type == 'image':
                 img_data = rec.header_media_file
                 if img_data:
-                    if isinstance(img_data, bytes):
-                        img_src = f"data:image/png;base64,{img_data.decode('utf-8')}"
-                    else:
-                        img_src = f"data:image/png;base64,{str(img_data)}"
+                    import base64
+                    try:
+                        if isinstance(img_data, bytes):
+                            try:
+                                decoded = img_data.decode('utf-8')
+                                base64.b64decode(decoded, validate=True)
+                                img_src = f"data:image/png;base64,{decoded}"
+                            except Exception:
+                                img_src = f"data:image/png;base64,{base64.b64encode(img_data).decode('utf-8')}"
+                        else:
+                            img_src = f"data:image/png;base64,{str(img_data)}"
+                    except Exception:
+                        img_src = "https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png"
                 else:
                     img_src = "https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png"
                 header_html = f"<div style='background: #e9edef; height: 140px; border-radius: 8px; margin-bottom: 8px; overflow: hidden; position: relative;'><img src='{img_src}' style='width: 100%; height: 100%; object-fit: cover;' alt='Image preview'/></div>"
