@@ -10,43 +10,67 @@
                     <div class="spinner-border text-success" role="status" style="width: 3rem; height: 3rem;">
                         <span class="visually-hidden">Loading...</span>
                     </div>
-                    <h5 class="mt-3 text-muted">Loading Analytics...</h5>
+                    <h5 class="mt-3 text-muted">Loading Real-Time Analytics...</h5>
                 </div>
 
                 <div t-if="!state.loading">
-                    <!-- Header -->
-                    <div class="d-flex justify-content-between align-items-center mb-4">
+                    <!-- Top Navigation Bar & Date Selector -->
+                    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
                         <div>
-                            <h2 class="mb-0 fw-bold text-dark">WhatsApp Analytics Overview</h2>
-                            <p class="text-muted mb-0">Track your messaging performance and team efficiency</p>
+                            <h2 class="mb-0 fw-bold text-dark d-flex align-items-center gap-2">
+                                <i class="fa fa-pie-chart text-success"></i>
+                                <span>WhatsApp Analytics Hub</span>
+                            </h2>
+                            <p class="text-muted mb-0">Monitor broadcast delivery, support performance, and marketing ROI</p>
                         </div>
-                        <div class="o_whatsapp_dash_header_actions d-flex gap-2">
-                            <button class="btn btn-whatsapp-meta d-flex align-items-center gap-2" t-on-click="openMetaManager">
-                                <i class="fa fa-facebook-square" style="color: #1877F2;"></i>
-                                <span>Meta Template Manager</span>
-                            </button>
-                            <button class="btn btn-primary" t-on-click="openNewChat">
-                                <i class="fa fa-plus me-1"></i> New Chat
-                            </button>
-                            <button class="btn btn-primary shadow-sm" t-on-click="reloadDashboard">
-                                <i class="fa fa-refresh me-1"></i> Refresh Data
-                            </button>
+                        
+                        <div class="d-flex align-items-center flex-wrap gap-2">
+                            <!-- Dynamic Date Range Pickers -->
+                            <div class="btn-group shadow-sm bg-white rounded-3 p-1">
+                                <button type="button" 
+                                        t-attf-class="btn btn-sm px-3 rounded-2 #{state.dateRange === 'today' ? 'btn-success text-white fw-semibold' : 'btn-light text-secondary border-0'}" 
+                                        t-on-click="() => this.changeDateRange('today')">Today</button>
+                                <button type="button" 
+                                        t-attf-class="btn btn-sm px-3 rounded-2 #{state.dateRange === '7d' ? 'btn-success text-white fw-semibold' : 'btn-light text-secondary border-0'}" 
+                                        t-on-click="() => this.changeDateRange('7d')">Last 7d</button>
+                                <button type="button" 
+                                        t-attf-class="btn btn-sm px-3 rounded-2 #{state.dateRange === '30d' ? 'btn-success text-white fw-semibold' : 'btn-light text-secondary border-0'}" 
+                                        t-on-click="() => this.changeDateRange('30d')">Last 30d</button>
+                                <button type="button" 
+                                        t-attf-class="btn btn-sm px-3 rounded-2 #{state.dateRange === 'all' ? 'btn-success text-white fw-semibold' : 'btn-light text-secondary border-0'}" 
+                                        t-on-click="() => this.changeDateRange('all')">All Time</button>
+                            </div>
+                            
+                            <!-- Header Actions -->
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-whatsapp-meta d-flex align-items-center gap-2 shadow-sm rounded-3 py-2 px-3 bg-white" t-on-click="openMetaManager">
+                                    <i class="fa fa-facebook-square fs-5 text-primary"></i>
+                                    <span class="small fw-bold">Meta WABA Manager</span>
+                                </button>
+                                <button class="btn btn-success d-flex align-items-center gap-2 shadow-sm rounded-3 py-2 px-3" t-on-click="openNewChat">
+                                    <i class="fa fa-plus"></i>
+                                    <span class="small fw-bold">New Chat</span>
+                                </button>
+                                <button class="btn btn-outline-secondary d-flex align-items-center gap-2 shadow-sm rounded-3 py-2 px-3 bg-white" t-on-click="reloadDashboard">
+                                    <i class="fa fa-refresh"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Top KPI Row -->
+                    <!-- 10 Advanced KPI Row -->
                     <div class="row g-3 mb-4">
-                        <!-- Sent -->
-                        <div class="col-md-3">
+                        <!-- Outbound Sent -->
+                        <div class="col-md col-sm-6 col-12">
                             <div class="card border-0 shadow-sm rounded-4 h-100 elsx-kpi-card border-start border-4 border-primary">
-                                <div class="card-body">
+                                <div class="card-body py-3">
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div>
-                                            <h6 class="text-muted fw-semibold mb-1 text-uppercase small">Sent (7d)</h6>
-                                            <h3 class="mb-0 fw-bold text-dark"><t t-esc="state.data.kpis.sent_7d"/></h3>
+                                            <span class="text-uppercase text-muted fw-bold small" style="font-size: 0.68rem; letter-spacing: 0.05em;">Sent Messages</span>
+                                            <h3 class="mb-0 fw-black text-dark mt-1"><t t-esc="state.data.kpis.sent"/></h3>
                                         </div>
-                                        <div class="bg-primary bg-opacity-10 p-3 rounded-circle text-primary">
-                                            <i class="fa fa-paper-plane fa-lg"></i>
+                                        <div class="bg-primary bg-opacity-10 p-2.5 rounded-circle text-primary">
+                                            <i class="fa fa-paper-plane fs-5"></i>
                                         </div>
                                     </div>
                                 </div>
@@ -54,16 +78,16 @@
                         </div>
                         
                         <!-- Delivered Rate -->
-                        <div class="col-md-3">
-                            <div class="card border-0 shadow-sm rounded-4 h-100 elsx-kpi-card border-start border-4 border-info">
-                                <div class="card-body">
+                        <div class="col-md col-sm-6 col-12">
+                            <div class="card border-0 shadow-sm rounded-4 h-100 elsx-kpi-card border-start border-4 border-warning">
+                                <div class="card-body py-3">
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div>
-                                            <h6 class="text-muted fw-semibold mb-1 text-uppercase small">Delivered Rate</h6>
-                                            <h3 class="mb-0 fw-bold text-dark"><t t-esc="state.data.kpis.delivered_rate"/>%</h3>
+                                            <span class="text-uppercase text-muted fw-bold small" style="font-size: 0.68rem; letter-spacing: 0.05em;">Delivered Rate</span>
+                                            <h3 class="mb-0 fw-black text-dark mt-1"><t t-esc="state.data.kpis.delivered_rate"/>%</h3>
                                         </div>
-                                        <div class="bg-info bg-opacity-10 p-3 rounded-circle text-info">
-                                            <i class="fa fa-check-circle fa-lg"></i>
+                                        <div class="bg-warning bg-opacity-10 p-2.5 rounded-circle text-warning">
+                                            <i class="fa fa-check-circle fs-5"></i>
                                         </div>
                                     </div>
                                 </div>
@@ -71,16 +95,104 @@
                         </div>
 
                         <!-- Read Rate -->
-                        <div class="col-md-3">
+                        <div class="col-md col-sm-6 col-12">
                             <div class="card border-0 shadow-sm rounded-4 h-100 elsx-kpi-card border-start border-4 border-success">
-                                <div class="card-body">
+                                <div class="card-body py-3">
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div>
-                                            <h6 class="text-muted fw-semibold mb-1 text-uppercase small">Read Rate</h6>
-                                            <h3 class="mb-0 fw-bold text-dark"><t t-esc="state.data.kpis.read_rate"/>%</h3>
+                                            <span class="text-uppercase text-muted fw-bold small" style="font-size: 0.68rem; letter-spacing: 0.05em;">Read Rate</span>
+                                            <h3 class="mb-0 fw-black text-dark mt-1"><t t-esc="state.data.kpis.read_rate"/>%</h3>
                                         </div>
-                                        <div class="bg-success bg-opacity-10 p-3 rounded-circle text-success">
-                                            <i class="fa fa-eye fa-lg"></i>
+                                        <div class="bg-success bg-opacity-10 p-2.5 rounded-circle text-success">
+                                            <i class="fa fa-eye fs-5"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Click Rate (CTR) -->
+                        <div class="col-md col-sm-6 col-12">
+                            <div class="card border-0 shadow-sm rounded-4 h-100 elsx-kpi-card border-start border-4 border-danger">
+                                <div class="card-body py-3">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <span class="text-uppercase text-muted fw-bold small" style="font-size: 0.68rem; letter-spacing: 0.05em;">Click Rate (CTR)</span>
+                                            <h3 class="mb-0 fw-black text-dark mt-1"><t t-esc="state.data.kpis.ctr_rate"/>%</h3>
+                                        </div>
+                                        <div class="bg-danger bg-opacity-10 p-2.5 rounded-circle text-danger">
+                                            <i class="fa fa-mouse-pointer fs-5"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Reply Rate -->
+                        <div class="col-md col-sm-6 col-12">
+                            <div class="card border-0 shadow-sm rounded-4 h-100 elsx-kpi-card border-start border-4 border-info">
+                                <div class="card-body py-3">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <span class="text-uppercase text-muted fw-bold small" style="font-size: 0.68rem; letter-spacing: 0.05em;">Reply Rate</span>
+                                            <h3 class="mb-0 fw-black text-dark mt-1"><t t-esc="state.data.kpis.reply_rate"/>%</h3>
+                                        </div>
+                                        <div class="bg-info bg-opacity-10 p-2.5 rounded-circle text-info">
+                                            <i class="fa fa-reply fs-5"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Second KPI Row -->
+                    <div class="row g-3 mb-4">
+                        <!-- Total Est Spend -->
+                        <div class="col-md col-sm-6 col-12">
+                            <div class="card border-0 shadow-sm rounded-4 h-100 elsx-kpi-card bg-gradient border-0" style="background: linear-gradient(135deg, #10b981, #059669); color: white;">
+                                <div class="card-body py-3">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <span class="text-uppercase text-white text-opacity-75 fw-bold small" style="font-size: 0.68rem; letter-spacing: 0.05em;">Estimated Cost</span>
+                                            <h3 class="mb-0 fw-black text-white mt-1">$<t t-esc="state.data.kpis.total_spend"/></h3>
+                                        </div>
+                                        <div class="bg-white bg-opacity-20 p-2.5 rounded-circle text-white">
+                                            <i class="fa fa-dollar fs-5"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- FRT (First Response Time) -->
+                        <div class="col-md col-sm-6 col-12">
+                            <div class="card border-0 shadow-sm rounded-4 h-100 elsx-kpi-card border-start border-4 border-secondary">
+                                <div class="card-body py-3">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <span class="text-uppercase text-muted fw-bold small" style="font-size: 0.68rem; letter-spacing: 0.05em;">First Response (FRT)</span>
+                                            <h3 class="mb-0 fw-black text-dark mt-1"><t t-esc="state.data.kpis.frt_minutes"/> min</h3>
+                                        </div>
+                                        <div class="bg-secondary bg-opacity-10 p-2.5 rounded-circle text-secondary">
+                                            <i class="fa fa-hourglass-half fs-5"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ART (Resolution Time) -->
+                        <div class="col-md col-sm-6 col-12">
+                            <div class="card border-0 shadow-sm rounded-4 h-100 elsx-kpi-card border-start border-4 border-dark">
+                                <div class="card-body py-3">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <span class="text-uppercase text-muted fw-bold small" style="font-size: 0.68rem; letter-spacing: 0.05em;">Avg Resolution (ART)</span>
+                                            <h3 class="mb-0 fw-black text-dark mt-1"><t t-esc="state.data.kpis.art_hours"/> hrs</h3>
+                                        </div>
+                                        <div class="bg-dark bg-opacity-10 p-2.5 rounded-circle text-dark">
+                                            <i class="fa fa-check fs-5"></i>
                                         </div>
                                     </div>
                                 </div>
@@ -88,16 +200,33 @@
                         </div>
 
                         <!-- Open Chats -->
-                        <div class="col-md-3">
-                            <div class="card border-0 shadow-sm rounded-4 h-100 elsx-kpi-card border-start border-4 border-warning">
-                                <div class="card-body">
+                        <div class="col-md col-sm-6 col-12">
+                            <div class="card border-0 shadow-sm rounded-4 h-100 elsx-kpi-card border-start border-4 border-primary">
+                                <div class="card-body py-3">
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div>
-                                            <h6 class="text-muted fw-semibold mb-1 text-uppercase small">Open Chats</h6>
-                                            <h3 class="mb-0 fw-bold text-dark"><t t-esc="state.data.kpis.open_chats"/></h3>
+                                            <span class="text-uppercase text-muted fw-bold small" style="font-size: 0.68rem; letter-spacing: 0.05em;">Active Chats</span>
+                                            <h3 class="mb-0 fw-black text-dark mt-1"><t t-esc="state.data.kpis.open_chats"/></h3>
                                         </div>
-                                        <div class="bg-warning bg-opacity-10 p-3 rounded-circle text-warning">
-                                            <i class="fa fa-comments fa-lg"></i>
+                                        <div class="bg-primary bg-opacity-10 p-2.5 rounded-circle text-primary">
+                                            <i class="fa fa-comments fs-5"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Resolved Today -->
+                        <div class="col-md col-sm-6 col-12">
+                            <div class="card border-0 shadow-sm rounded-4 h-100 elsx-kpi-card border-start border-4 border-success">
+                                <div class="card-body py-3">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <span class="text-uppercase text-muted fw-bold small" style="font-size: 0.68rem; letter-spacing: 0.05em;">Resolved Today</span>
+                                            <h3 class="mb-0 fw-black text-dark mt-1"><t t-esc="state.data.kpis.resolved_today"/></h3>
+                                        </div>
+                                        <div class="bg-success bg-opacity-10 p-2.5 rounded-circle text-success">
+                                            <i class="fa fa-check-square fs-5"></i>
                                         </div>
                                     </div>
                                 </div>
@@ -105,55 +234,170 @@
                         </div>
                     </div>
 
-                    <!-- Volume Trend Chart Row -->
-                    <div class="row mb-4">
-                        <div class="col-12">
-                            <div class="card border-0 shadow-sm rounded-4">
+                    <!-- Main Charts Row: Volume Trend & Spend Doughnut -->
+                    <div class="row g-4 mb-4">
+                        <!-- 14-Day Line Trend -->
+                        <div class="col-lg-8 col-12">
+                            <div class="card border-0 shadow-sm rounded-4 h-100">
                                 <div class="card-header bg-white border-0 pt-4 pb-0 d-flex justify-content-between align-items-center">
-                                    <h5 class="fw-bold text-dark mb-0">14-Day Message Volume Trend</h5>
+                                    <div>
+                                        <h5 class="fw-bold text-dark mb-0">Message Volume &amp; Engagement Trend</h5>
+                                        <span class="text-muted small">Daily volume of outbound, delivered, and read messages</span>
+                                    </div>
                                 </div>
                                 <div class="card-body">
-                                    <div style="height: 300px; width: 100%;">
+                                    <div style="height: 320px; width: 100%;">
                                         <canvas t-ref="volumeChartCanvas"></canvas>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Main Charts Row -->
-                    <div class="row g-3 mb-4">
-                        <!-- Top Templates -->
-                        <div class="col-md-6">
+                        <!-- Spend Category Doughnut -->
+                        <div class="col-lg-4 col-12">
                             <div class="card border-0 shadow-sm rounded-4 h-100">
                                 <div class="card-header bg-white border-0 pt-4 pb-0">
-                                    <h5 class="fw-bold text-dark mb-0">Top Performing Templates</h5>
+                                    <h5 class="fw-bold text-dark mb-0">Cost by Meta Category</h5>
+                                    <span class="text-muted small">Breakdown of billing spend across conversation types</span>
+                                </div>
+                                <div class="card-body d-flex flex-column align-items-center justify-content-center">
+                                    <div style="height: 240px; width: 100%; position: relative;">
+                                        <canvas t-ref="categoryChartCanvas"></canvas>
+                                    </div>
+                                    <!-- Dynamic breakdown list below chart -->
+                                    <div class="w-100 mt-3 d-flex justify-content-between px-3 small">
+                                        <div class="text-center">
+                                            <span class="d-block text-pink" style="color: #ec4899; font-weight: 700;">Marketing</span>
+                                            <span class="fw-bold">$<t t-esc="state.data.cost_by_category.marketing"/></span>
+                                        </div>
+                                        <div class="text-center">
+                                            <span class="d-block text-amber" style="color: #f59e0b; font-weight: 700;">Utility</span>
+                                            <span class="fw-bold">$<t t-esc="state.data.cost_by_category.utility"/></span>
+                                        </div>
+                                        <div class="text-center">
+                                            <span class="d-block text-purple" style="color: #8b5cf6; font-weight: 700;">Auth</span>
+                                            <span class="fw-bold">$<t t-esc="state.data.cost_by_category.authentication"/></span>
+                                        </div>
+                                        <div class="text-center">
+                                            <span class="d-block text-emerald" style="color: #10b981; font-weight: 700;">Service</span>
+                                            <span class="fw-bold">$<t t-esc="state.data.cost_by_category.service"/></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Second Visual Row: Funnel Success and Agent Leaderboard -->
+                    <div class="row g-4 mb-4">
+                        <!-- Campaign Funnel Chart -->
+                        <div class="col-lg-6 col-12">
+                            <div class="card border-0 shadow-sm rounded-4 h-100">
+                                <div class="card-header bg-white border-0 pt-4 pb-0">
+                                    <h5 class="fw-bold text-dark mb-0">Interactive Broadcast Success Funnel</h5>
+                                    <span class="text-muted small">Drop-off tracking from targeting to active user replies</span>
+                                </div>
+                                <div class="card-body">
+                                    <div style="height: 300px; width: 100%;">
+                                        <canvas t-ref="funnelChartCanvas"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Agent Performance Leaderboard -->
+                        <div class="col-lg-6 col-12">
+                            <div class="card border-0 shadow-sm rounded-4 h-100">
+                                <div class="card-header bg-white border-0 pt-4 pb-0 d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h5 class="fw-bold text-dark mb-0">Support Agent Leaderboard</h5>
+                                        <span class="text-muted small">Real-time performance and chat resolution analytics</span>
+                                    </div>
                                 </div>
                                 <div class="card-body">
                                     <div class="table-responsive">
                                         <table class="table table-borderless table-hover align-middle">
                                             <thead class="text-muted small text-uppercase bg-light rounded">
                                                 <tr>
-                                                    <th class="rounded-start ps-3 py-2">Template Name</th>
-                                                    <th class="py-2">Sent</th>
-                                                    <th class="rounded-end py-2">Read Rate</th>
+                                                    <th class="rounded-start ps-3 py-2">Agent Name</th>
+                                                    <th class="py-2 text-center">Active Chats</th>
+                                                    <th class="py-2 text-center">Resolved</th>
+                                                    <th class="py-2 text-center">Avg ART</th>
+                                                    <th class="rounded-end py-2 text-end pe-3">Resolution Rate</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                <tr t-foreach="state.data.top_templates" t-as="tpl" t-key="tpl.name" class="border-bottom">
-                                                    <td class="ps-3 fw-medium text-dark"><t t-esc="tpl.name"/></td>
-                                                    <td><t t-esc="tpl.usage"/></td>
-                                                    <td>
-                                                        <div class="d-flex align-items-center">
-                                                            <div class="progress flex-grow-1 me-2" style="height: 6px;">
+                                                <tr t-foreach="state.data.agent_stats" t-as="agent" t-key="agent.id" class="border-bottom" style="cursor: pointer;" t-on-click="() => this.openAgentChat(agent.id)">
+                                                    <td class="ps-3 fw-bold text-dark">
+                                                        <i class="fa fa-user-circle-o text-muted me-2"></i>
+                                                        <t t-esc="agent.name"/>
+                                                    </td>
+                                                    <td class="text-center fw-semibold text-primary"><t t-esc="agent.open_chats"/></td>
+                                                    <td class="text-center fw-semibold text-success"><t t-esc="agent.resolved_chats"/></td>
+                                                    <td class="text-center text-muted"><t t-esc="agent.avg_resolution_time"/> hrs</td>
+                                                    <td class="text-end pe-3">
+                                                        <span class="badge rounded-pill bg-success bg-opacity-10 text-success fw-bold px-2.5 py-1">
+                                                            <t t-esc="agent.resolution_rate"/>%
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                                <tr t-if="state.data.agent_stats.length === 0">
+                                                    <td colspan="5" class="text-center py-4 text-muted">No active agent assignments detected</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bottom Tables: Top Performing Templates and Recent Campaigns -->
+                    <div class="row g-4 mb-4">
+                        <!-- Top Templates -->
+                        <div class="col-lg-6 col-12">
+                            <div class="card border-0 shadow-sm rounded-4 h-100">
+                                <div class="card-header bg-white border-0 pt-4 pb-0">
+                                    <h5 class="fw-bold text-dark mb-0">Top Performing WhatsApp Templates</h5>
+                                    <span class="text-muted small">Templates with highest customer interaction rates</span>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-borderless table-hover align-middle">
+                                            <thead class="text-muted small text-uppercase bg-light rounded">
+                                                <tr>
+                                                    <th class="rounded-start ps-3 py-2">Template</th>
+                                                    <th class="py-2 text-center">Category</th>
+                                                    <th class="py-2 text-center">Usage</th>
+                                                    <th class="py-2 text-center">Read Rate</th>
+                                                    <th class="rounded-end py-2 text-end pe-3">CTR (Clicks)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr t-foreach="state.data.top_templates" t-as="tpl" t-key="tpl.name" class="border-bottom" style="cursor: pointer;" t-on-click="() => this.openTemplateByName(tpl.name)">
+                                                    <td class="ps-3 fw-bold text-dark text-truncate" style="max-width: 140px;" t-att-title="tpl.name">
+                                                        <t t-esc="tpl.name"/>
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <span t-attf-class="badge rounded-pill px-2.5 py-1 #{tpl.category === 'Marketing' ? 'bg-pink-light' : tpl.category === 'Utility' ? 'bg-amber-light' : 'bg-purple-light'}" style="font-size: 0.72rem;">
+                                                            <t t-esc="tpl.category"/>
+                                                        </span>
+                                                    </td>
+                                                    <td class="text-center fw-semibold text-dark"><t t-esc="tpl.usage"/></td>
+                                                    <td class="text-center">
+                                                        <div class="d-flex align-items-center justify-content-center gap-1.5">
+                                                            <div class="progress flex-grow-1" style="height: 5px; min-width: 48px; max-width: 60px;">
                                                                 <div class="progress-bar bg-success rounded-pill" role="progressbar" t-attf-style="width: #{tpl.read_rate}%;"></div>
                                                             </div>
-                                                            <span class="small fw-semibold"><t t-esc="tpl.read_rate"/>%</span>
+                                                            <span class="small fw-bold"><t t-esc="tpl.read_rate"/>%</span>
                                                         </div>
+                                                    </td>
+                                                    <td class="text-end pe-3 fw-bold text-danger">
+                                                        <t t-esc="tpl.ctr_rate"/>% <span class="text-muted small font-normal">(<t t-esc="tpl.clicks"/>)</span>
                                                     </td>
                                                 </tr>
                                                 <tr t-if="state.data.top_templates.length === 0">
-                                                    <td colspan="3" class="text-center py-4 text-muted">No template data available</td>
+                                                    <td colspan="5" class="text-center py-4 text-muted">No template usage logs in selected period</td>
                                                 </tr>
                                             </tbody>
                                         </table>
@@ -163,12 +407,15 @@
                         </div>
 
                         <!-- Recent Campaigns -->
-                        <div class="col-md-6">
+                        <div class="col-lg-6 col-12">
                             <div class="card border-0 shadow-sm rounded-4 h-100">
                                 <div class="card-header bg-white border-0 pt-4 pb-0 d-flex justify-content-between align-items-center">
-                                    <h5 class="fw-bold text-dark mb-0">Recent Campaigns</h5>
-                                    <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3 py-2">
-                                        <t t-esc="state.data.kpis.active_campaigns"/> Active
+                                    <div>
+                                        <h5 class="fw-bold text-dark mb-0">Recent Marketing Broadcast Campaigns</h5>
+                                        <span class="text-muted small">Blast logs and click success details</span>
+                                    </div>
+                                    <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3 py-1.5 fw-bold">
+                                        <t t-esc="state.data.kpis.active_campaigns"/> Active Campaigns
                                     </span>
                                 </div>
                                 <div class="card-body">
@@ -177,24 +424,28 @@
                                             <thead class="text-muted small text-uppercase bg-light rounded">
                                                 <tr>
                                                     <th class="rounded-start ps-3 py-2">Campaign Name</th>
-                                                    <th class="py-2">Status</th>
-                                                    <th class="py-2">Sent</th>
-                                                    <th class="rounded-end py-2">Delivered</th>
+                                                    <th class="py-2 text-center">Status</th>
+                                                    <th class="py-2 text-center">Sent</th>
+                                                    <th class="py-2 text-center">Delivered</th>
+                                                    <th class="rounded-end py-2 text-end pe-3">CTR (Clicks)</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 <tr t-foreach="state.data.recent_campaigns" t-as="camp" t-key="camp.id" class="border-bottom" style="cursor: pointer;" t-on-click="() => this.openCampaign(camp.id)">
-                                                    <td class="ps-3 fw-medium text-dark"><t t-esc="camp.name"/></td>
-                                                    <td>
-                                                        <span t-attf-class="badge rounded-pill bg-#{camp.state === 'running' ? 'primary' : camp.state === 'completed' ? 'success' : camp.state === 'scheduled' ? 'warning' : 'secondary'}">
+                                                    <td class="ps-3 fw-bold text-dark"><t t-esc="camp.name"/></td>
+                                                    <td class="text-center">
+                                                        <span t-attf-class="badge rounded-pill px-2.5 py-1 bg-#{camp.state === 'running' ? 'primary' : camp.state === 'completed' ? 'success' : camp.state === 'scheduled' ? 'warning' : 'secondary'}" style="font-size: 0.72rem;">
                                                             <t t-esc="camp.state"/>
                                                         </span>
                                                     </td>
-                                                    <td class="fw-semibold"><t t-esc="camp.sent"/></td>
-                                                    <td class="text-success fw-semibold"><t t-esc="camp.delivered"/></td>
+                                                    <td class="text-center fw-semibold text-dark"><t t-esc="camp.sent"/></td>
+                                                    <td class="text-center text-success fw-bold"><t t-esc="camp.delivered_rate"/>%</td>
+                                                    <td class="text-end pe-3 fw-bold text-danger">
+                                                        <t t-esc="camp.ctr_rate"/>% <span class="text-muted small font-normal">(<t t-esc="camp.clicks"/>)</span>
+                                                    </td>
                                                 </tr>
                                                 <tr t-if="state.data.recent_campaigns.length === 0">
-                                                    <td colspan="4" class="text-center py-4 text-muted">No recent campaigns</td>
+                                                    <td colspan="5" class="text-center py-4 text-muted">No marketing campaigns found</td>
                                                 </tr>
                                             </tbody>
                                         </table>

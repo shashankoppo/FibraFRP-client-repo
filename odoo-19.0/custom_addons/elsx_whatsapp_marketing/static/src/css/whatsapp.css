@@ -1420,6 +1420,34 @@
     box-shadow: 0 8px 16px rgba(0,0,0,0.08) !important;
 }
 
+.bg-pink-light {
+    background-color: #fce7f3 !important;
+    color: #db2777 !important;
+}
+
+.bg-amber-light {
+    background-color: #fef3c7 !important;
+    color: #d97706 !important;
+}
+
+.bg-purple-light {
+    background-color: #f3e8ff !important;
+    color: #7c3aed !important;
+}
+
+.bg-emerald-light {
+    background-color: #d1fae5 !important;
+    color: #059669 !important;
+}
+
+.fw-black {
+    font-weight: 850 !important;
+}
+
+.font-normal {
+    font-weight: 400 !important;
+}
+
 /* Dashboard Meta Button */
 .btn-whatsapp-meta {
     background: #fff !important;
