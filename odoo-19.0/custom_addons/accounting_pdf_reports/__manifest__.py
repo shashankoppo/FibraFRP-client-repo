@@ -7,7 +7,6 @@
     'summary': 'Accounting Reports For Odoo 19',
     'sequence': '1',
     'author': 'Odoo Mates, Odoo SA',
-    'license': 'LGPL-3',
     'company': 'Odoo Mates',
     'maintainer': 'Odoo Mates',
     'support': 'odoomates@gmail.com',

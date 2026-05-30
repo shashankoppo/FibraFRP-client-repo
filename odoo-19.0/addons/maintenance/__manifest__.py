@@ -32,5 +32,4 @@ Track equipment and maintenance requests""",
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

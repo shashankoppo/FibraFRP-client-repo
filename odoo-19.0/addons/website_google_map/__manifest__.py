@@ -14,5 +14,4 @@ Show your company address/partner address on Google Maps. Configure an API key i
     ],
     'installable': True,
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

@@ -51,5 +51,4 @@ Wizards provided by this module:
     'demo': [
         'demo/demo_company.xml',
     ],
-    'license': 'LGPL-3',
 }

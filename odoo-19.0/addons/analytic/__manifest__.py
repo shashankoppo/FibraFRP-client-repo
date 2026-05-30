@@ -44,5 +44,4 @@ that have no counterpart in the general financial accounts.
     },
     'installable': True,
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

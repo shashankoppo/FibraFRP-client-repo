@@ -50,5 +50,4 @@ Both goals and badges are flexibles and can be adapted to a large range of modul
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

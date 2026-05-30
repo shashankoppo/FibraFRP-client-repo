@@ -20,7 +20,6 @@ E-invoice implementation for Romania
     'installable': True,
     'auto_install': True,
     'uninstall_hook': 'uninstall_hook',
-    'license': 'LGPL-3',
     'assets': {
         'web.assets_backend': [
             'l10n_ro_edi/static/src/components/*',

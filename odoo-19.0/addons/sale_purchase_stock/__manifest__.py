@@ -16,5 +16,4 @@ Add relation information between Sale Orders and Purchase Orders if Make to Orde
     'installable': True,
     'auto_install': True,
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

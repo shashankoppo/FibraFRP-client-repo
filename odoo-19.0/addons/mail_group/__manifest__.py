@@ -42,5 +42,4 @@ Manage your mailing lists from Odoo.
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

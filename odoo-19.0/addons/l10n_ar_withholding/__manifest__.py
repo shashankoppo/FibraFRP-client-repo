@@ -25,5 +25,4 @@
     ],
     'installable': True,
     'post_init_hook': '_l10n_ar_wth_post_init',
-    'license': 'LGPL-3',
 }

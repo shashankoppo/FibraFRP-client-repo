@@ -13,5 +13,4 @@ The module adds Microsoft user in res user.
         'data/microsoft_account_data.xml',
     ],
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

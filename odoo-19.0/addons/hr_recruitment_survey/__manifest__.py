@@ -25,5 +25,4 @@ to allow you to define interviews for different jobs.
         'data/hr_job_demo.xml',
     ],
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

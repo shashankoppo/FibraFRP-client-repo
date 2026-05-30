@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api
+from odoo.exceptions import ValidationError
 import logging
 import json
 
@@ -38,6 +39,22 @@ class WhatsAppBotRule(models.Model):
     template_id = fields.Many2one('whatsapp.template', string='Template')
     assign_user_id = fields.Many2one('res.users', string='Assign to Agent')
     tag_id = fields.Many2one('res.partner.category', string='Label to Assign')
+
+    @api.constrains('active', 'trigger_type', 'keywords', 'action_type', 'reply_text', 'template_id', 'assign_user_id', 'tag_id')
+    def _check_active_rule_configuration(self):
+        for rule in self:
+            if not rule.active:
+                continue
+            if rule.trigger_type == 'keyword' and not (rule.keywords or '').strip():
+                raise ValidationError(f'Bot rule "{rule.name}" needs at least one keyword.')
+            if rule.action_type == 'text' and not (rule.reply_text or '').strip():
+                raise ValidationError(f'Bot rule "{rule.name}" needs reply text.')
+            if rule.action_type == 'template' and not rule.template_id:
+                raise ValidationError(f'Bot rule "{rule.name}" needs a template.')
+            if rule.action_type == 'transfer' and not rule.assign_user_id:
+                raise ValidationError(f'Bot rule "{rule.name}" needs an assigned agent.')
+            if rule.action_type == 'assign_label' and not rule.tag_id:
+                raise ValidationError(f'Bot rule "{rule.name}" needs a label.')
 
     def check_and_fire(self, env, account, phone_number, body, partner_id=None, chat_id=None):
         """Check if this rule matches and fire the action. Returns True if matched."""

@@ -26,13 +26,12 @@ class SaleOrder(models.Model):
 
     def _send_whatsapp_confirmation(self):
         """Helper to send WhatsApp confirmation message"""
-        # Find active WhatsApp account
-        account = self.env['whatsapp.account'].search([('active', '=', True)], limit=1)
+        account = self.env['whatsapp.account']._get_default_account()
         if not account:
             return
 
         partner = self.partner_id
-        phone = partner.mobile or partner.phone
+        phone = getattr(partner, 'mobile', False) or partner.phone
         if not phone:
             return
 

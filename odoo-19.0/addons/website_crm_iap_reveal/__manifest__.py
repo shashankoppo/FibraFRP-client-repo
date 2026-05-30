@@ -23,5 +23,4 @@
         'views/crm_menus.xml',
     ],
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

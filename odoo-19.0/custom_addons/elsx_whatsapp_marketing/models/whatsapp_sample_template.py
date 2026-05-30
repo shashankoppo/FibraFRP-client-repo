@@ -2,12 +2,13 @@
 from odoo import models, fields, api
 import re
 import logging
+from html import escape as html_escape
 
 _logger = logging.getLogger(__name__)
 
 
 class WhatsAppSampleTemplate(models.Model):
-    """Pre-built template library — ready-to-import enterprise-grade templates"""
+    """Pre-built template library - ready-to-import enterprise-grade templates"""
     _name = 'whatsapp.sample.template'
     _description = 'WhatsApp Sample Template Library'
     _order = 'industry, category, name'
@@ -74,6 +75,7 @@ class WhatsAppSampleTemplate(models.Model):
 
     # Preview
     preview_html = fields.Html('Preview', compute='_compute_preview_html', sanitize=False)
+    preview_text = fields.Text('Preview Text', compute='_compute_preview_html')
 
     @api.depends('name')
     def _compute_display_name_clean(self):
@@ -90,37 +92,46 @@ class WhatsAppSampleTemplate(models.Model):
     def _compute_preview_html(self):
         for rec in self:
             header_html = ""
+            text_lines = []
             if rec.header_type == 'text' and rec.header_text:
-                header_html = f"<div style='font-weight:700;margin-bottom:4px;color:#111b21;font-size:14px;'>{rec.header_text}</div>"
+                header_html = f"<div style='font-weight:700;margin-bottom:4px;color:#111b21;font-size:14px;'>{html_escape(rec.header_text)}</div>"
+                text_lines.append("Header: %s" % rec.header_text)
             elif rec.header_type in ('image', 'video'):
                 icon = 'image' if rec.header_type == 'image' else 'play-circle'
                 header_html = f"<div style='background:#e9edef;height:100px;border-radius:6px;margin-bottom:6px;display:flex;align-items:center;justify-content:center;'><i class='fa fa-{icon} fa-2x' style='color:#8696a0;'></i></div>"
+                text_lines.append("Header: %s placeholder" % rec.header_type.title())
 
-            body_html = f"<div style='color:#111b21;font-size:13px;white-space:pre-wrap;line-height:1.4;'>{rec.body or ''}</div>"
+            body_html = f"<div style='color:#111b21;font-size:13px;white-space:pre-wrap;line-height:1.4;'>{html_escape(rec.body or '')}</div>"
+            text_lines.append(rec.body or '')
 
             footer_html = ""
             if rec.footer:
-                footer_html = f"<div style='color:#667781;font-size:11px;margin-top:4px;'>{rec.footer}</div>"
+                footer_html = f"<div style='color:#667781;font-size:11px;margin-top:4px;'>{html_escape(rec.footer)}</div>"
+                text_lines.append("Footer: %s" % rec.footer)
 
             buttons_html = ""
+            button_labels = []
             if rec.has_buttons:
                 for btn in [rec.button_text_1, rec.button_text_2, rec.button_text_3]:
                     if btn:
+                        button_labels.append(btn)
                         buttons_html += f"""
                         <div style="background: #fff; border-radius: 8px; padding: 10px; text-align: center; color: #008069; font-weight: 600; font-size: 13px; margin-top: 4px; box-shadow: 0 1px 0.5px rgba(0,0,0,0.13); cursor: pointer; transition: background 0.2s;">
-                            {btn}
+                            {html_escape(btn)}
                         </div>"""
+            if button_labels:
+                text_lines.append("Buttons: %s" % " | ".join(button_labels))
 
             rec.preview_html = f"""
             <div class="o_whatsapp_preview_container" style="max-width:320px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-                <div class="o_whatsapp_preview_chat_bg" style="background-color: #efeae2; background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); background-size: 400px; padding: 20px; border-radius: 16px; box-shadow: inset 0 0 20px rgba(0,0,0,0.05); min-height: 200px;">
+                <div class="o_whatsapp_preview_chat_bg" style="background-color: #efeae2; background-image: radial-gradient(rgba(17,27,33,.06) .8px, transparent .8px); background-size: 18px 18px; padding: 20px; border-radius: 16px; box-shadow: inset 0 0 20px rgba(0,0,0,0.05); min-height: 200px;">
                     <div class="o_whatsapp_bubble" style="background: #d9fdd3; border-radius: 8px 8px 0 8px; padding: 10px 12px; position: relative; box-shadow: 0 1px 0.5px rgba(11,20,26,.13); margin-left: auto; width: fit-content; max-width: 90%;">
                         {header_html}
                         {body_html}
                         {footer_html}
                         <div style="display: flex; justify-content: flex-end; align-items: center; gap: 4px; margin-top: 4px;">
                             <span style="font-size: 11px; color: #667781;">10:42 AM</span>
-                            <span style="color: #53bdeb; font-size: 14px; line-height: 1;">✓✓</span>
+                            <span style="color: #53bdeb; font-size: 11px; line-height: 1;">read</span>
                         </div>
                     </div>
                     <div style="width: 90%; margin-left: auto;">
@@ -129,14 +140,14 @@ class WhatsAppSampleTemplate(models.Model):
                 </div>
             </div>
             """
+            rec.preview_text = "\n".join(line for line in text_lines if line)
 
     def action_import_to_templates(self):
         """Import this sample template into the user's template library"""
         self.ensure_one()
         Template = self.env['whatsapp.template']
 
-        # Find default account
-        account = self.env['whatsapp.account'].search([('active', '=', True)], limit=1)
+        account = self.env['whatsapp.account']._get_default_account()
 
         vals = {
             'name': self.name,
@@ -176,6 +187,7 @@ class WhatsAppSampleTemplate(models.Model):
                     'res_model': 'whatsapp.template',
                     'res_id': template.id,
                     'view_mode': 'form',
+                    'views': [(False, 'form')],
                     'target': 'current',
                 },
             }

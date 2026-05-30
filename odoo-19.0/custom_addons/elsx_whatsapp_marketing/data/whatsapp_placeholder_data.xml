@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="placeholder_name" model="whatsapp.placeholder">
+        <field name="sequence">1</field>
+        <field name="placeholder">{{name}}</field>
+        <field name="name">Customer Name</field>
+        <field name="context_type">all</field>
+        <field name="sample_value">Shashank Patel</field>
+        <field name="description">Customer or partner display name.</field>
+    </record>
+    <record id="placeholder_phone" model="whatsapp.placeholder">
+        <field name="sequence">2</field>
+        <field name="placeholder">{{phone}}</field>
+        <field name="name">Phone Number</field>
+        <field name="context_type">all</field>
+        <field name="sample_value">919999999999</field>
+        <field name="description">Normalized customer phone or mobile number.</field>
+    </record>
+    <record id="placeholder_company" model="whatsapp.placeholder">
+        <field name="sequence">3</field>
+        <field name="placeholder">{{company}}</field>
+        <field name="name">Company</field>
+        <field name="context_type">all</field>
+        <field name="sample_value">FiberaFRP Dealer</field>
+        <field name="description">Commercial company name when available.</field>
+    </record>
+    <record id="placeholder_email" model="whatsapp.placeholder">
+        <field name="sequence">4</field>
+        <field name="placeholder">{{email}}</field>
+        <field name="name">Email</field>
+        <field name="context_type">contact</field>
+        <field name="sample_value">customer@example.com</field>
+    </record>
+    <record id="placeholder_last_reply" model="whatsapp.placeholder">
+        <field name="sequence">10</field>
+        <field name="placeholder">{{last_reply}}</field>
+        <field name="name">Last Customer Reply</field>
+        <field name="context_type">chat</field>
+        <field name="sample_value">Need catalogue and price list</field>
+        <field name="description">Latest known chat message used by bot flows and AI draft replies.</field>
+    </record>
+    <record id="placeholder_chat_status" model="whatsapp.placeholder">
+        <field name="sequence">11</field>
+        <field name="placeholder">{{chat_status}}</field>
+        <field name="name">Chat Status</field>
+        <field name="context_type">chat</field>
+        <field name="sample_value">open</field>
+    </record>
+    <record id="placeholder_assigned_agent" model="whatsapp.placeholder">
+        <field name="sequence">12</field>
+        <field name="placeholder">{{assigned_agent}}</field>
+        <field name="name">Assigned Agent</field>
+        <field name="context_type">chat</field>
+        <field name="sample_value">Sales User</field>
+    </record>
+    <record id="placeholder_record_name" model="whatsapp.placeholder">
+        <field name="sequence">20</field>
+        <field name="placeholder">{{record_name}}</field>
+        <field name="name">Record Name</field>
+        <field name="context_type">all</field>
+        <field name="sample_value">INV/2026/001</field>
+    </record>
+    <record id="placeholder_amount_total" model="whatsapp.placeholder">
+        <field name="sequence">30</field>
+        <field name="placeholder">{{amount_total}}</field>
+        <field name="name">Amount Total</field>
+        <field name="context_type">invoice</field>
+        <field name="sample_value">25000.00</field>
+    </record>
+    <record id="placeholder_invoice_due_date" model="whatsapp.placeholder">
+        <field name="sequence">31</field>
+        <field name="placeholder">{{invoice_due_date}}</field>
+        <field name="name">Invoice Due Date</field>
+        <field name="context_type">invoice</field>
+        <field name="sample_value">2026-06-15</field>
+    </record>
+    <record id="placeholder_opportunity_name" model="whatsapp.placeholder">
+        <field name="sequence">40</field>
+        <field name="placeholder">{{opportunity_name}}</field>
+        <field name="name">Opportunity Name</field>
+        <field name="context_type">crm</field>
+        <field name="sample_value">FRP Manhole Cover Enquiry</field>
+    </record>
+    <record id="placeholder_customer_requirement" model="whatsapp.placeholder">
+        <field name="sequence">50</field>
+        <field name="placeholder">{{customer_requirement}}</field>
+        <field name="name">Flow Captured Requirement</field>
+        <field name="context_type">flow</field>
+        <field name="sample_value">Drainage covers for project site</field>
+        <field name="description">Example variable saved by an Ask Question flow step.</field>
+    </record>
+</odoo>

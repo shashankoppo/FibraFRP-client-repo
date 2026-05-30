@@ -9,7 +9,6 @@
     'category': 'Accounting',
     'sequence': 10,
     'website': 'https://www.odoomates.tech',
-    'license': 'LGPL-3',
     'images': ['static/description/assets.gif'],
     'data': [
         'data/account_asset_data.xml',

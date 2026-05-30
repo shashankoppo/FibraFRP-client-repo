@@ -23,5 +23,4 @@ This is the base module for managing Units of measure.
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

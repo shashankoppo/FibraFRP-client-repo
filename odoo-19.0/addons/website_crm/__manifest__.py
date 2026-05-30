@@ -33,5 +33,4 @@ This module includes contact phone and mobile numbers validation.""",
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

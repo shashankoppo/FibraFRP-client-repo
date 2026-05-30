@@ -11,5 +11,4 @@
     'data': [
         'report/hr_expense_report.xml',
     ],
-    'license': 'LGPL-3',
 }

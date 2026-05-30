@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_move_form_tally_inherit" model="ir.ui.view">
+        <field name="name">account.move.form.tally.inherit</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_export_tally_xml"
+                        string="Tally XML"
+                        type="object"
+                        class="btn-secondary"
+                        icon="fa-download"
+                        invisible="state != 'posted' or move_type not in ('out_invoice', 'out_refund', 'out_receipt', 'in_invoice', 'in_refund', 'in_receipt')"/>
+                <button name="action_push_to_tally"
+                        string="Push to Tally"
+                        type="object"
+                        class="btn-primary"
+                        icon="fa-exchange"
+                        invisible="state != 'posted' or move_type not in ('out_invoice', 'out_refund', 'out_receipt', 'in_invoice', 'in_refund', 'in_receipt')"/>
+            </xpath>
+
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_view_tally_logs"
+                        type="object"
+                        class="oe_stat_button"
+                        icon="fa-exchange"
+                        invisible="elsx_tally_log_count == 0">
+                    <field name="elsx_tally_log_count" widget="statinfo" string="Tally Logs"/>
+                </button>
+            </xpath>
+
+            <xpath expr="//page[@name='other_info']" position="inside">
+                <group string="Tally Integration">
+                    <group>
+                        <field name="elsx_tally_state" widget="badge"
+                               decoration-muted="elsx_tally_state == 'not_synced'"
+                               decoration-info="elsx_tally_state == 'xml_generated'"
+                               decoration-success="elsx_tally_state == 'pushed'"
+                               decoration-danger="elsx_tally_state == 'failed'"/>
+                        <field name="elsx_tally_synced_at"/>
+                    </group>
+                    <group>
+                        <field name="elsx_tally_last_error" invisible="elsx_tally_state != 'failed'"/>
+                        <button name="action_reset_tally_status"
+                                string="Reset Tally Status"
+                                type="object"
+                                class="btn-secondary"
+                                invisible="elsx_tally_state == 'not_synced'"/>
+                    </group>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>

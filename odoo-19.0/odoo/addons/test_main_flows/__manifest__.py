@@ -19,5 +19,4 @@ It will install some main apps and will try to execute the most important action
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

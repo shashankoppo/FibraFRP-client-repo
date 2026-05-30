@@ -17,5 +17,4 @@
         'wizard/account_update_tax_tags_wizard.xml',
     ],
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

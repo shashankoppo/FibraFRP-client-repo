@@ -31,5 +31,4 @@ This module allows to manage onboardings and their progress
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

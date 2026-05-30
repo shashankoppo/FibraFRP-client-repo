@@ -57,5 +57,4 @@ The automatic assignment is figured from the weight of partner levels and the ge
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

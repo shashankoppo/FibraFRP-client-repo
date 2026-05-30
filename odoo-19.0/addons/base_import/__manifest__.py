@@ -40,5 +40,4 @@ Re-implement Odoo's file import system:
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

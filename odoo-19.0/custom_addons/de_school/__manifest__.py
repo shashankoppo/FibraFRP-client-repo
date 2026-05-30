@@ -44,7 +44,6 @@
         'demo/student_demo.xml',
         'demo/teacher_demo.xml',
     ],
-    'license': 'LGPL-3',
     'images': ['static/description/banner.gif'],
     'installable': True,
     'application': True,

@@ -36,5 +36,4 @@ The actual till still requires one user but an unlimited number of employees can
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

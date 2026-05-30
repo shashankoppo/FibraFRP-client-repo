@@ -27,9 +27,9 @@ const io = new Server(server, {
 });
 
 const PORT = process.env.PORT || 3000;
-const SIDECAR_SECRET = process.env.SIDECAR_SECRET || 'elsx_sidecar_secure_2024';
+const SIDECAR_SECRET = process.env.SIDECAR_SECRET || '';
 const ODOO_URL = process.env.ODOO_URL || 'http://odoo:8069';
-const VERIFY_TOKEN = process.env.VERIFY_TOKEN || 'elsx_verify_2024';
+const VERIFY_TOKEN = process.env.VERIFY_TOKEN || '';
 const META_APP_SECRET = process.env.META_APP_SECRET || process.env.APP_SECRET || '';
 const REDIS_URL = process.env.REDIS_URL || '';
 const QUEUE_KEY = process.env.REDIS_QUEUE_KEY || 'elsx:whatsapp:webhook:queue';

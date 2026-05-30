@@ -26,5 +26,4 @@ Convert employee's extra hours to leave allocations.
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

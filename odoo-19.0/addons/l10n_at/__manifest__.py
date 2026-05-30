@@ -37,5 +37,4 @@ Austrian charts of accounts (Einheitskontenrahmen 2010).
     'demo': [
         'demo/demo_company.xml',
     ],
-    'license': 'LGPL-3',
 }

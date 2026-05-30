@@ -39,12 +39,15 @@
                     </div>
                     
                     <field name="description" placeholder="Describe this segment..."/>
+                    <div class="alert alert-info" role="alert" invisible="segment_type not in ['smart_valid_contacts', 'smart_highly_engaged', 'smart_winback', 'smart_at_risk', 'smart_opted_out', 'smart_no_recent_reply']">
+                        Smart segments are recalculated from WhatsApp opt-in state, message history, and recent replies when you click Refresh Contacts.
+                    </div>
                     
                     <group string="Manual Audience" invisible="segment_type != 'manual'">
                         <field name="manual_contact_ids" widget="many2many_tags" domain="[('phone', '!=', False)]"/>
                     </group>
 
-                    <group string="Segmentation Criteria" invisible="segment_type == 'manual'">
+                    <group string="Segmentation Criteria" invisible="segment_type in ['manual', 'smart_valid_contacts', 'smart_highly_engaged', 'smart_winback', 'smart_at_risk', 'smart_opted_out', 'smart_no_recent_reply']">
                         <group invisible="segment_type != 'auto_tag'">
                             <field name="tag_ids" widget="many2many_tags" string="Any Tags"/>
                             <field name="tag_all_ids" widget="many2many_tags" string="All Tags"/>

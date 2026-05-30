@@ -7,7 +7,6 @@
     ''',
     'version': '19.0.1.4.1',
     'category': 'Themes/Backend', 
-    'license': 'LGPL-3', 
     'author': 'MuK IT',
     'website': 'http://www.mukit.at',
     'live_test_url': 'https://my.mukit.at/r/f6m',

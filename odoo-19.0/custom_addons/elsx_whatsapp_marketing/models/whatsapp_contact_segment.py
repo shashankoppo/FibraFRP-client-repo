@@ -28,6 +28,12 @@ class WhatsAppContactSegment(models.Model):
         ('engagement', 'Engagement-Based'),
         ('revenue', 'Revenue-Based'),
         ('custom_filter', 'Custom Filter'),
+        ('smart_valid_contacts', 'Smart: All Valid Contacts'),
+        ('smart_highly_engaged', 'Smart: Highly Engaged'),
+        ('smart_winback', 'Smart: Winback'),
+        ('smart_at_risk', 'Smart: At Risk'),
+        ('smart_opted_out', 'Smart: Opted Out'),
+        ('smart_no_recent_reply', 'Smart: No Recent Reply'),
     ], string='Segment Type', default='manual')
     
     # Tag-based segmentation
@@ -206,14 +212,71 @@ class WhatsAppContactSegment(models.Model):
                         ]).mapped('amount_total'))
                         if record.min_lifetime_value and revenue < record.min_lifetime_value:
                             continue
-                        if record.max_lifetime_value and revenue > record.max_lifetime_value:
-                            continue
-                        valid_ids.append(partner.id)
-                    contacts = Partner.browse(valid_ids)
+                    if record.max_lifetime_value and revenue > record.max_lifetime_value:
+                        continue
+                    valid_ids.append(partner.id)
+                contacts = Partner.browse(valid_ids)
                 record.contact_ids = contacts
+
+            elif record.segment_type.startswith('smart_'):
+                record.contact_ids = record._compute_smart_contacts(domain)
             
             else:
                 record.contact_ids = Partner.browse([])
+
+    def _compute_smart_contacts(self, domain):
+        self.ensure_one()
+        Partner = self.env['res.partner'].sudo()
+        Message = self.env['whatsapp.message'].sudo()
+        now = fields.Datetime.now()
+        if self.segment_type == 'smart_valid_contacts':
+            if 'whatsapp_opt_in' in Partner._fields:
+                domain.append(('whatsapp_opt_in', '=', True))
+            return Partner.search(domain)
+        if self.segment_type == 'smart_opted_out':
+            return Partner.search([('active', '=', True), ('whatsapp_opt_in', '=', False)])
+
+        inbound_domain = [
+            ('partner_id', '!=', False),
+            ('direction', '=', 'inbound'),
+        ]
+        outbound_domain = [
+            ('partner_id', '!=', False),
+            ('direction', '=', 'outbound'),
+        ]
+        if self.account_id:
+            inbound_domain.append(('account_id', '=', self.account_id.id))
+            outbound_domain.append(('account_id', '=', self.account_id.id))
+
+        if self.segment_type == 'smart_highly_engaged':
+            cutoff = now - timedelta(days=30)
+            counts = {}
+            for msg in Message.search(inbound_domain + [('create_date', '>=', cutoff)]):
+                counts[msg.partner_id.id] = counts.get(msg.partner_id.id, 0) + 1
+            partner_ids = [partner_id for partner_id, count in counts.items() if count >= 3]
+            return Partner.search(domain + [('id', 'in', partner_ids)])
+
+        if self.segment_type == 'smart_winback':
+            cutoff = now - timedelta(days=60)
+            older_cutoff = now - timedelta(days=365)
+            old_partner_ids = set(Message.search(inbound_domain + [('create_date', '>=', older_cutoff)]).mapped('partner_id').ids)
+            recent_partner_ids = set(Message.search(inbound_domain + [('create_date', '>=', cutoff)]).mapped('partner_id').ids)
+            return Partner.search(domain + [('id', 'in', list(old_partner_ids - recent_partner_ids))])
+
+        if self.segment_type == 'smart_at_risk':
+            recent_cutoff = now - timedelta(days=30)
+            older_cutoff = now - timedelta(days=120)
+            had_engagement = set(Message.search(inbound_domain + [('create_date', '>=', older_cutoff)]).mapped('partner_id').ids)
+            recent_engagement = set(Message.search(inbound_domain + [('create_date', '>=', recent_cutoff)]).mapped('partner_id').ids)
+            return Partner.search(domain + [('id', 'in', list(had_engagement - recent_engagement))])
+
+        if self.segment_type == 'smart_no_recent_reply':
+            cutoff = now - timedelta(days=14)
+            outbound_partners = set(Message.search(outbound_domain + [('create_date', '>=', cutoff)]).mapped('partner_id').ids)
+            inbound_partners = set(Message.search(inbound_domain + [('create_date', '>=', cutoff)]).mapped('partner_id').ids)
+            return Partner.search(domain + [('id', 'in', list(outbound_partners - inbound_partners))])
+
+        return Partner.browse([])
 
     def _base_partner_domain(self):
         self.ensure_one()
@@ -237,6 +300,7 @@ class WhatsAppContactSegment(models.Model):
             'name': 'Add Contacts',
             'type': 'ir.actions.act_window',
             'view_mode': 'form',
+            'views': [(False, 'form')],
             'res_model': 'whatsapp.contact.segment.wizard',
             'target': 'new',
             'context': {'default_segment_id': self.id}
@@ -268,6 +332,7 @@ class WhatsAppContactSegment(models.Model):
             'name': 'Send Campaign',
             'type': 'ir.actions.act_window',
             'view_mode': 'form',
+            'views': [(False, 'form')],
             'res_model': 'whatsapp.campaign',
             'target': 'new',
             'context': {

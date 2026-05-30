@@ -1,8 +1,8 @@
 {
     'name': 'ELSX Studio Engine',
     'version': '1.0',
-    'summary': 'Enterprise Parity: No-Code Advanced Builder',
-    'description': 'Dynamic database model builder and XPath view injector replacing Web Studio.',
+    'summary': 'No-Code Advanced Builder',
+    'description': 'Dynamic database model builder and XPath view injector for internal customization workflows.',
     'author': 'ELSX',
     'depends': ['base', 'web'],
     'data': [],

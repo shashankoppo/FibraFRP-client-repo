@@ -21,5 +21,4 @@ This module add completed course events to resume for employees.
     'auto_install': True,
     'assets': {},
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

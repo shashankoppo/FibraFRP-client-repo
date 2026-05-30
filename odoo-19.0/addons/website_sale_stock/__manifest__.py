@@ -45,5 +45,4 @@ Then it can be made specific at the product level.
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_tally" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.tally</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="account.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//block[@id='invoicing_settings']" position="after">
+                <block title="Tally Integration" id="elsx_tally_integration_setting">
+                    <setting id="elsx_tally_enabled_setting" help="Adds safe Tally XML export and optional direct push buttons on posted invoices.">
+                        <field name="elsx_tally_enabled"/>
+                    </setting>
+                    <setting id="elsx_tally_gateway_setting" help="Tally must be running with its XML/HTTP gateway enabled. From Docker, use host.docker.internal when Tally runs on the Windows host.">
+                        <field name="elsx_tally_gateway_url" placeholder="http://host.docker.internal:9000"/>
+                        <button name="action_test_tally_connection"
+                                string="Test Tally Connection"
+                                type="object"
+                                class="btn-secondary mt-2"
+                                invisible="not elsx_tally_gateway_url"/>
+                    </setting>
+                    <setting id="elsx_tally_company_setting" help="Exact company name open in Tally. Leave blank to use the Odoo company name.">
+                        <field name="elsx_tally_company_name" placeholder="Company name in Tally"/>
+                    </setting>
+                    <setting id="elsx_tally_ledgers_setting" help="These ledger names must exist in Tally, or Tally will reject the voucher import.">
+                        <div class="content-group">
+                            <div class="row mt8">
+                                <label for="elsx_tally_sales_ledger" class="col-lg-4 o_light_label"/>
+                                <field name="elsx_tally_sales_ledger"/>
+                            </div>
+                            <div class="row mt8">
+                                <label for="elsx_tally_purchase_ledger" class="col-lg-4 o_light_label"/>
+                                <field name="elsx_tally_purchase_ledger"/>
+                            </div>
+                            <div class="row mt8">
+                                <label for="elsx_tally_tax_ledger" class="col-lg-4 o_light_label"/>
+                                <field name="elsx_tally_tax_ledger"/>
+                            </div>
+                        </div>
+                    </setting>
+                    <setting id="elsx_tally_timeout_setting" help="Network timeout for direct Tally push. XML download does not need Tally to be reachable.">
+                        <field name="elsx_tally_timeout"/>
+                    </setting>
+                    <setting id="elsx_tally_auto_push_setting" help="Keep off until tested. If enabled, posted customer invoices will try to push to Tally automatically.">
+                        <field name="elsx_tally_auto_push_on_post"/>
+                    </setting>
+                </block>
+            </xpath>
+        </field>
+    </record>
+</odoo>

@@ -3,7 +3,7 @@
 import re
 
 from odoo import api, models
-from odoo.osv import expression
+from odoo.fields import Domain
 from odoo.tools.mail import email_domain_extract, url_domain_extract
 
 
@@ -82,7 +82,7 @@ class IapAutocompleteApi(models.AbstractModel):
             country = self.env['res.country'].search([('code', '=ilike', query_country_code)], limit=1)
             if not country:
                 return Partner
-            domain = expression.AND([domain, [
+            domain = Domain.AND([domain, [
                 '|',
                 ('country_id', '=', country.id),
                 ('country_id', '=', False),
@@ -106,8 +106,8 @@ class IapAutocompleteApi(models.AbstractModel):
         for token in re.findall(r'\w+', query):
             field_domains = [[(field, 'ilike', token)] for field in fields]
             if field_domains:
-                token_domains.append(expression.OR(field_domains))
-        return expression.AND(token_domains) if token_domains else []
+                token_domains.append(Domain.OR(field_domains))
+        return Domain.AND(token_domains) if token_domains else []
 
     @api.model
     def _local_vat_domain(self, query):
@@ -118,7 +118,7 @@ class IapAutocompleteApi(models.AbstractModel):
         candidates = {candidate for candidate in candidates if candidate}
         if not candidates:
             return []
-        return expression.OR([
+        return Domain.OR([
             [('vat', 'ilike', candidate)]
             for candidate in candidates
         ])
@@ -186,7 +186,7 @@ class IapAutocompleteApi(models.AbstractModel):
             'state_code': partner.state_id.code or '',
             'state_name': partner.state_id.name or '',
             'email': partner.email or '',
-            'phone': partner.phone or partner.mobile or '',
+            'phone': partner.phone or getattr(partner, 'mobile', False) or '',
             'website': partner.website or '',
             'domain': self._partner_domain(partner) or '',
             'logo': False,

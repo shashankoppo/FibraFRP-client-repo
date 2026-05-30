@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_whatsapp_placeholder_list" model="ir.ui.view">
+        <field name="name">whatsapp.placeholder.list</field>
+        <field name="model">whatsapp.placeholder</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="sequence" widget="handle"/>
+                <field name="placeholder"/>
+                <field name="name"/>
+                <field name="context_type"/>
+                <field name="sample_value"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_whatsapp_placeholder_form" model="ir.ui.view">
+        <field name="name">whatsapp.placeholder.form</field>
+        <field name="model">whatsapp.placeholder</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <div class="alert alert-info" role="alert">
+                        Use these placeholders in templates, campaigns, flow messages, quick replies, and AI prompts. Numeric Meta template variables such as {{1}} still come from template variable mappings.
+                    </div>
+                    <group>
+                        <group>
+                            <field name="placeholder" placeholder="{{name}}"/>
+                            <field name="name"/>
+                            <field name="context_type"/>
+                        </group>
+                        <group>
+                            <field name="sample_value"/>
+                            <field name="sequence"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <field name="description" placeholder="Where this placeholder is available and how it resolves."/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_whatsapp_placeholder" model="ir.actions.act_window">
+        <field name="name">Placeholder Guide</field>
+        <field name="res_model">whatsapp.placeholder</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create placeholder help records</p>
+            <p>Placeholders make WhatsApp templates, campaigns, bot flows, and AI prompts easier for users to configure safely.</p>
+        </field>
+    </record>
+</odoo>

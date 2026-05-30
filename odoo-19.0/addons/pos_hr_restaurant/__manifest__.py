@@ -21,5 +21,4 @@ This module adapts the behavior of the PoS when the pos_hr and pos_restaurant ar
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

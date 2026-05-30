@@ -49,5 +49,4 @@ The following topics are covered by this module:
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

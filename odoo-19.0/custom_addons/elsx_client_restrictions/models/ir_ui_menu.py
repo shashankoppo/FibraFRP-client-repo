@@ -11,47 +11,9 @@ class IrUiMenu(models.Model):
     @api.model
     def load_menus(self, debug):
         """
-        Override to hide Apps menu from all users.
-        Only accessible via /action-39 secret URL.
+        Compatibility hook from the old access-helper addon.
+
+        The system no longer hides menus here. Standard Odoo access groups
+        decide what each user can see.
         """
-        menus = super(IrUiMenu, self).load_menus(debug)
-        
-        # ALLOW Settings Administrators to see Apps (Safety Bypass)
-        if self.env.user.has_group('base.group_system'):
-            return menus
-        try:
-            apps_menu = self.env.ref('base.menu_apps', raise_if_not_found=False)
-            management_menu = self.env.ref('base.menu_management', raise_if_not_found=False)
-            
-            if apps_menu and 'root' in menus:
-                # Remove Apps menu from root
-                if apps_menu.id in menus['root'].get('children', []):
-                    menus['root']['children'].remove(apps_menu.id)
-                
-                # Remove from all_menu_ids
-                if apps_menu.id in menus.get('all_menu_ids', []):
-                    menus['all_menu_ids'].remove(apps_menu.id)
-                
-                # Remove the menu entry itself
-                if str(apps_menu.id) in menus:
-                    del menus[str(apps_menu.id)]
-            
-            if management_menu and 'root' in menus:
-                # Remove Management menu from root
-                if management_menu.id in menus['root'].get('children', []):
-                    menus['root']['children'].remove(management_menu.id)
-                
-                # Remove from all_menu_ids
-                if management_menu.id in menus.get('all_menu_ids', []):
-                    menus['all_menu_ids'].remove(management_menu.id)
-                
-                # Remove the menu entry itself
-                if str(management_menu.id) in menus:
-                    del menus[str(management_menu.id)]
-                    
-            _logger.info('Apps menu hidden from menu tree')
-            
-        except Exception as e:
-            _logger.warning('Failed to hide Apps menu: %s', e)
-        
-        return menus
+        return super(IrUiMenu, self).load_menus(debug)

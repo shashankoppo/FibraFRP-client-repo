@@ -74,7 +74,7 @@
 
     <menuitem id="menu_whatsapp_api_log"
               name="Outbound API Logs"
-              parent="menu_whatsapp_analytics"
+              parent="menu_whatsapp_analytics_section"
               action="action_whatsapp_api_log"
               sequence="20"/>
 </odoo>

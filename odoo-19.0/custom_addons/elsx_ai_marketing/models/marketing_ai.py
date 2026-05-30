@@ -1,57 +1,67 @@
-from odoo import models, fields, api
+from odoo import fields, models, _
+from odoo.exceptions import UserError
 import logging
-import random
 
 _logger = logging.getLogger(__name__)
 
+
 class ELSXMarketingAI(models.Model):
     _name = 'elsx.marketing.ai'
-    _description = 'ELSX Generative Marketing AI'
+    _description = 'ELSX Draft Marketing AI'
 
     name = fields.Char('Campaign Name', required=True)
     target_audience = fields.Char('Target Audience')
-    generated_content = fields.Text('AI Generated Content')
+    generated_content = fields.Text('AI Draft Content')
+    ai_job_id = fields.Many2one('elsx.ai.job', string='AI Job', readonly=True)
     platform = fields.Selection([
         ('email', 'Email'),
         ('linkedin', 'LinkedIn'),
         ('twitter', 'Twitter'),
-        ('instagram', 'Instagram')
+        ('instagram', 'Instagram'),
     ], string='Platform', default='email')
-    
     state = fields.Selection([
         ('draft', 'Draft'),
         ('generating', 'Generating'),
         ('approved', 'Approved'),
-        ('posted', 'Posted')
+        ('posted', 'Posted'),
     ], default='draft')
 
     def action_generate_content(self):
-        """Simulates AI content generation using templates/LLM logic."""
+        """Generate an auditable draft through the shared AI layer."""
+        self.ensure_one()
+        provider_model = self.env['elsx.ai.provider']
+        if not provider_model._ai_enabled():
+            raise UserError(_('Enable AI in Settings and test an AI provider before generating marketing drafts.'))
+
         self.state = 'generating'
-        # In a real integration, this would call OpenAI/Gemini API
-        # For now, we use high-quality ELSX templates
-        
-        templates = {
-            'email': [
-                "Subject: Unlock the Future with ELSX\n\nDear {Customer},\n\nExperience the next generation of ERP. ELSX utilizes self-evolving technology to keep your business ahead of the curve. Join the revolution today.",
-                "Subject: Exclusive Access: ELSX Quantum Tier\n\nHi,\n\nWe've noticed you're ready for more. Upgrade to ELSX Quantum and tap into autonomous market research and blockchain security."
-            ],
-            'linkedin': [
-                "🚀 Just upgraded our entire stack with ELSX ERP. The self-evolution engine is a game changer! #ELSX #TechRevolution #ERP",
-                "Why settle for manual updates? ELSX updates itself. 🤖✨ #Automation #FutureofWork"
-            ],
-            'twitter': [
-                "ELSX ERP is not just software, it's a living organism. 🌱 #Tech #AI",
-                "Gone are the days of manual patching. Hello ELSX! 👋 #CyberpunkTech"
-            ]
+        job = self.env['elsx.ai.job'].create_job(
+            'whatsapp_campaign_default',
+            'Marketing draft for %s' % self.display_name,
+            origin=self,
+            input_text='\n'.join([
+                'Campaign: %s' % (self.name or ''),
+                'Platform: %s' % (self.platform or ''),
+                'Audience: %s' % (self.target_audience or ''),
+                'Draft only. Do not post or send automatically.',
+            ]),
+        )
+        job.action_run()
+        self.write({
+            'generated_content': job.response_text or job.response_json or '',
+            'ai_job_id': job.id,
+            'state': 'draft',
+        })
+        _logger.info("ELSX AI drafted content for %s via job %s", self.name, job.id)
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('AI Marketing Draft Job'),
+            'res_model': 'elsx.ai.job',
+            'res_id': job.id,
+            'view_mode': 'form',
+            'views': [(False, 'form')],
+            'target': 'current',
         }
-        
-        selected_template = random.choice(templates.get(self.platform, ['Generic Content']))
-        self.generated_content = selected_template
-        self.state = 'approved'
-        _logger.info(f"ELSX AI Generated content for {self.name}")
 
     def action_post_content(self):
-        """Simulates posting content."""
-        self.state = 'posted'
-        _logger.info(f"ELSX AI Posted content to {self.platform}")
+        """Keep AI marketing draft-only until a real approved publishing flow exists."""
+        raise UserError(_('Automatic posting is disabled. Review the AI draft and publish through the approved marketing channel manually.'))

@@ -242,6 +242,8 @@ class WhatsAppConversationAssignment(models.Model):
         ('workload', 'Workload Balancing'),
         ('escalation', 'Escalation'),
         ('manual', 'Manual Transfer'),
+        ('round_robin', 'Round Robin Auto-Assignment'),
+        ('sticky', 'Sticky Routing Auto-Assignment'),
     ], string='Transfer Reason')
     
     # Notes

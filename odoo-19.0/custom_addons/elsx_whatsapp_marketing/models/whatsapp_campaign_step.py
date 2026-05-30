@@ -29,6 +29,12 @@ class WhatsAppCampaignStep(models.Model):
         ('none', 'No Condition'),
         ('last_read', 'If Last Message Was Read'),
         ('last_not_read', 'If Last Message Was NOT Read'),
+        ('last_delivered', 'If Last Message Was Delivered'),
+        ('last_failed', 'If Last Message Failed'),
+        ('replied', 'If Customer Replied'),
+        ('not_replied', 'If Customer Did Not Reply'),
+        ('clicked', 'If Customer Clicked Button/List'),
+        ('no_reply', 'No Reply After Delay'),
     ], string='Condition', default='none')
 
     @api.constrains('delay_unit', 'template_id', 'message_body')
@@ -40,3 +46,19 @@ class WhatsAppCampaignStep(models.Model):
                 raise ValidationError(
                     f'Drip step "{step.name}" requires either a template or message body.'
                 )
+            if step.template_id:
+                if step.template_id.status != 'approved':
+                    raise ValidationError(f'Drip step "{step.name}" requires an approved template.')
+                if (
+                    step.campaign_id.account_id
+                    and step.template_id.account_id
+                    and step.template_id.account_id != step.campaign_id.account_id
+                ):
+                    raise ValidationError(f'Drip step "{step.name}" template must belong to the campaign account.')
+                if step.template_id.header_type in ('image', 'video', 'document') and not (
+                    step.template_id.header_media_url or step.template_id.header_media_file
+                ):
+                    raise ValidationError(
+                        f'Drip step "{step.name}" template has a {step.template_id.header_type} header. '
+                        "Set a default header media file or URL on the template before using it in a campaign."
+                    )

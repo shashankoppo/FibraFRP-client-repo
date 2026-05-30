@@ -26,5 +26,4 @@ This module implements reCaptchaV3 so that you can prevent bot spam on your publ
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

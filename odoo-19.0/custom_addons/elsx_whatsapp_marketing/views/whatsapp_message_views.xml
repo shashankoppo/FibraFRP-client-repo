@@ -12,6 +12,7 @@
                 <field name="phone_number"/>
                 <field name="direction"/>
                 <field name="message_type"/>
+                <field name="interactive_type" optional="hide"/>
                 <field name="body"/>
                 <field name="status" decoration-success="status in ['delivered', 'read']" decoration-danger="status=='failed'"/>
                 <field name="campaign_id"/>
@@ -37,6 +38,7 @@
                             <field name="partner_id"/>
                             <field name="phone_number"/>
                             <field name="direction"/>
+                            <field name="sale_order_id" invisible="not sale_order_id"/>
                         </group>
                         <group>
                             <field name="message_type"/>
@@ -49,6 +51,13 @@
                         <field name="body" widget="text"/>
                         <field name="media_url" invisible="message_type == 'text'"/>
                         <field name="caption" invisible="message_type == 'text'"/>
+                    </group>
+                    <group string="Interactive / Commerce" invisible="message_type != 'interactive'">
+                        <field name="interactive_type"/>
+                        <field name="button_text"/>
+                        <field name="button_url"/>
+                        <field name="catalog_id"/>
+                        <field name="product_retailer_id"/>
                     </group>
                     <group string="Status Information">
                         <group>

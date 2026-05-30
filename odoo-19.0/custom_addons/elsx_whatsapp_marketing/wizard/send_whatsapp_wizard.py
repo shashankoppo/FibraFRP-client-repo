@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import re
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
 
@@ -10,7 +9,7 @@ class WhatsAppSendWizard(models.TransientModel):
 
     @api.model
     def _default_account_id(self):
-        return self.env['whatsapp.account'].search([('active', '=', True)], limit=1)
+        return self.env['whatsapp.account']._get_default_account()
 
     account_id = fields.Many2one('whatsapp.account', string='WhatsApp Account', required=True, default=_default_account_id)
     partner_ids = fields.Many2many('res.partner', string='Recipients')
@@ -30,88 +29,63 @@ class WhatsAppSendWizard(models.TransientModel):
         string='Template Live Preview',
         compute='_compute_template_preview_html',
     )
+    template_preview_text = fields.Text(
+        string='Template Preview Text',
+        compute='_compute_template_preview_html',
+    )
+    template_requires_header_media = fields.Boolean(
+        compute='_compute_template_requires_header_media',
+    )
 
-    @api.depends('template_id')
+    @api.depends('template_id', 'template_id.header_type')
+    def _compute_template_requires_header_media(self):
+        for record in self:
+            record.template_requires_header_media = record.template_id.header_type in ('image', 'video', 'document')
+
+    @api.depends(
+        'template_id',
+        'template_id.body',
+        'template_id.footer',
+        'template_id.header_type',
+        'template_id.header_text',
+        'template_id.header_media_file',
+        'template_id.header_media_filename',
+        'template_id.header_media_url',
+        'template_id.has_buttons',
+        'template_id.button_type',
+        'template_id.button_text_1',
+        'template_id.button_text_2',
+        'template_id.button_text_3',
+        'template_id.cta_url_text',
+        'template_id.cta_phone_text',
+        'template_id.variable_ids',
+        'template_id.variable_ids.sample_value',
+        'media_file',
+        'media_filename',
+    )
     def _compute_template_preview_html(self):
         for record in self:
             if not record.template_id:
                 record.template_preview_html = False
+                record.template_preview_text = False
                 continue
-            
-            t = record.template_id
-            
-            # Header
-            header_html = ""
-            if t.header_type == 'text' and t.header_text:
-                header_html = f'<div style="font-weight: bold; font-size: 0.95rem; color: #111B21; margin-bottom: 4px;">{t.header_text}</div>'
-            elif t.header_type == 'image':
-                header_html = '<div style="background: #E9EDEF; border-radius: 6px; height: 120px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; color: #667781;"><i class="fa fa-image fa-2x" title="Header Image"></i></div>'
-            elif t.header_type == 'video':
-                header_html = '<div style="background: #E9EDEF; border-radius: 6px; height: 120px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; color: #667781;"><i class="fa fa-video-camera fa-2x" title="Header Video"></i></div>'
-            elif t.header_type == 'document':
-                header_html = '<div style="background: #E9EDEF; border-radius: 6px; height: 60px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; color: #667781;"><i class="fa fa-file-pdf-o fa-lg me-2" title="Header Document"></i><span>Document Preview</span></div>'
-
-            # Body (replace variables with beautiful highlighting, e.g. {{1}} -> [Var 1])
-            body_text = t.body or ""
-            # Escape HTML in body
-            body_text = body_text.replace("<", "&lt;").replace(">", "&gt;").replace("\\n", "<br/>")
-            # Highlight placeholders like {{1}}, {{2}} in vibrant modern badges
-            body_text = re.sub(
-                r'\\{\\{(\d+)\\}\\}', 
-                r'<span class="badge rounded-pill bg-light text-primary border px-2 py-1 mx-1" style="font-weight: 500;">[Var \g<1>]</span>', 
-                body_text
+            partner = record.partner_ids[:1]
+            chat_id = record.env.context.get('default_chat_id')
+            if not partner and chat_id:
+                chat = record.env['whatsapp.chat'].browse(chat_id).exists()
+                partner = chat.partner_id if chat else False
+            record.template_preview_html = record.template_id._render_customer_preview_html(
+                partner=partner,
+                header_media_file=record.media_file,
+                header_media_filename=record.media_filename,
+                shell=True,
+                compact=True,
             )
-
-            # Footer
-            footer_html = ""
-            if t.footer:
-                footer_html = f'<div style="font-size: 0.75rem; color: #667781; margin-top: 6px;">{t.footer}</div>'
-
-            # Buttons
-            buttons_html = ""
-            if t.has_buttons:
-                buttons_list = []
-                if t.button_type == 'quick_reply':
-                    if t.button_text_1: buttons_list.append(t.button_text_1)
-                    if t.button_text_2: buttons_list.append(t.button_text_2)
-                    if t.button_text_3: buttons_list.append(t.button_text_3)
-                elif t.button_type == 'call_to_action':
-                    if t.cta_url_text: buttons_list.append(f'<i class="fa fa-external-link me-1"></i>{t.cta_url_text}')
-                    if t.cta_phone_text: buttons_list.append(f'<i class="fa fa-phone me-1"></i>{t.cta_phone_text}')
-                elif t.button_type == 'copy_code':
-                    buttons_list.append('<i class="fa fa-copy me-1"></i>Copy Code')
-
-                if buttons_list:
-                    btn_elements = []
-                    for btn in buttons_list:
-                        btn_elements.append(f'''
-                            <div style="background: #FFFFFF; color: #00A884; font-weight: 600; text-align: center; padding: 10px; font-size: 0.85rem; border-top: 1px solid #E9EDEF; cursor: pointer; flex: 1 1 auto; display: flex; align-items: center; justify-content: center;">
-                                {btn}
-                            </div>
-                        ''')
-                    
-                    buttons_html = f'<div style="display: flex; flex-direction: column; margin-top: 8px; border-radius: 0 0 8px 8px; overflow: hidden;">{"".join(btn_elements)}</div>'
-
-            # Combine into a premium, hyper-realistic WhatsApp chat bubble!
-            record.template_preview_html = f'''
-                <div class="d-flex justify-content-start align-items-end p-3 rounded" style="background: #efeae2; background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); background-repeat: repeat; background-size: 200px; min-height: 200px;">
-                    <div style="background: #FFFFFF; border-radius: 8px; box-shadow: 0 1px 0.5px rgba(11,20,26,.13); max-width: 85%; width: 100%; position: relative; border-top-left-radius: 0;">
-                        <!-- WhatsApp bubble tail -->
-                        <div style="position: absolute; left: -8px; top: 0; width: 0; height: 0; border-top: 8px solid #FFFFFF; border-left: 8px solid transparent;"></div>
-                        
-                        <!-- Content container -->
-                        <div style="padding: 8px 10px 8px 12px;">
-                            {header_html}
-                            <div style="font-size: 0.9rem; line-height: 1.4; color: #111B21; white-space: pre-wrap; word-wrap: break-word;">{body_text}</div>
-                            {footer_html}
-                            <div style="font-size: 0.65rem; color: #667781; text-align: right; margin-top: 2px;">
-                                {fields.Datetime.now().strftime('%I:%M %p')}
-                            </div>
-                        </div>
-                        {buttons_html}
-                    </div>
-                </div>
-            '''
+            record.template_preview_text = record.template_id._render_customer_preview_text(
+                partner=partner,
+                header_media_file=record.media_file,
+                header_media_filename=record.media_filename,
+            )
 
     def _normalize_phone(self, phone):
         """Normalize and validate recipient numbers before calling Meta."""
@@ -127,14 +101,56 @@ class WhatsAppSendWizard(models.TransientModel):
             return 'audio'
         return 'document'
 
-    def _send_to_recipient(self, phone, partner=False):
+    def _template_header_media_filename(self):
+        self.ensure_one()
+        filename = self.media_filename or self.template_id.header_media_filename
+        if filename and '.' in filename:
+            return filename
+        template_name = self.template_id._get_send_template_name() if self.template_id else 'template'
+        filename = filename or f"{template_name}_header"
+        extension = {
+            'image': 'jpg',
+            'video': 'mp4',
+            'document': 'pdf',
+        }.get(self.template_id.header_type if self.template_id else 'document', 'bin')
+        return f"{filename}.{extension}"
+
+    def _prepare_template_header_media_kwargs(self):
+        self.ensure_one()
+        if not self.template_id or self.template_id.header_type not in ('image', 'video', 'document'):
+            return {}
+        if self.media_file:
+            filename = self._template_header_media_filename()
+            media_id = self.account_id._upload_media_to_meta(
+                self.media_file,
+                filename,
+                self.template_id.header_type,
+            )
+            return {
+                'header_media_url': media_id,
+                'header_media_filename': filename,
+            }
+        if self.template_id.header_media_url or self.template_id.header_media_file:
+            return {}
+        raise UserError(_(
+            "%(template)s needs a %(type)s header file before sending. "
+            "Upload a file in this wizard or set a default Header Media File on the template."
+        ) % {
+            'template': self.template_id.display_name,
+            'type': self.template_id.header_type,
+        })
+
+    def _send_to_recipient(self, phone, partner=False, template_header_media_kwargs=None):
         partner_id = partner.id if partner else False
         if self.template_id:
+            template_kwargs = dict(template_header_media_kwargs or {})
             self.account_id.send_message(
                 to_number=phone,
                 message_type='template',
                 template_record=self.template_id,
+                partner=partner,
                 partner_id=partner_id,
+                **template_kwargs,
             )
             return
 
@@ -154,12 +170,76 @@ class WhatsAppSendWizard(models.TransientModel):
             message.action_send()
             return
 
+        body = (self.message_body or '').strip()
+        if not body:
+            raise UserError(_('Please enter a message, select a template, or attach media.'))
+
         self.account_id.send_message(
             to_number=phone,
             message_type='text',
-            body=self.message_body,
+            body=body,
             partner_id=partner_id,
         )
+
+    def _send_to_chat(self, chat, template_header_media_kwargs=None):
+        """Send exactly one message to the chat that opened this wizard."""
+        self.ensure_one()
+        chat.ensure_one()
+        account = chat.account_id
+        partner = chat.partner_id
+        partner_id = partner.id if partner else False
+
+        if self.template_id:
+            template_kwargs = dict(template_header_media_kwargs or {})
+            vals = {
+                'account_id': account.id,
+                'phone_number': chat.phone_number,
+                'partner_id': partner_id,
+                'chat_id_ref': chat.id,
+                'message_type': 'template',
+                'body': self.template_id.body,
+                'template_id': self.template_id.id,
+                'template_name': self.template_id._get_send_template_name(),
+                'template_language': self.template_id._get_send_language_code(),
+                'direction': 'outbound',
+            }
+            if template_kwargs.get('header_media_url'):
+                vals['media_url'] = template_kwargs['header_media_url']
+            if template_kwargs.get('header_media_filename'):
+                vals['media_filename'] = template_kwargs['header_media_filename']
+            message = self.env['whatsapp.message'].create(vals)
+            message.action_send()
+            return
+
+        if self.media_file:
+            media_type = self._detect_media_type()
+            message = self.env['whatsapp.message'].create({
+                'account_id': account.id,
+                'phone_number': chat.phone_number,
+                'partner_id': partner_id,
+                'chat_id_ref': chat.id,
+                'message_type': media_type,
+                'body': self.message_body or False,
+                'caption': self.message_body if media_type in ('image', 'video', 'document') else False,
+                'media_file': self.media_file,
+                'media_filename': self.media_filename or 'attachment',
+                'direction': 'outbound',
+            })
+            message.action_send()
+            return
+
+        if not self.message_body:
+            raise UserError(_('Please enter a message, select a template, or attach media.'))
+        message = self.env['whatsapp.message'].create({
+            'account_id': account.id,
+            'phone_number': chat.phone_number,
+            'partner_id': partner_id,
+            'chat_id_ref': chat.id,
+            'message_type': 'text',
+            'body': self.message_body,
+            'direction': 'outbound',
+        })
+        message.action_send()
 
     def action_send(self):
         """Send WhatsApp message to selected partners or direct phone number"""
@@ -167,14 +247,36 @@ class WhatsAppSendWizard(models.TransientModel):
         sent_count = 0
         errors = []
 
+        chat_id = self.env.context.get('default_chat_id')
+        if not chat_id and self.env.context.get('active_model') == 'whatsapp.chat':
+            chat_id = self.env.context.get('active_id')
+        chat = self.env['whatsapp.chat'].browse(chat_id).exists() if chat_id else False
+        if chat:
+            if self.account_id != chat.account_id:
+                self.account_id = chat.account_id
+            template_header_media_kwargs = self._prepare_template_header_media_kwargs()
+            self._send_to_chat(chat, template_header_media_kwargs=template_header_media_kwargs)
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Done',
+                    'message': 'WhatsApp message sent to this chat.',
+                    'type': 'success',
+                    'sticky': False,
+                }
+            }
+
         if not self.partner_ids and not self.phone_number:
             raise UserError(_('Please select at least one recipient or enter a Direct Phone Number.'))
+
+        template_header_media_kwargs = self._prepare_template_header_media_kwargs()
 
         # Send to direct phone number if provided
         if self.phone_number:
             phone = self._normalize_phone(self.phone_number)
             try:
-                self._send_to_recipient(phone)
+                self._send_to_recipient(phone, template_header_media_kwargs=template_header_media_kwargs)
                 sent_count += 1
             except Exception as e:
                 errors.append(f"{phone}: {str(e)}")
@@ -188,7 +290,11 @@ class WhatsAppSendWizard(models.TransientModel):
                 continue
             phone = self._normalize_phone(phone)
             try:
-                self._send_to_recipient(phone, partner=partner)
+                self._send_to_recipient(
+                    phone,
+                    partner=partner,
+                    template_header_media_kwargs=template_header_media_kwargs,
+                )
                 sent_count += 1
             except Exception as e:
                 errors.append(f"{partner.name}: {str(e)}")

@@ -16,5 +16,4 @@ For instance when invoicing a training, the training agenda and materials will a
         'views/mail_template_views.xml',
     ],
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

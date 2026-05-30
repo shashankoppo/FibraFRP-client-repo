@@ -39,7 +39,6 @@ E-invoice implementation
         'data/account_invoice_demo.xml',
     ],
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
     'post_init_hook': '_l10n_it_edi_post_init',
     'uninstall_hook': 'uninstall_hook',
 }

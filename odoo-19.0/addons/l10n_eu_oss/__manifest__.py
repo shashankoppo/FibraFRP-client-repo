@@ -27,5 +27,4 @@ Council Implementing Regulation (EU) 2019/2026
     ],
     'uninstall_hook': 'l10n_eu_oss_uninstall',
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

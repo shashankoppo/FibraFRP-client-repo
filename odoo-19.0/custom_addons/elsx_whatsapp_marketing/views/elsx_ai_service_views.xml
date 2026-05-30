@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_elsx_ai_provider_list" model="ir.ui.view">
+        <field name="name">elsx.ai.provider.list</field>
+        <field name="model">elsx.ai.provider</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="provider_type"/>
+                <field name="default_model"/>
+                <field name="request_format"/>
+                <field name="test_status"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_elsx_ai_provider_form" model="ir.ui.view">
+        <field name="name">elsx.ai.provider.form</field>
+        <field name="model">elsx.ai.provider</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_test_provider" string="Test Provider" type="object" class="btn-primary"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="provider_type"/>
+                            <field name="default_model"/>
+                            <field name="request_format"/>
+                            <field name="active"/>
+                        </group>
+                        <group>
+                            <field name="api_base_url"/>
+                            <field name="api_key" password="True"/>
+                            <field name="api_key_header" invisible="provider_type != 'custom'"/>
+                            <field name="organization_id" invisible="provider_type not in ['openai']"/>
+                            <field name="project_id" invisible="provider_type not in ['openai']"/>
+                            <field name="timeout_seconds"/>
+                            <field name="max_retries"/>
+                        </group>
+                    </group>
+                    <group string="Generation Defaults">
+                        <group>
+                            <field name="temperature"/>
+                            <field name="max_tokens"/>
+                            <field name="response_path" placeholder="choices.0.message.content / content.0.text / generated_text"/>
+                        </group>
+                        <group>
+                            <field name="cost_input_per_1k"/>
+                            <field name="cost_output_per_1k"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Advanced Request">
+                            <field name="request_extra_json" placeholder='{"stream": false}'/>
+                            <field name="enabled_tools" placeholder="Reserved for future tool/function calling. Keep empty for draft-only mode."/>
+                        </page>
+                        <page string="Test Result">
+                            <group>
+                                <field name="test_status" readonly="1"/>
+                                <field name="last_test_date" readonly="1"/>
+                            </group>
+                            <field name="last_test_error" readonly="1"/>
+                            <field name="last_test_response" readonly="1"/>
+                        </page>
+                        <page string="Notes">
+                            <field name="notes"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_elsx_ai_provider" model="ir.actions.act_window">
+        <field name="name">AI Providers</field>
+        <field name="res_model">elsx.ai.provider</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="view_elsx_ai_prompt_list" model="ir.ui.view">
+        <field name="name">elsx.ai.prompt.list</field>
+        <field name="model">elsx.ai.prompt</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="purpose"/>
+                <field name="provider_id"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_elsx_ai_prompt_form" model="ir.ui.view">
+        <field name="name">elsx.ai.prompt.form</field>
+        <field name="model">elsx.ai.prompt</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="code"/>
+                            <field name="purpose"/>
+                            <field name="active"/>
+                        </group>
+                        <group>
+                            <field name="provider_id"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="System Prompt">
+                            <field name="system_prompt"/>
+                        </page>
+                        <page string="User Prompt">
+                            <field name="user_prompt"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_elsx_ai_prompt" model="ir.actions.act_window">
+        <field name="name">AI Prompts</field>
+        <field name="res_model">elsx.ai.prompt</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="view_elsx_ai_job_list" model="ir.ui.view">
+        <field name="name">elsx.ai.job.list</field>
+        <field name="model">elsx.ai.job</field>
+        <field name="arch" type="xml">
+            <list decoration-danger="state == 'failed'" decoration-success="state in ('done', 'applied')">
+                <field name="create_date"/>
+                <field name="name"/>
+                <field name="job_type"/>
+                <field name="state"/>
+                <field name="provider_id"/>
+                <field name="origin_ref"/>
+                <field name="duration_ms"/>
+                <field name="attempts"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_elsx_ai_job_form" model="ir.ui.view">
+        <field name="name">elsx.ai.job.form</field>
+        <field name="model">elsx.ai.job</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_run" string="Run" type="object" class="btn-primary" invisible="state not in ('queued', 'failed')"/>
+                    <button name="action_mark_reviewed" string="Mark Reviewed" type="object" invisible="state != 'done'"/>
+                    <button name="action_apply_to_origin" string="Apply to Origin" type="object" class="btn-secondary" invisible="state not in ('done', 'reviewed')"/>
+                    <field name="state" widget="statusbar" statusbar_visible="queued,running,done,reviewed,applied,failed"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="job_type"/>
+                            <field name="provider_id"/>
+                            <field name="prompt_id"/>
+                            <field name="origin_ref"/>
+                        </group>
+                        <group>
+                            <field name="attempts"/>
+                            <field name="duration_ms"/>
+                            <field name="usage_prompt_tokens"/>
+                            <field name="usage_completion_tokens"/>
+                            <field name="estimated_cost"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Input">
+                            <field name="input_text"/>
+                            <field name="input_payload"/>
+                        </page>
+                        <page string="Output">
+                            <field name="response_text"/>
+                            <field name="response_json"/>
+                            <field name="error_message"/>
+                        </page>
+                        <page string="Logs">
+                            <field name="log_ids" readonly="1">
+                                <list>
+                                    <field name="create_date"/>
+                                    <field name="level"/>
+                                    <field name="message"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_elsx_ai_job" model="ir.actions.act_window">
+        <field name="name">AI Jobs</field>
+        <field name="res_model">elsx.ai.job</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="view_elsx_ai_tool_list" model="ir.ui.view">
+        <field name="name">elsx.ai.tool.list</field>
+        <field name="model">elsx.ai.tool</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="active"/>
+                <field name="allow_auto_execute"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_elsx_ai_tool_form" model="ir.ui.view">
+        <field name="name">elsx.ai.tool.form</field>
+        <field name="model">elsx.ai.tool</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="code"/>
+                            <field name="sequence"/>
+                            <field name="active"/>
+                        </group>
+                        <group>
+                            <field name="allow_auto_execute"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Description">
+                            <field name="description"/>
+                        </page>
+                        <page string="Schema">
+                            <field name="schema_json" placeholder='{"type": "object", "properties": {}}'/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_elsx_ai_tool" model="ir.actions.act_window">
+        <field name="name">AI Tools</field>
+        <field name="res_model">elsx.ai.tool</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

@@ -9,10 +9,83 @@
                 <field name="name"/>
                 <field name="phone_number"/>
                 <field name="status" decoration-success="status=='connected'" decoration-danger="status=='error'"/>
+                <field name="quality_rating"/>
+                <field name="messaging_limit"/>
+                <field name="daily_limit_usage_percent" string="Usage %"/>
                 <field name="message_count"/>
                 <field name="campaign_count"/>
                 <field name="active"/>
             </list>
+        </field>
+    </record>
+
+    <record id="view_whatsapp_account_commerce_tree" model="ir.ui.view">
+        <field name="name">whatsapp.account.commerce.tree</field>
+        <field name="model">whatsapp.account</field>
+        <field name="arch" type="xml">
+            <list string="Commerce / Shop Setup" create="0" delete="0">
+                <field name="name"/>
+                <field name="phone_number"/>
+                <field name="commerce_catalog_id" string="Catalog ID"/>
+                <field name="commerce_default_product_retailer_id" string="Default Product ID"/>
+                <field name="payment_link_mode"/>
+                <field name="default_form_id"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_whatsapp_account_commerce_form" model="ir.ui.view">
+        <field name="name">whatsapp.account.commerce.form</field>
+        <field name="model">whatsapp.account</field>
+        <field name="arch" type="xml">
+            <form string="Commerce / Shop Setup" create="0" delete="0">
+                <header>
+                    <button name="action_open_full_account_setup"
+                            string="Open Full Account Setup"
+                            type="object"
+                            class="btn-primary"
+                            icon="fa-cog"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <div class="alert alert-info" role="alert">
+                        <i class="fa fa-shopping-bag me-1"/>
+                        This page configures commerce defaults for an existing WhatsApp account. To add/connect another WhatsApp API number, use Configuration > WhatsApp Accounts > New.
+                        Fill these values before using Catalog/Product, Shop URL, Form Link, or Payment Link actions in Inbox, Campaigns, and Flows.
+                    </div>
+                    <group>
+                        <group string="WhatsApp Account" col="2">
+                            <field name="phone_number" readonly="1"/>
+                            <field name="status" readonly="1"/>
+                            <field name="quality_rating" readonly="1"/>
+                            <field name="messaging_limit" readonly="1"/>
+                        </group>
+                        <group string="Meta Catalog / Shop" col="2">
+                            <field name="commerce_catalog_id" placeholder="Meta Commerce Manager Catalog ID"/>
+                            <field name="commerce_default_product_retailer_id" placeholder="Meta product Content ID / Retailer ID"/>
+                            <field name="commerce_shop_url" placeholder="https://your-shop-or-catalogue-url"/>
+                            <field name="commerce_manager_url" placeholder="https://business.facebook.com/commerce/catalogs/..."/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Forms" col="2">
+                            <field name="default_form_id"/>
+                        </group>
+                        <group string="Payment Links" col="2">
+                            <field name="payment_link_mode"/>
+                            <field name="payment_manual_url" invisible="payment_link_mode != 'manual_url'" placeholder="https://payment.example.com/pay"/>
+                            <field name="payment_link_message" invisible="payment_link_mode == 'disabled'"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-warning" role="alert">
+                        <i class="fa fa-info-circle me-1"/>
+                        Product Retailer ID is the Content ID/SKU from Meta Commerce Manager. It is not the Odoo product database ID.
+                    </div>
+                </sheet>
+            </form>
         </field>
     </record>
 
@@ -24,10 +97,12 @@
             <form string="WhatsApp Account">
                 <header>
                     <button name="action_test_connection" string="Test Connection" type="object" class="btn-primary"/>
+                    <button name="action_sync_meta_health" string="Sync Meta Health" type="object" class="btn-secondary" icon="fa-heartbeat"/>
                     <button name="action_perform_api_test_calls" string="Perform Meta Test Calls" type="object" class="btn-info" icon="fa-vial"/>
                     <button name="action_test_sidecar" string="Test Sidecar" type="object" class="btn-secondary" icon="fa-heartbeat"/>
                     <button name="action_sync_templates" string="Sync Templates" type="object" class="btn-secondary" icon="fa-refresh" invisible="status != 'connected'"/>
                     <button name="action_create_sample_templates" string="Load Sample Templates" type="object" class="btn-secondary" icon="fa-magic"/>
+                    <button name="action_initialize_whatsapp_defaults" string="Initialize Defaults" type="object" class="btn-secondary" icon="fa-check-circle"/>
                     <field name="status" widget="statusbar" statusbar_visible="draft,connected"/>
                 </header>
                 <sheet>
@@ -51,6 +126,8 @@
                             <field name="phone_number_id"/>
                             <field name="business_account_id"/>
                             <field name="api_version"/>
+                            <field name="phone_number_status"/>
+                            <field name="display_name_status"/>
                             <field name="active"/>
                         </group>
                         <group string="API Configuration">
@@ -83,6 +160,8 @@
                                 <group string="Account Health">
                                     <field name="quality_rating" decoration-success="quality_rating == 'GREEN'" decoration-warning="quality_rating == 'YELLOW'" decoration-danger="quality_rating == 'RED'"/>
                                     <field name="messaging_limit"/>
+                                    <field name="throughput_level"/>
+                                    <field name="last_health_sync"/>
                                 </group>
                                 <group string="Contact Details">
                                     <field name="business_email" widget="email"/>
@@ -95,6 +174,26 @@
                                 Changes made here will be visible to your customers on WhatsApp once you click <strong>Save to Meta</strong>.
                             </div>
                         </page>
+                        <page string="Commerce / Shop" name="commerce_shop">
+                            <group>
+                                <group string="Meta Catalog">
+                                    <field name="commerce_catalog_id" placeholder="Meta Commerce Manager Catalog ID"/>
+                                    <field name="commerce_default_product_retailer_id" placeholder="Default product/content ID"/>
+                                    <field name="commerce_shop_url" placeholder="https://your-shop-or-catalogue-url"/>
+                                    <field name="commerce_manager_url" placeholder="https://business.facebook.com/commerce/catalogs/..."/>
+                                </group>
+                                <group string="Forms &amp; Payment Links">
+                                    <field name="default_form_id"/>
+                                    <field name="payment_link_mode"/>
+                                    <field name="payment_manual_url" invisible="payment_link_mode != 'manual_url'" placeholder="https://payment.example.com/pay"/>
+                                    <field name="payment_link_message" invisible="payment_link_mode == 'disabled'"/>
+                                </group>
+                            </group>
+                            <div class="alert alert-info" role="alert">
+                                <i class="fa fa-shopping-bag me-1"/>
+                                Use these defaults in bot flow Catalog/Product, Form Link, Payment Link, and URL Button steps. Product Retailer ID is the Content ID/SKU from Meta Commerce Manager, not the Odoo product ID.
+                            </div>
+                        </page>
                         <page string="Automation &amp; AI" name="automation_ai">
                             <group>
                                 <group string="Traditional Auto-Reply">
@@ -104,10 +203,20 @@
                                 <group string="AI Smart Assistant">
                                     <field name="ai_enabled"/>
                                     <field name="ai_model" invisible="not ai_enabled"/>
+                                    <field name="ai_brand_name" invisible="not ai_enabled" placeholder="FiberaFRP"/>
+                                    <field name="ai_reply_tone" invisible="not ai_enabled"/>
+                                    <field name="ai_reply_signature" invisible="not ai_enabled" placeholder="Regards, FiberaFRP Team"/>
                                 </group>
                             </group>
                             <group string="AI Business Context" invisible="not ai_enabled">
-                                <field name="ai_context" placeholder="Example: We are an e-commerce store selling premium coffee beans. Our shipping policy is 2-3 business days. We offer free returns within 30 days..."/>
+                                <field name="ai_context" placeholder="Example: We manufacture FRP/GRP covers, gratings, tanks, and drainage products. Ask for size, load capacity, city, and quantity before pricing."/>
+                            </group>
+                            <group string="AI Reply Rules" invisible="not ai_enabled">
+                                <field name="ai_reply_instructions" placeholder="Example: Draft short WhatsApp replies only. Do not promise price without quantity and size. Ask for project details. Mention catalogue only when relevant. Never auto-send."/>
+                                <div class="alert alert-info" role="alert" colspan="2">
+                                    <i class="fa fa-lightbulb-o me-1"/>
+                                    Agents can still edit every AI draft before sending. Advanced prompt/provider setup is under Configuration &gt; AI Providers and AI Prompts.
+                                </div>
                             </group>
                         </page>
                         <page string="Compliance &amp; Health" name="compliance_health">
@@ -119,8 +228,10 @@
                                         <field name="is_limit_reached" invisible="1"/>
                                         <span class="badge rounded-pill text-bg-danger ms-2" invisible="not is_limit_reached">LIMIT REACHED</span>
                                     </div>
+                                    <field name="daily_limit_remaining"/>
+                                    <field name="daily_limit_usage_percent"/>
                                     <field name="messaging_limit"/>
-                                    <field name="quality_rating" widget="state_selection" 
+                                    <field name="quality_rating"
                                            decoration-success="quality_rating == 'GREEN'" 
                                            decoration-warning="quality_rating == 'YELLOW'" 
                                            decoration-danger="quality_rating == 'RED'"/>
@@ -177,6 +288,10 @@
                                            decoration-success="webhook_status == 'verified'" 
                                            decoration-danger="webhook_status == 'failed'" 
                                            decoration-info="webhook_status == 'none'"/>
+                                    <field name="last_webhook_at"/>
+                                    <field name="last_status_webhook_at"/>
+                                    <field name="last_inbound_webhook_at"/>
+                                    <field name="last_status_wamid"/>
                                     <field name="webhook_last_error" invisible="not webhook_last_error" class="text-danger fw-bold"/>
                                 </group>
                                 <group string="Enterprise Reliability">

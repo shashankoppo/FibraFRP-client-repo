@@ -15,7 +15,6 @@
     'website': 'https://www.walnutit.com',
     'author': 'Odoo Mates, Walnut Software Solutions, Odoo SA',
     'maintainer': 'Odoo Mates, Walnut Software Solutions',
-    'license': 'LGPL-3',
     'support': 'odoomates@gmail.com',
     'depends': [
         'accounting_pdf_reports',

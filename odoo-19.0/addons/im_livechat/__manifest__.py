@@ -194,5 +194,4 @@ Help your customers with this chat, and analyse their feedback.
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

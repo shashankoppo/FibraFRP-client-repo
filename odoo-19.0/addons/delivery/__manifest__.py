@@ -43,5 +43,4 @@ The system is able to add and compute the shipping line.
     'uninstall_hook': 'uninstall_hook',
     'installable': True,
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

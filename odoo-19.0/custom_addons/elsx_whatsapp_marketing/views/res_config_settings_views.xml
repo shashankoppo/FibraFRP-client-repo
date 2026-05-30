@@ -10,6 +10,9 @@
             <xpath expr="//form" position="inside">
                 <app data-string="WhatsApp Marketing" string="WhatsApp Marketing" name="elsx_whatsapp_marketing" groups="base.group_system">
                     <block title="Real-Time Engine (Sidecar)" id="whatsapp_sidecar_setting">
+                        <setting id="whatsapp_realtime_mode_setting" help="Use Odoo Bus for normal production. Enable Sidecar Socket only when the sidecar service is configured and healthy.">
+                            <field name="whatsapp_realtime_mode"/>
+                        </setting>
                         <setting id="whatsapp_sidecar_url_setting" help="URL of the Node.js WebSocket server for zero-latency messaging.">
                             <field name="whatsapp_sidecar_url" placeholder="http://node_sidecar:3000"/>
                         </setting>
@@ -19,8 +22,47 @@
                     </block>
 
                     <block title="General Configuration" id="whatsapp_general_setting">
+                        <setting id="whatsapp_history_initial_limit_setting" help="Keep first chat render light. Users can still load older messages from the chat history.">
+                            <field name="whatsapp_history_initial_limit"/>
+                        </setting>
                         <setting id="whatsapp_default_account_setting" help="Default account for sending messages if not explicitly set.">
                             <field name="whatsapp_default_account_id"/>
+                        </setting>
+                        <setting id="whatsapp_default_account_health_setting" help="Current Meta quality and messaging limit for the default WhatsApp account.">
+                            <div class="d-flex flex-column gap-1">
+                                <field name="whatsapp_default_quality_rating" readonly="1"/>
+                                <field name="whatsapp_default_messaging_limit" readonly="1"/>
+                                <field name="whatsapp_default_remaining_limit" readonly="1"/>
+                                <field name="whatsapp_default_daily_usage" readonly="1"/>
+                                <button name="action_sync_default_whatsapp_account_health" string="Sync Meta Health" type="object" class="btn-secondary mt-2" invisible="not whatsapp_default_account_id"/>
+                            </div>
+                        </setting>
+                        <setting id="whatsapp_contact_sync_setting" help="Synchronize all Odoo contacts (partners) with phone/mobile numbers to WhatsApp contacts.">
+                            <button name="action_sync_all_whatsapp_contacts" string="Synchronize Contacts" type="object" class="oe_highlight"/>
+                        </setting>
+                    </block>
+
+                    <block title="Dashboard &amp; User Experience" id="whatsapp_dashboard_ux_setting">
+                        <setting id="whatsapp_dashboard_refresh_setting" help="Refresh the WhatsApp dashboard automatically without forcing users to reload the browser. Set 0 to disable auto-refresh.">
+                            <field name="whatsapp_dashboard_refresh_seconds"/>
+                        </setting>
+                        <setting id="whatsapp_dashboard_cache_setting" help="Hybrid dashboard mode keeps critical health values live and caches heavier chart/leaderboard sections for this many minutes.">
+                            <field name="whatsapp_dashboard_cache_minutes"/>
+                        </setting>
+                        <setting id="whatsapp_ui_motion_enabled_setting" help="Subtle local animations for custom WhatsApp screens only. The setting respects browser reduced-motion preferences.">
+                            <field name="whatsapp_ui_motion_enabled"/>
+                        </setting>
+                        <setting id="whatsapp_ui_motion_level_setting" help="Use Subtle for production. Standard adds slightly more dashboard and flow-builder motion.">
+                            <field name="whatsapp_ui_motion_level"/>
+                        </setting>
+                    </block>
+
+                    <block title="Forms, Payments &amp; Commerce" id="whatsapp_forms_payment_setting">
+                        <setting id="whatsapp_form_rate_limit_setting" help="Protect public WhatsApp forms from repeated submissions. Applies per browser session.">
+                            <field name="whatsapp_form_rate_limit_seconds"/>
+                        </setting>
+                        <setting id="whatsapp_form_upload_setting" help="Maximum upload size per public form file field. Keep this conservative for mobile users.">
+                            <field name="whatsapp_form_max_upload_mb"/>
                         </setting>
                     </block>
 
@@ -33,9 +75,51 @@
                         </setting>
                     </block>
 
+                    <block title="Invoicing Integration" id="whatsapp_invoicing_setting">
+                        <setting id="whatsapp_invoice_auto_send_setting" help="Automatically send WhatsApp notification when invoice is posted.">
+                            <field name="whatsapp_invoice_auto_send"/>
+                        </setting>
+                        <setting id="whatsapp_invoice_default_template_setting" help="Default template for sending invoices via WhatsApp.">
+                            <field name="whatsapp_invoice_default_template_id"/>
+                        </setting>
+                        <setting id="whatsapp_invoice_auto_remind_setting" help="Enable automated overdue reminders via Cron.">
+                            <field name="whatsapp_invoice_auto_remind"/>
+                        </setting>
+                        <setting id="whatsapp_invoice_reminder_days_setting" help="Days between automatic overdue invoice reminders." invisible="not whatsapp_invoice_auto_remind">
+                            <field name="whatsapp_invoice_reminder_days"/>
+                        </setting>
+                    </block>
+
                     <block title="Data Retention &amp; Compliance" id="whatsapp_retention_setting">
                         <setting id="whatsapp_retention_setting" help="Days to keep chat history (0 to keep forever).">
                             <field name="whatsapp_retention_days"/>
+                        </setting>
+                    </block>
+
+                    <block title="AI Stabilization" id="elsx_ai_stabilization_setting">
+                        <setting id="elsx_ai_enabled_setting" help="AI is disabled by default until provider setup and tests pass. Jobs remain auditable.">
+                            <field name="elsx_ai_enabled"/>
+                        </setting>
+                        <setting id="elsx_ai_provider_setting" help="Provider used by WhatsApp drafts, CRM drafts, OCR jobs, and campaign draft generation.">
+                            <field name="elsx_ai_default_provider_id"/>
+                        </setting>
+                        <setting id="elsx_ai_default_model_setting" help="Fallback model name used when the selected provider has no default model. Examples: gpt-style, claude-style, qwen, deepseek, local model names.">
+                            <field name="elsx_ai_default_model" placeholder="model name"/>
+                        </setting>
+                        <setting id="whatsapp_ai_draft_enabled_setting" help="Allow AI to create draft replies, campaign copy, template suggestions, summaries, and classifications. Users still approve output.">
+                            <field name="whatsapp_ai_draft_enabled"/>
+                        </setting>
+                        <setting id="elsx_ai_auto_write_setting" help="Keep disabled for safety. When disabled, AI output must be reviewed before applying to records.">
+                            <field name="elsx_ai_auto_write"/>
+                        </setting>
+                        <setting id="whatsapp_ai_auto_send_setting" help="Safety switch. Keep disabled unless a separate approval workflow is built and tested.">
+                            <field name="whatsapp_ai_auto_send"/>
+                        </setting>
+                    </block>
+
+                    <block title="Diagnostics" id="whatsapp_diagnostics_setting">
+                        <setting id="whatsapp_health_snapshot_setting" help="Capture queue size, failed sends, webhook freshness, realtime mode, and AI job health.">
+                            <button name="action_capture_whatsapp_health_snapshot" string="Capture Health Snapshot" type="object" class="btn-secondary"/>
                         </setting>
                     </block>
                 </app>

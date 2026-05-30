@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="elsx_web_layout_branding" inherit_id="web.layout" name="ELSxGlobal Web Layout Branding">
+        <xpath expr="//title" position="replace">
+            <title t-esc="title or 'ELSxGlobal'"/>
+        </xpath>
+        <xpath expr="//link[@rel='shortcut icon']" position="attributes">
+            <attribute name="t-att-href">x_icon or '/elsx_client_restrictions/static/src/img/elsxglobal_favicon.svg'</attribute>
+        </xpath>
+    </template>
+
+    <template id="elsx_login_layout_branding" inherit_id="web.login_layout" name="ELSxGlobal Login Branding">
+        <xpath expr="//a[contains(@href, 'odoo.com')]" position="replace">
+            <span class="text-muted">Powered by <span>ELSxGlobal</span></span>
+        </xpath>
+    </template>
+
+    <template id="elsx_brand_promotion" inherit_id="web.brand_promotion" name="ELSxGlobal Brand Promotion">
+        <xpath expr="//div[hasclass('o_brand_promotion')]" position="replace">
+            <div class="o_brand_promotion">Powered by <span>ELSxGlobal</span></div>
+        </xpath>
+    </template>
+
+    <template id="elsx_webclient_bootstrap_branding" inherit_id="web.webclient_bootstrap" name="ELSxGlobal Backend Icon">
+        <xpath expr="//link[@rel='apple-touch-icon']" position="attributes">
+            <attribute name="href">/elsx_client_restrictions/static/src/img/elsxglobal_favicon.svg</attribute>
+        </xpath>
+    </template>
+
+    <template id="elsx_webclient_offline_branding" inherit_id="web.webclient_offline" name="ELSxGlobal Offline Branding">
+        <xpath expr="//div[hasclass('card')]/img[1]" position="replace">
+            <img src="/elsx_client_restrictions/static/src/img/elsxglobal_favicon.svg" alt="ELSxGlobal logo"/>
+        </xpath>
+        <xpath expr="//div[hasclass('card')]/p[1]" position="replace">
+            <p>Check your network connection and come back here. ELSxGlobal will load as soon as you're back online.</p>
+        </xpath>
+    </template>
+</odoo>

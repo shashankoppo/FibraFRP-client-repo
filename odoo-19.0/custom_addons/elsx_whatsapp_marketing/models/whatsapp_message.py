@@ -2,7 +2,7 @@
 import odoo
 import odoo.modules.registry
 from odoo import models, fields, api, _
-from odoo.exceptions import ValidationError
+from odoo.exceptions import UserError, ValidationError
 import requests
 import json
 import logging
@@ -12,8 +12,18 @@ from datetime import timedelta
 import threading
 import random
 import pytz
+import time
 
 _logger = logging.getLogger(__name__)
+
+NON_RETRYABLE_META_ERROR_CODES = {131049}
+
+
+def _safe_int(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return False
 
 def notify_sidecar_background(env, message_id, event_type='new_message'):
     """Fire-and-forget notification to the sidecar — non-blocking thread."""
@@ -30,11 +40,12 @@ def notify_sidecar_background(env, message_id, event_type='new_message'):
             with registry.cursor() as cr:
                 new_env = api.Environment(cr, odoo.SUPERUSER_ID, {})
 
-                base_url = new_env['ir.config_parameter'].sudo().get_param('whatsapp.sidecar.url')
-                secret = new_env['ir.config_parameter'].sudo().get_param(
-                    'whatsapp.sidecar.secret', 'elsx_sidecar_secure_2024'
-                )
-                if not base_url:
+                params = new_env['ir.config_parameter'].sudo()
+                if params.get_param('whatsapp.realtime.mode', default='bus') != 'socket':
+                    return
+                base_url = params.get_param('whatsapp.sidecar.url')
+                secret = params.get_param('whatsapp.sidecar.secret')
+                if not base_url or not secret:
                     return
 
                 msg = new_env['whatsapp.message'].sudo().browse(message_id)
@@ -43,8 +54,12 @@ def notify_sidecar_background(env, message_id, event_type='new_message'):
 
                 payload = {
                     'chat_id': msg.chat_id_ref.id if msg.chat_id_ref else msg.phone_number,
+                    'message_id': msg.id,
+                    'message_wamid': msg.message_id,
+                    'status': msg.status,
                     'message': {
                         'id': msg.id,
+                        'wamid': msg.message_id,
                         'body': msg.body,
                         'direction': msg.direction,
                         'type': msg.message_type,
@@ -69,15 +84,18 @@ class WhatsAppMessage(models.Model):
     _description = 'WhatsApp Message'
     _order = 'create_date desc'
     _rec_name = 'phone_number'
-    
+
     _message_id_unique = models.Constraint(
         'unique(message_id)',
         'Duplicate WhatsApp Message ID (wamid) detected. Data integrity enforced.',
     )
-    
+
     _message_id_idx = models.Index(
         "(message_id) WHERE message_id IS NOT NULL",
     )
+    _campaign_queue_idx = models.Index("(campaign_id, status, next_retry_at, create_date)")
+    _message_status_idx = models.Index("(status, retry_count, next_retry_at, create_date)")
+    _chat_direction_idx = models.Index("(chat_id_ref, direction, status, create_date)")
 
     account_id = fields.Many2one('whatsapp.account', string='WhatsApp Account', required=True, ondelete='cascade')
     partner_id = fields.Many2one('res.partner', string='Contact')
@@ -113,6 +131,16 @@ class WhatsAppMessage(models.Model):
     button_payload = fields.Char('Button Payload', help='Developer payload of the button')
     list_item_id = fields.Char('List Item ID', help='ID of the list item selected')
     list_item_title = fields.Char('List Item Title')
+    interactive_type = fields.Char(
+        'Interactive Type',
+        help='Meta interactive type such as button, list, cta_url, product, product_list, or catalog_message.',
+    )
+    button_url = fields.Char('Button URL', help='URL used by CTA URL interactive messages.')
+    catalog_id = fields.Char('Catalog ID', help='Meta Commerce Manager catalog ID used by product messages.')
+    product_retailer_id = fields.Char(
+        'Product Retailer ID',
+        help='Commerce Manager content/product ID used by product and catalog messages.',
+    )
 
     # Conversation Grouping
     chat_id = fields.Char('Chat ID', compute='_compute_chat_id', store=True)
@@ -144,7 +172,7 @@ class WhatsAppMessage(models.Model):
     # Threading (Replies)
     parent_id = fields.Many2one('whatsapp.message', string='Replying To', ondelete='set null')
     parent_message_id = fields.Char('Meta Parent ID', help='Original wamid being replied to')
-    
+
     # Campaign relation
     campaign_id = fields.Many2one('whatsapp.campaign', string='Campaign', ondelete='set null')
     flow_id = fields.Many2one('whatsapp.bot.flow', string='Auto-Start Flow', ondelete='set null')
@@ -163,16 +191,64 @@ class WhatsAppMessage(models.Model):
     conversation_type = fields.Char('Conversation Type')
     pricing_category = fields.Char('Pricing Category')
     pricing_model = fields.Char('Pricing Model')
-    
+
     # Compliance & Safety
     is_opt_out = fields.Boolean('Opt-out Message', default=False, help="True if this message triggered a STOP request.")
-    
+
     # Automation
     is_automated = fields.Boolean('Automated Message', default=False)
     trigger_event = fields.Char('Trigger Event')
-    
+
     # Media handling
     attachment_ids = fields.Many2many('ir.attachment', string='Attachments')
+
+    # E-Commerce Integration
+    sale_order_id = fields.Many2one('sale.order', string='Created Order', ondelete='set null')
+
+    @api.model
+    def _is_non_retryable_meta_error_code(self, code):
+        return _safe_int(code) in NON_RETRYABLE_META_ERROR_CODES
+
+    @api.model
+    def _meta_error_code_from_text(self, message):
+        if not message:
+            return False
+        match = re.search(r'\[(\d+)\]', str(message))
+        if match:
+            return _safe_int(match.group(1))
+        match = re.search(r'\b(?:code|error)\D{0,12}(\d{4,6})\b', str(message), re.IGNORECASE)
+        return _safe_int(match.group(1)) if match else False
+
+    @api.model
+    def _format_meta_error(self, error):
+        error = error or {}
+        code = error.get('code')
+        code_int = _safe_int(code)
+        if code_int == 131049:
+            return _(
+                "[131049] Meta blocked delivery for this recipient to maintain WhatsApp ecosystem health. "
+                "This commonly affects marketing templates when the recipient has reached Meta's per-user "
+                "marketing limit or has low recent engagement. Do not retry immediately; wait for the "
+                "customer to reply, improve opt-in/segmentation, or use an approved utility template for "
+                "transactional content."
+            )
+
+        title = error.get('title') or ''
+        message = error.get('message') or ''
+        details = ''
+        if isinstance(error.get('error_data'), dict):
+            details = error['error_data'].get('details') or ''
+
+        parts = [part for part in (title, message, details) if part]
+        text = " - ".join(parts) or _("Message delivery failed")
+        return f"[{code}] {text}" if code else text
+
+    def _is_non_retryable_failure(self):
+        self.ensure_one()
+        return self._is_non_retryable_meta_error_code(
+            self._meta_error_code_from_text(self.error_message)
+        )
+
 
     @api.depends('phone_number', 'account_id')
     def _compute_chat_id(self):
@@ -189,11 +265,14 @@ class WhatsAppMessage(models.Model):
                 account = self.env['whatsapp.account'].sudo().browse(vals.get('account_id')) if vals.get('account_id') else False
                 vals['phone_number'] = self._normalize_phone(vals['phone_number'], account=account, strict=False)
 
-            if not vals.get('chat_id_ref') and vals.get('phone_number') and vals.get('account_id'):
+            # Skip chat creation for campaign/bulk messages — they are marketing blasts,
+            # not conversations. A chat will be created when the customer replies.
+            is_campaign = bool(vals.get('campaign_id'))
+            if not is_campaign and not vals.get('chat_id_ref') and vals.get('phone_number') and vals.get('account_id'):
                 # Link to existing chat or create new one
                 chat = self.env['whatsapp.chat'].sudo()._get_or_create_chat(vals['account_id'], vals['phone_number'])
                 vals['chat_id_ref'] = chat.id
-            
+
             # Auto-assign partner if missing
             if not vals.get('partner_id') and vals.get('phone_number'):
                 normalized = self._normalize_phone(vals['phone_number'])
@@ -203,15 +282,27 @@ class WhatsAppMessage(models.Model):
                 partner = self.env['res.partner'].sudo().search(partner_domain, limit=1)
                 if partner:
                     vals['partner_id'] = partner.id
-            
+
             # Populate body for templates to show in chat list
-            if vals.get('message_type') == 'template' and not vals.get('body'):
-                template = self.env['whatsapp.template'].sudo().search([('name', '=', vals.get('template_name'))], limit=1)
+            if vals.get('message_type') == 'template' and (not vals.get('body') or vals.get('body') == 'Template Sent'):
+                template = False
+                if vals.get('template_id'):
+                    template = self.env['whatsapp.template'].sudo().browse(vals['template_id'])
+                if not template and vals.get('template_name'):
+                    template_domain = [
+                        '|',
+                        ('meta_template_name', '=', vals.get('template_name')),
+                        ('name', '=', vals.get('template_name')),
+                    ]
+                    if vals.get('account_id'):
+                        template_domain = ['&', ('account_id', 'in', [False, vals.get('account_id')])] + template_domain
+                    template = self.env['whatsapp.template'].sudo().search(template_domain, limit=1)
                 if template:
+                    vals['template_id'] = template.id
                     vals['body'] = template.body
 
         messages = super().create(vals_list)
-        
+
         # Ensure outbound media gets an attachment so the UI can render it immediately
         for msg in messages:
             if msg.media_file and not msg.attachment_ids:
@@ -227,23 +318,42 @@ class WhatsAppMessage(models.Model):
             if msg.chat_id_ref and msg.partner_id and not msg.chat_id_ref.partner_id:
                 msg.chat_id_ref.sudo().write({'partner_id': msg.partner_id.id})
 
-            if msg.direction == 'inbound' and msg.chat_id_ref:
+            # Skip lead chatter sync for campaign messages to avoid CRM spam
+            if msg.direction == 'inbound' and msg.chat_id_ref and not msg.campaign_id:
                 msg.chat_id_ref.sudo()._sync_message_to_lead_chatter(msg)
-            elif msg.direction == 'outbound' and msg.chat_id_ref:
+            elif msg.direction == 'outbound' and msg.chat_id_ref and not msg.campaign_id:
                 msg.chat_id_ref.sudo()._sync_message_to_lead_chatter(msg)
 
         # Notify real-time sidecar
         for record in messages:
             if record.status != 'draft':
                 notify_sidecar_background(self.env, record.id)
-                
+
         return messages
 
     def write(self, vals):
         res = super(WhatsAppMessage, self).write(vals)
         if 'status' in vals or 'body' in vals:
             for record in self:
-                notify_sidecar_background(self.env, record.id, event_type='message_update')
+                event_type = 'status_update' if 'status' in vals else 'message_update'
+                notify_sidecar_background(self.env, record.id, event_type=event_type)
+                if 'status' in vals and record.chat_id_ref:
+                    try:
+                        self.env['bus.bus']._sendone(
+                            'elsx_whatsapp_channel',
+                            'whatsapp_status_update',
+                            {
+                                'chat_id': record.chat_id_ref.id,
+                                'message_id': record.id,
+                                'message_wamid': record.message_id,
+                                'status': record.status,
+                                'sent_date': str(record.sent_date or ''),
+                                'delivered_date': str(record.delivered_date or ''),
+                                'read_date': str(record.read_date or ''),
+                            }
+                        )
+                    except Exception as exc:
+                        _logger.debug("WhatsApp status bus notification failed: %s", exc)
         if vals.get('chat_id_ref'):
             for record in self.filtered(lambda msg: msg.chat_id_ref):
                 record.chat_id_ref.sudo()._sync_message_to_lead_chatter(record)
@@ -265,7 +375,7 @@ class WhatsAppMessage(models.Model):
             if account and getattr(account, 'default_country_code', False):
                 cc = account.default_country_code
             else:
-                active_account = self.env['whatsapp.account'].search([], limit=1)
+                active_account = self.env['whatsapp.account']._get_default_account()
                 if active_account and active_account.default_country_code:
                     cc = active_account.default_country_code
                 elif hasattr(self, 'account_id') and self.account_id and self.account_id.default_country_code:
@@ -286,7 +396,7 @@ class WhatsAppMessage(models.Model):
         normalized = self._normalize_phone(phone)
         if not normalized:
             return False
-        
+
         # 1. Try exact normalized match first
         domain = [('phone', '=', normalized)]
         if 'mobile' in self.env['res.partner']._fields:
@@ -294,7 +404,7 @@ class WhatsAppMessage(models.Model):
         partner = self.env['res.partner'].sudo().search(domain, limit=1)
         if partner:
             return partner
-            
+
         # 2. Try normalized match with prepended '+'
         plus_normalized = '+' + normalized
         domain = [('phone', '=', plus_normalized)]
@@ -314,7 +424,7 @@ class WhatsAppMessage(models.Model):
             for p in partners:
                 # Strip all non-digits from partner's phone/mobile to see if it matches normalized suffix
                 p_phone = re.sub(r'\D', '', p.phone or '')
-                p_mobile = re.sub(r'\D', '', p.mobile or '')
+                p_mobile = re.sub(r'\D', '', getattr(p, 'mobile', '') or '')
                 if p_phone.endswith(suffix) or p_mobile.endswith(suffix):
                     return p
         return False
@@ -350,7 +460,7 @@ class WhatsAppMessage(models.Model):
             },
         }
 
-    def _prepare_interactive_payload(self, body_text, buttons):
+    def _prepare_interactive_payload(self, body_text, buttons, header_text=False, footer_text=False):
         """Build and store a Meta Cloud API interactive button payload."""
         self.ensure_one()
         prepared_buttons = []
@@ -367,12 +477,201 @@ class WhatsAppMessage(models.Model):
             'body': {'text': body_text or ''},
             'action': {'buttons': prepared_buttons},
         }
+        if header_text:
+            interactive['header'] = {'type': 'text', 'text': str(header_text)[:60]}
+        if footer_text:
+            interactive['footer'] = {'text': str(footer_text)[:60]}
         write_vals = {'raw_data': json.dumps(interactive)}
         if self.message_type != 'interactive':
             write_vals['message_type'] = 'interactive'
         if body_text and not self.body:
             write_vals['body'] = body_text
         self.sudo().write(write_vals)
+        return interactive
+
+    def _prepare_interactive_list_payload(self, body_text, rows, button_text=False, section_title=False, header_text=False, footer_text=False):
+        """Build and store a Meta Cloud API interactive list payload."""
+        self.ensure_one()
+        prepared_rows = []
+        for index, row in enumerate((rows or [])[:10]):
+            if isinstance(row, dict):
+                title = row.get('title') or row.get('name') or row.get('text') or row.get('label')
+                row_id = row.get('id') or row.get('button_id') or row.get('payload') or row.get('value')
+                description = row.get('description') or ''
+            else:
+                title = row
+                row_id = row
+                description = ''
+            title = str(title or row_id or f"Option {index + 1}").strip()
+            row_id = str(row_id or title or f"list_{index + 1}").strip()
+            if not title:
+                continue
+            prepared = {
+                'id': row_id[:200],
+                'title': title[:24],
+            }
+            if description:
+                prepared['description'] = str(description)[:72]
+            prepared_rows.append(prepared)
+
+        if not prepared_rows:
+            raise ValidationError(_("Interactive list messages require at least one row."))
+
+        interactive = {
+            'type': 'list',
+            'body': {'text': body_text or ''},
+            'action': {
+                'button': (button_text or _('Choose'))[:20],
+                'sections': [{
+                    'title': (section_title or _('Options'))[:24],
+                    'rows': prepared_rows,
+                }],
+            },
+        }
+        if header_text:
+            interactive['header'] = {'type': 'text', 'text': str(header_text)[:60]}
+        if footer_text:
+            interactive['footer'] = {'text': str(footer_text)[:60]}
+        write_vals = {'raw_data': json.dumps(interactive)}
+        if self.message_type != 'interactive':
+            write_vals['message_type'] = 'interactive'
+        if body_text and not self.body:
+            write_vals['body'] = body_text
+        self.sudo().write(write_vals)
+        return interactive
+
+    def _prepare_interactive_cta_url_payload(self, body_text, display_text, url, header_text=False, footer_text=False):
+        """Build and store a Meta Cloud API interactive CTA URL payload."""
+        self.ensure_one()
+        display_text = str(display_text or _('Open Link')).strip()[:20]
+        url = str(url or '').strip()
+        if not url:
+            raise ValidationError(_("CTA URL messages require a URL."))
+        if not url.startswith(('http://', 'https://')):
+            raise ValidationError(_("CTA URL must start with http:// or https://."))
+        interactive = {
+            'type': 'cta_url',
+            'body': {'text': body_text or ''},
+            'action': {
+                'name': 'cta_url',
+                'parameters': {
+                    'display_text': display_text,
+                    'url': url,
+                },
+            },
+        }
+        if header_text:
+            interactive['header'] = {'type': 'text', 'text': str(header_text)[:60]}
+        if footer_text:
+            interactive['footer'] = {'text': str(footer_text)[:60]}
+        self.sudo().write({
+            'message_type': 'interactive',
+            'raw_data': json.dumps(interactive),
+            'body': body_text or self.body,
+            'interactive_type': 'cta_url',
+            'button_text': display_text,
+            'button_url': url,
+        })
+        return interactive
+
+    def _prepare_interactive_product_payload(self, body_text, catalog_id, product_retailer_id, footer_text=False):
+        """Build and store a single product interactive payload."""
+        self.ensure_one()
+        catalog_id = str(catalog_id or '').strip()
+        product_retailer_id = str(product_retailer_id or '').strip()
+        if not catalog_id or not product_retailer_id:
+            raise ValidationError(_("Single product messages require Catalog ID and Product Retailer ID."))
+        interactive = {
+            'type': 'product',
+            'body': {'text': body_text or _('Please review this product.')},
+            'action': {
+                'catalog_id': catalog_id,
+                'product_retailer_id': product_retailer_id,
+            },
+        }
+        if footer_text:
+            interactive['footer'] = {'text': str(footer_text)[:60]}
+        self.sudo().write({
+            'message_type': 'interactive',
+            'raw_data': json.dumps(interactive),
+            'body': body_text or self.body or _('Product message'),
+            'interactive_type': 'product',
+            'catalog_id': catalog_id,
+            'product_retailer_id': product_retailer_id,
+        })
+        return interactive
+
+    def _prepare_interactive_product_list_payload(
+        self, body_text, catalog_id, product_retailer_ids,
+        header_text=False, footer_text=False, section_title=False,
+    ):
+        """Build and store a multi-product list payload."""
+        self.ensure_one()
+        catalog_id = str(catalog_id or '').strip()
+        if isinstance(product_retailer_ids, str):
+            product_retailer_ids = [
+                part.strip() for part in re.split(r'[\n,;]+', product_retailer_ids)
+                if part.strip()
+            ]
+        product_retailer_ids = [str(item).strip() for item in (product_retailer_ids or []) if str(item).strip()]
+        if not catalog_id:
+            raise ValidationError(_("Product list messages require Catalog ID."))
+        if not product_retailer_ids:
+            raise ValidationError(_("Product list messages require at least one Product Retailer ID."))
+        product_retailer_ids = product_retailer_ids[:30]
+        interactive = {
+            'type': 'product_list',
+            'header': {
+                'type': 'text',
+                'text': str(header_text or _('Products'))[:60],
+            },
+            'body': {'text': body_text or _('Please review these products.')},
+            'action': {
+                'catalog_id': catalog_id,
+                'sections': [{
+                    'title': str(section_title or _('Products'))[:24],
+                    'product_items': [
+                        {'product_retailer_id': item}
+                        for item in product_retailer_ids
+                    ],
+                }],
+            },
+        }
+        if footer_text:
+            interactive['footer'] = {'text': str(footer_text)[:60]}
+        self.sudo().write({
+            'message_type': 'interactive',
+            'raw_data': json.dumps(interactive),
+            'body': body_text or self.body or _('Product list message'),
+            'interactive_type': 'product_list',
+            'catalog_id': catalog_id,
+            'product_retailer_id': ','.join(product_retailer_ids),
+        })
+        return interactive
+
+    def _prepare_interactive_catalog_message_payload(self, body_text, thumbnail_product_retailer_id=False, footer_text=False):
+        """Build and store a catalog message payload that opens the WhatsApp shop/catalog."""
+        self.ensure_one()
+        parameters = {}
+        thumbnail_product_retailer_id = str(thumbnail_product_retailer_id or '').strip()
+        if thumbnail_product_retailer_id:
+            parameters['thumbnail_product_retailer_id'] = thumbnail_product_retailer_id
+        interactive = {
+            'type': 'catalog_message',
+            'body': {'text': body_text or _('Browse our catalogue.')},
+            'action': {'name': 'catalog_message'},
+        }
+        if parameters:
+            interactive['action']['parameters'] = parameters
+        if footer_text:
+            interactive['footer'] = {'text': str(footer_text)[:60]}
+        self.sudo().write({
+            'message_type': 'interactive',
+            'raw_data': json.dumps(interactive),
+            'body': body_text or self.body or _('Catalog message'),
+            'interactive_type': 'catalog_message',
+            'product_retailer_id': thumbnail_product_retailer_id,
+        })
         return interactive
 
     def _store_downloaded_media(self, content, mimetype=False, filename=False):
@@ -425,9 +724,9 @@ class WhatsAppMessage(models.Model):
         if not base_url or not self.media_url:
             return False
 
-        secret = self.env['ir.config_parameter'].sudo().get_param(
-            'whatsapp.sidecar.secret', 'elsx_sidecar_secure_2024'
-        )
+        secret = self.env['ir.config_parameter'].sudo().get_param('whatsapp.sidecar.secret')
+        if not secret:
+            return False
         headers = {'x-sidecar-key': secret}
         media_ref = str(self.media_url).strip()
         endpoints = [
@@ -482,13 +781,13 @@ class WhatsAppMessage(models.Model):
             return True
         if not self.media_url:  # media_url stores the media_id for inbound
             return self._restore_media_from_local_cache()
-            
+
         account = self.account_id
         if not account or not account.access_token:
             return self._restore_media_from_local_cache() or self._download_media_from_sidecar()
-            
+
         _logger.info(f"[MEDIA-DL] Starting download for media_id {self.media_url}")
-        
+
         try:
             headers = {'Authorization': f'Bearer {account.access_token}'}
             media_ref = str(self.media_url).strip()
@@ -522,7 +821,7 @@ class WhatsAppMessage(models.Model):
                 _logger.warning("[MEDIA-DL] No direct download URL returned for message %s", self.id)
         except Exception as e:
             _logger.warning("[MEDIA-DL] Direct Meta download failed for message %s: %s", self.id, e)
-            
+
         return self._restore_media_from_local_cache() or self._download_media_from_sidecar()
 
     def queue_media_download(self):
@@ -599,7 +898,7 @@ class WhatsAppMessage(models.Model):
         """Verify if the recipient can receive this outbound WhatsApp message."""
         self.ensure_one()
         # 1. Tier Limit Check
-        if self.account_id.is_limit_reached:
+        if not self.account_id._has_daily_capacity():
             raise ValidationError(_("Daily messaging limit reached for account %s.") % self.account_id.name)
 
         policy = self._get_active_compliance_policy()
@@ -634,7 +933,7 @@ class WhatsAppMessage(models.Model):
         for record in self:
             if record.direction == 'inbound' or record.status in ['sent', 'delivered', 'read']:
                 continue
-            
+
             # Compliance Check before attempting send
             record._check_compliance()
 
@@ -678,6 +977,13 @@ class WhatsAppMessage(models.Model):
                     send_kwargs['template'] = payload
                 elif record.template_id:
                     send_kwargs['template_record'] = record.template_id
+                    if record.media_file:
+                        send_kwargs['header_media_file'] = record.media_file
+                        send_kwargs['header_media_filename'] = record.media_filename
+                    elif record.media_url:
+                        send_kwargs['header_media_url'] = record.media_url
+                        if record.media_filename:
+                            send_kwargs['header_media_filename'] = record.media_filename
                 elif record.template_name:
                     send_kwargs['template_name'] = record.template_name
                     send_kwargs['language_code'] = record.template_language or 'en_US'
@@ -709,6 +1015,13 @@ class WhatsAppMessage(models.Model):
         return True
 
     def action_retry(self):
+        non_retryable = self.filtered(lambda msg: msg._is_non_retryable_failure())
+        if non_retryable:
+            raise UserError(_(
+                "This message failed with Meta error 131049, so retrying the same marketing template "
+                "immediately is blocked. Wait for the customer to reply, retry later with better "
+                "segmentation, or use an approved utility template for transactional content."
+            ))
         self.write({'status': 'queued', 'error_message': False})
         self.action_send()
 
@@ -716,9 +1029,22 @@ class WhatsAppMessage(models.Model):
         self.write({'status': 'read', 'read_date': fields.Datetime.now()})
 
     @api.model
-    def _cleanup_old_messages(self, days=90):
+    def _cleanup_old_messages(self, days=None):
+        if days is None:
+            try:
+                days = int(self.env['ir.config_parameter'].sudo().get_param('whatsapp.retention.days', default=0) or 0)
+            except (TypeError, ValueError):
+                days = 0
+        if not days or days <= 0:
+            _logger.info("WhatsApp message retention cleanup skipped; retention is disabled.")
+            return 0
+
         limit_date = fields.Datetime.now() - timedelta(days=days)
-        self.search([('create_date', '<', limit_date)]).unlink()
+        messages = self.search([('create_date', '<', limit_date)])
+        count = len(messages)
+        if messages:
+            messages.unlink()
+        return count
 
     @api.model
     def _cron_process_broadcast_queue(self, limit=100):
@@ -726,6 +1052,7 @@ class WhatsAppMessage(models.Model):
         High-priority processor for the broadcast campaign queue.
         Processes newly 'queued' messages that haven't failed yet.
         """
+        started = time.monotonic()
         now = fields.Datetime.now()
         queued_msgs = self.search([
             ('status', '=', 'queued'),
@@ -733,7 +1060,7 @@ class WhatsAppMessage(models.Model):
             ('campaign_id', '=', False),
             '|', ('next_retry_at', '=', False), ('next_retry_at', '<=', now)
         ], limit=limit, order='create_date asc')
-        
+
         sent_count = 0
         for msg in queued_msgs:
             try:
@@ -755,9 +1082,12 @@ class WhatsAppMessage(models.Model):
                         'next_retry_at': fields.Datetime.now() + timedelta(seconds=backoff_seconds + random.uniform(0, 10)),
                     })
                 msg.write(vals)
-        
-        if sent_count > 0:
-            _logger.info(f"[CRON-BROADCAST] Successfully processed {sent_count} messages from queue.")
+
+        duration_ms = round((time.monotonic() - started) * 1000, 2)
+        _logger.info(
+            "[CRON-BROADCAST] processed=%s sent=%s duration_ms=%s",
+            len(queued_msgs), sent_count, duration_ms,
+        )
         return sent_count
 
     @api.model
@@ -765,8 +1095,9 @@ class WhatsAppMessage(models.Model):
         """
         Cron job to retry failed messages with exponential backoff.
         """
+        started = time.monotonic()
         now = fields.Datetime.now()
-        
+
         # Failed-only retry path. Queued messages are handled by their queue processors.
         retry_msgs = self.search([
             ('status', '=', 'failed'),
@@ -774,9 +1105,12 @@ class WhatsAppMessage(models.Model):
             ('next_retry_at', '!=', False),
             ('next_retry_at', '<=', now),
         ], limit=50, order='next_retry_at asc, create_date asc')
-        
+
         retried_count = 0
         for msg in retry_msgs:
+            if msg._is_non_retryable_failure():
+                msg.write({'next_retry_at': False})
+                continue
             try:
                 with self.env.cr.savepoint():
                     msg.action_send()
@@ -812,7 +1146,10 @@ class WhatsAppMessage(models.Model):
                     msg.write(vals)
                 except Exception:
                     _logger.error(f"[CRON-RETRY] Could not update message {msg.id} after failure")
-        
-        if retried_count > 0:
-            _logger.info(f"[CRON-RETRY] Successfully resent {retried_count} failed messages")
+
+        duration_ms = round((time.monotonic() - started) * 1000, 2)
+        _logger.info(
+            "[CRON-RETRY] processed=%s resent=%s duration_ms=%s",
+            len(retry_msgs), retried_count, duration_ms,
+        )
         return retried_count

@@ -1,9 +1,8 @@
 {
     'name': 'ELSX Approvals (HR Ecosystem)',
     'version': '1.0',
-    'summary': 'Enterprise Parity: Multi-Level HR Approvals Engine',
+    'summary': 'Multi-Level HR Approvals Engine',
     'description': """
-        Replaces Odoo Enterprise 'Approvals' app.
         Supports custom multi-level approval workflows for:
         - Leave Requests
         - Expense Reports

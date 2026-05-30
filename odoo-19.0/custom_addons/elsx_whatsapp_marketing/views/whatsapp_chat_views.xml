@@ -99,6 +99,7 @@
                 <sheet>
                     <div class="o_whatsapp_chat_container d-flex position-relative">
                         <field name="unread_count" invisible="1"/>
+                        <field name="account_id" invisible="1"/>
                         <field name="partner_id" invisible="1"/>
                         <!-- Hidden buttons for JS to trigger instant refresh/paging -->
                         <button name="action_reload_chat" type="object" string="Refresh" class="wa-hidden-reload-btn d-none" style="position: absolute; left: -9999px; visibility: hidden;"/>
@@ -134,6 +135,7 @@
                                              </button>
                                          </div>
                                      </div>
+                                     <div id="wa-account-selector-mount" class="mb-2"></div>
                                      <div class="position-relative mb-1">
                                          <input type="text" id="wa-sidebar-search-input" class="o_whatsapp_search_box w-100 ps-5" placeholder="Search or start new chat"/>
                                          <i class="fa fa-search position-absolute start-0 top-50 translate-middle-y ms-3 text-muted" title="Search" style="font-size: 0.9rem;"/>
@@ -175,7 +177,7 @@
 
                         <!-- Main Chat Area -->
                         <div class="o_whatsapp_chat_main d-flex flex-column flex-grow-1">
-                            <!-- Header — Flat Professional Design -->
+                            <!-- Header - Flat Professional Design -->
                             <div class="p-2 px-3 border-bottom d-flex align-items-center justify-content-between bg-white" style="z-index: 10;">
                                 <div class="d-flex align-items-center">
                                     <button type="button" class="btn btn-link p-0 me-3 d-lg-none wa-mobile-back-btn text-dark" title="Back to Chats">
@@ -236,7 +238,7 @@
                                 </div>
                             </div>
 
-                            <!-- Messages Area — Surgical Zero-Flicker View -->
+                            <!-- Messages Area - Surgical Zero-Flicker View -->
                             <div class="o_whatsapp_chat_history flex-grow-1 overflow-auto d-flex flex-column" id="wa_chat_history">
                                 <div class="wa-chat-history-content-container p-3 d-flex flex-column gap-2 flex-grow-1">
                                     <field name="history_html" invisible="1" class="wa-hidden-history-field"/>
@@ -251,11 +253,11 @@
                                 <field name="quick_media_filename" invisible="1"/>
 
                                 <!-- SESSION CLOSED: Show Template Picker (primary action) -->
-                                <div invisible="session_open" class="o_whatsapp_template_row">
-                                    <i class="fa fa-lock text-warning me-1" title="Session Closed" style="font-size:1rem;"/>
-                                    <span class="small fw-semibold text-muted me-2" style="white-space:nowrap;">Session closed — send a template:</span>
+                                <div invisible="session_open" class="o_whatsapp_template_row wa-composer-shell wa-composer-closed">
+                                    <i class="fa fa-lock text-warning me-1" title="Session Closed"/>
+                                    <span class="small fw-semibold text-muted me-2" style="white-space:nowrap;">Session closed - send a template:</span>
                                     <div class="flex-grow-1">
-                                        <field name="quick_template_id" nolabel="1" placeholder="Select approved template..." options="{'no_create': True}" class="w-100"/>
+                                        <field name="quick_template_id" nolabel="1" placeholder="Select approved template..." domain="[('status', '=', 'approved'), '|', ('account_id', '=', False), ('account_id', '=', account_id)]" options="{'no_create': True}" class="w-100"/>
                                     </div>
                                     <button name="action_send_quick_template" type="object" class="o_whatsapp_template_send_btn btn ms-2">
                                         <i class="fa fa-paper-plane me-1" title="Send Template"/> Send Template
@@ -264,34 +266,45 @@
                                         <i class="fa fa-cog" title="Advanced Options"/>
                                     </button>
                                 </div>
+                                <div invisible="session_open or not quick_template_id" class="wa-closed-template-preview px-3 pb-2">
+                                    <div class="wa-template-preview-safe">
+                                        <div class="wa-template-preview-safe-title">
+                                            <i class="fa fa-eye me-1" title="Preview"/> Customer preview checklist
+                                        </div>
+                                        <field name="quick_template_preview_text" nolabel="1" readonly="1" class="wa-template-preview-text"/>
+                                    </div>
+                                </div>
 
                                 <!-- SESSION OPEN: Normal text + media input -->
-                                 <div invisible="not session_open" class="wa-premium-footer-bar bg-white border-top p-2" style="z-index: 10;">
-                                    <div class="d-flex align-items-center gap-2 p-1">
+                                 <div invisible="not session_open" class="wa-premium-footer-bar wa-composer-shell bg-white border-top p-2" style="z-index: 10;">
+                                    <div class="wa-composer-surface">
                                         <!-- Left Side Icons -->
-                                        <div class="d-flex align-items-center gap-1">
+                                        <div class="wa-composer-tools">
                                             <!-- Emoji Picker -->
-                                            <button id="wa_emoji_trigger" type="button" class="wa-footer-icon-btn" title="Emojis">
+                                            <button id="wa_emoji_trigger" type="button" class="wa-footer-icon-btn" title="Emojis" data-wa-label="Emoji" aria-label="Emoji picker">
                                                 <i class="fa fa-smile-o" title="Emojis"/>
+                                            </button>
+                                            <button id="wa_quick_reply_trigger" type="button" class="wa-footer-icon-btn wa-quick-reply-trigger-btn" title="Quick Replies" data-wa-label="Replies" aria-label="Quick replies">
+                                                <i class="fa fa-bolt" title="Quick Replies"/>
                                             </button>
                                             
                                             <!-- Attachment Button -->
-                                            <div class="wa-attachment-wrapper position-relative">
-                                                <i class="fa fa-paperclip wa-attachment-trigger-icon" title="Attach Media" style="font-size: 1.2rem; cursor: pointer; color: #64748b; padding: 8px;"/>
-                                                <field name="quick_media_file" filename="quick_media_filename" widget="binary" nolabel="1" options="{'accepted_file_extensions': 'image/*, video/*, audio/*, application/pdf'}" class="wa-hidden-binary" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;"/>
+                                            <div class="wa-attachment-wrapper wa-footer-icon-btn position-relative" title="Attach file or media" data-wa-label="Attach" aria-label="Attach file or media">
+                                                <i class="fa fa-paperclip wa-attachment-trigger-icon" title="Attach Media"/>
+                                                <field name="quick_media_file" filename="quick_media_filename" widget="binary" nolabel="1" options="{'accepted_file_extensions': 'image/*, video/*, audio/*, application/pdf, application/msword, application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, text/plain'}" class="wa-hidden-binary"/>
                                             </div>
 
                                             <!-- Template Quick Access -->
-                                            <button name="action_open_send_wizard" type="object" class="wa-footer-icon-btn d-none d-md-flex" title="Send Template">
-                                                <i class="fa fa-magic" title="Send Template"/>
+                                            <button name="action_open_send_wizard" type="object" class="wa-footer-icon-btn wa-template-trigger-btn d-none d-md-flex" title="Open Templates" data-wa-label="Templates" aria-label="Open template sender">
+                                                <i class="fa fa-list-alt" title="Open Templates"/>
                                             </button>
-                                            <button name="action_generate_ai_reply" type="object" class="wa-footer-icon-btn d-none d-md-flex" title="Draft AI Reply">
+                                            <button name="action_generate_ai_reply" type="object" class="wa-footer-icon-btn wa-ai-trigger-btn d-none d-md-flex" title="Draft AI Reply" data-wa-label="AI draft" aria-label="Generate AI draft reply">
                                                 <i class="fa fa-lightbulb-o" title="Draft AI Reply"/>
                                             </button>
                                         </div>
 
                                         <!-- Text Input Area -->
-                                        <div class="flex-grow-1 position-relative d-flex flex-column">
+                                        <div class="wa-composer-input-wrap">
                                             <!-- Floating media preview if file selected -->
                                             <div invisible="not quick_media_file" class="wa-floating-attachment-preview mb-1 p-2 bg-light rounded border d-flex align-items-center justify-content-between">
                                                 <div class="d-flex align-items-center gap-2">
@@ -302,20 +315,53 @@
                                                     <i class="fa fa-times-circle" title="Remove Media"/>
                                                 </button>
                                             </div>
-                                            <field name="quick_reply_text" widget="text" class="wa-premium-input" placeholder="Type a message..." nolabel="1"/>
+                                            <div id="wa_quick_reply_popover" class="wa-quick-reply-popover d-none"></div>
+                                            <div class="wa-message-input-frame">
+                                                <field name="quick_reply_text" widget="text" class="wa-premium-input" placeholder="Type a message..." nolabel="1"/>
+                                                <div class="wa-composer-meta">
+                                                    <span id="wa_composer_counter">0/4096</span>
+                                                </div>
+                                            </div>
                                         </div>
 
                                         <!-- Right Side Actions -->
-                                        <div class="d-flex align-items-center gap-2">
+                                        <div class="wa-composer-actions">
                                             <!-- Internal Note -->
-                                            <button name="action_send_internal_note" type="object" class="wa-footer-icon-btn wa-note-btn" title="Internal Note">
+                                            <button name="action_send_internal_note" type="object" class="wa-footer-icon-btn wa-note-btn" title="Internal Note" data-wa-label="Note" aria-label="Internal note">
                                                 <i class="fa fa-sticky-note-o" title="Internal Note"/>
                                             </button>
 
                                             <!-- Send Button -->
-                                            <button name="action_send_quick_reply" type="object" class="wa-main-send-btn shadow-sm" style="background: #00A884; color: white; width: 44px; height: 44px; border-radius: 50%; border: none;">
+                                            <button name="action_send_quick_reply" type="object" class="wa-main-send-btn shadow-sm">
                                                 <i class="fa fa-send" title="Send"/>
                                             </button>
+                                        </div>
+                                        <field name="ai_suggested_reply" invisible="1"/>
+                                        <field name="ai_intent" invisible="1"/>
+                                        <field name="ai_sentiment" invisible="1"/>
+                                        <field name="ai_urgency" invisible="1"/>
+                                        <field name="ai_next_action" invisible="1"/>
+                                        <field name="ai_suggested_tags" invisible="1"/>
+                                        <field name="ai_suggested_flow_id" invisible="1"/>
+                                        <div class="wa-ai-guidance d-none" role="status">
+                                            <div class="wa-ai-guidance-runtime"/>
+                                            <div class="wa-ai-actions">
+                                                <button name="action_use_ai_suggested_reply" type="object" class="btn btn-sm btn-success" invisible="not ai_suggested_reply">
+                                                    <i class="fa fa-check me-1" title="Use Draft"/> Use Draft
+                                                </button>
+                                                <button name="action_generate_ai_reply" type="object" class="btn btn-sm btn-outline-secondary">
+                                                    <i class="fa fa-refresh me-1" title="Regenerate"/> Regenerate
+                                                </button>
+                                                <button name="action_start_ai_suggested_flow" type="object" class="btn btn-sm btn-outline-primary" invisible="not ai_suggested_flow_id">
+                                                    <i class="fa fa-code-fork me-1" title="Start Suggested Flow"/> Start Flow
+                                                </button>
+                                                <button name="action_open_ai_flow_manager" type="object" class="btn btn-sm btn-outline-primary">
+                                                    <i class="fa fa-sitemap me-1" title="Manage Flows"/> Manage Flows
+                                                </button>
+                                                <button name="action_clear_ai_guidance" type="object" class="btn btn-sm btn-link text-muted">
+                                                    Clear
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -361,9 +407,13 @@
                                         <i class="fa fa-id-card text-muted" title="CRM Context"/>
                                         <h6 class="mb-0 fw-bold text-dark" style="font-size: 0.9rem;">Lead / Opportunity</h6>
                                     </div>
-                                    <div class="p-3 rounded border bg-white mb-2 shadow-sm">
+                                    <div class="p-3 rounded border bg-white mb-2 shadow-sm wa-lead-card" invisible="not lead_id">
                                         <div class="fw-bold text-dark" style="font-size: 0.9rem;"><field name="lead_id"/></div>
                                         <div class="badge bg-light text-dark border mt-2"><field name="lead_state"/></div>
+                                    </div>
+                                    <div class="wa-empty-lead-card mb-2" invisible="lead_id">
+                                        <i class="fa fa-info-circle me-1" title="No Lead"/>
+                                        No linked opportunity yet.
                                     </div>
                                     <div class="d-flex justify-content-between text-center mt-3 mb-2 px-1">
                                         <div class="p-2 bg-light rounded flex-fill me-1 border shadow-sm">
@@ -378,6 +428,64 @@
                                     <button name="action_view_partner" type="object" class="btn btn-sm btn-outline-primary w-100 mt-2 wa-view-partner-btn">
                                         <i class="fa fa-external-link me-1" title="View in Odoo"/> View Partner
                                     </button>
+                                    <div class="d-flex gap-2 mt-2">
+                                        <button name="action_create_opportunity" type="object" class="btn btn-sm btn-outline-success flex-fill fw-semibold">
+                                            <i class="fa fa-plus me-1" title="Opportunity"/> Opportunity
+                                        </button>
+                                        <button name="action_create_quote" type="object" class="btn btn-sm btn-outline-info flex-fill fw-semibold">
+                                            <i class="fa fa-file-text-o me-1" title="Create Quote"/> New Quote
+                                        </button>
+                                    </div>
+                                    <div class="small text-muted mt-2">
+                                        Create the CRM record first. Use the payment shortcut after a quotation or invoice exists.
+                                    </div>
+                                </div>
+
+                                <div class="mb-4">
+                                    <div class="d-flex align-items-center gap-2 mb-2">
+                                        <i class="fa fa-bolt text-muted" title="Action Shortcuts"/>
+                                        <h6 class="mb-0 fw-bold text-dark" style="font-size: 0.9rem;">Action Shortcuts</h6>
+                                    </div>
+                                    <div class="p-3 rounded border bg-white shadow-sm wa-action-shortcuts-card">
+                                        <div class="small text-muted mb-2">
+                                            Guided shortcuts for forms and payment links. The checklist below shows what will happen before you send.
+                                        </div>
+                                        <div class="wa-shortcut-guide mb-2">
+                                            <field name="quick_action_help_text" readonly="1" nolabel="1" class="wa-shortcut-guide-text"/>
+                                        </div>
+                                        <field name="quick_form_id" placeholder="Select form or use account default"/>
+                                        <field name="quick_invoice_id" placeholder="Optional unpaid invoice for payment link"/>
+                                        <field name="quick_sale_order_id" placeholder="Optional quotation/order if no invoice is selected"/>
+                                        <div class="d-grid gap-2 mt-2">
+                                            <button name="action_send_form_link" type="object" class="btn btn-sm btn-outline-primary fw-semibold">
+                                                <i class="fa fa-wpforms me-1" title="Send Form"/> Send Form Link
+                                            </button>
+                                            <button name="action_send_payment_link" type="object" class="btn btn-sm btn-outline-success fw-semibold">
+                                                <i class="fa fa-credit-card me-1" title="Send Payment Link"/> Send Payment Link
+                                            </button>
+                                        </div>
+                                        <div class="d-flex gap-2 mt-2">
+                                            <button type="object" name="action_open_forms" class="btn btn-sm btn-light border flex-fill">
+                                                <i class="fa fa-list-alt me-1" title="Forms"/> Forms
+                                            </button>
+                                            <button type="object" name="action_open_commerce_setup" class="btn btn-sm btn-light border flex-fill">
+                                                <i class="fa fa-shopping-bag me-1" title="Commerce Setup"/> Shop Setup
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mb-4" invisible="not source_campaign_id and not source_keyword">
+                                    <h6 class="text-uppercase text-muted fw-bold mb-2" style="font-size: 0.75rem; letter-spacing: 1px;">Source Tracking</h6>
+                                    <div class="p-3 bg-light rounded border shadow-sm">
+                                        <div class="small text-muted">Campaign</div>
+                                        <div class="fw-semibold text-truncate"><field name="source_campaign_id"/></div>
+                                        <div class="small text-muted mt-2">Entry Keyword</div>
+                                        <div class="fw-semibold text-truncate"><field name="source_keyword"/></div>
+                                        <div class="small text-muted mt-2">Medium</div>
+                                        <div class="fw-semibold text-truncate"><field name="source_medium"/></div>
+                                        <field name="source_first_message_id" invisible="1"/>
+                                    </div>
                                 </div>
 
                                 <div class="mb-4">
@@ -460,9 +568,9 @@
         <field name="model_id" ref="model_whatsapp_chat"/>
         <field name="state">code</field>
         <field name="code">
-last_chat = env['whatsapp.chat'].search([('state', '=', 'open')], limit=1, order='last_message_date desc, id desc')
+last_chat = env['whatsapp.chat'].search([('state', '=', 'open')], limit=1, order='last_message_date desc nulls last, id desc')
 if not last_chat:
-    last_chat = env['whatsapp.chat'].search([], limit=1, order='last_message_date desc, id desc')
+    last_chat = env['whatsapp.chat'].search([], limit=1, order='last_message_date desc nulls last, id desc')
 
 if last_chat:
     action = last_chat.action_open_chat()
@@ -473,6 +581,8 @@ action['target'] = 'current'
 action['context'] = {'active_test': False}
 action.pop('flags', None) 
 action['view_mode'] = 'form,kanban' 
+if not action.get('views'):
+    action['views'] = [(False, 'form'), (False, 'kanban')]
 action = action
         </field>
     </record>

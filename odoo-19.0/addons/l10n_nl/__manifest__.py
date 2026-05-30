@@ -24,5 +24,4 @@
         'demo/demo_company.xml',
     ],
     'installable': True,
-    'license': 'LGPL-3',
 }

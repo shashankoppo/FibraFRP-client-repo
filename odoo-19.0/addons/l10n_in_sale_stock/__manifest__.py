@@ -25,5 +25,4 @@ So this module is to get the warehouse address if the invoice is created from Sa
 
     'auto_install': True,
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

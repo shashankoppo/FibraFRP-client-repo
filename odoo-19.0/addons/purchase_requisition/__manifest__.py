@@ -35,5 +35,4 @@ are agreements you have with vendors to benefit from a predetermined pricing.
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

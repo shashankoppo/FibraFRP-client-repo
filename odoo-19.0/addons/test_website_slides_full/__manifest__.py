@@ -27,5 +27,4 @@ certification flow including purchase, certification, failure and success.
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

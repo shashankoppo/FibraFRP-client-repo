@@ -18,6 +18,5 @@ Allow internal users requesting a module installation
         'views/ir_module_module_views.xml',
     ],
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
     'post_init_hook': '_auto_install_apps'
 }

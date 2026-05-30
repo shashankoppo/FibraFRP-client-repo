@@ -25,5 +25,4 @@ by sending an email to the target user. This email redirects them to:
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

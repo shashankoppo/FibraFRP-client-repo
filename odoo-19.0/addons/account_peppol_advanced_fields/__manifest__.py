@@ -9,5 +9,4 @@
         'views/account_move_views.xml',
     ],
     'installable': True,
-    'license': 'LGPL-3',
 }

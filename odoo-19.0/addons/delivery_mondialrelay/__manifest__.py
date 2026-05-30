@@ -25,5 +25,4 @@ Delivery price pre-configured is an example, you need to adapt the pricing's rul
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

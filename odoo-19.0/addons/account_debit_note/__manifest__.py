@@ -21,5 +21,4 @@ The wizard used is similar as the one for the credit note.
     ],
     'installable': True,
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

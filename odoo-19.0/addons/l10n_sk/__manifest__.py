@@ -37,5 +37,4 @@ Pre viac informácií kontaktujte info@26house.com alebo navštívte https://www
     'demo': [
         'demo/demo_company.xml',
     ],
-    'license': 'LGPL-3',
 }

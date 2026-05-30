@@ -43,5 +43,4 @@ This is a bridge module that adds multi-website support for payment providers.
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

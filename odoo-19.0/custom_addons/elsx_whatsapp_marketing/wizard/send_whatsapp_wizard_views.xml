@@ -14,14 +14,19 @@
                             <field name="template_id" options="{'no_create': True}"/>
                             <field name="phone_number" placeholder="e.g. 917247558873 (with country code, no +)"/>
                             <field name="partner_ids" widget="many2many_tags" invisible="phone_number != False"/>
-                            <field name="media_file" filename="media_filename" invisible="template_id != False"/>
+                            <field name="template_requires_header_media" invisible="1"/>
+                            <div invisible="not template_requires_header_media" class="alert alert-warning py-2 mb-2" role="alert">
+                                This template uses a media header. Upload a file here if the template does not already have a default header file or Meta media URL.
+                            </div>
+                            <field name="media_file" filename="media_filename" invisible="template_id != False and not template_requires_header_media"/>
+                            <field name="media_filename" invisible="1"/>
                             <field name="message_body" widget="text" placeholder="Type message or optional media/voice caption..." invisible="template_id != False"/>
                         </group>
                     </div>
                     
-                    <!-- Right Column: Live Premium WhatsApp Preview -->
+                    <!-- Right Column: safe customer preview -->
                     <div class="col-lg-5 ps-4">
-                        <div class="text-muted small mb-3 text-uppercase fw-bold" style="letter-spacing: 1px;">Live Preview</div>
+                        <div class="text-muted small mb-3 text-uppercase fw-bold" style="letter-spacing: 1px;">Customer Preview</div>
                         
                         <div invisible="template_id != False" class="d-flex flex-column align-items-center justify-content-center h-100 text-center" style="background: #F8F9FA; border-radius: 12px; border: 2px dashed #E9EDEF; min-height: 250px;">
                             <div class="mb-3">
@@ -31,8 +36,9 @@
                             <p class="small text-muted px-4">Select an approved Meta template on the left to see exactly how it will appear to your customers.</p>
                         </div>
                         
-                        <div invisible="template_id == False" class="wa-template-preview-container" style="box-shadow: 0 4px 12px rgba(0,0,0,0.05); border-radius: 12px; overflow: hidden; border: 1px solid #e0e0e0;">
-                            <field name="template_preview_html" nolabel="1" widget="html" readonly="1" options="{'codeview': true}"/>
+                        <div invisible="template_id == False" class="wa-template-preview-container wa-safe-preview-panel">
+                            <div class="fw-bold text-muted text-uppercase small mb-2">Before Send Checklist</div>
+                            <field name="template_preview_text" nolabel="1" readonly="1" class="wa-safe-preview-text"/>
                         </div>
                     </div>
                 </div>

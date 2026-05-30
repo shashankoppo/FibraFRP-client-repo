@@ -1,0 +1,14 @@
+.git
+.github
+*.zip
+*.log
+venv19/
+__pycache__/
+*.pyc
+*.pyo
+*.bat
+*.bat
+debian/
+doc/
+setup/
+upgrade_client_restrictions.bat

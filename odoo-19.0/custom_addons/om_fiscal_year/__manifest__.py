@@ -9,7 +9,6 @@
     'website': 'https://www.odoomates.tech',
     'author': 'Odoo Mates, Odoo SA',
     'maintainer': 'Odoo Mates',
-    'license': 'LGPL-3',
     'support': 'odoomates@gmail.com',
     'depends': ['account'],
     'data': [

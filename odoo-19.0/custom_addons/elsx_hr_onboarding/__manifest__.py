@@ -1,7 +1,7 @@
 {
     'name': 'ELSX HR Onboarding & Document Signing',
     'version': '1.0',
-    'summary': 'Enterprise Parity: Full Employee Onboarding Pipeline with eSignature',
+    'summary': 'Full Employee Onboarding Pipeline with eSignature',
     'description': """
         End-to-end Employee Onboarding system:
         - Onboarding plan with checklist tasks (IT setup, NDA, Training, etc.)

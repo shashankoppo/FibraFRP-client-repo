@@ -6,19 +6,55 @@ import json
 import hashlib
 import hmac
 import logging
+import time
+from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 
 _logger = logging.getLogger(__name__)
 
-FALLBACK_VERIFY_TOKEN = 'elsx_verify_2024'
+WEBHOOK_EXECUTOR = ThreadPoolExecutor(max_workers=4, thread_name_prefix='wa-webhook')
 
 
-def _get_env(db_name=None):
+def _mask_secret(value):
+    value = str(value or '')
+    if not value:
+        return ''
+    if len(value) <= 8:
+        return '***'
+    return f"{value[:3]}...{value[-3:]}"
+
+
+class WebhookSerializationRetry(Exception):
+    """Raised when a webhook row is busy and the event should be retried."""
+
+
+def _get_env(db_name=None, payload=None):
     """Get a fresh Odoo environment for webhook context (no request session)"""
     db_name = db_name or request.session.db or getattr(request, 'db', None)
-    
+
     from odoo.service import db as db_service
     dbs = db_service.list_dbs()
-    
+
+    # 0. Multi-tenant phone_number_id matching
+    if payload:
+        try:
+            meta = payload.get('entry', [{}])[0].get('changes', [{}])[0].get('value', {}).get('metadata', {})
+            phone_number_id = meta.get('phone_number_id')
+            if phone_number_id:
+                for db in dbs:
+                    try:
+                        registry = Registry(db)
+                        if 'whatsapp.account' in registry.models:
+                            cr = registry.cursor()
+                            env = api.Environment(cr, odoo.SUPERUSER_ID, {})
+                            if env['whatsapp.account'].sudo().search_count([('phone_number_id', '=', phone_number_id)]):
+                                return env, cr, db
+                            cr.close()
+                    except Exception:
+                        continue
+        except Exception:
+            pass
+
     # 1. Try specified/guessed DB
     if db_name and db_name in dbs:
         try:
@@ -76,11 +112,36 @@ def _find_account(env, account_id, payload):
     except Exception:
         pass
 
-    # Fallback: first active account
-    return env['whatsapp.account'].sudo().search([('active', '=', True)], limit=1)
+    # Fallback: configured default account, then first active account.
+    return env['whatsapp.account'].sudo()._get_default_account()
 
 
 class WhatsAppWebhook(http.Controller):
+    SERIALIZATION_RETRY_DELAYS = (0.05, 0.15, 0.35, 0.75)
+    STATUS_ORDER = {
+        'draft': 0,
+        'queued': 1,
+        'sent': 2,
+        'delivered': 3,
+        'read': 4,
+    }
+
+    def _is_serialization_failure(self, exc):
+        """PostgreSQL asks for a transaction retry when concurrent webhook workers touch the same row."""
+        if isinstance(exc, WebhookSerializationRetry):
+            return True
+        seen = set()
+        current = exc
+        while current and id(current) not in seen:
+            seen.add(id(current))
+            text = str(current)
+            if (
+                current.__class__.__name__ == 'SerializationFailure'
+                or 'could not serialize access due to concurrent update' in text
+            ):
+                return True
+            current = getattr(current, '__cause__', None) or getattr(current, '__context__', None)
+        return False
 
     # =========================================================
     # MAIN ROUTE — Handles ALL Meta webhook calls
@@ -105,17 +166,12 @@ class WhatsAppWebhook(http.Controller):
         token = params.get('hub.verify_token') or params.get('hub_verify_token', '')
         challenge = params.get('hub.challenge') or params.get('hub_challenge', '')
 
-        _logger.info(f'[WH-VERIFY] mode={mode} token={token} account_id={account_id}')
+        _logger.info('[WH-VERIFY] mode=%s token=%s account_id=%s', mode, _mask_secret(token), account_id)
 
         if mode != 'subscribe' or not token or not challenge:
             return request.make_response('Bad Request', status=400)
 
-        # 1. Instant accept on fallback token
-        if token == FALLBACK_VERIFY_TOKEN:
-            _logger.info('[WH-VERIFY] Accepted via fallback token')
-            return request.make_response(challenge, headers=[('Content-Type', 'text/plain')])
-
-        # 2. DB lookup
+        # DB lookup only. No hard-coded fallback verify token is accepted.
         try:
             env, cr, _ = _get_env()
             try:
@@ -132,7 +188,7 @@ class WhatsAppWebhook(http.Controller):
         except Exception as e:
             _logger.error(f'[WH-VERIFY] DB lookup failed: {e}')
 
-        _logger.warning(f'[WH-VERIFY] REJECTED — no matching account for token {token}')
+        _logger.warning('[WH-VERIFY] REJECTED - no matching account for token %s', _mask_secret(token))
         return request.make_response('Verification Failed', status=403)
 
     def _verify_meta_signature(self, account, raw_body, signature):
@@ -183,14 +239,14 @@ class WhatsAppWebhook(http.Controller):
             if payload.get('object') != 'whatsapp_business_account':
                 return request.make_response('OK', status=200)
 
-            env, cr, db_name = _get_env()
+            env, cr, db_name = _get_env(payload=payload)
             if not cr:
                 return request.make_response('Database Unavailable', status=503)
 
             try:
                 with cr:
                     account = _find_account(env, account_id, payload)
-                    
+
                     ok, message, status = self._verify_meta_signature(
                         account,
                         raw_body,
@@ -210,9 +266,8 @@ class WhatsAppWebhook(http.Controller):
                     log_id = log_record.id
                     cr.commit()
 
-                # 2. Spawn a background thread to process it with zero-latency
-                # This ensures Meta NEVER receives a timeout, even if Odoo takes 5 seconds to download a 4k Video.
-                import threading
+                # 2. Queue webhook processing with a bounded worker pool.
+                # This keeps Meta responses fast without spawning unlimited DB cursors.
                 def process_webhook_thread(db_name, log_id, account_id):
                     try:
                         registry = Registry(db_name)
@@ -221,7 +276,7 @@ class WhatsAppWebhook(http.Controller):
                             thread_log = thread_env['whatsapp.webhook.log'].browse(log_id)
                             thread_acc = thread_env['whatsapp.account'].browse(account_id) if account_id else None
                             payload_json = json.loads(thread_log.raw_payload)
-                            
+
                             for entry in payload_json.get('entry', []):
                                 for change in entry.get('changes', []):
                                     field = change.get('field', '')
@@ -230,15 +285,13 @@ class WhatsAppWebhook(http.Controller):
                                         self._dispatch_change(thread_env, thread_acc, field, value, thread_log.raw_payload)
                                     except Exception as dispatch_err:
                                         _logger.error(f'[WH-DISPATCH-THREAD] Failure: {dispatch_err}', exc_info=True)
-                            
+
                             thread_log.sudo().write({'status': 'processed'})
                             thread_cr.commit()
                     except Exception as e:
                         _logger.error(f'[WH-THREAD-CRASH] Webhook processing failed: {e}', exc_info=True)
 
-                thread = threading.Thread(target=process_webhook_thread, args=(db_name, log_id, account.id if account else None))
-                thread.daemon = True
-                thread.start()
+                WEBHOOK_EXECUTOR.submit(process_webhook_thread, db_name, log_id, account.id if account else None)
 
                 # 3. Return 200 OK instantly (< 50ms)
                 return request.make_response('OK', status=200)
@@ -265,9 +318,12 @@ class WhatsAppWebhook(http.Controller):
 
         # Log every event for audit
         self._log_event(env, account, field, value, raw_data)
+        self._touch_account_webhook(env, account)
 
         handlers = {
             'messages': self._handle_messages_field,
+            'message_status': self._handle_messages_field,
+            'message_status_update': self._handle_messages_field,
             'typing': self._handle_typing_event,
             'account_alerts': self._handle_account_alerts,
             'account_review_update': self._handle_account_review_update,
@@ -332,6 +388,8 @@ class WhatsAppWebhook(http.Controller):
         if not account:
             _logger.error('[WH-MSG] No WhatsApp account matched inbound payload; skipping message %s', wamid)
             return
+
+        self._touch_account_webhook(env, account, inbound=True)
 
         phone_number = env['whatsapp.message'].sudo()._normalize_phone(phone_number, account=account, strict=False)
 
@@ -416,7 +474,53 @@ class WhatsAppWebhook(http.Controller):
             order = msg_data.get('order', {})
             catalog_id = order.get('catalog_id', '')
             items = order.get('product_items', [])
-            vals['body'] = f'[Order from catalog {catalog_id}: {len(items)} item(s)]'
+
+            order_text = f'[Order from catalog {catalog_id}: {len(items)} item(s)]\n'
+            sale_order_lines = []
+
+            for item in items:
+                retailer_id = item.get('product_retailer_id', '')
+                qty = item.get('quantity', 1)
+                price = item.get('item_price', 0)
+
+                product = env['product.product'].sudo().search([
+                    '|', ('default_code', '=', retailer_id), ('barcode', '=', retailer_id)
+                ], limit=1)
+
+                if product:
+                    order_text += f'- {qty}x {product.name} ({retailer_id})\n'
+                    sale_order_lines.append((0, 0, {
+                        'product_id': product.id,
+                        'product_uom_qty': qty,
+                        'price_unit': price,
+                    }))
+                else:
+                    order_text += f'- {qty}x Unknown Product ({retailer_id})\n'
+
+            vals['body'] = order_text
+
+            if sale_order_lines and partner:
+                try:
+                    sale_order = env['sale.order'].sudo().create({
+                        'partner_id': partner.id,
+                        'order_line': sale_order_lines,
+                        'origin': f'WhatsApp Catalog {catalog_id}',
+                    })
+                    vals['sale_order_id'] = sale_order.id
+                    vals['body'] += f'\nGenerated Sale Order: {sale_order.name}'
+
+                    # Send auto-confirmation
+                    env['whatsapp.message'].sudo().create({
+                        'account_id': account.id,
+                        'phone_number': phone_number,
+                        'partner_id': partner.id,
+                        'message_type': 'text',
+                        'body': f'Thank you for your order! Your order {sale_order.name} has been received and is being processed.',
+                        'direction': 'outbound',
+                        'is_automated': True,
+                    }).action_send()
+                except Exception as e:
+                    _logger.error(f'[WH-ORDER] Failed to create sale order: {e}')
 
         # --- Special type: unsupported ---
         elif msg_type == 'unsupported':
@@ -471,7 +575,7 @@ class WhatsAppWebhook(http.Controller):
             chat_id = chat.id
             if chat.state in ('snoozed', 'resolved') or chat.is_archived:
                 chat.sudo().write({'state': 'open', 'is_archived': False})
-            
+
             # Industrial Assignment Guard: Ensure chat has an owner
             if not chat.assigned_user_id:
                 chat.sudo()._auto_assign_agent()
@@ -495,6 +599,12 @@ class WhatsAppWebhook(http.Controller):
                     p.sudo().write({'name': profile_name})
             _logger.info(f'[WH-MSG] Updated profile name "{profile_name}" for {phone_number}')
 
+        # --- Click-to-WhatsApp entry tracking ---
+        try:
+            env['whatsapp.campaign'].sudo().track_entry_message(msg_record)
+        except Exception as e:
+            _logger.warning(f'[CAMPAIGN-TRACKING] Entry tracking failed: {e}')
+
         # --- Automatic Opt-out Keyword Detection ---
         if body and account.opt_out_keywords:
             keywords = [k.strip().lower() for k in account.opt_out_keywords.split(',') if k.strip()]
@@ -513,6 +623,23 @@ class WhatsAppWebhook(http.Controller):
                         'tag_ids': [(4, env.ref('elsx_whatsapp_marketing.whatsapp_tag_opted_out', raise_if_not_found=False).id)] if env.ref('elsx_whatsapp_marketing.whatsapp_tag_opted_out', raise_if_not_found=False) else []
                     })
                 return # Stop further processing (bots, etc) for opt-out messages
+
+        bot_enabled = env['ir.config_parameter'].sudo().get_param('whatsapp.enable.bot', 'True')
+        bot_enabled = str(bot_enabled).lower() in ('true', '1', 'yes', 'on')
+
+        # --- Campaign/template reply actions ---
+        try:
+            reply_rule = env['whatsapp.campaign'].sudo().process_inbound_reply(msg_record)
+            if reply_rule:
+                _logger.info(
+                    f'[CAMPAIGN-REPLY] Rule "{reply_rule.name}" handled reply from {phone_number}'
+                )
+                return
+        except Exception as e:
+            _logger.error(f'[CAMPAIGN-REPLY] Reply action error: {e}', exc_info=True)
+
+        if not bot_enabled:
+            return
 
         # --- Resume pending flow conversations first ---
         pending_flow_resumed = False
@@ -618,7 +745,15 @@ class WhatsAppWebhook(http.Controller):
                 return reply.get('id', reply.get('title', '[List Reply]'))  # Prefer ID for bot triggers
             elif itype == 'nfm_reply':
                 nfm = inter.get('nfm_reply', {})
-                return f'[Flow Response: {nfm.get("name", "")}]'
+                response_json_str = nfm.get('response_json', '{}')
+                try:
+                    response_data = json.loads(response_json_str)
+                    formatted_text = f"[Flow Response: {nfm.get('name', 'Form')}]\n"
+                    for k, v in response_data.items():
+                        formatted_text += f"- {k}: {v}\n"
+                    return formatted_text.strip()
+                except Exception:
+                    return f'[Flow Response: {nfm.get("name", "")}] - Data: {response_json_str}'
             return f'[Interactive: {itype}]'
 
         elif msg_type == 'template':
@@ -631,10 +766,52 @@ class WhatsAppWebhook(http.Controller):
     # STATUS UPDATE PROCESSOR
     # =========================================================
     def _process_status_update(self, env, account, status_data):
+        """Run each Meta status update in a small retryable transaction.
+
+        Meta can deliver duplicate status webhooks within milliseconds. Odoo runs
+        PostgreSQL in a strict isolation mode, so two background webhook threads
+        updating the same message row can raise SerializationFailure. Retrying in
+        a fresh cursor preserves delivered/read updates instead of crashing the
+        webhook worker.
+        """
+        db_name = env.cr.dbname
+        account_id = account.id if account else False
+        last_error = None
+
+        for attempt, delay in enumerate((0,) + self.SERIALIZATION_RETRY_DELAYS, start=1):
+            if delay:
+                time.sleep(delay)
+            registry = Registry(db_name)
+            with registry.cursor() as status_cr:
+                status_env = api.Environment(status_cr, odoo.SUPERUSER_ID, {})
+                status_account = status_env['whatsapp.account'].sudo().browse(account_id) if account_id else False
+                try:
+                    self._process_status_update_once(status_env, status_account, status_data)
+                    status_cr.commit()
+                    return
+                except Exception as exc:
+                    status_cr.rollback()
+                    if self._is_serialization_failure(exc):
+                        last_error = exc
+                        _logger.info(
+                            '[WH-STATUS] Serialization retry %s/%s for wamid=%s',
+                            attempt,
+                            len(self.SERIALIZATION_RETRY_DELAYS) + 1,
+                            status_data.get('id'),
+                        )
+                        continue
+                    raise
+
+        _logger.error(
+            '[WH-STATUS] Could not apply status update after retries wamid=%s error=%s',
+            status_data.get('id'),
+            last_error,
+        )
+
+    def _process_status_update_once(self, env, account, status_data):
         """Update outbound message delivery status from Meta"""
         wamid = status_data.get('id')
         new_status = status_data.get('status')  # sent | delivered | read | failed | deleted
-        recipient_id = status_data.get('recipient_id', '')
         timestamp = status_data.get('timestamp')
 
         # Pricing / conversation info
@@ -650,19 +827,63 @@ class WhatsAppWebhook(http.Controller):
         msg = env['whatsapp.message'].sudo().search([('message_id', '=', wamid)], limit=1)
         if not msg:
             _logger.debug(f'[WH-STATUS] No message found for wamid={wamid}')
+            self._touch_account_webhook(env, account, status_wamid=wamid)
             return
 
-        update_vals = {'status': new_status}
+        env.cr.execute('SELECT id FROM whatsapp_message WHERE id = %s FOR UPDATE SKIP LOCKED', [msg.id])
+        if not env.cr.fetchone():
+            raise WebhookSerializationRetry('Message row is locked by another webhook worker.')
+        msg.invalidate_recordset([
+            'status',
+            'sent_date',
+            'delivered_date',
+            'read_date',
+            'conversation_id',
+            'conversation_type',
+            'pricing_category',
+            'pricing_model',
+        ])
+
+        status_dt = self._parse_meta_timestamp(timestamp) or fields.Datetime.now()
+        old_status = msg.status or 'draft'
+        old_rank = self.STATUS_ORDER.get(old_status, 0)
+        new_rank = self.STATUS_ORDER.get(new_status, old_rank)
+        should_update_status = (
+            new_status == 'deleted'
+            or (new_status == 'failed' and old_status not in ('delivered', 'read'))
+            or new_rank >= old_rank
+        )
+
+        update_vals = {}
+        if should_update_status:
+            update_vals['status'] = new_status
+        elif old_status != new_status:
+            _logger.info(
+                '[WH-STATUS] Ignoring out-of-order downgrade wamid=%s old=%s new=%s',
+                wamid, old_status, new_status
+            )
         if new_status == 'sent':
-            update_vals['sent_date'] = fields.Datetime.now()
+            if not msg.sent_date:
+                update_vals['sent_date'] = status_dt
         elif new_status == 'delivered':
-            update_vals['delivered_date'] = fields.Datetime.now()
+            if not msg.sent_date:
+                update_vals['sent_date'] = status_dt
+            if not msg.delivered_date:
+                update_vals['delivered_date'] = status_dt
         elif new_status == 'read':
-            update_vals['read_date'] = fields.Datetime.now()
+            if not msg.sent_date:
+                update_vals['sent_date'] = status_dt
+            if not msg.delivered_date:
+                update_vals['delivered_date'] = status_dt
+            update_vals['read_date'] = status_dt
         elif new_status == 'failed':
             if errors:
                 err = errors[0]
                 update_vals['error_message'] = f"[{err.get('code')}] {err.get('title', '')} — {err.get('message', '')}"
+                message_model = env['whatsapp.message'].sudo()
+                update_vals['error_message'] = message_model._format_meta_error(err)
+                if message_model._is_non_retryable_meta_error_code(err.get('code')):
+                    update_vals['next_retry_at'] = False
             else:
                 update_vals['error_message'] = 'Message delivery failed'
         elif new_status == 'deleted':
@@ -677,7 +898,9 @@ class WhatsAppWebhook(http.Controller):
         if pricing.get('pricing_model'):
             update_vals['pricing_model'] = pricing.get('pricing_model')
 
-        msg.sudo().write(update_vals)
+        if update_vals:
+            msg.sudo().write(update_vals)
+        self._touch_account_webhook(env, account, status_wamid=wamid)
         _logger.info(f'[WH-STATUS] wamid={wamid} → {new_status} (conversation_type={conv_origin})')
 
         # ENTERPRISE LOGIC: Trigger Real-Time UI Update for Status (Blue Ticks)
@@ -686,10 +909,50 @@ class WhatsAppWebhook(http.Controller):
                 env['bus.bus']._sendone(
                     'elsx_whatsapp_channel',
                     'whatsapp_status_update',
-                    {'chat_id': msg.chat_id_ref.id, 'message_id': msg.id, 'status': new_status}
+                    {
+                        'chat_id': msg.chat_id_ref.id,
+                        'message_id': msg.id,
+                        'message_wamid': msg.message_id,
+                        'status': msg.status,
+                        'event_status': new_status,
+                        'sent_date': str(msg.sent_date or ''),
+                        'delivered_date': str(msg.delivered_date or ''),
+                        'read_date': str(msg.read_date or ''),
+                    }
                 )
         except Exception as e:
             _logger.error(f'[WH-STATUS] Bus notification failed: {e}')
+
+    def _parse_meta_timestamp(self, timestamp):
+        """Convert Meta's UNIX timestamp string to a naive UTC datetime for Odoo."""
+        if not timestamp:
+            return False
+        try:
+            return datetime.utcfromtimestamp(int(timestamp))
+        except Exception:
+            return False
+
+    def _touch_account_webhook(self, env, account, inbound=False, status_wamid=False):
+        """Record webhook freshness for dashboard/account health diagnostics."""
+        if not account or not account.exists():
+            return
+        now = fields.Datetime.now()
+        vals = {
+            'last_webhook_at': now,
+            'webhook_status': 'verified',
+            'webhook_last_error': False,
+        }
+        if inbound:
+            vals['last_inbound_webhook_at'] = now
+        if status_wamid:
+            vals.update({
+                'last_status_webhook_at': now,
+                'last_status_wamid': status_wamid,
+            })
+        try:
+            account.sudo().write(vals)
+        except Exception as exc:
+            _logger.warning('[WH-WEBHOOK] Failed to update account webhook freshness: %s', exc)
 
     # =========================================================
     # READ RECEIPT SENDER
@@ -745,13 +1008,29 @@ class WhatsAppWebhook(http.Controller):
             if new_name:
                 account.sudo().write({'phone_number': new_name})
         elif 'MESSAGING_LIMIT' in event:
-            limit = value.get('new_tier', '')
+            limit = (
+                value.get('new_tier')
+                or value.get('current_limit')
+                or value.get('messaging_limit_tier')
+                or value.get('whatsapp_business_manager_messaging_limit')
+                or ''
+            )
             if limit:
-                account.sudo().write({'messaging_limit': limit})
+                label = account._normalize_meta_limit_label(limit)
+                limit_number = account._extract_meta_limit_number(limit)
+                vals = {'messaging_limit': label or str(limit)}
+                if limit_number:
+                    vals['max_daily_limit'] = limit_number
+                account.sudo().write(vals)
 
     def _handle_business_capability_update(self, env, account, value):
         """Handle business_capability_update — messaging window changes"""
         _logger.info(f'[WH-BUSI-CAP] Business capability update: {value}')
+        if account:
+            try:
+                account.sudo().action_sync_meta_health()
+            except Exception as exc:
+                _logger.info('[WH-BUSI-CAP] Meta health refresh skipped: %s', exc)
 
     def _handle_template_status_update(self, env, account, value):
         """Handle message_template_status_update — template approved/rejected/paused"""
@@ -769,7 +1048,7 @@ class WhatsAppWebhook(http.Controller):
             'PENDING_DELETION': 'paused',
             'FLAGGED': 'paused',
             'PAUSED': 'paused',
-            'DISABLED': 'rejected',
+            'DISABLED': 'disabled',
         }
         odoo_status = status_map.get(event)
 
@@ -779,9 +1058,17 @@ class WhatsAppWebhook(http.Controller):
                 ('template_id', '=', template_id_meta),
             ], limit=1)
             if template:
-                template.sudo().write({'status': odoo_status})
+                vals = {
+                    'status': odoo_status,
+                    'meta_state': event,
+                    'last_meta_event': event,
+                    'last_meta_event_date': fields.Datetime.now(),
+                }
                 if reason:
-                    template.sudo().write({'rejection_reason': reason})
+                    vals['rejection_reason'] = reason
+                    vals['meta_disabled_reason'] = reason
+                template.sudo().write(vals)
+                template.sudo()._log_meta_audit(event or 'status_update', status=odoo_status, reason=reason, raw_data=value)
 
     def _handle_template_quality_update(self, env, account, value):
         """Handle message_template_quality_update — quality score changes"""
@@ -807,7 +1094,13 @@ class WhatsAppWebhook(http.Controller):
         domain += ['|', ('meta_template_name', '=', template_name), ('name', '=', template_name)]
         template = env['whatsapp.template'].sudo().search(domain, limit=1)
         if template:
-            template.sudo().write({'quality_score': quality_score})
+            template.sudo().write({
+                'quality_score': quality_score,
+                'meta_quality_rating': quality,
+                'last_meta_event': 'quality_update',
+                'last_meta_event_date': fields.Datetime.now(),
+            })
+            template.sudo()._log_meta_audit('quality_update', status=quality_score, raw_data=value)
 
     def _handle_template_components_update(self, env, account, value):
         """Handle message_template_components_update — auto-fill updates"""
@@ -826,7 +1119,15 @@ class WhatsAppWebhook(http.Controller):
         if account and quality:
             quality_map = {'HIGH': 'GREEN', 'MEDIUM': 'YELLOW', 'LOW': 'RED', 'UNKNOWN': 'UNKNOWN'}
             new_quality = quality_map.get(quality.upper(), 'UNKNOWN')
-            account.sudo().write({'quality_rating': new_quality})
+            vals = {'quality_rating': new_quality}
+            limit = value.get('current_limit') or value.get('messaging_limit_tier') or value.get('whatsapp_business_manager_messaging_limit')
+            if limit:
+                label = account._normalize_meta_limit_label(limit)
+                limit_number = account._extract_meta_limit_number(limit)
+                vals['messaging_limit'] = label or str(limit)
+                if limit_number:
+                    vals['max_daily_limit'] = limit_number
+            account.sudo().write(vals)
 
     def _handle_security_event(self, env, account, value):
         """Handle security webhook events — e.g. user_identity_changed"""
@@ -841,7 +1142,12 @@ class WhatsAppWebhook(http.Controller):
         if template_name and new_category:
             template = env['whatsapp.template'].sudo().search([('name', '=', template_name)], limit=1)
             if template:
-                template.sudo().write({'template_category': new_category.lower()})
+                template.sudo().write({
+                    'template_category': new_category.lower(),
+                    'last_meta_event': 'category_update',
+                    'last_meta_event_date': fields.Datetime.now(),
+                })
+                template.sudo()._log_meta_audit('category_update', status=new_category, raw_data=value)
 
     # =========================================================
     # AUDIT LOG HELPERS
@@ -892,7 +1198,7 @@ class WhatsAppWebhook(http.Controller):
         try:
             env, cr, _ = _get_env()
             with cr:
-                account = env['whatsapp.account'].sudo().search([('active', '=', True)], limit=1)
+                account = env['whatsapp.account'].sudo()._get_default_account()
                 if not account:
                     return request.not_found()
 
@@ -934,21 +1240,21 @@ class WhatsAppWebhook(http.Controller):
         Used when Sidecar receives Meta Webhook FIRST and forwards to Odoo.
         """
         secret = request.httprequest.headers.get('x-sidecar-key')
-        
+
         # We need a valid environment to check config parameters in auth='none'
         env, cr, _ = _get_env()
         if not env:
             _logger.error('[SIDECAR-IN] Could not initialize environment for security check')
             return request.make_json_response({'status': 'error', 'message': 'System Initialization Error'}, status=500)
-            
+
         try:
-            expected_secret = env['ir.config_parameter'].sudo().get_param('whatsapp.sidecar.secret', 'elsx_sidecar_secure_2024')
-            if secret != expected_secret:
-                _logger.warning('[SIDECAR-IN] Unauthorized access attempt with secret: %s', secret)
+            expected_secret = env['ir.config_parameter'].sudo().get_param('whatsapp.sidecar.secret')
+            if not expected_secret or secret != expected_secret:
+                _logger.warning('[SIDECAR-IN] Unauthorized access attempt with secret %s', _mask_secret(secret))
                 return request.make_json_response({'status': 'error', 'message': 'Unauthorized'}, status=403)
         finally:
             cr.close()
-            
+
         raw_body = request.httprequest.data or b''
         signature = request.httprequest.headers.get('X-Hub-Signature-256', '')
         try:
@@ -956,7 +1262,7 @@ class WhatsAppWebhook(http.Controller):
         except json.JSONDecodeError:
             return request.make_json_response({'status': 'error', 'message': 'Invalid JSON'}, status=400)
         _logger.info('[SIDECAR-IN] Received payload for processing')
-        
+
         # We reuse the POST logic by calling _handle_post with raw JSON
         # Since _handle_post normally reads from request.httprequest.data,
         # we'll create a small helper.
@@ -968,7 +1274,7 @@ class WhatsAppWebhook(http.Controller):
         """Helper to process a JSON payload directly without re-reading from request"""
         if payload.get('object') != 'whatsapp_business_account':
             return {'status': 'ignored'}
-            
+
         env, cr, _ = _get_env()
         with cr:
             # We'll use the same processing logic as _handle_post
@@ -983,7 +1289,7 @@ class WhatsAppWebhook(http.Controller):
                     ok, message, status = self._verify_meta_signature(account, raw_body, signature or '')
                     if not ok:
                         return {'status': 'error', 'message': message, 'http_status': status}
-                
+
                 # Process entries
                 for entry in payload.get('entry', []):
                     for change in entry.get('changes', []):

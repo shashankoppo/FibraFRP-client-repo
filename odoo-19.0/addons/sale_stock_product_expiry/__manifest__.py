@@ -6,7 +6,6 @@
     'depends': ['sale_stock', 'product_expiry'],
     'installable': True,
     'auto_install': True,
-    'license': 'LGPL-3',
     'author': 'Odoo S.A.',
     'assets': {
         'web.assets_tests': [

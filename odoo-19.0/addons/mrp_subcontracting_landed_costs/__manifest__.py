@@ -16,5 +16,4 @@ by also displaying the associated picking reference in the search view.
     ],
     'auto_install': True,
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

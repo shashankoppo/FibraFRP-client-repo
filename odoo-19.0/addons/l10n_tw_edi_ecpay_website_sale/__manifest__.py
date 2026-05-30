@@ -9,7 +9,6 @@
     """,
     "website": "https://www.odoo.com",
     'author': 'Odoo S.A.',
-    "license": "LGPL-3",
     "depends": [
         "website_sale",
         "l10n_tw_edi_ecpay",

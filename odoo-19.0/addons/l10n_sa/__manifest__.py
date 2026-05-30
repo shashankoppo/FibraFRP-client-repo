@@ -40,7 +40,6 @@ Activates:
     'demo': [
         'demo/demo_company.xml',
     ],
-    'license': 'LGPL-3',
     "assets": {
         "web.report_assets_common": [
             "l10n_sa/static/src/scss/styles.scss",

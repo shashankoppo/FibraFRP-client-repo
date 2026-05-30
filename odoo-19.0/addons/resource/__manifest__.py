@@ -36,5 +36,4 @@ associated to every resource. It also manages the leaves of every resource.
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

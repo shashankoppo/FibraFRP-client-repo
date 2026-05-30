@@ -137,5 +137,4 @@ You could use this simplified accounting in case you work with an (external) acc
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

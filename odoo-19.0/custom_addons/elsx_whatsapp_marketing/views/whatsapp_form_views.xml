@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_whatsapp_form_list" model="ir.ui.view">
+        <field name="name">whatsapp.form.list</field>
+        <field name="model">whatsapp.form</field>
+        <field name="arch" type="xml">
+            <list string="WhatsApp Forms">
+                <field name="name"/>
+                <field name="form_type"/>
+                <field name="account_id"/>
+                <field name="submission_count"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_whatsapp_form_form" model="ir.ui.view">
+        <field name="name">whatsapp.form.form</field>
+        <field name="model">whatsapp.form</field>
+        <field name="arch" type="xml">
+            <form string="WhatsApp Form">
+                <header>
+                    <button name="action_open_public_url" type="object" string="Open Public Form" class="btn-primary" invisible="not public_url"/>
+                    <button name="action_create_sample_fields" type="object" string="Add Sample Fields" class="btn-secondary"/>
+                    <button name="action_view_submissions" type="object" string="Submissions" class="btn-secondary"/>
+                    <button name="action_regenerate_token" type="object" string="Regenerate Link" class="btn-secondary"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-info" role="alert">
+                        Use this form when a WhatsApp conversation needs structured details such as lead requirements, support issue data, dealer enquiry information, or payment follow-up context. Submissions are saved first; users decide when to create or update CRM records.
+                    </div>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="active"/>
+                            <field name="account_id"/>
+                            <field name="form_type"/>
+                        </group>
+                        <group>
+                            <field name="title"/>
+                            <field name="submit_label"/>
+                            <field name="public_url" readonly="1"/>
+                            <field name="submission_count" readonly="1"/>
+                            <field name="auto_create_lead"/>
+                            <field name="require_consent"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="description" placeholder="Short text shown above the form fields."/>
+                        <field name="success_message" placeholder="Message shown after customer submits the form."/>
+                    </group>
+                    <notebook>
+                        <page string="Fields">
+                            <div class="alert alert-warning" role="alert">
+                                Keep forms short. For lead capture, ask only for product, quantity, city, and contact details needed by the team.
+                            </div>
+                            <field name="field_ids" context="{'default_form_id': id}">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="name"/>
+                                    <field name="field_key"/>
+                                    <field name="field_type"/>
+                                    <field name="required"/>
+                                    <field name="placeholder"/>
+                                    <field name="help_text"/>
+                                    <field name="crm_mapping"/>
+                                </list>
+                                <form>
+                                    <group>
+                                        <field name="sequence"/>
+                                        <field name="name"/>
+                                        <field name="field_key"/>
+                                        <field name="field_type"/>
+                                        <field name="required"/>
+                                        <field name="placeholder"/>
+                                        <field name="help_text"/>
+                                        <field name="options_text" placeholder="One option per line for dropdown fields."/>
+                                        <field name="crm_mapping"/>
+                                    </group>
+                                </form>
+                            </field>
+                        </page>
+                        <page string="Submissions">
+                            <field name="submission_ids" readonly="1">
+                                <list>
+                                    <field name="create_date"/>
+                                    <field name="customer_name"/>
+                                    <field name="phone"/>
+                                    <field name="email"/>
+                                    <field name="state"/>
+                                    <field name="lead_id"/>
+                                    <field name="chat_id"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_whatsapp_form_search" model="ir.ui.view">
+        <field name="name">whatsapp.form.search</field>
+        <field name="model">whatsapp.form</field>
+        <field name="arch" type="xml">
+            <search string="WhatsApp Forms">
+                <field name="name"/>
+                <field name="account_id"/>
+                <field name="form_type"/>
+                <filter name="active" string="Active" domain="[('active', '=', True)]"/>
+                <filter name="archived" string="Archived" domain="[('active', '=', False)]"/>
+                <group>
+                    <filter name="group_type" string="Type" context="{'group_by': 'form_type'}"/>
+                    <filter name="group_account" string="Account" context="{'group_by': 'account_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_whatsapp_form_submission_list" model="ir.ui.view">
+        <field name="name">whatsapp.form.submission.list</field>
+        <field name="model">whatsapp.form.submission</field>
+        <field name="arch" type="xml">
+            <list string="Form Submissions">
+                <field name="create_date"/>
+                <field name="form_id"/>
+                <field name="customer_name"/>
+                <field name="phone"/>
+                <field name="email"/>
+                <field name="state"/>
+                <field name="lead_id"/>
+                <field name="chat_id"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_whatsapp_form_submission_form" model="ir.ui.view">
+        <field name="name">whatsapp.form.submission.form</field>
+        <field name="model">whatsapp.form.submission</field>
+        <field name="arch" type="xml">
+            <form string="Form Submission">
+                <header>
+                    <button name="action_create_lead" type="object" string="Create CRM Lead" class="btn-primary" invisible="lead_id"/>
+                    <button name="action_update_contact_from_mapping" type="object" string="Update Contact" class="btn-secondary"/>
+                    <button name="action_mark_reviewed" type="object" string="Mark Reviewed" class="btn-secondary" invisible="state != 'new'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="new,reviewed,lead_created"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="form_id" readonly="1"/>
+                            <field name="customer_name"/>
+                            <field name="phone"/>
+                            <field name="email"/>
+                            <field name="partner_id"/>
+                            <field name="chat_id"/>
+                        </group>
+                        <group>
+                            <field name="campaign_id"/>
+                            <field name="source"/>
+                            <field name="lead_id" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="summary" placeholder="Short internal note for this submission."/>
+                        <field name="values_json" readonly="1" widget="text"/>
+                        <field name="attachment_ids" widget="many2many_binary" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_whatsapp_form_submission_search" model="ir.ui.view">
+        <field name="name">whatsapp.form.submission.search</field>
+        <field name="model">whatsapp.form.submission</field>
+        <field name="arch" type="xml">
+            <search string="Form Submissions">
+                <field name="form_id"/>
+                <field name="customer_name"/>
+                <field name="phone"/>
+                <field name="email"/>
+                <field name="campaign_id"/>
+                <filter name="new" string="New" domain="[('state', '=', 'new')]"/>
+                <filter name="reviewed" string="Reviewed" domain="[('state', '=', 'reviewed')]"/>
+                <filter name="lead_created" string="Lead Created" domain="[('state', '=', 'lead_created')]"/>
+                <group>
+                    <filter name="group_form" string="Form" context="{'group_by': 'form_id'}"/>
+                    <filter name="group_state" string="State" context="{'group_by': 'state'}"/>
+                    <filter name="group_campaign" string="Campaign" context="{'group_by': 'campaign_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_whatsapp_form" model="ir.actions.act_window">
+        <field name="name">WhatsApp Forms</field>
+        <field name="res_model">whatsapp.form</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_whatsapp_form_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create your first WhatsApp form</p>
+            <p>Use forms to collect lead, support, dealer, callback, or payment details from WhatsApp customers.</p>
+        </field>
+    </record>
+
+    <record id="action_whatsapp_form_submission" model="ir.actions.act_window">
+        <field name="name">Form Submissions</field>
+        <field name="res_model">whatsapp.form.submission</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_whatsapp_form_submission_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No form submissions yet</p>
+            <p>Customer responses submitted through tokenized WhatsApp forms will appear here for review.</p>
+        </field>
+    </record>
+</odoo>

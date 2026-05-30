@@ -6,7 +6,6 @@
     "version": "1.0.0",
     "category": "Accounting/Localizations/Account Charts",
     "author": "Odoo S.A.",
-    "license": "LGPL-3",
     "description": """
 This is the basic Zambian localization necessary to run Odoo in ZM:
 ================================================================================

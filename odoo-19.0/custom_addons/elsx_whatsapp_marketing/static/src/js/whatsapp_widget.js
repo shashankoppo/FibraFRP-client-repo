@@ -2,6 +2,7 @@
 
 import { registry } from "@web/core/registry";
 import { playTone } from "@elsx_whatsapp_marketing/js/notification_tones";
+import { animateInboxRefresh } from "@elsx_whatsapp_marketing/js/elsx_ui_motion";
 
 // ============================================================
 // WhatsApp Real-time Handler — Odoo 19 Compatible (v7.5)
@@ -30,7 +31,9 @@ export class WhatsAppChatHandler {
         this._presenceInterval = null;
         this._slaInterval = null;
         this._componentInitInterval = null;
-        this._historyLimit = 100;
+        this._historyLimit = 50;
+        this._pollIntervalMs = 8000;
+        this._maxPollIntervalMs = 30000;
         this._isPaging = false;
         this._userIsAtBottom = true;
         this._notificationPreferencesByAccount = {};
@@ -38,17 +41,29 @@ export class WhatsAppChatHandler {
         this._boundHashChange = null;
         this._lastPlayedMessageId = new Set();
         this._processedMessageIds = new Set();
+        this._lastBusActivity = 0; // BUG 3+8 FIX: timestamp of last Bus/Socket notification
+        this._quickReplyItems = [];
+        this._quickReplyActiveIndex = 0;
+        this._quickReplyQueryKey = null;
+        this._quickReplyFetchTimer = null;
+        this._activeChatSwitchToken = 0;
+        this._aiGuidanceLoadedForChatId = null;
+        this._mobilePanel = null;
+        this._lastViewportIsMobile = window.matchMedia('(max-width: 991px)').matches;
+        this._mobileResizeTimer = null;
+        try {
+            sessionStorage.removeItem('wa_mobile_panel');
+        } catch (e) { /* sessionStorage may be blocked */ }
         
         // --- Sidebar State ---
         this._sidebarFilter = sessionStorage.getItem('wa_sidebar_filter') || 'all';
         this._sidebarQuery = '';
+        this._selectedAccountId = sessionStorage.getItem('wa_selected_account_id') ? parseInt(sessionStorage.getItem('wa_selected_account_id')) : null;
         // Per-pane fetch guards and pagination (map keyed by paneKey)
         this._isFetchingSidebar = { active: false, request: false, intervened: false };
         this._hasMoreSidebar = { active: true, request: true, intervened: true };
         this._sidebarOffsets = { active: 0, request: 0, intervened: 0 };
         
-        console.log('[WhatsApp] Handler Service Initialized (v7.6 - SPA Engine)');
-
         this._initGlobalComponents();
         
         this._boundHashChange = () => {
@@ -56,58 +71,38 @@ export class WhatsAppChatHandler {
         };
         window.addEventListener('hashchange', this._boundHashChange);
         window.addEventListener('popstate', this._boundHashChange);
+        this._boundResize = () => this._handleViewportResize();
+        window.addEventListener('resize', this._boundResize);
+        this._boundMobileKeydown = (ev) => this._handleMobileKeydown(ev);
+        window.addEventListener('keydown', this._boundMobileKeydown);
 
         this._componentInitInterval = setInterval(() => this._initGlobalComponents(), 5000);
 
         try { this.init(); } catch (e) { console.warn('[WhatsApp] Service init error:', e); }
-        try { this.initSocket(); } catch (e) { console.warn('[WhatsApp] Socket init error:', e); }
+    }
+
+    _normalizeActionViews(action, fallbackViews = [[false, 'form']]) {
+        if (!action || typeof action !== 'object') {
+            return action;
+        }
+        const normalized = { ...action };
+        if (!Array.isArray(normalized.views) || !normalized.views.length) {
+            const modes = String(normalized.view_mode || '')
+                .split(',')
+                .map((mode) => mode.trim())
+                .filter(Boolean);
+            normalized.views = modes.length
+                ? modes.map((mode) => [false, mode === 'tree' ? 'list' : mode])
+                : fallbackViews;
+        }
+        if (!normalized.view_mode && normalized.views.length) {
+            normalized.view_mode = normalized.views.map((view) => view[1]).join(',');
+        }
+        return normalized;
     }
 
     _initGlobalComponents() {
-        // Run safely without crashing if DOM is not ready
-        if (!document.head) {
-            setTimeout(() => this._initGlobalComponents(), 100);
-            return;
-        }
-
-        // Hide the "WhatsApp Marketing" app from the main Odoo menu instantly via CSS
-        if (!document.getElementById('wa_hide_menu_style')) {
-            const style = document.createElement('style');
-            style.id = 'wa_hide_menu_style';
-            style.innerHTML = `
-                /* Hide from Enterprise Home Screen (App Switcher) */
-                a.o_app[data-menu-xmlid="elsx_whatsapp_marketing.menu_whatsapp_root"] { display: none !important; }
-                /* Hide from Community Navbar / Dropdown */
-                a.dropdown-item[data-menu-xmlid="elsx_whatsapp_marketing.menu_whatsapp_root"] { display: none !important; }
-                .o_menu_sections a[data-menu-xmlid="elsx_whatsapp_marketing.menu_whatsapp_root"] { display: none !important; }
-            `;
-            document.head.appendChild(style);
-        }
-
-        if (!document.body) {
-            // Document body not ready yet, defer FAB injection
-            setTimeout(() => this._initGlobalComponents(), 100);
-            return;
-        }
-
-        if (!document.getElementById('wa_global_fab')) {
-            const fab = document.createElement('div');
-            fab.id = 'wa_global_fab';
-            fab.className = 'wa-floating-fab animate-bounce-in';
-            fab.title = 'Open WhatsApp';
-            fab.innerHTML = `
-                <div class="wa-fab-icon shadow-lg">
-                    <i class="fa fa-whatsapp"></i>
-                    <span class="wa-fab-badge d-none">0</span>
-                </div>
-            `;
-            fab.onclick = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                this._openTeamInbox();
-            };
-            document.body.appendChild(fab);
-        }
+        // Disabled by user request: no longer hiding the module from the menu or showing the floating chat button.
     }
 
     async _openTeamInbox() {
@@ -152,7 +147,7 @@ export class WhatsAppChatHandler {
         actionObj.target = 'new';
         actionObj.context = { ...(actionObj.context || {}), wa_floating_mode: true };
 
-        await this.actionService.doAction(actionObj);
+        await this.actionService.doAction(this._normalizeActionViews(actionObj, [[false, 'kanban'], [false, 'list'], [false, 'form']]));
 
         // Inject CSS to convert the centered modal into a floating bottom-right chatbox
         let retries = 0;
@@ -384,7 +379,7 @@ export class WhatsAppChatHandler {
         if (typeof io === 'undefined') return;
         if (this.socket) this.socket.disconnect();
 
-        let socketUrl = 'http://localhost:3000';
+        let socketUrl = '';
         try {
             const sysParam = await this._rpc('whatsapp.chat', 'get_sidecar_url', []);
             if (sysParam) {
@@ -392,15 +387,11 @@ export class WhatsAppChatHandler {
                 if (socketUrl.includes('sidecar')) {
                     socketUrl = socketUrl.replace('sidecar', window.location.hostname);
                 }
-            } else {
-                const origin = window.location.origin;
-                if (!origin.includes('localhost')) {
-                    socketUrl = origin.replace('8069', '3000');
-                }
             }
         } catch (e) {
             console.warn('[WhatsApp] Could not fetch sidecar url:', e);
         }
+        if (!socketUrl) return;
 
         this.socket = io(socketUrl, {
             transports: ['websocket', 'polling'],
@@ -416,9 +407,25 @@ export class WhatsAppChatHandler {
             this._surgicalRefresh();
         });
         this.socket.on('whatsapp_event', (data) => {
+            // BUG 3 FIX: Record socket activity to suppress redundant polling
+            this._lastBusActivity = Date.now();
+            if (data?.type === 'status_update' && (data.message_id || data.message?.id) && (data.status || data.message?.status)) {
+                const messageId = data.message_id || data.message?.id;
+                const status = data.status || data.message?.status;
+                this._patchMessageStatus(data.chat_id, messageId, status);
+                if (data.chat_id) {
+                    this._patchSidebarStatus(data.chat_id, status);
+                    this._updateSidebarForChat(data.chat_id);
+                }
+                return;
+            }
             if (this._isDuplicateNewMessage(data || {})) {
                 return;
             }
+
+            // Reset cache so incoming message ALWAYS re-renders
+            this._lastHtml = null;
+
             const activeChatId = this._getActiveChatId();
             
             // 1. Refresh UI if it's for the current chat (or we are in list view)
@@ -426,12 +433,14 @@ export class WhatsAppChatHandler {
                 this._surgicalRefresh();
             }
 
-            // 1b. Refresh sidebar preview for this chat
+            // 2. Update sidebar preview + counts
             if (data.chat_id) {
                 this._updateSidebarForChat(data.chat_id);
+            } else {
+                this._updateSidebarCounts();
             }
 
-            // 2. Play sound for ALL inbound messages regardless of active chat
+            // 3. Play sound for ALL inbound messages regardless of active chat
             if (data.type === 'new_message' && data.message?.direction === 'inbound') {
                 this._playSound('received', data.chat_id, data.message?.id);
             }
@@ -469,16 +478,23 @@ export class WhatsAppChatHandler {
             // Subscribe to channels using modern Odoo 19 Bus API
             this.bus.addChannel('elsx_whatsapp_channel');
             
-            // Listen for notifications
-            this.bus.addEventListener('notification', ({ detail: notifications }) => {
-                for (const { type, payload } of notifications) {
-                    if (WA_NOTIFICATION_TYPES.includes(type)) {
-                        this._onNotification(type, payload);
-                    } else if (type === 'whatsapp_typing') {
-                        this._showTypingIndicator(payload || {});
-                    }
-                }
+            // Subscribe directly to modern Odoo 19 Bus notification types
+            this._busSubscriptions = [];
+
+            WA_NOTIFICATION_TYPES.forEach(type => {
+                const callback = (payload) => {
+                    this._onNotification(type, payload);
+                };
+                this.bus.subscribe(type, callback);
+                this._busSubscriptions.push({ type, callback });
             });
+
+            const typingCallback = (payload) => {
+                this._showTypingIndicator(payload || {});
+            };
+            this.bus.subscribe('whatsapp_typing', typingCallback);
+            this._busSubscriptions.push({ type: 'whatsapp_typing', callback: typingCallback });
+
         } catch (e) {
             console.error('[WhatsApp] Bus subscription error:', e);
         }
@@ -489,8 +505,10 @@ export class WhatsAppChatHandler {
             this._injectScrollFAB();
             this._injectMobileBackButton();
             this._applyRightPanePreference();
+            this._syncMobileLayout();
             this._tickSlaTimers();
             this._initSidebarEngine();
+            this._enhanceComposer();
 
             // KEY FIX: Actively fetch & render history on first paint
             const chatId = this._getActiveChatId();
@@ -514,18 +532,17 @@ export class WhatsAppChatHandler {
                 this._attachScrollListener();
                 this._injectScrollFAB();
                 this._applyRightPanePreference();
+                this._syncMobileLayout();
                 this._tickSlaTimers();
                 this._initSidebarEngine();
+                this._enhanceComposer();
             }
         });
         this._historyMountObserver.observe(document.body, { childList: true, subtree: true });
 
         // Fallback polling — fires every 8 seconds as safety net when bus/socket is absent.
-        // This ensures messages are always visible even without a sidecar.
-        this._refreshInterval = setInterval(() => {
-            const chatId = this._getActiveChatId();
-            if (chatId) this._surgicalRefresh();
-        }, 8000);
+        // BUG 3+8 FIX: Skip polling when Bus was active recently (<12s) or not on WA view.
+        this._startFallbackPolling();
 
         // Presence heartbeat every 45 seconds
         this._presenceInterval = setInterval(() => this._touchPresence(), 45000);
@@ -541,16 +558,51 @@ export class WhatsAppChatHandler {
         }
         document.addEventListener('click', this._boundGlobalClick, true);
 
-        // Enter to Send
+        if (!this._boundComposerInput) {
+            this._boundComposerInput = (e) => {
+                const textarea = e.target.closest('.wa-premium-input textarea') || e.target.closest('.wa-premium-input');
+                if (!textarea) return;
+                this._resizeComposer(textarea);
+                this._updateComposerCounter(textarea);
+                this._queueQuickReplySuggestions(textarea);
+            };
+        }
+        document.addEventListener('input', this._boundComposerInput);
+
+        // Enter to Send & Slash command for Quick Replies
         if (!this._boundKeydown) {
             this._boundKeydown = (e) => {
+                const textarea = e.target.closest('.wa-premium-input textarea') || e.target.closest('.wa-premium-input');
+                if (!textarea) return;
+
+                if (e.key === 'Escape' && this._isQuickReplyOpen()) {
+                    e.preventDefault();
+                    this._hideQuickReplyPopover();
+                    return;
+                }
+
+                if (this._isQuickReplyOpen() && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+                    e.preventDefault();
+                    this._moveQuickReplySelection(e.key === 'ArrowDown' ? 1 : -1);
+                    return;
+                }
+
+                if (this._isQuickReplyOpen() && e.key === 'Tab') {
+                    e.preventDefault();
+                    this._insertQuickReply(this._quickReplyItems[this._quickReplyActiveIndex], textarea);
+                    return;
+                }
+
+                // Enter to Send
                 if (e.key === 'Enter' && !e.shiftKey) {
-                    const textarea = e.target.closest('.wa-premium-input textarea') || e.target.closest('.wa-premium-input');
-                    if (textarea) {
-                        e.preventDefault();
-                        const sendBtn = document.querySelector('button[name="action_send_quick_reply"]');
-                        if (sendBtn) sendBtn.click();
+                    e.preventDefault();
+                    if (this._isQuickReplyOpen() && this._quickReplyItems[this._quickReplyActiveIndex]) {
+                        this._insertQuickReply(this._quickReplyItems[this._quickReplyActiveIndex], textarea);
+                        return;
                     }
+                    const sendBtn = textarea.closest('.o_form_view')?.querySelector('button[name="action_send_quick_reply"]')
+                        || document.querySelector('button[name="action_send_quick_reply"]');
+                    if (sendBtn) sendBtn.click();
                 }
             };
         }
@@ -563,6 +615,45 @@ export class WhatsAppChatHandler {
     }
 
     // ── Custom JS Sidebar Engine (SPA) ─────────────────────────────
+    _hasWhatsAppView() {
+        return !!(
+            document.querySelector('.o_whatsapp_chat_form_view')
+            || document.querySelector('.o_whatsapp_inbox_kanban')
+        );
+    }
+
+    _startFallbackPolling() {
+        if (this._refreshInterval) return;
+        const tick = async () => {
+            this._refreshInterval = null;
+            let shouldBackoff = true;
+            try {
+                if (
+                    document.visibilityState !== 'visible'
+                    || Date.now() - this._lastBusActivity < 12000
+                    || !this._hasWhatsAppView()
+                ) {
+                    shouldBackoff = false;
+                } else {
+                    const chatId = this._getActiveChatId();
+                    if (chatId) {
+                        await this._surgicalRefresh();
+                        shouldBackoff = false;
+                    }
+                }
+            } catch (error) {
+                console.warn('[WhatsApp] fallback poll failed:', error);
+                shouldBackoff = true;
+            } finally {
+                this._pollIntervalMs = shouldBackoff
+                    ? Math.min(this._maxPollIntervalMs, this._pollIntervalMs + 4000)
+                    : 8000;
+                this._refreshInterval = setTimeout(tick, this._pollIntervalMs);
+            }
+        };
+        this._refreshInterval = setTimeout(tick, this._pollIntervalMs);
+    }
+
     _initSidebarEngine() {
         // Initialize three sidebar panes
         this._paneIds = {
@@ -576,6 +667,8 @@ export class WhatsAppChatHandler {
             this._hasMoreSidebar[k] = true;
             this._isFetchingSidebar[k] = false;
         });
+
+        this._initAccountSelectorDropdown();
 
         // Initialize each pane: guard + infinite scroll
         Object.entries(this._paneIds).forEach(([paneKey, paneId]) => {
@@ -647,11 +740,23 @@ export class WhatsAppChatHandler {
 
         // Filter Pills
         const filters = document.querySelectorAll('.wa-filter-btn');
+
+        // BUG FIX: Deactivate ALL pills first to clear any inline XML styles,
+        // so only the persisted/active filter gets the active highlight.
+        filters.forEach(f => {
+            f.style.background = '';
+            f.style.color = '';
+            f.classList.remove('bg-success', 'text-white');
+            f.classList.add('bg-light', 'text-muted');
+        });
+
         filters.forEach(btn => {
             if (btn._waFilterBound) return;
             btn._waFilterBound = true;
             btn.addEventListener('click', () => {
                 filters.forEach(f => {
+                    f.style.background = '';
+                    f.style.color = '';
                     f.classList.remove('bg-success', 'text-white');
                     f.classList.add('bg-light', 'text-muted');
                 });
@@ -665,12 +770,10 @@ export class WhatsAppChatHandler {
                 });
                 this._refreshAllPanes();
             });
-            // Restore active state
+            // Restore active state for the persisted filter
             if (btn.dataset.filter === this._sidebarFilter) {
-                filters.forEach(f => {
-                    f.classList.remove('bg-success', 'text-white');
-                    f.classList.add('bg-light', 'text-muted');
-                });
+                btn.style.background = '';
+                btn.style.color = '';
                 btn.classList.remove('bg-light', 'text-muted');
                 btn.classList.add('bg-success', 'text-white');
             }
@@ -688,11 +791,170 @@ export class WhatsAppChatHandler {
         });
     }
 
+    async _initAccountSelectorDropdown() {
+        const mount = document.getElementById('wa-account-selector-mount');
+        if (!mount || mount.dataset.dropdownInit) return;
+        mount.dataset.dropdownInit = 'true';
+
+        try {
+            const accounts = await this._rpc('whatsapp.account', 'search_read', [[['active', '=', true]], ['id', 'name']]);
+            if (!accounts || accounts.length === 0) {
+                mount.innerHTML = '';
+                return;
+            }
+
+            let optionsHtml = `<option value="">All Accounts</option>`;
+            accounts.forEach(acc => {
+                const selected = this._selectedAccountId === acc.id ? 'selected' : '';
+                optionsHtml += `<option value="${acc.id}" ${selected}>${acc.name}</option>`;
+            });
+
+            mount.innerHTML = `
+                <div class="position-relative">
+                    <select id="wa-account-dropdown" class="form-select shadow-sm" style="background: #f0f2f5; border: 1px solid rgba(0,0,0,0.05); border-radius: 8px; padding: 8px 12px; font-size: 0.85rem; font-weight: 600; color: #111B21; cursor: pointer; transition: all 0.2s; -webkit-appearance: none; -moz-appearance: none; appearance: none; background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2523555%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E'); background-repeat: no-repeat; background-position: right%2012px%20top%2050%25; background-size:%2010px%20auto;">
+                        ${optionsHtml}
+                    </select>
+                </div>
+            `;
+
+            const selectEl = document.getElementById('wa-account-dropdown');
+            if (selectEl) {
+                selectEl.addEventListener('change', (e) => {
+                    const val = e.target.value;
+                    this._selectedAccountId = val ? parseInt(val) : null;
+                    if (this._selectedAccountId) {
+                        sessionStorage.setItem('wa_selected_account_id', this._selectedAccountId);
+                    } else {
+                        sessionStorage.removeItem('wa_selected_account_id');
+                    }
+                    this._refreshAllPanes();
+                });
+            }
+        } catch (e) {
+            console.error('[WhatsApp] Failed to init account selector dropdown:', e);
+        }
+    }
+
+    _matchesFilterAndPane(chat, filterType, paneKey) {
+        if (chat.is_archived) return false;
+
+        // Account filter constraint
+        if (this._selectedAccountId && chat.account_id !== this._selectedAccountId) {
+            return false;
+        }
+
+        // 1. Check pane matching
+        let paneMatch = false;
+        // BUG 6 FIX: Reliable user ID resolution — Odoo 19 env.user may not have .id
+        // Note: `odoo` is NOT a global in ES module scope, so we use try-catch
+        let currentUserId = null;
+        try {
+            currentUserId = this.env?.user?.userId || this.env?.user?.id || this.env?.services?.user?.userId || null;
+        } catch (e) { /* fallback to null */ }
+        if (!currentUserId) {
+            try { currentUserId = window.__session_info?.uid || null; } catch (e) {}
+        }
+        if (paneKey === 'active') { // Mine
+            paneMatch = (chat.assigned_user_id === currentUserId);
+        } else if (paneKey === 'request') { // Unassigned
+            paneMatch = (!chat.assigned_user_id);
+        } else if (paneKey === 'intervened') { // All
+            paneMatch = true;
+        }
+        if (!paneMatch) return false;
+
+        // 2. Check filter matching
+        if (filterType === 'all') {
+            return true;
+        } else if (filterType === 'open') {
+            return chat.state === 'open';
+        } else if (filterType === 'mine') {
+            return chat.assigned_user_id === currentUserId;
+        } else if (filterType === 'unread') {
+            return chat.unread_count > 0;
+        } else if (filterType === 'snoozed') {
+            return chat.state === 'snoozed';
+        } else if (filterType === 'resolved') {
+            return chat.state === 'resolved';
+        }
+        return true;
+    }
+
+    _renderChatCardHtml(chat) {
+        const isActive = this._getActiveChatId() === chat.id ? 'active' : '';
+        const unreadBadge = chat.unread_count > 0 ? `<div class="badge rounded-pill bg-success shadow-sm o_whatsapp_unread_count" style="padding: 4px 8px; font-size: 0.7rem;">${chat.unread_count}</div>` : '';
+        const pinnedIcon = chat.is_pinned ? `<i class="fa fa-thumb-tack text-muted" title="Pinned" style="font-size: 0.7rem;"></i>` : '';
+        const archivedIcon = chat.is_archived ? `<i class="fa fa-archive text-muted" title="Archived" style="font-size: 0.7rem;"></i>` : '';
+
+        let slaBadge = '';
+        if (chat.sla_status === 'breached') {
+            slaBadge = `<span class="badge bg-danger mt-1 shadow-sm" style="font-size: 0.6rem; animation: pulse 2s infinite;">SLA Breach</span>`;
+        } else if (chat.sla_status === 'active') {
+            slaBadge = `<span class="badge bg-warning text-dark mt-1 shadow-sm wa-sla-timer" data-wa-sla-minutes="${chat.sla_timer_minutes || 0}" style="font-size: 0.6rem;"><span class="wa-sla-value">${chat.sla_timer_minutes || 0}</span>m wait</span>`;
+        }
+
+        let statusIcon = '';
+        if (chat.last_message_direction === 'outbound') {
+            if (chat.last_message_status === 'sent') statusIcon = `<i class="fa fa-check text-muted" title="Sent" style="font-size: 0.7rem;"></i>`;
+            else if (chat.last_message_status === 'delivered') statusIcon = `<span class="d-flex align-items-center" style="margin-left: -2px;"><i class="fa fa-check text-muted" title="Delivered" style="font-size: 0.7rem;"></i><i class="fa fa-check text-muted" title="Delivered" style="font-size: 0.7rem; margin-left: -4px;"></i></span>`;
+            else if (chat.last_message_status === 'read') statusIcon = `<span class="d-flex align-items-center" style="margin-left: -2px;"><i class="fa fa-check text-info" title="Read" style="font-size: 0.7rem;"></i><i class="fa fa-check text-info" title="Read" style="font-size: 0.7rem; margin-left: -4px;"></i></span>`;
+        }
+
+        const safeName = (chat.display_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const safeBody = (chat.last_message_body || 'No messages yet').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+        const initial = chat.display_name_initial || '?';
+        const colors = ['#1abc9c', '#2ecc71', '#3498db', '#9b59b6', '#34495e', '#16a085', '#27ae60', '#2980b9', '#8e44ad', '#2c3e50', '#f1c40f', '#e67e22', '#e74c3c', '#95a5a6', '#f39c12', '#d35400', '#c0392b', '#7f8c8d'];
+        let hash = 0;
+        for (let i = 0; i < safeName.length; i++) hash = safeName.charCodeAt(i) + ((hash << 5) - hash);
+        const avatarColor = colors[Math.abs(hash) % colors.length];
+
+        const accountBadge = chat.account_name ? `<span class="badge text-white" style="background: rgba(0, 168, 132, 0.7); font-size: 0.65rem; border-radius: 4px; padding: 2px 6px;">${chat.account_name}</span>` : '';
+        const agentBadge = chat.assigned_user_name ? `<span class="badge text-dark" style="background: rgba(0, 0, 0, 0.05); font-size: 0.65rem; border-radius: 4px; padding: 2px 6px;"><i class="fa fa-user-o me-1"></i>${chat.assigned_user_name}</span>` : `<span class="badge text-muted" style="background: rgba(0, 0, 0, 0.03); font-size: 0.65rem; border-radius: 4px; padding: 2px 6px; border: 1px dashed rgba(0,0,0,0.1);"><i class="fa fa-user-times me-1"></i>Unassigned</span>`;
+
+        return `
+            <button type="button" class="o_whatsapp_sidebar_btn p-0 border-0 bg-transparent w-100 text-start">
+                <div class="p-2 px-3 border-bottom cursor-pointer o_whatsapp_sidebar_item hover-bg-light position-relative ${isActive}"
+                    data-chat-id="${chat.id}" style="transition: all 0.2s; border-left: 4px solid transparent;">
+                    <div class="d-flex align-items-center">
+                        <div class="o_whatsapp_avatar position-relative shadow-sm d-flex align-items-center justify-content-center text-white fw-bold" style="background: ${avatarColor} !important; border-radius: 50%; user-select: none;">${initial}</div>
+                        <div class="ms-3 flex-grow-1 overflow-hidden">
+                            <div class="d-flex justify-content-between align-items-start mb-1">
+                                <div class="fw-bold text-truncate o_whatsapp_chat_item_name" style="max-width: 140px; font-size: 1.05rem;">${safeName}</div>
+                                <div class="d-flex flex-column align-items-end">
+                                    <div class="small text-muted text-nowrap" style="font-size: 0.75rem; min-width: 60px; text-align: right;">${chat.last_message_date_str || ''}</div>
+                                    ${slaBadge}
+                                </div>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <div class="small text-muted text-truncate d-flex align-items-center gap-1" style="max-width: 140px; font-size: 0.85rem;">
+                                    ${statusIcon}
+                                    ${safeBody}
+                                </div>
+                                <div class="d-flex align-items-center gap-1">
+                                    ${chat.needs_reply ? '<span class="badge bg-danger rounded-pill" style="font-size: 0.65rem;">Needs Reply</span>' : ''}
+                                    ${pinnedIcon}
+                                    ${archivedIcon}
+                                    ${unreadBadge}
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center gap-1 mt-1 flex-wrap">
+                                ${accountBadge}
+                                ${agentBadge}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </button>
+        `;
+    }
+
     async _updateSidebarCounts() {
         try {
             const counts = await this._rpc('whatsapp.chat', 'get_sidebar_counts', [], {
                 filter_type: this._sidebarFilter,
                 search_query: this._sidebarQuery,
+                account_id: this._selectedAccountId,
             });
             if (counts) {
                 Object.entries(counts).forEach(([paneKey, count]) => {
@@ -732,7 +994,8 @@ export class WhatsAppChatHandler {
                 search_query: this._sidebarQuery,
                 offset: offset,
                 limit: limit,
-                pane: paneKey // optional, backend can ignore
+                pane: paneKey,
+                account_id: this._selectedAccountId,
             });
 
             const loader = document.getElementById('wa-sidebar-loader');
@@ -750,71 +1013,29 @@ export class WhatsAppChatHandler {
             this._sidebarOffsets[paneKey] += chats.length;
 
             let html = '';
+            const existingChatIds = new Set(
+                Array.from(mount.querySelectorAll('.o_whatsapp_sidebar_item[data-chat-id]'))
+                    .map((el) => el.getAttribute('data-chat-id'))
+            );
             chats.forEach(chat => {
-                const isActive = this._getActiveChatId() === chat.id ? 'active' : '';
-                const unreadBadge = chat.unread_count > 0 ? `<div class="badge rounded-pill bg-success shadow-sm o_whatsapp_unread_count" style="padding: 4px 8px; font-size: 0.7rem;">${chat.unread_count}</div>` : '';
-                const pinnedIcon = chat.is_pinned ? `<i class="fa fa-thumb-tack text-muted" title="Pinned" style="font-size: 0.7rem;"></i>` : '';
-                const archivedIcon = chat.is_archived ? `<i class="fa fa-archive text-muted" title="Archived" style="font-size: 0.7rem;"></i>` : '';
-                let slaBadge = '';
-                if (chat.sla_status === 'breached') {
-                    slaBadge = `<span class="badge bg-danger mt-1 shadow-sm" style="font-size: 0.6rem; animation: pulse 2s infinite;">SLA Breach</span>`;
-                } else if (chat.sla_status === 'active') {
-                    slaBadge = `<span class="badge bg-warning text-dark mt-1 shadow-sm wa-sla-timer" data-wa-sla-minutes="${chat.sla_timer_minutes || 0}" style="font-size: 0.6rem;"><span class="wa-sla-value">${chat.sla_timer_minutes || 0}</span>m wait</span>`;
+                try {
+                    const chatId = String(chat.id);
+                    if (append && existingChatIds.has(chatId)) return;
+                    existingChatIds.add(chatId);
+                    html += this._renderChatCardHtml(chat);
+                } catch (renderErr) {
+                    console.error('[WhatsApp] Failed to render chat card:', chat.id, renderErr);
+                    // Skip broken cards instead of killing entire sidebar
                 }
-                let statusIcon = '';
-                if (chat.last_message_direction === 'outbound') {
-                    if (chat.last_message_status === 'sent') statusIcon = `<i class="fa fa-check text-muted" title="Sent" style="font-size: 0.7rem;"></i>`;
-                    else if (chat.last_message_status === 'delivered') statusIcon = `<span class="d-flex align-items-center" style="margin-left: -2px;"><i class="fa fa-check text-muted" title="Delivered" style="font-size: 0.7rem;"></i><i class="fa fa-check text-muted" title="Delivered" style="font-size: 0.7rem; margin-left: -4px;"></i></span>`;
-                    else if (chat.last_message_status === 'read') statusIcon = `<span class="d-flex align-items-center" style="margin-left: -2px;"><i class="fa fa-check text-info" title="Read" style="font-size: 0.7rem;"></i><i class="fa fa-check text-info" title="Read" style="font-size: 0.7rem; margin-left: -4px;"></i></span>`;
-                }
-                const safeName = (chat.display_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                const safeBody = (chat.last_message_body || 'No messages yet').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                
-                // AiSensy Premium Avatar Generation
-                const initial = chat.display_name_initial || '?';
-                const colors = ['#1abc9c', '#2ecc71', '#3498db', '#9b59b6', '#34495e', '#16a085', '#27ae60', '#2980b9', '#8e44ad', '#2c3e50', '#f1c40f', '#e67e22', '#e74c3c', '#95a5a6', '#f39c12', '#d35400', '#c0392b', '#7f8c8d'];
-                let hash = 0;
-                for (let i = 0; i < safeName.length; i++) hash = safeName.charCodeAt(i) + ((hash << 5) - hash);
-                const avatarColor = colors[Math.abs(hash) % colors.length];
-
-                html += `
-                    <button type="button" class="o_whatsapp_sidebar_btn p-0 border-0 bg-transparent w-100 text-start">
-                        <div class="p-2 px-3 border-bottom cursor-pointer o_whatsapp_sidebar_item hover-bg-light position-relative ${isActive}" 
-                            data-chat-id="${chat.id}" style="transition: all 0.2s; border-left: 4px solid transparent;">
-                            <div class="d-flex align-items-center">
-                                <div class="o_whatsapp_avatar position-relative shadow-sm d-flex align-items-center justify-content-center text-white fw-bold" style="background: ${avatarColor} !important; border-radius: 50%; user-select: none;">${initial}</div>
-                                <div class="ms-3 flex-grow-1 overflow-hidden">
-                                    <div class="d-flex justify-content-between align-items-start mb-1">
-                                        <div class="fw-bold text-truncate o_whatsapp_chat_item_name" style="max-width: 140px; font-size: 1.05rem;">${safeName}</div>
-                                        <div class="d-flex flex-column align-items-end">
-                                            <div class="small text-muted text-nowrap" style="font-size: 0.75rem; min-width: 60px text-align: right;">${chat.last_message_date_str || ''}</div>
-                                            ${slaBadge}
-                                        </div>
-                                    </div>
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <div class="small text-muted text-truncate d-flex align-items-center gap-1" style="max-width: 140px; font-size: 0.85rem;">
-                                            ${statusIcon}
-                                            ${safeBody}
-                                        </div>
-                                        <div class="d-flex align-items-center gap-1">
-                                            ${pinnedIcon}
-                                            ${archivedIcon}
-                                            ${unreadBadge}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </button>
-                `;
             });
             mount.insertAdjacentHTML('beforeend', html);
+            animateInboxRefresh(mount, { level: "subtle" });
         } catch (e) {
-            console.error('[WhatsApp] Sidebar fetch error:', e);
-            if (!append && mount) mount.innerHTML = '<div class="text-center p-3 text-danger"><i class="fa fa-warning"></i> Error loading</div>';
+            console.error('[WhatsApp] Sidebar fetch error for pane:', paneKey, e);
+            if (!append && mount) mount.innerHTML = '<div class="text-center p-3 text-danger"><i class="fa fa-warning"></i> Error loading: ' + (e.message || String(e)).replace(/</g, '&lt;') + '</div>';
         }
         this._isFetchingSidebar[paneKey] = false;
-        this._bindSidebarClickHandlers();
+        // BUG 5 FIX: Removed redundant _bindSidebarClickHandlers() — global click handler covers sidebar clicks
     }
 
     _bindSidebarClickHandlers() {
@@ -904,7 +1125,7 @@ export class WhatsAppChatHandler {
         }
     }
 
-    _scrollToBottom(force = false) {
+    _scrollToBottom(force = false, options = {}) {
         // Find the visible scroll container (Odoo might keep old form views hidden in DOM)
         const historyWrappers = document.querySelectorAll('.o_whatsapp_chat_history');
         let activeWrapper = null;
@@ -921,15 +1142,39 @@ export class WhatsAppChatHandler {
         
         // Odoo native scroll wrapper
         const oContent = activeWrapper.closest('.o_content');
+        const scrollTargets = [historyDiv];
+        if (oContent) {
+            scrollTargets.push(oContent);
+        }
+        const previousScrollBehavior = new Map();
+        const useInstantScroll = !!options.instant;
+        const setInstantScroll = () => {
+            if (!useInstantScroll) return;
+            scrollTargets.forEach((target) => {
+                previousScrollBehavior.set(target, target.style.scrollBehavior);
+                target.style.scrollBehavior = 'auto';
+            });
+        };
+        const restoreScrollBehavior = () => {
+            if (!useInstantScroll) return;
+            scrollTargets.forEach((target) => {
+                const previous = previousScrollBehavior.get(target);
+                if (previous) {
+                    target.style.scrollBehavior = previous;
+                } else {
+                    target.style.removeProperty('scroll-behavior');
+                }
+            });
+        };
 
         if (force || this._userIsAtBottom) {
             this._isInitialScroll = true;
+            setInstantScroll();
             
             const doScroll = () => {
-                historyDiv.scrollTop = historyDiv.scrollHeight + 1000;
-                if (oContent) {
-                    oContent.scrollTop = oContent.scrollHeight + 1000;
-                }
+                scrollTargets.forEach((target) => {
+                    target.scrollTop = target.scrollHeight + 1000;
+                });
             };
             
             // Immediate synchronous scroll
@@ -945,13 +1190,44 @@ export class WhatsAppChatHandler {
             
             // Extra safety pass for slow-loading media
             setTimeout(doScroll, 600);
-            setTimeout(doScroll, 1200);
+            setTimeout(() => {
+                doScroll();
+                restoreScrollBehavior();
+            }, 1200);
         } else {
             this._isInitialScroll = false;
         }
     }
 
     // ── Scroll-to-Bottom FAB ───────────────────────────────────────
+    _prepareHistorySoftReveal(mount) {
+        if (!mount || window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) {
+            return;
+        }
+        mount.classList.remove('wa-history-soft-ready');
+        mount.classList.add('wa-history-soft-loading');
+    }
+
+    _finishHistorySoftReveal(mount) {
+        if (!mount) return;
+        mount.querySelectorAll('.wa-message-row:not([data-wa-motion-seen])').forEach((row) => {
+            row.dataset.waMotionSeen = '1';
+        });
+        if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) {
+            mount.classList.remove('wa-history-soft-loading', 'wa-history-soft-ready');
+            return;
+        }
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                mount.classList.remove('wa-history-soft-loading');
+                mount.classList.add('wa-history-soft-ready');
+                setTimeout(() => {
+                    mount.classList.remove('wa-history-soft-ready');
+                }, 220);
+            });
+        });
+    }
+
     _injectScrollFAB() {
         if (document.getElementById('wa_scroll_fab')) return;
         const chatMain = document.querySelector('.o_whatsapp_chat_main');
@@ -988,30 +1264,277 @@ export class WhatsAppChatHandler {
     }
 
     // ── Mobile Back Button ─────────────────────────────────────────
+    _getMobileHeaderRow(container = null) {
+        const root = container || document.querySelector('.o_whatsapp_chat_container');
+        return root?.querySelector('.o_whatsapp_chat_main > .border-bottom .d-flex.align-items-center') ||
+            root?.querySelector('.o_whatsapp_chat_main > .border-bottom') ||
+            document.querySelector('.o_whatsapp_chat_main > .border-bottom .d-flex.align-items-center') ||
+            document.querySelector('.o_whatsapp_chat_main > .border-bottom') ||
+            document.querySelector('.o_whatsapp_panel_header_premium .d-flex');
+    }
+
+    _normalizeMobileChatsButton(button) {
+        if (!button) return;
+        button.id = button.id || 'wa_mobile_back_btn';
+        button.type = 'button';
+        button.classList.add('btn', 'btn-light', 'wa-mobile-back-btn', 'wa-mobile-chats-btn');
+        button.classList.remove('btn-link', 'p-0');
+        button.title = 'Chats';
+        button.setAttribute('aria-label', 'Open chats');
+        button.setAttribute('aria-controls', 'wa-active-sidebar-mount');
+        button.innerHTML = '<i class="fa fa-comments-o me-1"></i><span class="wa-mobile-chats-label">Chats</span>';
+    }
+
     _injectMobileBackButton() {
-        if (document.getElementById('wa_mobile_back_btn')) return;
         if (window.innerWidth > 991) return;
-        const header = document.querySelector('.o_whatsapp_panel_header_premium');
-        if (!header) return;
+        const { container } = this._getMobileLayoutParts();
+        const existingBtn = container?.querySelector('.wa-mobile-back-btn') || document.querySelector('.wa-mobile-back-btn');
+        if (existingBtn) {
+            this._normalizeMobileChatsButton(existingBtn);
+            return;
+        }
+        if (document.getElementById('wa_mobile_back_btn')) return;
+        const headerRow = this._getMobileHeaderRow(container);
+        if (!headerRow) return;
 
         const btn = document.createElement('button');
-        btn.id = 'wa_mobile_back_btn';
-        btn.type = 'button';
-        btn.className = 'btn btn-link p-0 me-2 text-dark d-lg-none';
-        btn.innerHTML = '<i class="fa fa-arrow-left" style="font-size:1.2rem;"></i>';
-        btn.title = 'Back to Chats';
+        btn.className = 'me-2 d-lg-none';
+        this._normalizeMobileChatsButton(btn);
         btn.addEventListener('click', () => {
-            const sidebar = document.querySelector('.wa-left-sidebar');
-            const main = document.querySelector('.o_whatsapp_chat_main');
-            const rightSidebar = document.querySelector('.wa-right-sidebar');
-            if (sidebar) { sidebar.classList.remove('d-none'); sidebar.classList.add('d-flex'); }
-            if (main) main.classList.add('d-none');
-            if (rightSidebar) rightSidebar.classList.add('d-none');
+            this._openMobileChatList();
         });
-        header.querySelector('.d-flex')?.prepend(btn);
+        headerRow.prepend(btn);
+    }
+
+    _isMobileViewport() {
+        return window.matchMedia('(max-width: 991px)').matches;
+    }
+
+    _handleViewportResize() {
+        if (this._mobileResizeTimer) {
+            clearTimeout(this._mobileResizeTimer);
+        }
+        this._mobileResizeTimer = setTimeout(() => {
+            this._mobileResizeTimer = null;
+            const isMobile = this._isMobileViewport();
+            const enteredMobile = isMobile && !this._lastViewportIsMobile;
+            const leftMobile = !isMobile && this._lastViewportIsMobile;
+            this._lastViewportIsMobile = isMobile;
+
+            if (enteredMobile) {
+                this._refreshForMobileEntry();
+                return;
+            }
+
+            this._syncMobileLayout();
+            if (leftMobile) {
+                this._applyRightPanePreference();
+            }
+        }, 120);
+    }
+
+    _getMobileLayoutParts() {
+        const container = document.querySelector('.o_whatsapp_chat_container');
+        return {
+            container,
+            sidebar: container?.querySelector('.wa-left-sidebar') || document.querySelector('.wa-left-sidebar'),
+            main: container?.querySelector('.o_whatsapp_chat_main') || document.querySelector('.o_whatsapp_chat_main'),
+            rightPane: container?.querySelector('.wa-right-sidebar') || document.querySelector('.wa-right-sidebar'),
+            backdrop: container?.querySelector('.wa-mobile-drawer-backdrop') || document.querySelector('.wa-mobile-drawer-backdrop'),
+        };
+    }
+
+    _refreshForMobileEntry() {
+        const { container, sidebar } = this._getMobileLayoutParts();
+        if (!container) return;
+
+        container.removeAttribute('data-wa-mobile-panel');
+        this._mobilePanel = null;
+        try {
+            sessionStorage.removeItem('wa_mobile_panel');
+        } catch (e) { /* sessionStorage may be blocked */ }
+
+        this._injectMobileBackButton();
+        this._ensureMobileChatListControls(container, sidebar);
+        this._syncMobileLayout();
+        this._attachScrollListener();
+        this._initSidebarEngine();
+        this._enhanceComposer();
+
+        const activeChatId = this._selectedChatId || this._getActiveChatId();
+        if (activeChatId) {
+            this._lastHtml = null;
+            this._surgicalRefresh(activeChatId);
+        }
+    }
+
+    _openMobileChatList() {
+        if (!this._isMobileViewport()) return;
+        const activeChatId = this._selectedChatId || this._getActiveChatId();
+        this._setMobilePanel(activeChatId ? 'chat_list_drawer' : 'list');
+    }
+
+    _handleMobileKeydown(ev) {
+        if (!this._isMobileViewport() || ev.key !== 'Escape') return;
+        const { container } = this._getMobileLayoutParts();
+        const panel = container?.getAttribute('data-wa-mobile-panel');
+        if (panel === 'chat_list_drawer' || panel === 'details') {
+            ev.preventDefault();
+            this._setMobilePanel('chat');
+        }
+    }
+
+    _ensureMobileChatListControls(container, sidebar) {
+        const headerButton = container?.querySelector('.wa-mobile-back-btn') || document.querySelector('.wa-mobile-back-btn');
+        if (headerButton) {
+            this._normalizeMobileChatsButton(headerButton);
+        }
+
+        if (container && !container.querySelector('.wa-mobile-drawer-backdrop')) {
+            const backdrop = document.createElement('button');
+            backdrop.type = 'button';
+            backdrop.className = 'wa-mobile-drawer-backdrop';
+            backdrop.setAttribute('aria-label', 'Close chats drawer');
+            backdrop.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                this._setMobilePanel('chat');
+            });
+            container.insertBefore(backdrop, container.firstChild);
+        }
+
+        if (sidebar && !sidebar.querySelector('.wa-mobile-sidebar-close')) {
+            const closeBtn = document.createElement('button');
+            closeBtn.type = 'button';
+            closeBtn.className = 'wa-mobile-sidebar-close btn btn-light border rounded-circle';
+            closeBtn.setAttribute('aria-label', 'Close chats drawer');
+            closeBtn.title = 'Close chats';
+            closeBtn.innerHTML = '<i class="fa fa-times"></i>';
+            closeBtn.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                this._setMobilePanel('chat');
+            });
+            const headerRow = sidebar.querySelector('.o_whatsapp_panel_header .d-flex.justify-content-between') ||
+                sidebar.querySelector('.o_whatsapp_panel_header') ||
+                sidebar;
+            headerRow.append(closeBtn);
+        }
+    }
+
+    _ensureMobileDetailsCloseButton(rightPane) {
+        if (!rightPane || rightPane.querySelector('.wa-mobile-details-close')) return;
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'wa-mobile-details-close btn btn-light border rounded-circle';
+        closeBtn.setAttribute('aria-label', 'Close contact details');
+        closeBtn.title = 'Close';
+        closeBtn.innerHTML = '<i class="fa fa-times"></i>';
+        closeBtn.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            this._setMobilePanel('chat');
+        });
+        rightPane.prepend(closeBtn);
+    }
+
+    _setMobilePanel(panel = 'chat', { persist = true } = {}) {
+        if (!this._isMobileViewport()) return;
+        const { container, sidebar, main, rightPane, backdrop } = this._getMobileLayoutParts();
+        if (!container) return;
+
+        const allowedPanels = ['list', 'chat', 'chat_list_drawer', 'details'];
+        let nextPanel = allowedPanels.includes(panel) ? panel : 'chat';
+        const activeChatId = this._selectedChatId || this._getActiveChatId();
+        if (!activeChatId && nextPanel !== 'list') {
+            nextPanel = 'list';
+        }
+
+        this._ensureMobileChatListControls(container, sidebar);
+        container.setAttribute('data-wa-mobile-panel', nextPanel);
+        this._mobilePanel = nextPanel;
+        if (persist) {
+            try {
+                sessionStorage.removeItem('wa_mobile_panel');
+            } catch (e) { /* sessionStorage may be blocked */ }
+        }
+
+        if (sidebar) {
+            const sidebarOpen = nextPanel === 'list' || nextPanel === 'chat_list_drawer';
+            sidebar.classList.toggle('d-none', !sidebarOpen);
+            sidebar.classList.toggle('d-flex', sidebarOpen);
+            sidebar.classList.toggle('wa-mobile-chat-list-drawer', nextPanel === 'chat_list_drawer');
+            sidebar.classList.toggle('wa-mobile-chat-list-fullscreen', nextPanel === 'list');
+        }
+        if (main) {
+            main.classList.toggle('d-none', nextPanel === 'list');
+            main.classList.toggle('d-flex', nextPanel !== 'list');
+        }
+        if (rightPane) {
+            const detailsOpen = nextPanel === 'details';
+            rightPane.classList.toggle('d-none', !detailsOpen);
+            rightPane.classList.toggle('wa-mobile-details-open', detailsOpen);
+            if (detailsOpen) {
+                this._ensureMobileDetailsCloseButton(rightPane);
+            }
+        }
+        if (backdrop) {
+            backdrop.classList.toggle('wa-mobile-drawer-backdrop-open', nextPanel === 'chat_list_drawer');
+        }
+        const chatButton = container.querySelector('.wa-mobile-chats-btn');
+        if (chatButton) {
+            chatButton.classList.toggle('active', nextPanel === 'chat_list_drawer' || nextPanel === 'list');
+            chatButton.setAttribute('aria-expanded', nextPanel === 'chat_list_drawer' ? 'true' : 'false');
+        }
+    }
+
+    _syncMobileLayout() {
+        const { container, sidebar, main, rightPane } = this._getMobileLayoutParts();
+        if (!container) return;
+
+        if (!this._isMobileViewport()) {
+            container.removeAttribute('data-wa-mobile-panel');
+            if (sidebar) {
+                sidebar.classList.remove('wa-mobile-chat-list-drawer', 'wa-mobile-chat-list-fullscreen');
+            }
+            if (main) {
+                main.classList.remove('d-none');
+                main.classList.add('d-flex');
+            }
+            if (rightPane) {
+                rightPane.classList.remove('wa-mobile-details-open');
+            }
+            const backdrop = container.querySelector('.wa-mobile-drawer-backdrop');
+            if (backdrop) {
+                backdrop.classList.remove('wa-mobile-drawer-backdrop-open');
+            }
+            return;
+        }
+
+        const activeChatId = this._selectedChatId || this._getActiveChatId();
+        const currentPanel = container.getAttribute('data-wa-mobile-panel');
+        const allowedPanels = ['list', 'chat', 'chat_list_drawer', 'details'];
+        let nextPanel = allowedPanels.includes(currentPanel) ? currentPanel : 'list';
+        if (!activeChatId) {
+            nextPanel = 'list';
+        }
+        this._setMobilePanel(nextPanel, { persist: false });
+        if (sidebar && nextPanel === 'list') {
+            sidebar.classList.remove('d-none');
+            sidebar.classList.add('d-flex');
+        }
     }
 
     _setRightPaneOpen(isOpen) {
+        if (this._isMobileViewport()) {
+            const rightPane = document.querySelector('.wa-right-sidebar');
+            const isDetailsOpen = rightPane?.classList.contains('wa-mobile-details-open');
+            const targetPanel = typeof isOpen === 'boolean'
+                ? (isOpen ? 'details' : 'chat')
+                : (isDetailsOpen ? 'chat' : 'details');
+            this._setMobilePanel(targetPanel);
+            return;
+        }
         const rightPane = document.querySelector('.wa-right-sidebar');
         if (!rightPane) return;
         if (isOpen) {
@@ -1029,6 +1552,10 @@ export class WhatsAppChatHandler {
     }
 
     _applyRightPanePreference() {
+        if (this._isMobileViewport()) {
+            this._syncMobileLayout();
+            return;
+        }
         let stored = null;
         try {
             stored = localStorage.getItem(RIGHT_PANE_STORAGE_KEY);
@@ -1067,11 +1594,29 @@ export class WhatsAppChatHandler {
     }
 
     // ── Notification Handler ───────────────────────────────────────
+    // BUG 1+4 FIX: Type-aware routing — status updates get efficient DOM patching,
+    // new messages get full refresh. _lastBusActivity gates polling (BUG 3+8).
     _onNotification(type, payload) {
+        // Record Bus activity timestamp (gates 8s polling fallback)
+        this._lastBusActivity = Date.now();
+
         if (type === 'whatsapp_typing') {
             this._showTypingIndicator(payload || {});
             return;
         }
+
+        // ── STATUS UPDATE path (efficient tick patching) ──
+        if (type === 'whatsapp_status_update' && payload?.message_id && payload?.status) {
+            this._patchMessageStatus(payload.chat_id, payload.message_id, payload.status);
+            // Also update sidebar last-message status badge
+            if (payload.chat_id) {
+                this._patchSidebarStatus(payload.chat_id, payload.status);
+                this._updateSidebarForChat(payload.chat_id);
+            }
+            return;
+        }
+
+        // ── NEW MESSAGE path ──
         if (this._isDuplicateNewMessage(payload || {})) {
             return;
         }
@@ -1090,50 +1635,192 @@ export class WhatsAppChatHandler {
             this._surgicalRefresh();
         }
 
-        // Also instantly update the sidebar for the chat receiving the message!
+        // BUG 7 FIX: Always update the sidebar for the chat receiving the message
+        // across ALL panes, and refresh counts for badge accuracy.
         if (payload?.chat_id) {
             this._updateSidebarForChat(payload.chat_id);
+        } else {
+            // No specific chat in payload — refresh all to be safe
+            this._updateSidebarCounts();
+        }
+        // Always refresh pane tab badge counts so cross-pane visibility is correct
+        this._updateSidebarCounts();
+    }
+
+    // BUG 4 FIX: Direct DOM tick patching for status updates (sent→delivered→read)
+    // Avoids full RPC re-fetch for simple tick changes.
+    _patchMessageStatus(chatId, messageId, newStatus) {
+        const activeChatId = this._getActiveChatId();
+        if (!chatId || Number(chatId) !== Number(activeChatId)) return;
+
+        const row = document.querySelector(`[data-wa-message-id="${messageId}"]`);
+        if (!row) {
+            // Message not in DOM — fall back to full refresh
+            this._lastHtml = null;
+            this._surgicalRefresh();
+            return;
+        }
+
+        const tickEl = row.querySelector('.wa-msg-tick');
+        if (!tickEl) return;
+
+        // Build new tick HTML based on status
+        let tickHtml = '';
+        if (newStatus === 'sent') {
+            tickHtml = '<i class="fa fa-check text-muted wa-msg-tick" title="Sent" style="font-size: 0.7rem;"></i>';
+        } else if (newStatus === 'delivered') {
+            tickHtml = '<span class="wa-msg-tick d-inline-flex align-items-center" title="Delivered"><i class="fa fa-check text-muted" style="font-size: 0.7rem;"></i><i class="fa fa-check text-muted" style="font-size: 0.7rem; margin-left: -4px;"></i></span>';
+        } else if (newStatus === 'read') {
+            tickHtml = '<span class="wa-msg-tick d-inline-flex align-items-center" title="Read"><i class="fa fa-check text-info" style="font-size: 0.7rem;"></i><i class="fa fa-check text-info" style="font-size: 0.7rem; margin-left: -4px;"></i></span>';
+        } else if (newStatus === 'failed') {
+            tickHtml = '<i class="fa fa-exclamation-circle text-danger wa-msg-tick" title="Failed" style="font-size: 0.7rem;"></i>';
+        }
+
+        if (tickHtml) {
+            tickEl.outerHTML = tickHtml;
+        }
+    }
+
+    // BUG 4 FIX: Patch sidebar last-message status icon without full re-fetch
+    _patchSidebarStatus(chatId, newStatus) {
+        const sidebarItem = document.querySelector(`.o_whatsapp_sidebar_item[data-chat-id="${chatId}"]`);
+        if (!sidebarItem) return;
+
+        const bodyEl = sidebarItem.querySelector('.small.text-muted.text-truncate.d-flex');
+        if (!bodyEl) return;
+
+        // Find existing status icons and update them
+        const existingIcons = bodyEl.querySelectorAll('.fa-check, .fa-exclamation-circle');
+        if (existingIcons.length === 0) return; // No outbound status to update
+
+        let statusIcon = '';
+        if (newStatus === 'sent') {
+            statusIcon = '<i class="fa fa-check text-muted" title="Sent" style="font-size: 0.7rem;"></i>';
+        } else if (newStatus === 'delivered') {
+            statusIcon = '<span class="d-flex align-items-center" style="margin-left: -2px;"><i class="fa fa-check text-muted" title="Delivered" style="font-size: 0.7rem;"></i><i class="fa fa-check text-muted" title="Delivered" style="font-size: 0.7rem; margin-left: -4px;"></i></span>';
+        } else if (newStatus === 'read') {
+            statusIcon = '<span class="d-flex align-items-center" style="margin-left: -2px;"><i class="fa fa-check text-info" title="Read" style="font-size: 0.7rem;"></i><i class="fa fa-check text-info" title="Read" style="font-size: 0.7rem; margin-left: -4px;"></i></span>';
+        }
+
+        // Replace the first icon group (status indicators come before the text)
+        const textContent = bodyEl.textContent?.trim() || '';
+        // Remove all existing check icons, keep the text
+        existingIcons.forEach(icon => {
+            const parent = icon.closest('span.d-flex');
+            if (parent) parent.remove();
+            else icon.remove();
+        });
+        // Re-insert the new status icon at the beginning
+        if (statusIcon) {
+            bodyEl.insertAdjacentHTML('afterbegin', statusIcon);
         }
     }
 
     async _updateSidebarForChat(chatId) {
         if (!chatId) return;
         try {
-            const res = await this._rpc('whatsapp.chat', 'read', [[parseInt(chatId)], ['last_message_body', 'last_message_date_str', 'unread_count']]);
+            const fieldsToRead = [
+                'display_name', 'phone_number', 'display_name_initial',
+                'account_id', 'assigned_user_id',
+                'last_message_body', 'last_message_date_str', 'last_message_status',
+                'last_message_direction', 'unread_count', 'is_pinned',
+                'is_archived', 'sla_status', 'sla_timer_minutes',
+                'state', 'needs_reply'
+            ];
+            const res = await this._rpc('whatsapp.chat', 'read', [[parseInt(chatId)], fieldsToRead]);
             if (!res || !res[0]) return;
-            const data = res[0];
 
-            const sidebarItem = document.querySelector(`.o_whatsapp_sidebar_item[data-chat-id="${chatId}"]`);
-            if (sidebarItem) {
-                // Update preview text
-                const bodyEl = sidebarItem.querySelector('.text-muted.text-truncate.d-flex');
-                if (bodyEl) bodyEl.innerHTML = data.last_message_body || 'No messages yet';
-                const dateEl = sidebarItem.querySelector('.d-flex.flex-column.align-items-end .small.text-muted');
-                if (dateEl) dateEl.innerText = data.last_message_date_str || '';
-                // Move to top of its pane
-                const btnContainer = sidebarItem.closest('button.o_whatsapp_sidebar_btn');
-                if (btnContainer) {
-                    const pane = btnContainer.parentElement;
-                    if (pane && pane.firstChild !== btnContainer) pane.prepend(btnContainer);
-                }
-                // Update unread badge
-                let badge = sidebarItem.querySelector('.bg-success.rounded-pill');
-                if (data.unread_count > 0 && this._getActiveChatId() !== parseInt(chatId)) {
-                    if (!badge) {
-                        badge = document.createElement('div');
-                        badge.className = 'badge rounded-pill bg-success shadow-sm';
-                        badge.style.cssText = 'padding: 4px 8px; font-size: 0.7rem;';
-                        const rightSide = sidebarItem.querySelector('.d-flex.align-items-center.gap-1');
-                        if (rightSide) rightSide.appendChild(badge);
+            const rawChat = res[0];
+            const chat = {
+                id: rawChat.id,
+                display_name: rawChat.display_name || rawChat.phone_number,
+                phone_number: rawChat.phone_number,
+                display_name_initial: rawChat.display_name_initial,
+                account_id: rawChat.account_id ? rawChat.account_id[0] : false,
+                account_name: rawChat.account_id ? rawChat.account_id[1] : '',
+                assigned_user_id: rawChat.assigned_user_id ? rawChat.assigned_user_id[0] : false,
+                assigned_user_name: rawChat.assigned_user_id ? rawChat.assigned_user_id[1] : '',
+                last_message_body: rawChat.last_message_body || 'No messages yet',
+                last_message_date_str: rawChat.last_message_date_str || '',
+                last_message_status: rawChat.last_message_status,
+                last_message_direction: rawChat.last_message_direction,
+                unread_count: rawChat.unread_count,
+                is_pinned: rawChat.is_pinned,
+                is_archived: rawChat.is_archived,
+                sla_status: rawChat.sla_status,
+                sla_timer_minutes: rawChat.sla_timer_minutes,
+                state: rawChat.state,
+                needs_reply: rawChat.needs_reply,
+            };
+
+            Object.entries(this._paneIds).forEach(([paneKey, mountId]) => {
+                const mount = document.getElementById(mountId);
+                if (!mount) return;
+
+                const shouldBeInPane = this._matchesFilterAndPane(chat, this._sidebarFilter, paneKey);
+                const sidebarItem = mount.querySelector(`.o_whatsapp_sidebar_item[data-chat-id="${chat.id}"]`);
+
+                if (shouldBeInPane) {
+                    if (sidebarItem) {
+                        // Surgical update to avoid layout flicker
+                        const bodyEl = sidebarItem.querySelector('.small.text-muted.text-truncate.d-flex');
+                        if (bodyEl) {
+                            let statusIcon = '';
+                            if (chat.last_message_direction === 'outbound') {
+                                if (chat.last_message_status === 'sent') statusIcon = `<i class="fa fa-check text-muted" title="Sent" style="font-size: 0.7rem;"></i>`;
+                                else if (chat.last_message_status === 'delivered') statusIcon = `<span class="d-flex align-items-center" style="margin-left: -2px;"><i class="fa fa-check text-muted" title="Delivered" style="font-size: 0.7rem;"></i><i class="fa fa-check text-muted" title="Delivered" style="font-size: 0.7rem; margin-left: -4px;"></i></span>`;
+                                else if (chat.last_message_status === 'read') statusIcon = `<span class="d-flex align-items-center" style="margin-left: -2px;"><i class="fa fa-check text-info" title="Read" style="font-size: 0.7rem;"></i><i class="fa fa-check text-info" title="Read" style="font-size: 0.7rem; margin-left: -4px;"></i></span>`;
+                            }
+                            const safeBody = (chat.last_message_body || 'No messages yet').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                            bodyEl.innerHTML = `${statusIcon}${safeBody}`;
+                        }
+
+                        const dateEl = sidebarItem.querySelector('.d-flex.flex-column.align-items-end .small.text-muted');
+                        if (dateEl) dateEl.innerText = chat.last_message_date_str || '';
+
+                        // Update unread count
+                        let badge = sidebarItem.querySelector('.o_whatsapp_unread_count');
+                        if (chat.unread_count > 0 && this._getActiveChatId() !== chat.id) {
+                            if (!badge) {
+                                badge = document.createElement('div');
+                                badge.className = 'badge rounded-pill bg-success shadow-sm o_whatsapp_unread_count';
+                                badge.style.cssText = 'padding: 4px 8px; font-size: 0.7rem;';
+                                const badgeContainer = sidebarItem.querySelector('.d-flex.align-items-center.gap-1');
+                                if (badgeContainer) badgeContainer.appendChild(badge);
+                            }
+                            badge.innerText = chat.unread_count;
+                        } else if (badge) {
+                            badge.remove();
+                        }
+
+                        // Update badges container
+                        const badgesContainer = sidebarItem.querySelector('.mt-1.flex-wrap');
+                        if (badgesContainer) {
+                            const accountBadge = chat.account_name ? `<span class="badge text-white" style="background: rgba(0, 168, 132, 0.7); font-size: 0.65rem; border-radius: 4px; padding: 2px 6px;">${chat.account_name}</span>` : '';
+                            const agentBadge = chat.assigned_user_name ? `<span class="badge text-dark" style="background: rgba(0, 0, 0, 0.05); font-size: 0.65rem; border-radius: 4px; padding: 2px 6px;"><i class="fa fa-user-o me-1"></i>${chat.assigned_user_name}</span>` : `<span class="badge text-muted" style="background: rgba(0, 0, 0, 0.03); font-size: 0.65rem; border-radius: 4px; padding: 2px 6px; border: 1px dashed rgba(0,0,0,0.1);"><i class="fa fa-user-times me-1"></i>Unassigned</span>`;
+                            badgesContainer.innerHTML = `${accountBadge}${agentBadge}`;
+                        }
+
+                        // Promote to top
+                        const btnContainer = sidebarItem.closest('button.o_whatsapp_sidebar_btn');
+                        if (btnContainer && mount.firstChild !== btnContainer) {
+                            mount.prepend(btnContainer);
+                        }
+                    } else {
+                        // Create and prepend new card
+                        const cardHtml = this._renderChatCardHtml(chat);
+                        mount.insertAdjacentHTML('afterbegin', cardHtml);
                     }
-                    badge.innerText = data.unread_count;
-                } else if (badge) {
-                    badge.remove();
+                } else {
+                    // Remove from pane if it no longer belongs
+                    if (sidebarItem) {
+                        const btnContainer = sidebarItem.closest('button.o_whatsapp_sidebar_btn');
+                        if (btnContainer) btnContainer.remove();
+                    }
                 }
-            } else {
-                // Not found in any pane — new chat, re-fetch all panes
-                this._refreshAllPanes();
-            }
+            });
+
+            this._updateSidebarCounts();
         } catch (e) {
             console.warn('[WhatsApp] Sidebar update failed:', e);
         }
@@ -1161,6 +1848,12 @@ export class WhatsAppChatHandler {
         const rightPaneToggleBtn = e.target.closest('.wa-toggle-right-pane-btn');
         if (rightPaneToggleBtn) {
             e.preventDefault(); e.stopPropagation();
+            if (this._isMobileViewport()) {
+                const rightPane = document.querySelector('.wa-right-sidebar');
+                const isDetailsOpen = rightPane?.classList.contains('wa-mobile-details-open');
+                this._setMobilePanel(isDetailsOpen ? 'chat' : 'details');
+                return;
+            }
             const rightPane = document.querySelector('.wa-right-sidebar');
             if (rightPane) {
                 this._setRightPaneOpen(!rightPane.classList.contains('d-lg-block'));
@@ -1176,10 +1869,7 @@ export class WhatsAppChatHandler {
                 this._switchChatContext(chatId, sidebarItem);
                 // Mobile: hide sidebar, show chat
                 if (window.innerWidth <= 991) {
-                    const sidebar = document.querySelector('.wa-left-sidebar');
-                    const main = document.querySelector('.o_whatsapp_chat_main');
-                    if (sidebar) { sidebar.classList.add('d-none'); sidebar.classList.remove('d-flex'); }
-                    if (main) main.classList.remove('d-none');
+                    this._setMobilePanel('chat');
                 }
             }
             return;
@@ -1188,12 +1878,7 @@ export class WhatsAppChatHandler {
         const mobileBackBtn = e.target.closest('.wa-mobile-back-btn');
         if (mobileBackBtn) {
             e.preventDefault(); e.stopPropagation();
-            const sidebar = document.querySelector('.wa-left-sidebar');
-            const main = document.querySelector('.o_whatsapp_chat_main');
-            if (sidebar) { sidebar.classList.remove('d-none'); sidebar.classList.add('d-flex'); }
-            if (main) main.classList.add('d-none');
-            // Optionally reset active chat context if you want to force them to pick again
-            // this._switchChatContext(null, null); 
+            this._openMobileChatList();
             return;
         }
         
@@ -1201,21 +1886,30 @@ export class WhatsAppChatHandler {
         const templateBtn = e.target.closest('button[name="action_open_send_wizard"]');
         if (templateBtn) {
             e.preventDefault(); e.stopPropagation();
-            const chatId = this._getActiveChatId();
+            const chatId = this._getChatIdForUserAction(templateBtn);
             if (chatId) {
-                this.actionService.doAction({
-                    type: 'ir.actions.act_window',
-                    name: 'Send WhatsApp Message',
-                    res_model: 'whatsapp.send.wizard',
-                    view_mode: 'form',
-                    target: 'new',
-                    views: [[false, 'form']],
-                    context: { default_chat_id: chatId, active_id: chatId, active_model: 'whatsapp.chat', active_ids: [chatId] }
-                }, {
-                    onClose: () => {
-                        this._surgicalRefresh(chatId);
-                        this._refreshAllPanes();
-                    }
+                this._selectedChatId = chatId;
+                this._lastChatId = chatId;
+                sessionStorage.setItem('wa_selected_chat_id', chatId);
+                this._rpc('whatsapp.chat', 'action_open_send_wizard', [[chatId]]).then((action) => {
+                    this.actionService.doAction(this._normalizeActionViews(action, [[false, 'form']]), {
+                        onClose: () => {
+                            // BUG FIX: Template replies not showing after wizard closes.
+                            // Always bust the HTML cache and force a full re-fetch.
+                            // Then retry after 2s in case server-side template processing
+                            // (media upload, Meta API call) hasn't committed yet.
+                            this._lastHtml = null;
+                            this._surgicalRefresh(chatId);
+                            this._refreshAllPanes();
+                            setTimeout(() => {
+                                this._lastHtml = null;
+                                this._surgicalRefresh(chatId);
+                                this._refreshAllPanes();
+                            }, 2000);
+                        }
+                    });
+                }).catch((err) => {
+                    console.error('[WhatsApp] Failed to open send wizard:', err);
                 });
             }
             return;
@@ -1225,19 +1919,19 @@ export class WhatsAppChatHandler {
         const partnerBtn = e.target.closest('button[name="action_view_partner"]');
         if (partnerBtn) {
             e.preventDefault(); e.stopPropagation();
-            const chatId = this._getActiveChatId();
+            const chatId = this._getChatIdForUserAction(partnerBtn);
             if (chatId) {
                 this._rpc('whatsapp.chat', 'read', [[chatId], ['partner_id']]).then((res) => {
                     if (res && res[0] && res[0].partner_id) {
                         const pid = Array.isArray(res[0].partner_id) ? res[0].partner_id[0] : res[0].partner_id;
-                        this.actionService.doAction({
+                        this.actionService.doAction(this._normalizeActionViews({
                             type: 'ir.actions.act_window',
                             res_model: 'res.partner',
                             res_id: pid,
                             view_mode: 'form',
                             views: [[false, 'form']],
                             target: 'current'
-                        });
+                        }));
                     }
                 });
             }
@@ -1248,20 +1942,27 @@ export class WhatsAppChatHandler {
         const resolveBtn = e.target.closest('button[name="action_resolve"]');
         if (resolveBtn) {
             e.preventDefault(); e.stopPropagation();
-            const chatId = this._getActiveChatId();
+            const chatId = this._getChatIdForUserAction(resolveBtn);
             if (chatId) {
                 this._rpc('whatsapp.chat', 'action_resolve', [[chatId]]).then(() => {
+                    // BUG FIX: Clear state FIRST, then refresh sidebar, then navigate away.
+                    // The old order caused the resolved chat to briefly flash as active.
                     this._lastChatId = null;
                     this._selectedChatId = null;
+                    this._lastHtml = null;
                     sessionStorage.removeItem('wa_selected_chat_id');
-                    this._refreshAllPanes();
+
+                    // On mobile: show sidebar, hide chat area
                     if (window.innerWidth <= 991) {
                         const sidebar = document.querySelector('.wa-left-sidebar');
                         const main = document.querySelector('.o_whatsapp_chat_main');
                         if (sidebar) { sidebar.classList.remove('d-none'); sidebar.classList.add('d-flex'); }
                         if (main) main.classList.add('d-none');
                     }
+
+                    // Navigate away first, then refresh panes after navigation settles
                     this._hardRefresh();
+                    setTimeout(() => this._refreshAllPanes(), 500);
                 });
             }
             return;
@@ -1271,20 +1972,24 @@ export class WhatsAppChatHandler {
         const snoozeBtn = e.target.closest('button[name="action_snooze"]');
         if (snoozeBtn) {
             e.preventDefault(); e.stopPropagation();
-            const chatId = this._getActiveChatId();
+            const chatId = this._getChatIdForUserAction(snoozeBtn);
             if (chatId) {
                 this._rpc('whatsapp.chat', 'action_snooze', [[chatId]]).then(() => {
+                    // BUG FIX: Same fix as resolve — clear state cleanly
                     this._lastChatId = null;
                     this._selectedChatId = null;
+                    this._lastHtml = null;
                     sessionStorage.removeItem('wa_selected_chat_id');
-                    this._refreshAllPanes();
+
                     if (window.innerWidth <= 991) {
                         const sidebar = document.querySelector('.wa-left-sidebar');
                         const main = document.querySelector('.o_whatsapp_chat_main');
                         if (sidebar) { sidebar.classList.remove('d-none'); sidebar.classList.add('d-flex'); }
                         if (main) main.classList.add('d-none');
                     }
+
                     this._hardRefresh();
+                    setTimeout(() => this._refreshAllPanes(), 500);
                 });
             }
             return;
@@ -1294,9 +1999,11 @@ export class WhatsAppChatHandler {
         const reopenBtn = e.target.closest('button[name="action_reopen"]');
         if (reopenBtn) {
             e.preventDefault(); e.stopPropagation();
-            const chatId = this._getActiveChatId();
+            const chatId = this._getChatIdForUserAction(reopenBtn);
             if (chatId) {
                 this._rpc('whatsapp.chat', 'action_reopen', [[chatId]]).then(() => {
+                    // BUG FIX: Clear cached HTML so the header badges (state) refresh
+                    this._lastHtml = null;
                     this._refreshAllPanes();
                     this._surgicalRefresh(chatId);
                 });
@@ -1305,20 +2012,132 @@ export class WhatsAppChatHandler {
         }
 
 
+        // AI draft generation: keep this in-place. Letting the native Odoo object
+        // button reload the form can wipe the custom chat-history mount.
+        const generateAiBtn = e.target.closest('button[name="action_generate_ai_reply"]');
+        if (generateAiBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof e.stopImmediatePropagation === 'function') {
+                e.stopImmediatePropagation();
+            }
+            const chatId = this._getChatIdForUserAction(generateAiBtn);
+            if (chatId) {
+                this._generateAiReplyInPlace(chatId, generateAiBtn);
+            }
+            return;
+        }
+
+        const clearAiBtn = e.target.closest('button[name="action_clear_ai_guidance"]');
+        if (clearAiBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof e.stopImmediatePropagation === 'function') {
+                e.stopImmediatePropagation();
+            }
+            const chatId = this._getChatIdForUserAction(clearAiBtn);
+            if (chatId) {
+                this._clearAiGuidanceInPlace(chatId, clearAiBtn);
+            }
+            return;
+        }
+
+        // AI draft: place text in composer without reloading/replacing the chat form.
+        const useAiDraftBtn = e.target.closest('button[name="action_use_ai_suggested_reply"]');
+        if (useAiDraftBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof e.stopImmediatePropagation === 'function') {
+                e.stopImmediatePropagation();
+            }
+            const chatId = this._getChatIdForUserAction(useAiDraftBtn);
+            const formRoot = useAiDraftBtn.closest('.o_form_view') || document;
+            const input = this._getComposerTextarea(formRoot);
+            if (chatId && input) {
+                this._setButtonBusy(useAiDraftBtn, true, 'Placing...');
+                this._rpc('whatsapp.chat', 'action_use_ai_suggested_reply', [[chatId]])
+                    .then(() => this._rpc('whatsapp.chat', 'read', [[chatId], ['quick_reply_text']]))
+                    .then((res) => {
+                        const draft = res?.[0]?.quick_reply_text || '';
+                        this._applyTextToComposer(input, draft);
+                    })
+                    .catch((error) => {
+                        console.warn('[WhatsApp] AI draft placement failed:', error);
+                        this._showTransientComposerWarning(formRoot, this._friendlyError(error, 'AI draft could not be placed in the composer.'), useAiDraftBtn);
+                    })
+                    .finally(() => this._setButtonBusy(useAiDraftBtn, false));
+            }
+            return;
+        }
+
+        // AI suggested flow: run it in-place and refresh the message history only.
+        const startAiFlowBtn = e.target.closest('button[name="action_start_ai_suggested_flow"]');
+        if (startAiFlowBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof e.stopImmediatePropagation === 'function') {
+                e.stopImmediatePropagation();
+            }
+            const chatId = this._getChatIdForUserAction(startAiFlowBtn);
+            if (chatId) {
+                this._rpc('whatsapp.chat', 'action_start_ai_suggested_flow', [[chatId]])
+                    .then((action) => {
+                        if (action?.type) {
+                            this.actionService.doAction(action);
+                        }
+                        this._lastHtml = null;
+                        this._surgicalRefresh(chatId);
+                        this._refreshAllPanes();
+                    })
+                    .catch((error) => console.warn('[WhatsApp] Starting AI suggested flow failed:', error));
+            }
+            return;
+        }
+
+        const manageAiFlowsBtn = e.target.closest('button[name="action_open_ai_flow_manager"]');
+        if (manageAiFlowsBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof e.stopImmediatePropagation === 'function') {
+                e.stopImmediatePropagation();
+            }
+            const chatId = this._getChatIdForUserAction(manageAiFlowsBtn);
+            if (chatId) {
+                this._setButtonBusy(manageAiFlowsBtn, true, 'Opening...');
+                this._rpc('whatsapp.chat', 'action_open_ai_flow_manager', [[chatId]])
+                    .then((action) => {
+                        if (action?.type) {
+                            this.actionService.doAction(action);
+                        }
+                    })
+                    .catch((error) => {
+                        console.warn('[WhatsApp] Opening AI flow manager failed:', error);
+                        this._showTransientComposerWarning(
+                            manageAiFlowsBtn.closest('.o_form_view') || document,
+                            this._friendlyError(error, 'Flow manager could not be opened.'),
+                            manageAiFlowsBtn
+                        );
+                    })
+                    .finally(() => this._setButtonBusy(manageAiFlowsBtn, false));
+            }
+            return;
+        }
+
         // Send message
         const sendBtn = e.target.closest('button[name="action_send_quick_reply"]');
         if (sendBtn) {
-            const mediaPreview = document.querySelector('.wa-floating-attachment-preview');
+            const formRoot = sendBtn.closest('.o_form_view') || document;
+            const mediaPreview = formRoot.querySelector('.wa-floating-attachment-preview');
             if (mediaPreview && !mediaPreview.parentElement.hasAttribute('invisible') && mediaPreview.offsetParent !== null) {
                 return; // Let Odoo native form handle file upload
             }
             
-            const input = document.querySelector('.wa-premium-input textarea') || document.querySelector('.wa-premium-input');
+            const input = this._getComposerTextarea(formRoot);
             if (input && input.value.trim()) {
                 e.preventDefault(); e.stopPropagation();
-                const chatId = this._getActiveChatId();
+                const chatId = this._getChatIdForUserAction(sendBtn);
                 if (chatId) {
-                    this._sendRPC('action_send_quick_reply', input.value.trim()).then(() => {
+                    this._sendRPC('action_send_quick_reply', input.value.trim(), chatId, input).then(() => {
                         input.value = '';
                         input.dispatchEvent(new Event('input', { bubbles: true }));
                         input.dispatchEvent(new Event('change', { bubbles: true }));
@@ -1332,10 +2151,11 @@ export class WhatsAppChatHandler {
         // Internal note
         const noteBtn = e.target.closest('button[name="action_send_internal_note"]');
         if (noteBtn) {
-            const input = document.querySelector('.wa-premium-input textarea') || document.querySelector('.wa-premium-input');
+            const input = this._getComposerTextarea(noteBtn.closest('.o_form_view') || document);
             if (input && input.value.trim()) {
                 e.preventDefault(); e.stopPropagation();
-                this._sendRPC('action_send_internal_note', input.value);
+                const chatId = this._getChatIdForUserAction(noteBtn);
+                this._sendRPC('action_send_internal_note', input.value, chatId, input);
             }
             return;
         }
@@ -1344,21 +2164,285 @@ export class WhatsAppChatHandler {
         if (emojiBtn) {
             e.preventDefault(); e.stopPropagation();
             this._toggleEmojiPicker(emojiBtn);
+            this._hideQuickReplyPopover();
+            return;
+        }
+
+        const quickReplyItem = e.target.closest('.wa-quick-reply-item');
+        if (quickReplyItem) {
+            e.preventDefault(); e.stopPropagation();
+            const textarea = this._getComposerTextarea(quickReplyItem.closest('.o_form_view') || document);
+            const idx = parseInt(quickReplyItem.dataset.index || '0', 10);
+            this._insertQuickReply(this._quickReplyItems[idx], textarea);
+            return;
+        }
+
+        const quickReplyBtn = e.target.closest('#wa_quick_reply_trigger');
+        if (quickReplyBtn) {
+            e.preventDefault(); e.stopPropagation();
+            const textarea = this._getComposerTextarea(quickReplyBtn.closest('.o_form_view') || document);
+            if (this._isQuickReplyOpen()) {
+                this._hideQuickReplyPopover();
+            } else {
+                this._fetchQuickReplySuggestions('', textarea);
+            }
+            return;
+        }
+
+        if (
+            this._isQuickReplyOpen()
+            && !e.target.closest('.wa-quick-reply-popover')
+            && !e.target.closest('#wa_quick_reply_trigger')
+            && !e.target.closest('.wa-premium-input')
+        ) {
+            this._hideQuickReplyPopover();
         }
     }
 
     // ── Twilio-Style Atomic Chat Context Switch ──────────────────────
+    _setButtonBusy(button, busy, label = null) {
+        if (!button) return;
+        if (busy) {
+            button.dataset.waOriginalHtml = button.innerHTML;
+            button.disabled = true;
+            button.classList.add('disabled');
+            button.innerHTML = `<i class="fa fa-spinner fa-spin me-1"></i>${label || 'Working...'}`;
+        } else {
+            button.disabled = false;
+            button.classList.remove('disabled');
+            if (button.dataset.waOriginalHtml) {
+                button.innerHTML = button.dataset.waOriginalHtml;
+                delete button.dataset.waOriginalHtml;
+            }
+        }
+    }
+
+    _friendlyError(error, fallback = 'Something went wrong. Please try again.') {
+        const raw = error?.data?.message || error?.message || error?.toString?.() || '';
+        const message = String(raw).replace(/^UserError:\s*/i, '').trim();
+        return message || fallback;
+    }
+
+    _applyTextToComposer(input, value) {
+        if (!input) return;
+        input.value = value || '';
+        input.focus();
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        this._resizeComposer(input);
+        this._updateComposerCounter(input);
+    }
+
+    async _generateAiReplyInPlace(chatId, triggerEl = null) {
+        const formRoot = triggerEl?.closest?.('.o_form_view') || document;
+        const mount = this._getHistoryMount();
+        const preservedHistory = mount?.innerHTML || '';
+        this._selectedChatId = chatId;
+        this._lastChatId = chatId;
+        sessionStorage.setItem('wa_selected_chat_id', chatId);
+        this._setCleanChatUrl(chatId);
+        this._setButtonBusy(triggerEl, true, 'Drafting...');
+        try {
+            const action = await this._rpc('whatsapp.chat', 'action_generate_ai_reply', [[chatId]]);
+            if (action?.tag === 'display_notification') {
+                await this.actionService.doAction(action);
+                return;
+            }
+            const rows = await this._rpc('whatsapp.chat', 'read', [[chatId], [
+                'ai_guidance_html',
+                'ai_suggested_reply',
+                'quick_reply_text',
+                'ai_suggested_flow_id',
+            ]]);
+            this._renderAiGuidanceInPlace(rows?.[0] || {}, formRoot);
+            if (mount && !mount.querySelector('[data-wa-message-id]') && preservedHistory) {
+                mount.innerHTML = preservedHistory;
+            }
+            this._lastHtml = null;
+            this._refreshAllPanes();
+        } catch (error) {
+            console.warn('[WhatsApp] AI draft generation failed:', error);
+            this._showTransientComposerWarning(formRoot, 'AI draft could not be generated. Check AI provider settings and try again.', triggerEl);
+        } finally {
+            this._setButtonBusy(triggerEl, false);
+        }
+    }
+
+    async _clearAiGuidanceInPlace(chatId, triggerEl = null) {
+        const formRoot = triggerEl?.closest?.('.o_form_view') || document;
+        this._setButtonBusy(triggerEl, true, 'Clearing...');
+        try {
+            await this._rpc('whatsapp.chat', 'action_clear_ai_guidance', [[chatId]]);
+            const panel = formRoot.querySelector('.wa-ai-guidance');
+            if (panel) {
+                panel.classList.add('d-none');
+                panel.style.display = 'none';
+                const content = panel.querySelector('.wa-ai-guidance-runtime');
+                if (content) {
+                    content.innerHTML = '';
+                }
+            }
+        } catch (error) {
+            console.warn('[WhatsApp] Clearing AI guidance failed:', error);
+        } finally {
+            this._setButtonBusy(triggerEl, false);
+        }
+    }
+
+    _renderAiGuidanceInPlace(data, formRoot = document) {
+        let panel = formRoot.querySelector('.wa-ai-guidance');
+        const composerSurface = formRoot.querySelector('.wa-composer-surface');
+        if (!panel && composerSurface) {
+            panel = document.createElement('div');
+            panel.className = 'wa-ai-guidance';
+            panel.setAttribute('role', 'status');
+            composerSurface.appendChild(panel);
+        }
+        if (!panel) return;
+
+        panel.classList.remove('d-none', 'o_invisible_modifier');
+        panel.removeAttribute('invisible');
+        panel.style.display = '';
+
+        let actions = panel.querySelector('.wa-ai-actions');
+        if (!actions) {
+            actions = document.createElement('div');
+            actions.className = 'wa-ai-actions';
+            actions.innerHTML = `
+                <button name="action_use_ai_suggested_reply" type="button" class="btn btn-sm btn-success">
+                    <i class="fa fa-check me-1" title="Use Draft"></i> Use Draft
+                </button>
+                <button name="action_generate_ai_reply" type="button" class="btn btn-sm btn-outline-secondary">
+                    <i class="fa fa-refresh me-1" title="Regenerate"></i> Regenerate
+                </button>
+                <button name="action_start_ai_suggested_flow" type="button" class="btn btn-sm btn-outline-primary">
+                    <i class="fa fa-code-fork me-1" title="Start Suggested Flow"></i> Start Flow
+                </button>
+                <button name="action_open_ai_flow_manager" type="button" class="btn btn-sm btn-outline-primary">
+                    <i class="fa fa-sitemap me-1" title="Manage Flows"></i> Manage Flows
+                </button>
+                <button name="action_clear_ai_guidance" type="button" class="btn btn-sm btn-link text-muted">Clear</button>
+            `;
+            panel.appendChild(actions);
+        }
+
+        let content = panel.querySelector('.wa-ai-guidance-runtime');
+        if (!content) {
+            content = document.createElement('div');
+            content.className = 'wa-ai-guidance-runtime';
+            panel.insertBefore(content, actions);
+        }
+        content.innerHTML = data.ai_guidance_html || `
+            <div class="wa-ai-guidance-content">
+                <div class="wa-ai-guidance-title"><i class="fa fa-lightbulb-o"></i><strong>AI draft guidance</strong></div>
+                <div class="wa-ai-rows"><div class="wa-ai-row"><span>Draft ready</span><p>${this._escapeHtml(data.ai_suggested_reply || '')}</p></div></div>
+            </div>
+        `;
+
+        const useBtn = actions.querySelector('button[name="action_use_ai_suggested_reply"]');
+        if (useBtn) {
+            useBtn.classList.toggle('d-none', !data.ai_suggested_reply);
+        }
+        const flowBtn = actions.querySelector('button[name="action_start_ai_suggested_flow"]');
+        if (flowBtn) {
+            flowBtn.classList.toggle('d-none', !data.ai_suggested_flow_id);
+        }
+    }
+
+    async _loadAiGuidanceForActiveChat(formRoot = document) {
+        const chatId = this._getActiveChatId();
+        if (!chatId || this._aiGuidanceLoadedForChatId === chatId) return;
+        this._aiGuidanceLoadedForChatId = chatId;
+        try {
+            const rows = await this._rpc('whatsapp.chat', 'read', [[chatId], [
+                'ai_guidance_html',
+                'ai_suggested_reply',
+                'ai_intent',
+                'ai_sentiment',
+                'ai_urgency',
+                'ai_next_action',
+                'ai_suggested_tags',
+                'ai_suggested_flow_id',
+            ]]);
+            const data = rows?.[0] || {};
+            const hasGuidance = !!(
+                data.ai_guidance_html ||
+                data.ai_suggested_reply ||
+                data.ai_intent ||
+                data.ai_sentiment ||
+                data.ai_urgency ||
+                data.ai_next_action ||
+                data.ai_suggested_tags ||
+                data.ai_suggested_flow_id
+            );
+            const panel = formRoot.querySelector('.wa-ai-guidance');
+            if (!hasGuidance) {
+                if (panel) {
+                    panel.classList.add('d-none');
+                    const content = panel.querySelector('.wa-ai-guidance-runtime');
+                    if (content) content.innerHTML = '';
+                }
+                return;
+            }
+            this._renderAiGuidanceInPlace(data, formRoot);
+        } catch (error) {
+            this._aiGuidanceLoadedForChatId = null;
+            console.warn('[WhatsApp] AI guidance load failed:', error);
+        }
+    }
+
+    _showTransientComposerWarning(formRoot, message, anchorEl = null) {
+        const shortcutCard = anchorEl?.closest?.('.wa-action-shortcuts-card');
+        const composerSurface = formRoot.querySelector('.wa-composer-surface') || formRoot;
+        const target = shortcutCard || formRoot.querySelector('.wa-composer-input-wrap') || composerSurface;
+        const existing = target.querySelector('.wa-transient-warning');
+        if (existing) existing.remove();
+        const warning = document.createElement('div');
+        warning.className = 'alert alert-warning py-2 px-3 my-2 small wa-transient-warning';
+        warning.textContent = message;
+        target.appendChild(warning);
+        setTimeout(() => warning.remove(), 5000);
+    }
+
+    _escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
     async _switchChatContext(chatId, sidebarEl) {
-        if (!chatId || chatId === this._lastChatId) return;
+        if (!chatId) return;
+        const switchToken = ++this._activeChatSwitchToken;
+
+        // BUG FIX: Only skip if the chat is already fully loaded and displayed.
+        // The old guard `chatId === this._lastChatId` prevented re-opening a chat
+        // that appeared selected but whose form view hadn't actually rendered.
+        const mount = document.getElementById('wa-custom-history-mount');
+        if (chatId === this._lastChatId && mount && mount.querySelector('[data-wa-message-id]')) {
+            // Chat is already displayed with messages — just ensure sidebar highlight
+            document.querySelectorAll('.o_whatsapp_sidebar_item').forEach(el => {
+                const elId = parseInt(el.getAttribute('data-chat-id'));
+                el.classList.toggle('active', el === sidebarEl || elId === chatId);
+            });
+            if (this._isMobileViewport()) {
+                this._setMobilePanel('chat');
+            }
+            return;
+        }
 
         // 1. Update state instantly
         this._lastChatId = chatId;
         this._selectedChatId = chatId;
         sessionStorage.setItem('wa_selected_chat_id', chatId);
         this._lastHtml = null;
-        this._historyLimit = 100;
+        this._historyLimit = 50;
         this._userIsAtBottom = true;
         this._isPaging = false;
+        this._aiGuidanceLoadedForChatId = null;
+        this._setCleanChatUrl(chatId);
 
         // 2. Mark active sidebar item immediately (zero-latency visual)
         document.querySelectorAll('.o_whatsapp_sidebar_item').forEach(el => {
@@ -1372,8 +2456,8 @@ export class WhatsAppChatHandler {
         if (unreadBadge) unreadBadge.remove();
 
         // 4. Show loading skeleton in the history canvas instantly
-        const mount = document.getElementById('wa-custom-history-mount') || document.querySelector('.wa-chat-history-content-container');
         if (mount) {
+            mount.classList.add('wa-history-switching');
             mount.innerHTML = `
                 <div class="d-flex flex-column gap-3 p-4 wa-loading-skeleton">
                     <div class="d-flex justify-content-start"><div class="wa-skeleton-item rounded-3" style="width:55%;height:48px;"></div></div>
@@ -1387,17 +2471,45 @@ export class WhatsAppChatHandler {
 
         // 5. Switch Odoo active form view record natively
         try {
-            await this.actionService.doAction({
+            await this.actionService.doAction(this._normalizeActionViews({
                 type: 'ir.actions.act_window',
                 res_model: 'whatsapp.chat',
                 res_id: chatId,
                 views: [[false, 'form']],
                 target: 'current',
-            }, {
+                context: {
+                    wa_selected_chat_id: chatId,
+                    wa_history_limit: this._historyLimit,
+                    wa_ts: Date.now(),
+                },
+            }), {
                 stackPosition: 'replaceCurrentAction',
             });
+            if (switchToken !== this._activeChatSwitchToken) return;
+            this._setCleanChatUrl(chatId);
+            if (this._isMobileViewport()) {
+                this._setMobilePanel('chat');
+            }
+            const nextMount = await this._waitForHistoryMount(24, 80);
+            if (nextMount) {
+                nextMount.classList.add('wa-history-switching');
+            }
+            this._lastHtml = null;
+            await this._surgicalRefresh(chatId);
+            setTimeout(() => {
+                if (switchToken === this._activeChatSwitchToken && Number(this._selectedChatId) === Number(chatId)) {
+                    this._setCleanChatUrl(chatId);
+                    this._lastHtml = null;
+                    this._surgicalRefresh(chatId);
+                }
+            }, 350);
         } catch (err) {
             console.error('[WhatsApp] _switchChatContext actionService.doAction error:', err);
+            if (this._isMobileViewport()) {
+                this._setMobilePanel('chat');
+            }
+            this._lastHtml = null;
+            this._surgicalRefresh(chatId);
         }
     }
 
@@ -1410,19 +2522,52 @@ export class WhatsAppChatHandler {
     }
 
     // ── Surgical Refresh (scroll-aware) ────────────────────────────
+    _dedupeRenderedMessages(mount) {
+        const seen = new Set();
+        mount.querySelectorAll('[data-wa-message-id]').forEach((row) => {
+            const messageId = row.dataset.waMessageId;
+            if (!messageId) return;
+            if (seen.has(messageId)) {
+                row.remove();
+            } else {
+                seen.add(messageId);
+            }
+        });
+    }
+
     _mergeHistoryHtml(mount, nextHtml) {
+        this._dedupeRenderedMessages(mount);
         const template = document.createElement('template');
         template.innerHTML = nextHtml || '';
 
-        const currentIds = new Set(
-            Array.from(mount.querySelectorAll('[data-wa-message-id]')).map((row) => row.dataset.waMessageId)
-        );
+        const currentRows = Array.from(mount.querySelectorAll('[data-wa-message-id]'));
         const incomingRows = Array.from(template.content.querySelectorAll('[data-wa-message-id]'));
+        const currentIds = new Set(currentRows.map((row) => row.dataset.waMessageId));
+        const incomingIds = new Set(incomingRows.map((row) => row.dataset.waMessageId));
         const missingIds = new Set(
             incomingRows
                 .map((row) => row.dataset.waMessageId)
                 .filter((messageId) => messageId && !currentIds.has(messageId))
         );
+
+        const currentSequence = currentRows
+            .map((row) => row.dataset.waMessageId)
+            .filter((messageId) => incomingIds.has(messageId))
+            .join('|');
+        const incomingSequence = incomingRows
+            .map((row) => row.dataset.waMessageId)
+            .filter((messageId) => currentIds.has(messageId))
+            .join('|');
+        const lastExistingIndex = incomingRows.reduce((lastIndex, row, index) => {
+            return currentIds.has(row.dataset.waMessageId) ? index : lastIndex;
+        }, -1);
+        const missingBeforeExistingTail = incomingRows.some((row, index) => {
+            return missingIds.has(row.dataset.waMessageId) && index < lastExistingIndex;
+        });
+        if (currentSequence !== incomingSequence || missingBeforeExistingTail) {
+            mount.innerHTML = nextHtml || '';
+            return true;
+        }
 
         this._patchExistingMessages(mount, template.content);
         if (!missingIds.size) return false;
@@ -1476,7 +2621,7 @@ export class WhatsAppChatHandler {
                 }
             } else if (!currentTick && incomingTick) {
                 // If tick didn't exist but now does, append it to the timestamp container
-                const timeContainer = currentRow.querySelector('.d-flex.justify-content-end.align-items-center');
+                const timeContainer = currentRow.querySelector('.wa-msg-time') || currentRow.querySelector('.d-flex.justify-content-end.align-items-center');
                 if (timeContainer) {
                     timeContainer.appendChild(incomingTick.cloneNode(true));
                 }
@@ -1488,6 +2633,9 @@ export class WhatsAppChatHandler {
         const historyDiv = document.getElementById('wa_chat_history') || document.querySelector('.o_whatsapp_chat_history');
         const chatId = forceChatId || this._getActiveChatId();
         if (!historyDiv || !chatId) return;
+        if (forceChatId && this._selectedChatId && Number(forceChatId) !== Number(this._selectedChatId)) {
+            return;
+        }
 
         // Mark the matching sidebar item as active so _getActiveChatId() can find it next time
         if (chatId) {
@@ -1496,6 +2644,7 @@ export class WhatsAppChatHandler {
                 el.classList.toggle('active', elId === chatId);
             });
             this._selectedChatId = chatId;
+            this._lastChatId = chatId;
             sessionStorage.setItem('wa_selected_chat_id', chatId);
         }
 
@@ -1522,18 +2671,7 @@ export class WhatsAppChatHandler {
 
                         // --- MOBILE RESPONSIVENESS INIT ---
                         if (window.innerWidth <= 991) {
-                            const sidebar = document.querySelector('.wa-left-sidebar');
-                            const main = document.querySelector('.o_whatsapp_chat_main');
-                            const chatId = this._getActiveChatId();
-                            if (!chatId) {
-                                // No chat selected: show sidebar, hide main chat
-                                if (sidebar) { sidebar.classList.remove('d-none'); sidebar.classList.add('d-flex'); }
-                                if (main) main.classList.add('d-none');
-                            } else if (main && main.classList.contains('d-none')) {
-                                // Chat selected but main is hidden (shouldn't happen on refresh, but just in case)
-                                if (sidebar) { sidebar.classList.add('d-none'); sidebar.classList.remove('d-flex'); }
-                                main.classList.remove('d-none');
-                            }
+                            this._syncMobileLayout();
                         }
 
                         // --- BACK BUTTON HANDLER ---
@@ -1541,21 +2679,22 @@ export class WhatsAppChatHandler {
                         if (backBtn && !backBtn.dataset.bound) {
                             backBtn.dataset.bound = "true";
                             backBtn.addEventListener('click', () => {
-                                const sidebar = document.querySelector('.wa-left-sidebar');
-                                const main = document.querySelector('.o_whatsapp_chat_main');
-                                if (sidebar) { sidebar.classList.remove('d-none'); sidebar.classList.add('d-flex'); }
-                                if (main) main.classList.add('d-none');
+                                this._openMobileChatList();
                             });
                         }
                     } catch(e) { console.error(e); }
 
-                    const shouldReplace = this._isPaging || forceChatId || !mount.querySelector('[data-wa-message-id]');
+                    const isInitialLoad = !this._lastHtml;
+                    const shouldReplace = !newHtml || !this._lastHtml || this._isPaging || forceChatId || !mount.querySelector('[data-wa-message-id]');
+                    const shouldSoftReveal = shouldReplace && !this._isPaging && (isInitialLoad || !!forceChatId);
+                    if (shouldSoftReveal) {
+                        this._prepareHistorySoftReveal(mount);
+                    }
                     if (shouldReplace) {
                         mount.innerHTML = newHtml || '<div class="text-center text-muted py-5 small"><i class="fa fa-comments-o fa-2x d-block mb-2"></i>No messages yet</div>';
                     } else {
                         this._mergeHistoryHtml(mount, newHtml);
                     }
-                    const isInitialLoad = !this._lastHtml;
                     this._lastHtml = newHtml;
                     // Update footer session state in real-time
                     this._updateFooterSessionState(res.session_open);
@@ -1566,28 +2705,38 @@ export class WhatsAppChatHandler {
                         historyDiv.scrollTop = prevScrollTop + addedHeight;
                         this._isPaging = false;
                     } else if (isInitialLoad || this._userIsAtBottom || forceChatId) {
-                        this._scrollToBottom(true);
+                        this._scrollToBottom(true, { instant: isInitialLoad || !!forceChatId });
                     }
 
                     this._attachScrollListener();
                     if (this._bindTopObserver) this._bindTopObserver();
                     this._injectScrollFAB();
                     this._tickSlaTimers();
+                    this._enhanceComposer();
+                    if (shouldSoftReveal) {
+                        this._finishHistorySoftReveal(mount);
+                    } else {
+                        animateInboxRefresh(mount, { level: "subtle" });
+                    }
+                    mount.classList.remove('wa-history-switching');
                 }
             }
         } catch (e) {
             console.warn('[WhatsApp] Refresh error:', e);
             const mount = document.getElementById('wa-custom-history-mount') || historyDiv;
-            if (mount) mount.innerHTML = '<div class="alert alert-danger m-4">RPC Error: ' + String(e.message || e) + '</div>';
+            if (mount && (!forceChatId || Number(forceChatId) === Number(this._selectedChatId))) {
+                mount.classList.remove('wa-history-switching');
+                mount.innerHTML = '<div class="alert alert-danger m-4">RPC Error: ' + String(e.message || e) + '</div>';
+            }
         }
     }
 
     // ── Send Message via RPC (Optimistic UI) ───────────────────────
-    async _sendRPC(method, text) {
-        const chatId = this._getActiveChatId();
+    async _sendRPC(method, text, chatIdOverride = null, inputEl = null) {
+        const chatId = chatIdOverride || this._getActiveChatId();
         if (!chatId) return;
 
-        const input = document.querySelector('.wa-premium-input textarea') || document.querySelector('.wa-premium-input');
+        const input = inputEl || this._getComposerTextarea();
         if (input) input.value = '';
 
         // 1. Optimistic UI: Inject bubble instantly before server response
@@ -1610,6 +2759,7 @@ export class WhatsAppChatHandler {
                 </div>
             `;
             mount.insertAdjacentHTML('beforeend', tempBubble);
+            animateInboxRefresh(mount, { level: "subtle" });
             this._scrollToBottom(true);
         }
 
@@ -1656,6 +2806,212 @@ export class WhatsAppChatHandler {
                 is_active: isActive
             });
         } catch (e) { /* non-fatal */ }
+    }
+
+    // ── Composer Enhancements ───────────────────────────────────────
+    _getHistoryMount() {
+        return document.getElementById('wa-custom-history-mount')
+            || document.querySelector('.wa-chat-history-content-container')
+            || document.getElementById('wa_chat_history')
+            || document.querySelector('.o_whatsapp_chat_history')
+            || null;
+    }
+
+    _getComposerTextarea(root = document) {
+        const scope = root || document;
+        if (scope.matches?.('.wa-premium-input textarea')) return scope;
+        if (scope.matches?.('textarea.wa-premium-input')) return scope;
+        return scope.querySelector?.('.wa-premium-input textarea')
+            || scope.querySelector?.('textarea.wa-premium-input')
+            || null;
+    }
+
+    _enhanceComposer() {
+        const textarea = this._getComposerTextarea();
+        if (!textarea) return;
+        textarea.setAttribute('maxlength', '4096');
+        textarea.setAttribute('rows', textarea.getAttribute('rows') || '1');
+        textarea.setAttribute('autocomplete', 'off');
+        textarea.setAttribute('aria-label', 'Type a WhatsApp message');
+        this._resizeComposer(textarea);
+        this._updateComposerCounter(textarea);
+        document.querySelectorAll('.wa-footer-icon-btn[data-wa-label], .wa-attachment-wrapper[data-wa-label]').forEach((button) => {
+            const label = button.getAttribute('data-wa-label');
+            if (label && !button.getAttribute('aria-label')) {
+                button.setAttribute('aria-label', label);
+            }
+        });
+        this._loadAiGuidanceForActiveChat(textarea.closest('.o_form_view') || document);
+    }
+
+    _resizeComposer(textarea) {
+        if (!textarea || textarea.tagName !== 'TEXTAREA') return;
+        textarea.style.height = 'auto';
+        const minHeight = 44;
+        const maxHeight = 112;
+        const value = textarea.value || '';
+        const measuredHeight = value.trim() ? (textarea.scrollHeight || minHeight) : minHeight;
+        const nextHeight = Math.min(Math.max(measuredHeight, minHeight), maxHeight);
+        textarea.style.height = `${nextHeight}px`;
+        textarea.style.overflowY = (textarea.scrollHeight || 0) > maxHeight ? 'auto' : 'hidden';
+    }
+
+    _updateComposerCounter(textarea) {
+        if (!textarea) return;
+        const counter = document.getElementById('wa_composer_counter');
+        const meta = counter?.closest('.wa-composer-meta');
+        if (!counter || !meta) return;
+
+        const count = (textarea.value || '').length;
+        counter.textContent = `${count}/4096`;
+        meta.classList.toggle('wa-counter-warn', count >= 3500 && count < 4096);
+        meta.classList.toggle('wa-counter-danger', count >= 4096);
+    }
+
+    _getQuickReplyQuery(textarea) {
+        if (!textarea) return null;
+        const value = textarea.value || '';
+        const cursor = Number.isInteger(textarea.selectionStart) ? textarea.selectionStart : value.length;
+        const beforeCursor = value.slice(0, cursor);
+        const match = beforeCursor.match(/(^|\s)\/([^\s]*)$/);
+        return match ? (match[2] || '') : null;
+    }
+
+    _queueQuickReplySuggestions(textarea) {
+        const query = this._getQuickReplyQuery(textarea);
+        if (query === null) {
+            this._hideQuickReplyPopover();
+            return;
+        }
+
+        const chatId = this._getActiveChatId() || 'none';
+        const queryKey = `${chatId}:${query}`;
+        if (this._quickReplyQueryKey === queryKey && this._isQuickReplyOpen()) return;
+        this._quickReplyQueryKey = queryKey;
+
+        if (this._quickReplyFetchTimer) clearTimeout(this._quickReplyFetchTimer);
+        this._quickReplyFetchTimer = setTimeout(() => {
+            this._fetchQuickReplySuggestions(query, textarea);
+        }, 140);
+    }
+
+    _isQuickReplyOpen() {
+        const popover = document.getElementById('wa_quick_reply_popover');
+        return !!(popover && !popover.classList.contains('d-none'));
+    }
+
+    async _fetchQuickReplySuggestions(query = '', textarea = null) {
+        const input = textarea || this._getComposerTextarea();
+        const chatId = this._getActiveChatId();
+        if (!input) return;
+        const requestKey = `${chatId || 'none'}:${query || ''}`;
+        this._quickReplyQueryKey = requestKey;
+
+        try {
+            const items = await this._rpc('whatsapp.chat', 'get_quick_reply_suggestions', [chatId || false, query || '']);
+            if (this._quickReplyQueryKey !== requestKey) return;
+            this._quickReplyItems = Array.isArray(items) ? items : [];
+            this._quickReplyActiveIndex = 0;
+            this._renderQuickReplyPopover(this._quickReplyItems, input);
+        } catch (e) {
+            console.warn('[WhatsApp] Quick reply suggestions failed:', e);
+            this._hideQuickReplyPopover();
+        }
+    }
+
+    _renderQuickReplyPopover(items, textarea) {
+        const popover = document.getElementById('wa_quick_reply_popover');
+        if (!popover || !textarea) return;
+
+        if (!items.length) {
+            popover.innerHTML = '<div class="wa-quick-reply-empty">No quick replies</div>';
+            popover.classList.remove('d-none');
+            return;
+        }
+
+        popover.innerHTML = items.map((item, index) => `
+            <button type="button" class="wa-quick-reply-item ${index === this._quickReplyActiveIndex ? 'active' : ''}" data-index="${index}">
+                <span class="wa-quick-reply-shortcut">/${this._escapeHtml(item.shortcut || item.name || 'reply')}</span>
+                <span class="wa-quick-reply-title">${this._escapeHtml(item.name || item.shortcut || 'Quick reply')}</span>
+                <span class="wa-quick-reply-preview">${this._escapeHtml(item.preview || item.message || '')}</span>
+            </button>
+        `).join('');
+        popover.classList.remove('d-none');
+    }
+
+    _moveQuickReplySelection(delta) {
+        const total = this._quickReplyItems.length;
+        if (!total) return;
+
+        this._quickReplyActiveIndex = (this._quickReplyActiveIndex + delta + total) % total;
+        document.querySelectorAll('.wa-quick-reply-item').forEach((item, index) => {
+            const active = index === this._quickReplyActiveIndex;
+            item.classList.toggle('active', active);
+            if (active) item.scrollIntoView({ block: 'nearest' });
+        });
+    }
+
+    _insertQuickReply(item, textarea = null) {
+        const input = textarea || this._getComposerTextarea();
+        if (!item || !input) return;
+
+        const message = item.message || '';
+        const value = input.value || '';
+        const start = Number.isInteger(input.selectionStart) ? input.selectionStart : value.length;
+        const end = Number.isInteger(input.selectionEnd) ? input.selectionEnd : start;
+        const beforeCursor = value.slice(0, start);
+        const afterSelection = value.slice(end);
+        const slashMatch = beforeCursor.match(/(^|\s)\/([^\s]*)$/);
+
+        let nextValue;
+        let cursor;
+        if (slashMatch) {
+            const tokenStart = beforeCursor.length - slashMatch[0].length + (slashMatch[1] || '').length;
+            nextValue = value.slice(0, tokenStart) + message + afterSelection;
+            cursor = tokenStart + message.length;
+        } else {
+            const separator = value && !/[\s\n]$/.test(beforeCursor) ? ' ' : '';
+            nextValue = value.slice(0, start) + separator + message + afterSelection;
+            cursor = start + separator.length + message.length;
+        }
+
+        if (nextValue.length > 4096) {
+            nextValue = nextValue.slice(0, 4096);
+            cursor = Math.min(cursor, 4096);
+        }
+
+        input.value = nextValue;
+        input.focus();
+        if (input.setSelectionRange) input.setSelectionRange(cursor, cursor);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        this._resizeComposer(input);
+        this._updateComposerCounter(input);
+        this._hideQuickReplyPopover();
+    }
+
+    _hideQuickReplyPopover() {
+        const popover = document.getElementById('wa_quick_reply_popover');
+        if (popover) {
+            popover.classList.add('d-none');
+            popover.innerHTML = '';
+        }
+        this._quickReplyItems = [];
+        this._quickReplyActiveIndex = 0;
+        this._quickReplyQueryKey = null;
+        if (this._quickReplyFetchTimer) {
+            clearTimeout(this._quickReplyFetchTimer);
+            this._quickReplyFetchTimer = null;
+        }
+    }
+
+    _escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
     }
 
     // ── Footer Session State ────────────────────────────────────────
@@ -1756,8 +3112,15 @@ export class WhatsAppChatHandler {
                     b.onmouseover = () => b.style.transform = 'scale(1.2)';
                     b.onmouseout = () => b.style.transform = 'scale(1)';
                     b.onclick = () => {
-                        const t = document.querySelector('.wa-premium-input textarea') || document.querySelector('.wa-premium-input');
-                        if (t) { t.value += e; t.focus(); }
+                        const t = this._getComposerTextarea(btn.closest('.o_form_view') || document);
+                        if (t) {
+                            t.value = (t.value || '') + e;
+                            t.focus();
+                            t.dispatchEvent(new Event('input', { bubbles: true }));
+                            t.dispatchEvent(new Event('change', { bubbles: true }));
+                            this._resizeComposer(t);
+                            this._updateComposerCounter(t);
+                        }
                         p.remove();
                     };
                     grid.appendChild(b);
@@ -1778,30 +3141,94 @@ export class WhatsAppChatHandler {
     }
 
     // ── Helpers ────────────────────────────────────────────────────
+    _getSidebarActiveChatId() {
+        const sidebarActive = document.querySelector('.o_whatsapp_sidebar_item.active');
+        if (!sidebarActive) return null;
+        const id = parseInt(sidebarActive.getAttribute('data-chat-id'));
+        return id || null;
+    }
+
+    _getChatIdForUserAction(triggerEl = null) {
+        const sidebarId = this._getSidebarActiveChatId();
+        if (sidebarId) return sidebarId;
+
+        const formView = triggerEl?.closest?.('.o_form_view[data-model="whatsapp.chat"][data-res-id]');
+        if (formView) {
+            const id = parseInt(formView.getAttribute('data-res-id'));
+            if (id) return id;
+        }
+
+        return this._getActiveChatId();
+    }
+
+    _setCleanChatUrl(chatId) {
+        if (!chatId || !window.history?.replaceState) return;
+        try {
+            const cleanUrl = `${window.location.origin}/odoo/whatsapp.chat/${chatId}${window.location.search || ''}`;
+            if (window.location.href !== cleanUrl) {
+                window.history.replaceState(window.history.state || {}, '', cleanUrl);
+            }
+        } catch (error) {
+            console.warn('[WhatsApp] Could not normalize chat URL:', error);
+        }
+    }
+
+    async _waitForHistoryMount(attempts = 14, delayMs = 70) {
+        for (let i = 0; i < attempts; i++) {
+            const mount = document.getElementById('wa-custom-history-mount');
+            const historyDiv = document.getElementById('wa_chat_history') || document.querySelector('.o_whatsapp_chat_history');
+            if (mount && historyDiv) {
+                return mount;
+            }
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+        return document.getElementById('wa-custom-history-mount');
+    }
+
     _getActiveChatId() {
         const hasChatDOM = !!(document.getElementById('wa_chat_history') || 
                               document.getElementById('wa-custom-history-mount') ||
                               document.querySelector('.o_whatsapp_chat_history') ||
                               document.querySelector('.wa-chat-history-content-container'));
 
-        if (hasChatDOM) {
-            // 1. Odoo 19 URL path: /odoo/whatsapp.chat/123 or /odoo/whatsapp-chats/123
-            const pathMatch = window.location.pathname.match(/\/odoo\/whatsapp\.chat\/(\d+)/) || 
-                              window.location.pathname.match(/\/odoo\/whatsapp-chats\/(\d+)/) ||
-                              window.location.pathname.match(/\/odoo\/[^/]+\/(\d+)/);
-            if (pathMatch) {
-                const id = parseInt(pathMatch[1]);
-                if (id) {
-                    this._selectedChatId = id;
-                    this._lastChatId = id;
-                    return id;
-                }
-            }
+        if (!hasChatDOM) {
+            // Staleness guard: Clear all cached IDs when view is destroyed/navigated away
+            this._selectedChatId = null;
+            this._lastChatId = null;
+            this._lastHtml = null;
+            return null;
+        }
 
-            // 2. Odoo legacy hash: #id=123 or #res_id=123
-            const hash = window.location.hash.slice(1);
-            if (hash) {
-                const params = new URLSearchParams(hash);
+        // In the Team Inbox hybrid view, the active sidebar row is the
+        // freshest selection. Odoo can briefly keep the previous form res_id
+        // while replacing records, so this prevents wrong-chat actions.
+        const sidebarId = this._getSidebarActiveChatId();
+        if (sidebarId) {
+            this._selectedChatId = sidebarId;
+            this._lastChatId = sidebarId;
+            return sidebarId;
+        }
+
+        // 1. Strict Odoo 19 URL path checks. If the router accidentally stacked
+        // paths, use the last chat id because it reflects the latest click.
+        const pathMatches = Array.from(
+            window.location.pathname.matchAll(/(?:\/odoo)?\/(?:whatsapp\.chat|whatsapp-chats)\/(\d+)/g)
+        );
+        if (pathMatches.length) {
+            const id = parseInt(pathMatches[pathMatches.length - 1][1]);
+            if (id) {
+                this._selectedChatId = id;
+                this._lastChatId = id;
+                return id;
+            }
+        }
+
+        // 2. Strict Odoo legacy hash check (only if model is whatsapp.chat)
+        const hash = window.location.hash.slice(1);
+        if (hash) {
+            const params = new URLSearchParams(hash);
+            const model = params.get('model');
+            if (!model || model === 'whatsapp.chat') {
                 const id = params.get('id') || params.get('res_id');
                 if (id) {
                     const parsedId = parseInt(id);
@@ -1812,38 +3239,27 @@ export class WhatsAppChatHandler {
                     }
                 }
             }
+        }
 
-            // 3. Odoo form view hidden input (injected by form renderer)
-            const hiddenResId = document.querySelector('input[name="id"], [data-res-id]');
-            if (hiddenResId) {
-                const id = parseInt(hiddenResId.value || hiddenResId.getAttribute('data-res-id'));
-                if (id) {
-                    this._selectedChatId = id;
-                    this._lastChatId = id;
-                    return id;
-                }
+        // 3. Odoo form view hidden input (only for whatsapp.chat model)
+        const hiddenResId = document.querySelector('.o_form_view[data-model="whatsapp.chat"] input[name="id"]');
+        if (hiddenResId) {
+            const id = parseInt(hiddenResId.value);
+            if (id) {
+                this._selectedChatId = id;
+                this._lastChatId = id;
+                return id;
             }
+        }
 
-            // 4. Read from the data attribute Odoo sets on .o_form_view
-            const formView = document.querySelector('.o_form_view[data-res-id]');
-            if (formView) {
-                const id = parseInt(formView.getAttribute('data-res-id'));
-                if (id) {
-                    this._selectedChatId = id;
-                    this._lastChatId = id;
-                    return id;
-                }
-            }
-
-            // 5. Sidebar active item (team inbox list-form hybrid view)
-            const sidebarActive = document.querySelector('.o_whatsapp_sidebar_item.active');
-            if (sidebarActive) {
-                const id = parseInt(sidebarActive.getAttribute('data-chat-id'));
-                if (id) {
-                    this._selectedChatId = id;
-                    this._lastChatId = id;
-                    return id;
-                }
+        // 4. Read from the data attribute Odoo sets on .o_form_view (whatsapp.chat only)
+        const formView = document.querySelector('.o_form_view[data-model="whatsapp.chat"][data-res-id]');
+        if (formView) {
+            const id = parseInt(formView.getAttribute('data-res-id'));
+            if (id) {
+                this._selectedChatId = id;
+                this._lastChatId = id;
+                return id;
             }
         }
 
@@ -1861,7 +3277,7 @@ export class WhatsAppChatHandler {
             }
         }
 
-        // 8. Fallback: State atomic cache
+        // 8. Fallback: State cache
         if (this._lastChatId) {
             return this._lastChatId;
         }
@@ -1879,8 +3295,12 @@ export class WhatsAppChatHandler {
             this._componentInitInterval = null;
         }
         if (this._refreshInterval) {
-            clearInterval(this._refreshInterval);
+            clearTimeout(this._refreshInterval);
             this._refreshInterval = null;
+        }
+        if (this._mobileResizeTimer) {
+            clearTimeout(this._mobileResizeTimer);
+            this._mobileResizeTimer = null;
         }
         if (this._presenceInterval) {
             clearInterval(this._presenceInterval);
@@ -1896,6 +3316,7 @@ export class WhatsAppChatHandler {
         }
         if (this._boundHashChange) {
             window.removeEventListener('hashchange', this._boundHashChange);
+            window.removeEventListener('popstate', this._boundHashChange); // BUG 9 FIX: clean up popstate listener too
             this._boundHashChange = null;
         }
         if (this._boundVisibilityChange) {
@@ -1906,19 +3327,39 @@ export class WhatsAppChatHandler {
             document.removeEventListener('click', this._boundGlobalClick, true);
             this._boundGlobalClick = null;
         }
+        if (this._boundResize) {
+            window.removeEventListener('resize', this._boundResize);
+            this._boundResize = null;
+        }
+        if (this._boundMobileKeydown) {
+            window.removeEventListener('keydown', this._boundMobileKeydown);
+            this._boundMobileKeydown = null;
+        }
         if (this._boundKeydown) {
             document.removeEventListener('keydown', this._boundKeydown);
             this._boundKeydown = null;
+        }
+        if (this._boundComposerInput) {
+            document.removeEventListener('input', this._boundComposerInput);
+            this._boundComposerInput = null;
+        }
+        if (this._quickReplyFetchTimer) {
+            clearTimeout(this._quickReplyFetchTimer);
+            this._quickReplyFetchTimer = null;
         }
         if (this.socket) {
             this.socket.disconnect();
             this.socket = null;
         }
+        if (this._busSubscriptions) {
+            this._busSubscriptions.forEach(({ type, callback }) => {
+                this.bus.unsubscribe(type, callback);
+            });
+            this._busSubscriptions = null;
+        }
     }
 
-    async _rpc(model, method, args = [], kwargs = {}) {
-        return this.orm.call(model, method, args, kwargs);
-    }
+    // BUG 2 FIX: Removed duplicate _rpc definition — primary is at line 272
 }
 
 registry.category("services").add("whatsapp_realtime", {

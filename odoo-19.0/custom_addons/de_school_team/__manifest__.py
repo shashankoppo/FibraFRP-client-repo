@@ -27,7 +27,6 @@ dmission team management simplifies coordination, communication, and task delega
         'views/admission_tag_views.xml',
         'views/student_views.xml',
     ],
-    'license': 'LGPL-3',
     'images': ['static/description/banner.gif'],
     'installable': True,
     'application': False,

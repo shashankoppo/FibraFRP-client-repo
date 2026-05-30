@@ -51,5 +51,4 @@ Dashboard / Reports for Warehouse Management includes:
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

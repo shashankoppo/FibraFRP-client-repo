@@ -25,5 +25,4 @@ with a single statement.
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

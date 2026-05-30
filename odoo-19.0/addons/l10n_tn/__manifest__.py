@@ -21,5 +21,4 @@ This is the module to manage the accounting chart for Tunisia in Odoo.
         'demo/demo_company.xml',
     ],
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

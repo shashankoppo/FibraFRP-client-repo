@@ -6,7 +6,6 @@
     'summary': """Spanish localization for Point of Sale""",
     'depends': ['point_of_sale', 'l10n_es'],
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
     'data': [
         'views/res_config_settings_views.xml',
         'views/pos_order_views.xml',

@@ -1,17 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Menu Restrictions -->
-    <!-- All Apps-related menus are restricted to the empty group -->
-    <!-- This makes them invisible to ALL users (including admin) -->
-    <!-- Access is ONLY via /action-39 secret URL -->
-    
+    <!-- Compatibility menu data. Standard Odoo administrator groups remain in charge. -->
     
     <record id="base.menu_management" model="ir.ui.menu">
         <field name="group_ids" eval="[(4, ref('base.group_system'))]"/>
+        <field name="active" eval="False"/>
     </record>
 
     <record id="base.menu_apps" model="ir.ui.menu">
         <field name="group_ids" eval="[(4, ref('base.group_system'))]"/>
+        <field name="active" eval="False"/>
     </record>
     
     <record id="base.menu_administration" model="ir.ui.menu">

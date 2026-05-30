@@ -2,10 +2,10 @@
 {
     'name': "ELSX Bank Reconciliation AI Engine",
     'summary': """
-        Enterprise Parity: Python-based Heuristic & ML Reconcile engine.""",
+        Python-based Heuristic & ML Reconcile engine.""",
     'description': """
-        Provides advanced fuzzy matching and machine learning equivalent to
-        the proprietary Enterprise bank reconciliation automation features.
+        Provides advanced fuzzy matching and machine-learning assisted
+        reconciliation automation.
     """,
     'author': "ELSX",
     'category': 'Accounting/Accounting',

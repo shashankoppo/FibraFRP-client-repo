@@ -8,5 +8,4 @@
     'depends': ['test_inherit', 'test_orm'],
     'installable': True,
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

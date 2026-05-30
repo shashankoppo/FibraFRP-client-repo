@@ -1,9 +1,8 @@
 {
     'name': 'ELSX eSignature (HR Ecosystem)',
     'version': '1.0',
-    'summary': 'Enterprise Parity: Digital Signing & Approvals',
+    'summary': 'Digital Signing & Approvals',
     'description': """
-        Replaces Odoo Enterprise 'Sign' app.
         Allows HR and users to send documents (PDFs) for digital e-signatures
         with legally binding hash logs and public facing Canvas links.
     """,

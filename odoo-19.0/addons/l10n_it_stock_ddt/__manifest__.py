@@ -32,5 +32,4 @@ invoice line to export in the FatturaPA XML.
     'auto_install': True,
     'post_init_hook': '_create_picking_seq',
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

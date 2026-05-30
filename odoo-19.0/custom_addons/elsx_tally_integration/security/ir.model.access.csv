@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_elsx_tally_sync_log_user,elsx.tally.sync.log.user,model_elsx_tally_sync_log,account.group_account_readonly,1,0,0,0
+access_elsx_tally_sync_log_manager,elsx.tally.sync.log.manager,model_elsx_tally_sync_log,account.group_account_manager,1,1,1,1

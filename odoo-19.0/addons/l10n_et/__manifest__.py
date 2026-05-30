@@ -27,5 +27,4 @@ This is the latest Ethiopian Odoo localization and consists of:
     'demo': [
         'demo/demo_company.xml',
     ],
-    'license': 'LGPL-3',
 }

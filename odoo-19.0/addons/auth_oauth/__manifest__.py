@@ -22,5 +22,4 @@ Allow users to login through OAuth2 Provider.
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

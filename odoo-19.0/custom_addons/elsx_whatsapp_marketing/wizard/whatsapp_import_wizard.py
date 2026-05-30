@@ -14,6 +14,15 @@ class WhatsAppImportWizard(models.TransientModel):
     _name = 'whatsapp.import.wizard'
     _description = 'WhatsApp Contact Import Wizard'
 
+    @api.model
+    def _default_account_id(self):
+        return self.env['whatsapp.account']._get_default_account()
+
+    @api.model
+    def _default_country_code(self):
+        account = self._default_account_id()
+        return account.default_country_code if account and account.default_country_code else '91'
+
     file = fields.Binary('Select File', required=True)
     file_name = fields.Char('File Name')
     file_type = fields.Selection([
@@ -21,13 +30,13 @@ class WhatsAppImportWizard(models.TransientModel):
         ('excel', 'Excel File'),
     ], string='File Format', required=True, default='excel')
     
-    account_id = fields.Many2one('whatsapp.account', string='WhatsApp Account', required=True)
+    account_id = fields.Many2one('whatsapp.account', string='WhatsApp Account', required=True, default=_default_account_id)
     campaign_id = fields.Many2one('whatsapp.campaign', string='Add to Campaign')
     
     auto_format_numbers = fields.Boolean('Auto-format Phone Numbers', default=True, help="Removes spaces, dashes, and ensures country code.")
     default_country_code = fields.Char(
         'Default Country Code',
-        default=lambda self: self.env['whatsapp.account'].search([('active', '=', True)], limit=1).default_country_code or '91',
+        default=_default_country_code,
         help="e.g. 91 for India",
     )
 

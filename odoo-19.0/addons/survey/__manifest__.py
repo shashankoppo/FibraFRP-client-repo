@@ -110,5 +110,4 @@ sent mails with personal token for the invitation of the survey.
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

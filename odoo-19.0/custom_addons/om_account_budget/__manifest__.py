@@ -8,7 +8,6 @@
     'sequence': 10,
     'website': 'https://www.odoomates.tech',
     'depends': ['account'],
-    'license': 'LGPL-3',
     'data': [
         'security/ir.model.access.csv',
         'security/security.xml',

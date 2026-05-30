@@ -77,5 +77,4 @@ This module also uses analytic accounting and is compatible with the invoice on 
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

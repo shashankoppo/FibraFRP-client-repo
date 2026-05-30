@@ -18,6 +18,413 @@
         </field>
     </record>
 
+    <record id="whatsapp_bot_flow_step_view_form" model="ir.ui.view">
+        <field name="name">whatsapp.bot.flow.step.form</field>
+        <field name="model">whatsapp.bot.flow.step</field>
+        <field name="arch" type="xml">
+            <form string="Configure Flow Step">
+                <header>
+                    <button name="action_view_buttons" type="object" string="Configure Options" class="btn-secondary" icon="fa-list-ul" invisible="action_type not in ['send_buttons', 'send_list']"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="Step Name"/></h1>
+                    </div>
+                    <group>
+                        <group string="Step Identity">
+                            <field name="flow_id" readonly="1"/>
+                            <field name="account_id" invisible="1"/>
+                            <field name="step_number"/>
+                            <field name="action_type"/>
+                            <field name="next_step_id" domain="[('flow_id', '=', flow_id)]"/>
+                            <field name="node_id"/>
+                        </group>
+                        <group string="Action Configuration">
+                    <field name="message_text" invisible="action_type not in ['send_text', 'send_buttons', 'send_list', 'send_media', 'create_lead', 'ask_question', 'send_catalog', 'send_cta_url', 'send_form_link', 'send_payment_link']" placeholder="Hi {{name}}, how can we help today?"/>
+                            <field name="button_header_text" invisible="action_type not in ['send_buttons', 'send_list', 'send_cta_url', 'send_catalog']" placeholder="Optional short header"/>
+                            <field name="button_footer_text" invisible="action_type not in ['send_buttons', 'send_list', 'send_cta_url', 'send_catalog']" placeholder="Optional footer"/>
+                            <field name="list_button_text" invisible="action_type != 'send_list'"/>
+                            <field name="list_section_title" invisible="action_type != 'send_list'"/>
+                    <field name="cta_button_text" invisible="action_type != 'send_cta_url'" placeholder="Open Catalogue"/>
+                    <field name="cta_button_url" invisible="action_type != 'send_cta_url'" placeholder="https://..."/>
+                    <field name="form_id" invisible="action_type != 'send_form_link'" placeholder="Leave empty to use account default form"/>
+                    <field name="payment_mode" invisible="action_type != 'send_payment_link'"/>
+                            <field name="template_id" invisible="action_type != 'send_template'" domain="[('account_id', '=', account_id), ('status', '=', 'approved')]"/>
+                            <field name="media_id" invisible="action_type != 'send_media'" domain="[('account_id', '=', account_id)]"/>
+                            <field name="delay_seconds" invisible="action_type != 'delay'"/>
+                            <field name="assign_user_id" invisible="action_type != 'transfer'"/>
+                            <field name="assign_team_member_ids" widget="many2many_tags" invisible="action_type != 'assign_team'"/>
+                            <field name="assign_tag_id" invisible="action_type != 'assign_tag'"/>
+                            <field name="chat_status" invisible="action_type != 'chat_status'"/>
+                            <field name="contact_attribute_name" invisible="action_type != 'update_contact'"/>
+                            <field name="contact_attribute_value" invisible="action_type != 'update_contact'"/>
+                            <field name="catalog_message_type" invisible="action_type != 'send_catalog'"/>
+                            <field name="catalog_id" invisible="action_type != 'send_catalog'"/>
+                            <field name="product_retailer_id" invisible="action_type != 'send_catalog' or catalog_message_type == 'multi_product'"/>
+                            <field name="product_retailer_ids" invisible="action_type != 'send_catalog' or catalog_message_type != 'multi_product'"/>
+                            <field name="thumbnail_product_retailer_id" invisible="action_type != 'send_catalog' or catalog_message_type != 'catalog_message'"/>
+                            <field name="catalog_section_title" invisible="action_type != 'send_catalog' or catalog_message_type != 'multi_product'"/>
+                            <field name="input_validation_type" invisible="action_type != 'ask_question'"/>
+                            <field name="max_attempts" invisible="action_type != 'ask_question'"/>
+                            <field name="timeout_minutes" invisible="action_type != 'ask_question'"/>
+                            <field name="invalid_message" invisible="action_type != 'ask_question'"/>
+                            <field name="invalid_step_id" invisible="action_type != 'ask_question'" domain="[('flow_id', '=', flow_id)]"/>
+                            <field name="timeout_step_id" invisible="action_type != 'ask_question'" domain="[('flow_id', '=', flow_id)]"/>
+                            <field name="fallback_step_id" invisible="action_type not in ['ask_question', 'send_buttons', 'send_list']" domain="[('flow_id', '=', flow_id)]"/>
+                            <field name="variable_name" invisible="action_type != 'set_variable'"/>
+                            <field name="variable_value" invisible="action_type != 'set_variable'" placeholder="WhatsApp"/>
+                            <field name="response_variable" invisible="action_type not in ['wait_response', 'ask_question']" placeholder="last_reply"/>
+                            <field name="http_method" invisible="action_type != 'http_request'"/>
+                            <field name="http_url" invisible="action_type != 'http_request'" placeholder="https://api.example.com/endpoint"/>
+                            <field name="http_auth_type" invisible="action_type != 'http_request'"/>
+                            <field name="http_auth_token" password="True" invisible="action_type != 'http_request' or http_auth_type != 'bearer'"/>
+                            <field name="http_username" invisible="action_type != 'http_request' or http_auth_type != 'basic'"/>
+                            <field name="http_password" password="True" invisible="action_type != 'http_request' or http_auth_type != 'basic'"/>
+                            <field name="http_headers" invisible="action_type != 'http_request'"/>
+                            <field name="http_query_params" invisible="action_type != 'http_request'"/>
+                            <field name="http_payload" invisible="action_type != 'http_request'" placeholder='{"phone": "{{phone}}", "name": "{{name}}"}'/>
+                            <field name="http_response_path" invisible="action_type != 'http_request'"/>
+                            <field name="http_success_step_id" invisible="action_type != 'http_request'" domain="[('flow_id', '=', flow_id)]"/>
+                            <field name="http_failure_step_id" invisible="action_type != 'http_request'" domain="[('flow_id', '=', flow_id)]"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Attributes / Samples" name="attributes_samples">
+                            <group>
+                                <field name="placeholder_help" readonly="1" nolabel="1"/>
+                    <field name="message_preview" readonly="1" invisible="action_type not in ['send_text', 'send_buttons', 'send_list', 'send_media', 'create_lead', 'ask_question', 'send_catalog', 'send_cta_url', 'send_form_link', 'send_payment_link']"/>
+                            </group>
+                        </page>
+                        <page string="Routing / Condition" name="routing">
+                            <group>
+                                <group string="Default Route">
+                                    <field name="next_step_id" domain="[('flow_id', '=', flow_id)]"/>
+                                    <field name="condition_on_previous"/>
+                                </group>
+                                <group string="Conditional Route" invisible="action_type == 'condition'">
+                                    <div class="alert alert-info" role="alert">
+                                        Conditional routing fields appear when Action is Conditional Logic.
+                                    </div>
+                                </group>
+                                <group string="Conditional Route" invisible="action_type != 'condition'">
+                                    <field name="condition_type"/>
+                                    <field name="condition_source"/>
+                                    <field name="condition_variable" invisible="condition_source != 'variable'"/>
+                                    <field name="condition_operator"/>
+                                    <field name="condition_value"/>
+                                    <field name="condition_true_step" domain="[('flow_id', '=', flow_id)]"/>
+                                    <field name="condition_false_step" domain="[('flow_id', '=', flow_id)]"/>
+                                    <field name="condition_branch_ids" nolabel="1">
+                                        <list editable="bottom">
+                                            <field name="sequence" widget="handle"/>
+                                            <field name="name"/>
+                                            <field name="operator"/>
+                                            <field name="value"/>
+                                            <field name="next_step_id"/>
+                                        </list>
+                                    </field>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Variables / Wait" name="variables">
+                            <group>
+                                <group string="Variables / Wait" invisible="action_type in ['wait_response', 'set_variable', 'send_buttons', 'send_list', 'ask_question']">
+                                    <div class="alert alert-info" role="alert">
+                                        Wait and variable fields appear when Action is Wait for Response or Set Variable.
+                                    </div>
+                                </group>
+                                <group string="Save Customer Reply" invisible="action_type not in ['wait_response', 'send_buttons', 'send_list', 'ask_question']">
+                                    <field name="save_response"/>
+                                    <field name="response_variable"/>
+                                </group>
+                                <group string="Ask / Collect Input" invisible="action_type != 'ask_question'">
+                                    <field name="message_text"/>
+                                    <field name="input_validation_type"/>
+                                    <field name="max_attempts"/>
+                                    <field name="timeout_minutes"/>
+                                    <field name="invalid_message"/>
+                                    <field name="invalid_step_id" domain="[('flow_id', '=', flow_id)]"/>
+                                    <field name="timeout_step_id" domain="[('flow_id', '=', flow_id)]"/>
+                                    <field name="fallback_step_id" domain="[('flow_id', '=', flow_id)]"/>
+                                </group>
+                                <group string="Set Variable" invisible="action_type != 'set_variable'">
+                                    <field name="variable_name"/>
+                                    <field name="variable_value"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Assignment / CRM" name="assignment">
+                            <group>
+                                <group string="Assignment / CRM" invisible="action_type in ['transfer', 'assign_team', 'assign_tag', 'create_lead', 'chat_status', 'update_contact']">
+                                    <div class="alert alert-info" role="alert">
+                                        Assignment and CRM fields appear when Action is Transfer to Agent, Assign Tag, or Create Lead.
+                                    </div>
+                                </group>
+                                <group string="Assignment" invisible="action_type not in ['transfer', 'assign_team', 'assign_tag']">
+                                    <field name="assign_user_id"/>
+                                    <field name="assign_team_member_ids" widget="many2many_tags" invisible="action_type != 'assign_team'"/>
+                                    <field name="assign_tag_id"/>
+                                </group>
+                                <group string="Lead" invisible="action_type != 'create_lead'">
+                                    <div class="alert alert-info" role="alert">
+                                        Use Message Text in Action Configuration for the optional CRM lead note.
+                                    </div>
+                                </group>
+                                <group string="Chat Status" invisible="action_type != 'chat_status'">
+                                    <field name="chat_status"/>
+                                </group>
+                                <group string="Contact Attribute" invisible="action_type != 'update_contact'">
+                                    <field name="contact_attribute_name"/>
+                                    <field name="contact_attribute_value"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Catalog / URL / Commerce" name="catalog_url">
+                            <group>
+                                <group string="URL Button" invisible="action_type != 'send_cta_url'">
+                                    <field name="message_text"/>
+                                    <field name="button_header_text"/>
+                                    <field name="button_footer_text"/>
+                                    <field name="cta_button_text"/>
+                                    <field name="cta_button_url" placeholder="Leave empty to use account Shop / Catalogue URL"/>
+                                    <div class="alert alert-info" role="alert" colspan="2">
+                                        WhatsApp CTA URL messages support one URL button. They are session messages, so use an approved template when the 24-hour window is closed.
+                                    </div>
+                                </group>
+                                <group string="Catalog / Shop" invisible="action_type != 'send_catalog'">
+                                    <field name="catalog_message_type"/>
+                                    <field name="message_text"/>
+                                    <field name="button_header_text" invisible="catalog_message_type == 'single_product'"/>
+                                    <field name="button_footer_text"/>
+                                    <field name="catalog_id" placeholder="Leave empty to use account Meta Catalog ID"/>
+                                    <field name="product_retailer_id" invisible="catalog_message_type == 'multi_product'"/>
+                                    <field name="product_retailer_ids" invisible="catalog_message_type != 'multi_product'" placeholder="One product/content ID per line"/>
+                                    <field name="thumbnail_product_retailer_id" invisible="catalog_message_type != 'catalog_message'"/>
+                                    <field name="catalog_section_title" invisible="catalog_message_type != 'multi_product'"/>
+                                    <div class="alert alert-info" role="alert" colspan="2">
+                                        Use Full Catalog to open the WhatsApp shop, Single Product for one item, and Multi-Product List for up to 30 product IDs.
+                                    </div>
+                                </group>
+                                <group string="Form Link" invisible="action_type != 'send_form_link'">
+                                    <field name="message_text" placeholder="Please fill this short form: {{form_url}}"/>
+                                    <field name="form_id" placeholder="Leave empty to use account default form"/>
+                                    <div class="alert alert-info" role="alert" colspan="2">
+                                        Form links are tokenized public links. Submissions stay in WhatsApp Form Submissions until a user reviews and creates/updates CRM data.
+                                    </div>
+                                </group>
+                                <group string="Payment Link" invisible="action_type != 'send_payment_link'">
+                                    <field name="message_text" placeholder="Here is your payment link: {{payment_url}}"/>
+                                    <field name="payment_mode"/>
+                                    <div class="alert alert-warning" role="alert" colspan="2">
+                                        Payment links use the WhatsApp Account payment mode. Enable Manual URL or Odoo Invoice / Quote Link on the account first.
+                                    </div>
+                                </group>
+                                <group string="Catalog / URL / Commerce" invisible="action_type in ['send_cta_url', 'send_catalog', 'send_form_link', 'send_payment_link']">
+                                    <div class="alert alert-info" role="alert">
+                                        URL, catalog, form, and payment fields appear when the matching commerce action is selected.
+                                    </div>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="HTTP / Delay" name="http_delay">
+                            <group>
+                                <group string="HTTP / Delay" invisible="action_type in ['http_request', 'delay']">
+                                    <div class="alert alert-info" role="alert">
+                                        HTTP and delay fields appear when Action is HTTP Request or Add Delay.
+                                    </div>
+                                </group>
+                                <group string="HTTP Request" invisible="action_type != 'http_request'">
+                                    <field name="http_method"/>
+                                    <field name="http_url"/>
+                                    <field name="http_auth_type"/>
+                                    <field name="http_auth_token" password="True" invisible="http_auth_type != 'bearer'"/>
+                                    <field name="http_username" invisible="http_auth_type != 'basic'"/>
+                                    <field name="http_password" password="True" invisible="http_auth_type != 'basic'"/>
+                                    <field name="http_headers"/>
+                                    <field name="http_query_params"/>
+                                    <field name="http_payload"/>
+                                    <field name="response_variable"/>
+                                    <field name="http_response_path"/>
+                                    <field name="http_success_step_id" domain="[('flow_id', '=', flow_id)]"/>
+                                    <field name="http_failure_step_id" domain="[('flow_id', '=', flow_id)]"/>
+                                </group>
+                                <group string="Delay" invisible="action_type != 'delay'">
+                                    <field name="delay_seconds"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Buttons" name="buttons">
+                            <div class="alert alert-info" role="alert" invisible="action_type in ['send_buttons', 'send_list']">
+                                Option rows appear when Action is Send Buttons/Quick Replies or Send List Menu.
+                            </div>
+                            <div class="alert alert-info" role="alert" invisible="action_type not in ['send_buttons', 'send_list']">
+                                Add one row per customer option. Quick Reply supports up to 3 buttons; List Menu supports up to 10 rows. Button Text is what the customer sees. Button ID is the payload/keyword saved from WhatsApp. Go To Step controls where the flow continues.
+                            </div>
+                            <group invisible="action_type not in ['send_buttons', 'send_list']">
+                                <group string="Message Layout">
+                                    <field name="button_header_text"/>
+                                    <field name="button_footer_text"/>
+                                </group>
+                                <group string="List Settings" invisible="action_type != 'send_list'">
+                                    <field name="list_button_text"/>
+                                    <field name="list_section_title"/>
+                                </group>
+                            </group>
+                            <field name="button_ids" nolabel="1" invisible="action_type not in ['send_buttons', 'send_list']">
+                                <list editable="bottom" open_form_view="1">
+                                    <button name="action_open_button_form" type="object" string="Configure" icon="fa-sliders" class="btn-link"/>
+                                    <field name="name"/>
+                                    <field name="button_action"/>
+                                    <field name="button_id"/>
+                                    <field name="url" optional="hide"/>
+                                    <field name="product_retailer_id" optional="hide"/>
+                                    <field name="description" optional="show"/>
+                                    <field name="next_step_id"/>
+                                </list>
+                                <form string="Configure Button Route">
+                                    <sheet>
+                                        <div class="oe_title">
+                                            <h1><field name="name" placeholder="Button Text"/></h1>
+                                        </div>
+                                        <group>
+                                            <group string="Button">
+                                                <field name="step_id" readonly="1"/>
+                                                <field name="flow_id" readonly="1"/>
+                                                <field name="name" required="1"/>
+                                                <field name="button_action"/>
+                                                <field name="button_id" placeholder="catalogue, price_quote, support"/>
+                                                <field name="description"/>
+                                            </group>
+                                            <group string="URL / Product Action">
+                                                <field name="url" invisible="button_action != 'url'" placeholder="https://..."/>
+                                                <field name="catalog_id" invisible="button_action != 'catalog_product'" placeholder="Leave empty to use account default"/>
+                                                <field name="product_retailer_id" invisible="button_action != 'catalog_product'"/>
+                                                <div class="alert alert-info" role="alert" colspan="2" invisible="button_action == 'reply'">
+                                                    URL and Product actions send one special WhatsApp interactive message and then continue to Go To Step. They do not wait for a reply payload.
+                                                </div>
+                                            </group>
+                                            <group string="Routing">
+                                                <field name="next_step_id" domain="[('flow_id', '=', flow_id)]"/>
+                                            </group>
+                                        </group>
+                                        <div class="alert alert-info" role="alert">
+                                            Button Text is shown to the customer. Reply buttons use Button ID as the internal WhatsApp payload. URL/Product actions are for single-action buttons, while normal Quick Reply supports up to 3 reply buttons.
+                                        </div>
+                                    </sheet>
+                                </form>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="whatsapp_bot_flow_step_view_tree" model="ir.ui.view">
+        <field name="name">whatsapp.bot.flow.step.tree</field>
+        <field name="model">whatsapp.bot.flow.step</field>
+        <field name="arch" type="xml">
+            <list string="Flow Steps" decoration-info="action_type in ['send_buttons', 'send_list']" decoration-success="action_type == 'create_lead'">
+                <button name="action_open_step_form" type="object" string="Configure" icon="fa-sliders" class="btn-link"/>
+                <field name="flow_id"/>
+                <field name="step_number"/>
+                <field name="name"/>
+                <field name="action_type"/>
+                <field name="next_step_id"/>
+                <field name="assign_user_id"/>
+                <field name="assign_tag_id"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="whatsapp_bot_flow_button_view_tree" model="ir.ui.view">
+        <field name="name">whatsapp.bot.flow.button.tree</field>
+        <field name="model">whatsapp.bot.flow.button</field>
+        <field name="arch" type="xml">
+            <list string="Flow Buttons">
+                <button name="action_open_button_form" type="object" string="Configure" icon="fa-sliders" class="btn-link"/>
+                <field name="flow_id"/>
+                <field name="step_id"/>
+                <field name="name"/>
+                <field name="button_action"/>
+                <field name="button_id"/>
+                <field name="url" optional="hide"/>
+                <field name="product_retailer_id" optional="hide"/>
+                <field name="description"/>
+                <field name="next_step_id"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="whatsapp_bot_flow_button_view_form" model="ir.ui.view">
+        <field name="name">whatsapp.bot.flow.button.form</field>
+        <field name="model">whatsapp.bot.flow.button</field>
+        <field name="arch" type="xml">
+            <form string="Configure Button Route">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="Button Text"/></h1>
+                    </div>
+                    <group>
+                        <group string="Where This Button Appears">
+                            <field name="flow_id" readonly="1"/>
+                            <field name="step_id" required="1" domain="[('action_type', 'in', ['send_buttons', 'send_list'])]"/>
+                        </group>
+                        <group string="Customer Button">
+                            <field name="name" required="1"/>
+                            <field name="button_action"/>
+                            <field name="button_id" placeholder="catalogue_request"/>
+                            <field name="description"/>
+                        </group>
+                    </group>
+                    <group string="URL / Product Action">
+                        <field name="url" invisible="button_action != 'url'" placeholder="https://..."/>
+                        <field name="catalog_id" invisible="button_action != 'catalog_product'" placeholder="Leave empty to use account default"/>
+                        <field name="product_retailer_id" invisible="button_action != 'catalog_product'"/>
+                    </group>
+                    <group string="Route After Tap">
+                        <field name="next_step_id" domain="[('flow_id', '=', flow_id)]"/>
+                    </group>
+                    <div class="alert alert-info" role="alert">
+                        Reply buttons wait for a tap and send Button ID back to the flow. URL/Product actions send one special interactive message and then continue; use templates for CTA phone buttons or closed-session outreach.
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="whatsapp_bot_flow_step_view_search" model="ir.ui.view">
+        <field name="name">whatsapp.bot.flow.step.search</field>
+        <field name="model">whatsapp.bot.flow.step</field>
+        <field name="arch" type="xml">
+            <search string="Flow Steps">
+                <field name="name"/>
+                <field name="flow_id"/>
+                <field name="action_type"/>
+                <filter string="Button Steps" name="button_steps" domain="[('action_type', '=', 'send_buttons')]"/>
+                <filter string="CRM Leads" name="lead_steps" domain="[('action_type', '=', 'create_lead')]"/>
+                <filter string="Group by Flow" name="group_flow" context="{'group_by': 'flow_id'}"/>
+                <filter string="Group by Action" name="group_action" context="{'group_by': 'action_type'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="whatsapp_bot_flow_button_view_search" model="ir.ui.view">
+        <field name="name">whatsapp.bot.flow.button.search</field>
+        <field name="model">whatsapp.bot.flow.button</field>
+        <field name="arch" type="xml">
+            <search string="Flow Buttons">
+                <field name="name"/>
+                <field name="button_id"/>
+                <field name="flow_id"/>
+                <field name="step_id"/>
+                <filter string="Group by Flow" name="group_flow" context="{'group_by': 'flow_id'}"/>
+                <filter string="Group by Step" name="group_step" context="{'group_by': 'step_id'}"/>
+            </search>
+        </field>
+    </record>
+
     <!-- Bot Flow Form with Visual Builder -->
     <record id="whatsapp_bot_flow_view_form" model="ir.ui.view">
         <field name="name">whatsapp.bot.flow.form</field>
@@ -26,13 +433,24 @@
             <form string="Bot Flow">
                 <header>
                     <button name="action_open_visual_builder" type="object" string="Open Visual Builder" class="btn-primary" icon="fa-sitemap"/>
+                    <button name="action_view_steps" type="object" string="Manage Steps" class="btn-secondary" icon="fa-list"/>
+                    <button name="action_view_buttons" type="object" string="Manage Buttons" class="btn-secondary" icon="fa-list-ul"/>
+                    <button name="action_validate_for_activation" type="object" string="Validate" class="btn-secondary" icon="fa-check-circle"/>
                     <button name="action_test_flow" type="object" string="Test Flow" class="btn-primary"/>
+                    <button name="action_generate_ai_flow_review" type="object" string="AI Review" class="btn-secondary" icon="fa-lightbulb-o"/>
+                    <button name="action_generate_ai_flow_draft" type="object" string="Generate Draft Flow" class="btn-secondary" icon="fa-magic"/>
                     <button name="action_view_logs" type="object" string="View Logs" class="btn-secondary"/>
                 </header>
                 <sheet>
                     <div class="oe_button_box" name="button_box">
                         <button class="oe_stat_button" icon="fa-bolt" name="action_view_logs" type="object">
                             <field name="trigger_count" widget="statinfo" string="Triggered"/>
+                        </button>
+                        <button class="oe_stat_button" icon="fa-list" name="action_view_steps" type="object">
+                            <field name="step_count" widget="statinfo" string="Steps"/>
+                        </button>
+                        <button class="oe_stat_button" icon="fa-list-ul" name="action_view_buttons" type="object">
+                            <field name="button_count" widget="statinfo" string="Buttons"/>
                         </button>
                         <button class="oe_stat_button" icon="fa-check-circle" type="object" name="action_view_logs">
                             <field name="success_count" widget="statinfo" string="Success"/>
@@ -63,6 +481,22 @@
                     </group>
 
                     <field name="description" placeholder="Describe this automation flow..."/>
+                    <div class="alert alert-info" role="alert">
+                        Use AI Draft Flow for inactive editable suggestions only. Review routes, account defaults, forms, payment mode, templates, and catalog IDs before activation.
+                    </div>
+                    <group string="AI Draft Assistant">
+                        <field name="ai_flow_prompt" placeholder="Example: Create a FiberaFRP sales bot that shares catalogue, collects size/load/quantity/city, creates a lead, sends a form, and offers payment link when available."/>
+                        <field name="ai_generated_from_flow_id" readonly="1"/>
+                        <field name="ai_draft_job_id" readonly="1"/>
+                    </group>
+                    <div class="alert alert-info" role="alert" invisible="not ai_flow_review">
+                        <strong>AI Flow Review:</strong>
+                        <field name="ai_flow_review" readonly="1" nolabel="1"/>
+                    </div>
+                    <div class="alert alert-warning" role="alert" invisible="not flow_health_warnings">
+                        <strong>Flow Health Warnings:</strong>
+                        <field name="flow_health_warnings" readonly="1" nolabel="1"/>
+                    </div>
 
                     <notebook>
                         <page string="Visual Flow Builder" name="visual_builder" icon="fa-sitemap">
@@ -72,55 +506,312 @@
 
                         <page string="Steps (List)" name="steps_list" icon="fa-list">
                             <field name="step_ids" nolabel="1">
-                                <list editable="bottom">
+                                <list editable="bottom" open_form_view="1">
+                                    <button name="action_open_step_form" type="object" string="View" icon="fa-external-link" class="btn-link"/>
                                     <field name="step_number"/>
                                     <field name="name"/>
                                     <field name="action_type"/>
                                     <field name="next_step_id"/>
+                                    <field name="started_count" readonly="1" optional="show"/>
+                                    <field name="pending_count" readonly="1" optional="hide"/>
+                                    <field name="failed_count" readonly="1" optional="show"/>
                                 </list>
-                                <form string="Flow Step">
-                                    <group>
+                                <form string="Configure Flow Step">
+                                    <sheet>
+                                        <div class="oe_title">
+                                            <h1><field name="name" placeholder="Step Name"/></h1>
+                                        </div>
                                         <group>
-                                            <field name="step_number"/>
-                                            <field name="name"/>
-                                            <field name="action_type"/>
-                                            <field name="next_step_id"/>
+                                            <group string="Step Identity">
+                                                <field name="flow_id" readonly="1"/>
+                                                <field name="account_id" invisible="1"/>
+                                                <field name="step_number"/>
+                                                <field name="action_type"/>
+                                                <field name="next_step_id" domain="[('flow_id', '=', flow_id)]"/>
+                                                <field name="node_id"/>
+                                            </group>
+                                            <group string="Action Configuration">
+                                                <field name="message_text" invisible="action_type not in ['send_text', 'send_buttons', 'send_list', 'send_media', 'create_lead', 'ask_question', 'send_catalog', 'send_cta_url', 'send_form_link', 'send_payment_link']" placeholder="Hi {{name}}, how can we help today?"/>
+                                                <field name="button_header_text" invisible="action_type not in ['send_buttons', 'send_list', 'send_cta_url', 'send_catalog']" placeholder="Optional short header"/>
+                                                <field name="button_footer_text" invisible="action_type not in ['send_buttons', 'send_list', 'send_cta_url', 'send_catalog']" placeholder="Optional footer"/>
+                                                <field name="list_button_text" invisible="action_type != 'send_list'"/>
+                                                <field name="list_section_title" invisible="action_type != 'send_list'"/>
+                                                <field name="cta_button_text" invisible="action_type != 'send_cta_url'" placeholder="Open Catalogue"/>
+                                                <field name="cta_button_url" invisible="action_type != 'send_cta_url'" placeholder="https://..."/>
+                                                <field name="form_id" invisible="action_type != 'send_form_link'" placeholder="Leave empty to use account default form"/>
+                                                <field name="template_id" invisible="action_type != 'send_template'" domain="[('account_id', '=', account_id), ('status', '=', 'approved')]"/>
+                                                <field name="media_id" invisible="action_type != 'send_media'" domain="[('account_id', '=', account_id)]"/>
+                                                <field name="delay_seconds" invisible="action_type != 'delay'"/>
+                                                <field name="assign_user_id" invisible="action_type != 'transfer'"/>
+                                                <field name="assign_team_member_ids" widget="many2many_tags" invisible="action_type != 'assign_team'"/>
+                                                <field name="assign_tag_id" invisible="action_type != 'assign_tag'"/>
+                                                <field name="chat_status" invisible="action_type != 'chat_status'"/>
+                                                <field name="contact_attribute_name" invisible="action_type != 'update_contact'"/>
+                                                <field name="contact_attribute_value" invisible="action_type != 'update_contact'"/>
+                                                <field name="catalog_message_type" invisible="action_type != 'send_catalog'"/>
+                                                <field name="catalog_id" invisible="action_type != 'send_catalog'"/>
+                                                <field name="product_retailer_id" invisible="action_type != 'send_catalog' or catalog_message_type == 'multi_product'"/>
+                                                <field name="product_retailer_ids" invisible="action_type != 'send_catalog' or catalog_message_type != 'multi_product'"/>
+                                                <field name="thumbnail_product_retailer_id" invisible="action_type != 'send_catalog' or catalog_message_type != 'catalog_message'"/>
+                                                <field name="catalog_section_title" invisible="action_type != 'send_catalog' or catalog_message_type != 'multi_product'"/>
+                                                <field name="input_validation_type" invisible="action_type != 'ask_question'"/>
+                                                <field name="max_attempts" invisible="action_type != 'ask_question'"/>
+                                                <field name="timeout_minutes" invisible="action_type != 'ask_question'"/>
+                                                <field name="invalid_message" invisible="action_type != 'ask_question'"/>
+                                                <field name="invalid_step_id" invisible="action_type != 'ask_question'" domain="[('flow_id', '=', flow_id)]"/>
+                                                <field name="timeout_step_id" invisible="action_type != 'ask_question'" domain="[('flow_id', '=', flow_id)]"/>
+                                                <field name="fallback_step_id" invisible="action_type not in ['ask_question', 'send_buttons', 'send_list']" domain="[('flow_id', '=', flow_id)]"/>
+                                                <field name="variable_name" invisible="action_type != 'set_variable'"/>
+                                                <field name="variable_value" invisible="action_type != 'set_variable'" placeholder="WhatsApp"/>
+                                                <field name="response_variable" invisible="action_type not in ['wait_response', 'ask_question']" placeholder="last_reply"/>
+                                                <field name="http_method" invisible="action_type != 'http_request'"/>
+                                                <field name="http_url" invisible="action_type != 'http_request'" placeholder="https://api.example.com/endpoint"/>
+                                                <field name="http_auth_type" invisible="action_type != 'http_request'"/>
+                                                <field name="http_auth_token" password="True" invisible="action_type != 'http_request' or http_auth_type != 'bearer'"/>
+                                                <field name="http_username" invisible="action_type != 'http_request' or http_auth_type != 'basic'"/>
+                                                <field name="http_password" password="True" invisible="action_type != 'http_request' or http_auth_type != 'basic'"/>
+                                                <field name="http_headers" invisible="action_type != 'http_request'"/>
+                                                <field name="http_query_params" invisible="action_type != 'http_request'"/>
+                                                <field name="http_payload" invisible="action_type != 'http_request'" placeholder='{"phone": "{{phone}}", "name": "{{name}}"}'/>
+                                                <field name="http_response_path" invisible="action_type != 'http_request'"/>
+                                                <field name="http_success_step_id" invisible="action_type != 'http_request'" domain="[('flow_id', '=', flow_id)]"/>
+                                                <field name="http_failure_step_id" invisible="action_type != 'http_request'" domain="[('flow_id', '=', flow_id)]"/>
+                                            </group>
                                         </group>
-                                        <group>
-                                            <field name="message_text" invisible="action_type not in ['send_text', 'send_buttons', 'send_media', 'create_lead']"/>
-                                            <field name="template_id" invisible="action_type != 'send_template'" domain="[('account_id', '=', parent.account_id), ('status', '=', 'approved')]"/>
-                                            <field name="media_id" invisible="action_type != 'send_media'" domain="[('account_id', '=', parent.account_id)]"/>
-                                            <field name="assign_user_id" invisible="action_type != 'transfer'"/>
-                                            <field name="assign_tag_id" invisible="action_type != 'assign_tag'"/>
-                                            <field name="delay_seconds" invisible="action_type != 'delay'"/>
-                                        </group>
-                                    </group>
-                                    <group string="Condition" invisible="action_type != 'condition'">
-                                        <field name="condition_type"/>
-                                        <field name="condition_value"/>
-                                        <field name="condition_true_step"/>
-                                        <field name="condition_false_step"/>
-                                    </group>
-                                    <group string="HTTP Request" invisible="action_type != 'http_request'">
-                                        <field name="http_method"/>
-                                        <field name="http_url"/>
-                                        <field name="http_payload"/>
-                                    </group>
-                                    <group string="Variables" invisible="action_type not in ['set_variable', 'wait_response']">
-                                        <field name="save_response" invisible="action_type != 'wait_response'"/>
-                                        <field name="response_variable" invisible="action_type != 'wait_response'"/>
-                                        <field name="variable_name" invisible="action_type != 'set_variable'"/>
-                                        <field name="variable_value" invisible="action_type != 'set_variable'"/>
-                                    </group>
-                                    <group string="Quick Reply Buttons" invisible="action_type != 'send_buttons'">
-                                        <field name="button_ids" nolabel="1">
-                                            <list editable="bottom">
-                                                <field name="name"/>
-                                                <field name="button_id"/>
-                                                <field name="next_step_id"/>
-                                            </list>
-                                        </field>
-                                    </group>
+                                        <notebook>
+                                            <page string="Attributes / Samples" name="attributes_samples">
+                                                <group>
+                                                    <field name="placeholder_help" readonly="1" nolabel="1"/>
+                                                    <field name="message_preview" readonly="1" invisible="action_type not in ['send_text', 'send_buttons', 'send_list', 'send_media', 'create_lead', 'ask_question', 'send_catalog', 'send_cta_url', 'send_form_link', 'send_payment_link']"/>
+                                                </group>
+                                                <group string="Step Analytics">
+                                                    <field name="started_count" readonly="1"/>
+                                                    <field name="pending_count" readonly="1"/>
+                                                    <field name="completed_count" readonly="1"/>
+                                                    <field name="failed_count" readonly="1"/>
+                                                </group>
+                                            </page>
+                                            <page string="Routing / Condition" name="routing">
+                                                <group>
+                                                    <group string="Default Route">
+                                                        <field name="next_step_id" domain="[('flow_id', '=', flow_id)]"/>
+                                                        <field name="condition_on_previous"/>
+                                                    </group>
+                                                    <group string="Conditional Route" invisible="action_type == 'condition'">
+                                                        <div class="alert alert-info" role="alert">
+                                                            Conditional routing fields appear when Action is Conditional Logic.
+                                                        </div>
+                                                    </group>
+                                                    <group string="Conditional Route" invisible="action_type != 'condition'">
+                                                        <field name="condition_type"/>
+                                                        <field name="condition_source"/>
+                                                        <field name="condition_variable" invisible="condition_source != 'variable'"/>
+                                                        <field name="condition_operator"/>
+                                                        <field name="condition_value"/>
+                                                        <field name="condition_true_step" domain="[('flow_id', '=', flow_id)]"/>
+                                                        <field name="condition_false_step" domain="[('flow_id', '=', flow_id)]"/>
+                                                        <field name="condition_branch_ids" nolabel="1">
+                                                            <list editable="bottom">
+                                                                <field name="sequence" widget="handle"/>
+                                                                <field name="name"/>
+                                                                <field name="operator"/>
+                                                                <field name="value"/>
+                                                                <field name="next_step_id"/>
+                                                            </list>
+                                                        </field>
+                                                    </group>
+                                                </group>
+                                            </page>
+                                            <page string="Variables / Wait" name="variables">
+                                                <group>
+                                                    <group string="Variables / Wait" invisible="action_type in ['wait_response', 'set_variable', 'send_buttons', 'send_list', 'ask_question']">
+                                                        <div class="alert alert-info" role="alert">
+                                                            Wait and variable fields appear when Action is Wait for Response or Set Variable.
+                                                        </div>
+                                                    </group>
+                                                    <group string="Save Customer Reply" invisible="action_type not in ['wait_response', 'send_buttons', 'send_list', 'ask_question']">
+                                                        <field name="save_response"/>
+                                                        <field name="response_variable"/>
+                                                    </group>
+                                                    <group string="Ask / Collect Input" invisible="action_type != 'ask_question'">
+                                                        <field name="message_text"/>
+                                                        <field name="input_validation_type"/>
+                                                        <field name="max_attempts"/>
+                                                        <field name="timeout_minutes"/>
+                                                        <field name="invalid_message"/>
+                                                        <field name="invalid_step_id" domain="[('flow_id', '=', flow_id)]"/>
+                                                        <field name="timeout_step_id" domain="[('flow_id', '=', flow_id)]"/>
+                                                        <field name="fallback_step_id" domain="[('flow_id', '=', flow_id)]"/>
+                                                    </group>
+                                                    <group string="Set Variable" invisible="action_type != 'set_variable'">
+                                                        <field name="variable_name"/>
+                                                        <field name="variable_value"/>
+                                                    </group>
+                                                </group>
+                                            </page>
+                                            <page string="Assignment / CRM" name="assignment">
+                                                <group>
+                                                    <group string="Assignment / CRM" invisible="action_type in ['transfer', 'assign_team', 'assign_tag', 'create_lead', 'chat_status', 'update_contact']">
+                                                        <div class="alert alert-info" role="alert">
+                                                            Assignment and CRM fields appear when Action is Transfer to Agent, Assign Tag, or Create Lead.
+                                                        </div>
+                                                    </group>
+                                                    <group string="Assignment" invisible="action_type not in ['transfer', 'assign_team', 'assign_tag']">
+                                                        <field name="assign_user_id"/>
+                                                        <field name="assign_team_member_ids" widget="many2many_tags" invisible="action_type != 'assign_team'"/>
+                                                        <field name="assign_tag_id"/>
+                                                    </group>
+                                                    <group string="Lead" invisible="action_type != 'create_lead'">
+                                                        <div class="alert alert-info" role="alert">
+                                                            Use Message Text in Action Configuration for the optional CRM lead note.
+                                                        </div>
+                                                    </group>
+                                                    <group string="Chat Status" invisible="action_type != 'chat_status'">
+                                                        <field name="chat_status"/>
+                                                    </group>
+                                                    <group string="Contact Attribute" invisible="action_type != 'update_contact'">
+                                                        <field name="contact_attribute_name"/>
+                                                        <field name="contact_attribute_value"/>
+                                                    </group>
+                                                </group>
+                                            </page>
+                                            <page string="Catalog / URL / Commerce" name="catalog_url">
+                                                <group>
+                                                    <group string="URL Button" invisible="action_type != 'send_cta_url'">
+                                                        <field name="message_text"/>
+                                                        <field name="button_header_text"/>
+                                                        <field name="button_footer_text"/>
+                                                        <field name="cta_button_text"/>
+                                                        <field name="cta_button_url" placeholder="Leave empty to use account Shop / Catalogue URL"/>
+                                                        <div class="alert alert-info" role="alert" colspan="2">
+                                                            WhatsApp CTA URL messages support one URL button. They are session messages, so use an approved template when the 24-hour window is closed.
+                                                        </div>
+                                                    </group>
+                                                    <group string="Catalog / Shop" invisible="action_type != 'send_catalog'">
+                                                        <field name="catalog_message_type"/>
+                                                        <field name="message_text"/>
+                                                        <field name="button_header_text" invisible="catalog_message_type == 'single_product'"/>
+                                                        <field name="button_footer_text"/>
+                                                        <field name="catalog_id" placeholder="Leave empty to use account Meta Catalog ID"/>
+                                                        <field name="product_retailer_id" invisible="catalog_message_type == 'multi_product'"/>
+                                                        <field name="product_retailer_ids" invisible="catalog_message_type != 'multi_product'" placeholder="One product/content ID per line"/>
+                                                        <field name="thumbnail_product_retailer_id" invisible="catalog_message_type != 'catalog_message'"/>
+                                                        <field name="catalog_section_title" invisible="catalog_message_type != 'multi_product'"/>
+                                                        <div class="alert alert-info" role="alert" colspan="2">
+                                                            Use Full Catalog to open the WhatsApp shop, Single Product for one item, and Multi-Product List for up to 30 product IDs.
+                                                        </div>
+                                                    </group>
+                                                    <group string="Form Link" invisible="action_type != 'send_form_link'">
+                                                        <field name="message_text" placeholder="Please fill this short form: {{form_url}}"/>
+                                                        <field name="form_id" placeholder="Leave empty to use account default form"/>
+                                                        <div class="alert alert-info" role="alert" colspan="2">
+                                                            Form links are tokenized public links. Submissions stay in WhatsApp Form Submissions until a user reviews and creates/updates CRM data.
+                                                        </div>
+                                                    </group>
+                                                    <group string="Payment Link" invisible="action_type != 'send_payment_link'">
+                                                        <field name="message_text" placeholder="Here is your payment link: {{payment_url}}"/>
+                                                        <field name="payment_mode"/>
+                                                        <div class="alert alert-warning" role="alert" colspan="2">
+                                                            Payment links use the WhatsApp Account payment mode. Enable Manual URL or Odoo Invoice / Quote Link on the account first.
+                                                        </div>
+                                                    </group>
+                                                    <group string="Catalog / URL / Commerce" invisible="action_type in ['send_cta_url', 'send_catalog', 'send_form_link', 'send_payment_link']">
+                                                        <div class="alert alert-info" role="alert">
+                                                            URL, catalog, form, and payment fields appear when the matching commerce action is selected.
+                                                        </div>
+                                                    </group>
+                                                </group>
+                                            </page>
+                                            <page string="HTTP / Delay" name="http_delay">
+                                                <group>
+                                                    <group string="HTTP / Delay" invisible="action_type in ['http_request', 'delay']">
+                                                        <div class="alert alert-info" role="alert">
+                                                            HTTP and delay fields appear when Action is HTTP Request or Add Delay.
+                                                        </div>
+                                                    </group>
+                                                    <group string="HTTP Request" invisible="action_type != 'http_request'">
+                                                        <field name="http_method"/>
+                                                        <field name="http_url"/>
+                                                        <field name="http_auth_type"/>
+                                                        <field name="http_auth_token" password="True" invisible="http_auth_type != 'bearer'"/>
+                                                        <field name="http_username" invisible="http_auth_type != 'basic'"/>
+                                                        <field name="http_password" password="True" invisible="http_auth_type != 'basic'"/>
+                                                        <field name="http_headers"/>
+                                                        <field name="http_query_params"/>
+                                                        <field name="http_payload"/>
+                                                        <field name="response_variable"/>
+                                                        <field name="http_response_path"/>
+                                                        <field name="http_success_step_id" domain="[('flow_id', '=', flow_id)]"/>
+                                                        <field name="http_failure_step_id" domain="[('flow_id', '=', flow_id)]"/>
+                                                    </group>
+                                                    <group string="Delay" invisible="action_type != 'delay'">
+                                                        <field name="delay_seconds"/>
+                                                    </group>
+                                                </group>
+                                            </page>
+                                            <page string="Buttons" name="buttons">
+                                                <div class="alert alert-info" role="alert" invisible="action_type in ['send_buttons', 'send_list']">
+                                                    Option rows appear when Action is Send Buttons/Quick Replies or Send List Menu.
+                                                </div>
+                                                <div class="alert alert-info" role="alert" invisible="action_type not in ['send_buttons', 'send_list']">
+                                                    Add one row per customer option. Quick Reply supports up to 3 buttons; List Menu supports up to 10 rows. Button Text is what the customer sees. Button ID is the payload/keyword saved from WhatsApp. Go To Step controls where the flow continues.
+                                                </div>
+                                                <group invisible="action_type not in ['send_buttons', 'send_list']">
+                                                    <group string="Message Layout">
+                                                        <field name="button_header_text"/>
+                                                        <field name="button_footer_text"/>
+                                                    </group>
+                                                    <group string="List Settings" invisible="action_type != 'send_list'">
+                                                        <field name="list_button_text"/>
+                                                        <field name="list_section_title"/>
+                                                    </group>
+                                                </group>
+                                                <field name="button_ids" nolabel="1" invisible="action_type not in ['send_buttons', 'send_list']">
+                                                    <list editable="bottom" open_form_view="1">
+                                                        <button name="action_open_button_form" type="object" string="Configure" icon="fa-sliders" class="btn-link"/>
+                                                        <field name="name"/>
+                                                        <field name="button_action"/>
+                                                        <field name="button_id"/>
+                                                        <field name="url" optional="hide"/>
+                                                        <field name="product_retailer_id" optional="hide"/>
+                                                        <field name="description" optional="show"/>
+                                                        <field name="next_step_id"/>
+                                                    </list>
+                                                    <form string="Configure Button Route">
+                                                        <sheet>
+                                                            <div class="oe_title">
+                                                                <h1><field name="name" placeholder="Button Text"/></h1>
+                                                            </div>
+                                                            <group>
+                                                                <group string="Button">
+                                                                    <field name="step_id" readonly="1"/>
+                                                                    <field name="flow_id" readonly="1"/>
+                                                                    <field name="name" required="1"/>
+                                                                    <field name="button_action"/>
+                                                                    <field name="button_id" placeholder="catalogue, price_quote, support"/>
+                                                                    <field name="description"/>
+                                                                </group>
+                                                                <group string="URL / Product Action">
+                                                                    <field name="url" invisible="button_action != 'url'" placeholder="https://..."/>
+                                                                    <field name="catalog_id" invisible="button_action != 'catalog_product'" placeholder="Leave empty to use account default"/>
+                                                                    <field name="product_retailer_id" invisible="button_action != 'catalog_product'"/>
+                                                                    <div class="alert alert-info" role="alert" colspan="2" invisible="button_action == 'reply'">
+                                                                        URL and Product actions send one special WhatsApp interactive message and then continue to Go To Step. They do not wait for a reply payload.
+                                                                    </div>
+                                                                </group>
+                                                                <group string="Routing">
+                                                                    <field name="next_step_id" domain="[('flow_id', '=', flow_id)]"/>
+                                                                </group>
+                                                            </group>
+                                                            <div class="alert alert-info" role="alert">
+                                                                Button Text is shown to the customer. Reply buttons use Button ID as the internal WhatsApp payload. URL/Product actions are for single-action buttons, while normal Quick Reply supports up to 3 reply buttons.
+                                                            </div>
+                                                        </sheet>
+                                                    </form>
+                                                </field>
+                                            </page>
+                                        </notebook>
+                                    </sheet>
                                 </form>
                             </field>
                         </page>
@@ -152,6 +843,28 @@
                 Create your first chatbot automation flow
             </p>
             <p>Design visual chatbot flows with drag-and-drop nodes.</p>
+        </field>
+    </record>
+
+    <record id="whatsapp_bot_flow_step_action" model="ir.actions.act_window">
+        <field name="name">Flow Steps</field>
+        <field name="res_model">whatsapp.bot.flow.step</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="whatsapp_bot_flow_step_view_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create your first flow step</p>
+            <p>Configure every message, template, button, routing, CRM, variable, HTTP, delay, and handoff step from one place.</p>
+        </field>
+    </record>
+
+    <record id="whatsapp_bot_flow_button_action" model="ir.actions.act_window">
+        <field name="name">Flow Buttons</field>
+        <field name="res_model">whatsapp.bot.flow.button</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="whatsapp_bot_flow_button_view_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create your first button route</p>
+            <p>Configure quick reply button text, payload IDs, and the next step each option should run.</p>
         </field>
     </record>
 

@@ -33,5 +33,4 @@ discount to a customer.
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

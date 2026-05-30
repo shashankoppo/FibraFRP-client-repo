@@ -22,4 +22,8 @@ from . import whatsapp_compliance
 from . import whatsapp_sample_template
 from . import whatsapp_chat_note
 from . import whatsapp_api_log
+from . import whatsapp_placeholder
+from . import whatsapp_form
+from . import elsx_ai_service
+from . import whatsapp_diagnostics
 from . import res_config_settings

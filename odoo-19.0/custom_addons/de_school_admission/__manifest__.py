@@ -63,7 +63,6 @@ Features:
         'wizards/lead_to_application_wizard_views.xml',
         'wizards/admission_confirm_wizard_views.xml',
     ],
-    'license': 'LGPL-3',
     'images': ['static/description/banner.gif'],
     'installable': True,
     'application': True,

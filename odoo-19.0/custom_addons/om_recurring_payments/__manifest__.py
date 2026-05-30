@@ -8,7 +8,6 @@
     'sequence': 11,
     'website': 'https://www.odoomates.tech',
     'depends': ['account'],
-    'license': 'LGPL-3',
     'data': [
         'data/sequence.xml',
         'data/recurring_cron.xml',

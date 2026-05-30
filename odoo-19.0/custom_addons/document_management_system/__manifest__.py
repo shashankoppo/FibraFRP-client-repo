@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 {
-    'license': 'LGPL-3',
     'name': "Document Management System",
     'summary': "Enterprise online document management",
     'author': "renjie <i@renjie.me>",

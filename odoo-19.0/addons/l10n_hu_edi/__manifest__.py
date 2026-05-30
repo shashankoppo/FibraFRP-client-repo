@@ -35,5 +35,4 @@
     ],
     'post_init_hook': 'post_init',
     'auto_install': ['l10n_hu'],
-    'license': 'LGPL-3',
 }

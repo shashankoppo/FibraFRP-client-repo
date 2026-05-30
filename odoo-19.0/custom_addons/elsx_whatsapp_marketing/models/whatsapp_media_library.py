@@ -157,6 +157,7 @@ class WhatsAppMediaLibrary(models.Model):
             'name': 'Send Message with Media',
             'res_model': 'whatsapp.message',
             'view_mode': 'form',
+            'views': [(False, 'form')],
             'target': 'new',
             'context': {
                 'default_account_id': self.account_id.id,
@@ -173,6 +174,7 @@ class WhatsAppMediaLibrary(models.Model):
             'name': 'Send to Multiple Contacts',
             'res_model': 'whatsapp.media.bulk.wizard',
             'view_mode': 'form',
+            'views': [(False, 'form')],
             'target': 'new',
             'context': {
                 'default_media_id': self.id,

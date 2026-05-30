@@ -8,5 +8,4 @@
     'installable': True,
     'auto_install': True,
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

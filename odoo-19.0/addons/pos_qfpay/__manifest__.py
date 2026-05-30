@@ -20,5 +20,4 @@
             'pos_qfpay/static/tests/tours/**/*',
         ],
     },
-    'license': 'LGPL-3',
 }

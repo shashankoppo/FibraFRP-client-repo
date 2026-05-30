@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_move_form_whatsapp_inherit" model="ir.ui.view">
+        <field name="name">account.move.form.whatsapp.inherit</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+            
+            <xpath expr="//header" position="inside">
+                <button name="action_send_whatsapp_invoice" string="Send via WhatsApp" type="object" class="btn-success" icon="fa-whatsapp" invisible="state != 'posted' or move_type not in ('out_invoice', 'out_receipt')"/>
+                <button name="action_send_whatsapp_reminder" string="WhatsApp Reminder" type="object" class="btn-secondary" icon="fa-bell" invisible="state != 'posted' or move_type not in ('out_invoice', 'out_receipt') or payment_state in ('paid', 'in_payment')"/>
+            </xpath>
+
+            <xpath expr="//div[hasclass('oe_button_box')]" position="inside">
+                <button name="action_view_whatsapp_messages" type="object" class="oe_stat_button" icon="fa-whatsapp" invisible="elsx_wa_message_count == 0">
+                    <field name="elsx_wa_message_count" widget="statinfo" string="WhatsApp"/>
+                </button>
+            </xpath>
+
+            <xpath expr="//page[@name='other_info']" position="inside">
+                <group string="WhatsApp Integration &amp; Payment">
+                    <group>
+                        <field name="elsx_payment_risk" widget="badge" decoration-success="elsx_payment_risk == 'low'" decoration-warning="elsx_payment_risk == 'medium'" decoration-danger="elsx_payment_risk == 'high'"/>
+                        <field name="elsx_blockchain_proof_url" widget="url" invisible="not elsx_blockchain_proof_url"/>
+                        <field name="elsx_payment_status_display" widget="badge" decoration-success="elsx_payment_status_display == 'paid'" decoration-info="elsx_payment_status_display == 'partial'" decoration-warning="elsx_payment_status_display == 'due_soon'" decoration-danger="elsx_payment_status_display == 'overdue'" decoration-muted="elsx_payment_status_display == 'not_due'"/>
+                    </group>
+                    <group>
+                        <field name="elsx_wa_auto_reminder" widget="boolean_toggle"/>
+                        <field name="elsx_wa_last_sent"/>
+                        <field name="elsx_wa_reminder_count"/>
+                        <field name="elsx_wa_next_reminder" invisible="not elsx_wa_auto_reminder"/>
+                    </group>
+                </group>
+            </xpath>
+
+        </field>
+    </record>
+</odoo>

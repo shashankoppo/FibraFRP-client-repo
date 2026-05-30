@@ -9,5 +9,4 @@
     'data': ['ir.model.access.csv'],
     'installable': True,
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

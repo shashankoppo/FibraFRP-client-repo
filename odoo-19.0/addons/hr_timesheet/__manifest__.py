@@ -73,5 +73,4 @@ up a management by affair.
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

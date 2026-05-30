@@ -19,5 +19,4 @@ up their account to start sending SMS messages.
     ],
     'installable': True,
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

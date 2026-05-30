@@ -15,7 +15,6 @@
     """,
     "author": "Serpent Consulting Services Pvt. Ltd.",
     "website": "http://www.serpentcs.com/",
-    'license': 'LGPL-3',
     'depends': ['web'],
     "images": ["static/description/Digital_Signature.jpg"],
     "data": ["views/users_view.xml"],

@@ -14,5 +14,4 @@ This is the base module to manage the accounting chart for Monaco.
         'account',
     ],
     'auto_install': ['account'],
-    'license': 'LGPL-3',
 }

@@ -28,5 +28,4 @@ Sell your event booths and track payments on sale orders.
         ]
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

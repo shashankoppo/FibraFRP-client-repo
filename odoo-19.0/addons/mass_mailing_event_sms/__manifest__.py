@@ -21,5 +21,4 @@ Bridge module adding UX requirements to ease SMS marketing o, event attendees.
     ],
     'auto_install': True,
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

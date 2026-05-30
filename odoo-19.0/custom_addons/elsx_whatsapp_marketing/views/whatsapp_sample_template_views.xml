@@ -10,7 +10,7 @@
                 <field name="display_name_clean"/>
                 <field name="industry"/>
                 <field name="category"/>
-                <field name="preview_html"/>
+                <field name="preview_text"/>
                 <field name="variable_count"/>
                 <field name="description"/>
                 <field name="is_imported"/>
@@ -39,8 +39,11 @@
                             </div>
 
                             <!-- Preview Bubble -->
-                            <div class="elsx_sample_preview_wrapper mb-3">
-                                <t t-out="record.preview_html.raw_value"/>
+                            <div class="elsx_sample_preview_wrapper mb-3 p-3 rounded border bg-light">
+                                <div class="text-muted small fw-bold text-uppercase mb-2">Preview</div>
+                                <div class="small text-dark" style="white-space: pre-wrap; line-height: 1.35;">
+                                    <t t-out="record.preview_text.value"/>
+                                </div>
                             </div>
 
                             <!-- Description -->

@@ -97,5 +97,4 @@ Ask questions, get answers, no distractions
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

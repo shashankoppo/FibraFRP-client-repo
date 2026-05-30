@@ -9,7 +9,6 @@
     'depends': ['bus', 'web', 'portal'],
     'installable': True,
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
     'data': [
         'views/public_readonly_spreadsheet_templates.xml',
     ],

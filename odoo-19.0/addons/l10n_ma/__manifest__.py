@@ -24,5 +24,4 @@ This module has been built with the help of Caudigef.
     'demo': [
         'demo/demo_company.xml',
     ],
-    'license': 'LGPL-3',
 }

@@ -1,7 +1,7 @@
 {
     'name': 'ELSX Advanced Views (Gantt & Map)',
     'version': '1.0',
-    'summary': 'Enterprise Parity: OWL Gantt and Map Renderers',
+    'summary': 'OWL Gantt and Map Renderers',
     'description': 'Injects native cohort, gantt, and map view architectural capabilities.',
     'author': 'ELSX',
     'depends': ['base', 'web'],

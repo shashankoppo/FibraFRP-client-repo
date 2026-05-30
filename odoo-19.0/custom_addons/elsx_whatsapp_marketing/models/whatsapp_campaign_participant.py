@@ -9,9 +9,10 @@ class WhatsAppCampaignParticipant(models.Model):
     _name = 'whatsapp.campaign.participant'
     _description = 'WhatsApp Campaign Participant'
     
-    _sql_constraints = [
-        ('campaign_partner_unique', 'unique(campaign_id, partner_id)', 'A contact can only be added once per campaign.')
-    ]
+    _campaign_partner_unique = models.Constraint(
+        'unique(campaign_id, partner_id)',
+        'A contact can only be added once per campaign.',
+    )
     
     campaign_id = fields.Many2one('whatsapp.campaign', string='Campaign', required=True, ondelete='cascade')
     partner_id = fields.Many2one('res.partner', string='Contact', required=True)
@@ -33,7 +34,9 @@ class WhatsAppCampaignParticipant(models.Model):
         for participant in participants:
             # Check opt-in status dynamically before executing any steps
             contact = self.env['whatsapp.contact'].sudo().search([('partner_id', '=', participant.partner_id.id)], limit=1)
-            if contact and not contact.opt_in:
+            partner_opted_in = getattr(participant.partner_id, 'whatsapp_opt_in', True)
+            is_opted_out = (contact and not contact.opt_in) or (not partner_opted_in)
+            if is_opted_out:
                 participant.write({'state': 'stopped'})
                 _logger.info(f"Drip Campaign stopped for {participant.partner_id.name} due to opt-out.")
                 continue
@@ -110,4 +113,28 @@ class WhatsAppCampaignParticipant(models.Model):
             return bool(last_campaign_message and last_campaign_message.status == 'read')
         if step.condition_type == 'last_not_read':
             return bool(last_campaign_message and last_campaign_message.status != 'read')
+        if step.condition_type == 'last_delivered':
+            return bool(last_campaign_message and last_campaign_message.status in ('delivered', 'read'))
+        if step.condition_type == 'last_failed':
+            return bool(last_campaign_message and last_campaign_message.status == 'failed')
+
+        last_inbound = self.env['whatsapp.message'].search([
+            ('campaign_id', '=', self.campaign_id.id),
+            ('partner_id', '=', self.partner_id.id),
+            ('direction', '=', 'inbound'),
+        ], order='create_date desc', limit=1)
+        if step.condition_type in ('replied', 'clicked'):
+            if not last_inbound:
+                return False
+            if not last_campaign_message:
+                return True
+            if last_inbound.create_date < last_campaign_message.create_date:
+                return False
+            if step.condition_type == 'clicked':
+                return bool(last_inbound.button_payload or last_inbound.list_item_id)
+            return True
+        if step.condition_type in ('not_replied', 'no_reply'):
+            if not last_campaign_message:
+                return False
+            return not last_inbound or last_inbound.create_date < last_campaign_message.create_date
         return True

@@ -23,5 +23,4 @@ by external providers and will automatically generate purchase orders directed t
     ],
     'auto_install': True,
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

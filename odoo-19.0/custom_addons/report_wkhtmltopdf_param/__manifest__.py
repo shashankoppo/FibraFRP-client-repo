@@ -5,7 +5,6 @@
 {
     "name": "Report Wkhtmltopdf Param",
     "version": "19.0.0.1",
-    "license": "AGPL-3",
     "summary": """
         Add new parameters for a paper format to be used by wkhtmltopdf
         command as arguments.

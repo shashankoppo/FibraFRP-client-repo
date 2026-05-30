@@ -35,14 +35,14 @@
                             <field name="sequence"/>
                             <field name="account_id"/>
                             <field name="trigger_type"/>
-                            <field name="keywords" invisible="trigger_type != 'keyword'" placeholder="hello, hi, start, hola"/>
+                            <field name="keywords" invisible="trigger_type != 'keyword'" required="active and trigger_type == 'keyword'" placeholder="hello, hi, start, hola"/>
                         </group>
                         <group string="Action">
                             <field name="action_type"/>
-                            <field name="reply_text" invisible="action_type != 'text'" placeholder="Hi {{name}}! Welcome to ELSX. How can we help you today?"/>
-                            <field name="template_id" invisible="action_type != 'template'"/>
-                            <field name="assign_user_id" invisible="action_type != 'transfer'"/>
-                            <field name="tag_id" invisible="action_type != 'assign_label'"/>
+                            <field name="reply_text" invisible="action_type != 'text'" required="active and action_type == 'text'" placeholder="Hi {{name}}! Welcome to ELSX. How can we help you today?"/>
+                            <field name="template_id" invisible="action_type != 'template'" required="active and action_type == 'template'" domain="[('status', '=', 'approved')]"/>
+                            <field name="assign_user_id" invisible="action_type != 'transfer'" required="active and action_type == 'transfer'"/>
+                            <field name="tag_id" invisible="action_type != 'assign_label'" required="active and action_type == 'assign_label'"/>
                         </group>
                     </group>
                     <div class="alert alert-info mt-2" role="alert">

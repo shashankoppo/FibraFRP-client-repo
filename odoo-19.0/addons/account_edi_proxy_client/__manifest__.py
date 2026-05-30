@@ -19,6 +19,5 @@ Odoo database.
     ],
     'installable': True,
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
     'post_init_hook': '_create_demo_config_param',
 }

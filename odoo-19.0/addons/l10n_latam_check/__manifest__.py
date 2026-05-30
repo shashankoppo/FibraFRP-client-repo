@@ -41,7 +41,6 @@ There are 2 main Payment Methods additions:
   * Those operations can be done with multiple checks at once
 """,
     'author': 'ADHOC SA',
-    'license': 'LGPL-3',
     'depends': [
         'account',
         'base_vat',

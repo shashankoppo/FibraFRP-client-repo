@@ -50,5 +50,4 @@ This module adds several features to the Point of Sale that are specific to rest
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

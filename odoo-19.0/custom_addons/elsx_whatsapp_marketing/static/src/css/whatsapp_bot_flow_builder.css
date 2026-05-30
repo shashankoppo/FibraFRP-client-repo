@@ -257,6 +257,43 @@
     padding-right: 4px;
 }
 
+.wa-fb-label,
+.wa-flow-field span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.wa-fb-help,
+.wa-flow-help {
+    color: #64748b;
+    cursor: help;
+    font-size: 12px;
+    line-height: 1;
+}
+
+.wa-fb-help:hover,
+.wa-flow-help:hover {
+    color: #00a884;
+}
+
+.wa-fb-section-title {
+    margin: 14px 0 8px;
+    color: #334155;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.wa-fb-option-row {
+    margin-bottom: 10px;
+    padding: 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #f8fafc;
+}
+
 /* Full-screen OWL client action: Visual Flow Builder */
 
 .wa-flow-action {
@@ -741,6 +778,18 @@
 
 .wa-flow-field textarea {
     resize: vertical;
+}
+
+.wa-flow-option-editor {
+    border: 1px solid #e4e7ec;
+    border-radius: 8px;
+    background: #f9fafb;
+    padding: 10px;
+    margin-bottom: 12px;
+}
+
+.wa-flow-option-editor .wa-flow-field {
+    margin-bottom: 10px;
 }
 
 .wa-flow-field input:focus,

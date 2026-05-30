@@ -52,6 +52,5 @@ With this module you will have:
             'l10n_mx/static/src/helpers/*.js',
         ],
     },
-    'license': 'LGPL-3',
     'post_init_hook': '_enable_group_uom_post_init',
 }

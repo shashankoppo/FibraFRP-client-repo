@@ -26,5 +26,4 @@ Shows you a list of applications features to install from.
     'installable': True,
 
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

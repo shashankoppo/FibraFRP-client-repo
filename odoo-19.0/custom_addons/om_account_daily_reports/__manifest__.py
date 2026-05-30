@@ -6,7 +6,6 @@
     'description': 'Cash Book, Day Book and Bank Book Report For Odoo 19',
     'sequence': '10',
     'author': 'Odoo Mates',
-    'license': 'LGPL-3',
     'company': 'Odoo Mates',
     'maintainer': 'Odoo Mates',
     'support': 'odoomates@gmail.com',

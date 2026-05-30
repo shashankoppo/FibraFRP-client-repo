@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_whatsapp_diagnostic_snapshot_list" model="ir.ui.view">
+        <field name="name">whatsapp.diagnostic.snapshot.list</field>
+        <field name="model">whatsapp.diagnostic.snapshot</field>
+        <field name="arch" type="xml">
+            <list decoration-success="severity == 'ok'" decoration-warning="severity == 'warning'" decoration-danger="severity == 'critical'">
+                <field name="create_date"/>
+                <field name="name"/>
+                <field name="severity"/>
+                <field name="duration_ms"/>
+                <field name="create_uid"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_whatsapp_diagnostic_snapshot_form" model="ir.ui.view">
+        <field name="name">whatsapp.diagnostic.snapshot.form</field>
+        <field name="model">whatsapp.diagnostic.snapshot</field>
+        <field name="arch" type="xml">
+            <form create="0" edit="0">
+                <header>
+                    <button name="action_capture_now" string="Capture New Snapshot" type="object" class="btn-primary"/>
+                </header>
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="severity"/>
+                        <field name="duration_ms"/>
+                    </group>
+                    <notebook>
+                        <page string="Summary">
+                            <field name="snapshot_text" nolabel="1" readonly="1"/>
+                        </page>
+                        <page string="Raw JSON">
+                            <field name="snapshot_json" nolabel="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_whatsapp_diagnostic_snapshot" model="ir.actions.act_window">
+        <field name="name">System Health</field>
+        <field name="res_model">whatsapp.diagnostic.snapshot</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_whatsapp_capture_diagnostic_snapshot" model="ir.actions.server">
+        <field name="name">Capture WhatsApp Health Snapshot</field>
+        <field name="model_id" ref="model_whatsapp_diagnostic_snapshot"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_capture_now()</field>
+    </record>
+</odoo>

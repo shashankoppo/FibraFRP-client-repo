@@ -29,5 +29,4 @@
             'l10n_pt/static/src/helpers/*.js',
         ],
     },
-    'license': 'LGPL-3',
 }

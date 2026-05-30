@@ -25,5 +25,4 @@ Send KPI Digests periodically
     ],
     'installable': True,
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

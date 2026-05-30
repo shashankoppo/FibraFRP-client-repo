@@ -31,8 +31,11 @@
                 <header>
                     <button name="action_load_recipients" string="Load Recipients" type="object" class="btn-secondary" invisible="state != 'draft'"/>
                     <button name="action_generate_ai_content" string="Draft Content" type="object" class="btn-secondary" invisible="state != 'draft'"/>
-                    <button name="%(elsx_whatsapp_marketing.action_whatsapp_campaign_schedule_wizard)d" string="Schedule / Send" type="action" class="btn-primary" invisible="state != 'draft'" context="{'default_campaign_id': active_id}"/>
+                    <button name="%(elsx_whatsapp_marketing.action_whatsapp_campaign_schedule_wizard)d" string="Schedule / Send" type="action" class="btn-primary" invisible="state != 'draft'" context="{'default_campaign_id': id}"/>
                     <button name="action_process_queue" string="Process Queue (Send 50)" type="object" class="btn-warning" invisible="state != 'running'"/>
+                    <button name="action_retry_failed_messages" string="Retry Failed" type="object" class="btn-secondary" invisible="failed_count == 0"/>
+                    <button name="action_view_failed_recipients" string="Failed Recipients" type="object" class="btn-secondary" invisible="failed_count == 0"/>
+                    <button name="action_export_failed_recipients" string="Export Failed" type="object" class="btn-secondary" invisible="failed_count == 0"/>
                     <button name="action_cancel" string="Cancel" type="object" class="btn-danger" invisible="state in ['completed', 'cancelled']"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,scheduled,running,completed"/>
                 </header>
@@ -64,6 +67,10 @@
                             <span>ROI</span>
                             <strong><field name="roi" widget="percentage" readonly="1"/></strong>
                         </div>
+                        <div class="wa-kpi-card">
+                            <span>Replies</span>
+                            <strong><field name="tracked_reply_count" readonly="1"/></strong>
+                        </div>
                     </div>
 
                     <group>
@@ -77,6 +84,7 @@
                             <field name="batch_size"/>
                             <field name="batch_interval"/>
                             <field name="flow_id" options="{'no_create': True}"/>
+                            <field name="form_id" options="{'no_create': True}"/>
                         </group>
                         <group string="Configuration">
                             <field name="target_type"/>
@@ -85,24 +93,62 @@
                             <field name="failed_count" readonly="1"/>
                         </group>
                     </group>
+                    <group string="Pre-send Checklist">
+                        <div class="alert alert-light border mb-0" role="status">
+                            <field name="pre_send_checklist_text" nolabel="1" readonly="1" class="wa-campaign-checklist-text"/>
+                        </div>
+                    </group>
                     <notebook>
                         <page string="Recipients" name="recipients">
                             <group>
                                 <field name="target_type"/>
-                                <field name="segment_id" invisible="target_type != 'segment'" />
-                                <field name="domain_filter" invisible="target_type != 'segment'"/>
+                                <field name="segment_id" invisible="target_type != 'segment'" required="target_type == 'segment' and not domain_filter"/>
+                                <field name="domain_filter" invisible="target_type != 'segment'" required="target_type == 'segment' and not segment_id"/>
                                 <field name="crm_stage_id" invisible="target_type != 'crm_stage'"/>
-                                <field name="tag_ids" widget="many2many_tags" invisible="target_type != 'tags'"/>
+                                <field name="tag_ids" widget="many2many_tags" invisible="target_type != 'tags'" required="target_type == 'tags'"/>
                                 <field name="csv_filename" invisible="1"/>
-                                <field name="csv_file" filename="csv_filename" invisible="target_type != 'csv'" string="Upload Audience CSV" help="Upload a CSV with 'Phone' and 'Name' columns"/>
+                                <field name="csv_file" filename="csv_filename" invisible="target_type != 'csv'" required="target_type == 'csv'" string="Upload Audience CSV" help="Upload a CSV with 'Phone' and 'Name' columns"/>
                             </group>
-                            <field name="partner_ids">
+                            <group string="Suppression &amp; Frequency Caps">
+                                <field name="exclude_recently_contacted"/>
+                                <field name="recent_contact_days" invisible="not exclude_recently_contacted"/>
+                                <field name="frequency_cap_days"/>
+                                <field name="excluded_count" readonly="1"/>
+                                <field name="exclusion_notes" readonly="1" nolabel="1" placeholder="Load recipients to see exclusion summary."/>
+                            </group>
+                            <field name="partner_ids" required="target_type == 'manual'">
                                 <list>
                                     <field name="name"/>
                                     <field name="phone"/>
                                     <field name="email"/>
                                 </list>
                             </field>
+                        </page>
+                        <page string="Tracking &amp; Conversions" name="tracking_conversions">
+                            <div class="alert alert-info" role="alert">
+                                Generate a wa.me entry link for click-to-WhatsApp ads or website CTAs. V1 tracks the source when the customer sends the entry keyword; it does not create Meta ads.
+                            </div>
+                            <group>
+                                <group string="Entry Link">
+                                    <field name="tracking_source"/>
+                                    <field name="tracking_medium"/>
+                                    <field name="tracking_campaign_code"/>
+                                    <field name="tracking_entry_keyword"/>
+                                    <button name="action_generate_tracking_keyword" type="object" string="Generate Keyword" class="btn-secondary"/>
+                                    <field name="tracking_wa_link" readonly="1" widget="copy_clipboard"/>
+                                </group>
+                                <group string="Conversion Counters">
+                                    <field name="form_submission_count" readonly="1"/>
+                                    <field name="payment_action_count" readonly="1"/>
+                                    <field name="tracked_reply_count" readonly="1"/>
+                                </group>
+                            </group>
+                            <group string="Campaign Form">
+                                <field name="form_id" options="{'no_create': True}"/>
+                                <div class="alert alert-warning" role="alert" colspan="2">
+                                    Form links save submissions for review first. Users can manually create leads from submissions.
+                                </div>
+                            </group>
                         </page>
                         <page string="Drip Steps" name="drip_steps" invisible="campaign_type != 'drip'">
                             <field name="step_ids">
@@ -111,7 +157,7 @@
                                     <field name="name"/>
                                     <field name="delay_unit" string="After"/>
                                     <field name="delay_type" string="Unit"/>
-                                    <field name="template_id" domain="[('account_id', '=', parent.account_id), ('status', '=', 'approved')]"/>
+                                    <field name="template_id" domain="[('account_id', '=', parent.account_id), ('status', '=', 'approved')]" options="{'no_create': True}"/>
                                     <field name="condition_type"/>
                                 </list>
                                 <form>
@@ -122,8 +168,8 @@
                                     <group string="Timing &amp; Content">
                                         <field name="delay_unit"/>
                                         <field name="delay_type"/>
-                                        <field name="template_id" domain="[('account_id', '=', parent.account_id), ('status', '=', 'approved')]"/>
-                                        <field name="message_body"/>
+                                        <field name="template_id" domain="[('account_id', '=', parent.account_id), ('status', '=', 'approved')]" options="{'no_create': True}" required="not message_body"/>
+                                        <field name="message_body" widget="text" invisible="template_id" required="not template_id"/>
                                     </group>
                                     <group string="Condition">
                                         <field name="condition_type"/>
@@ -132,17 +178,95 @@
                             </field>
                         </page>
                         <page string="Message" name="message" invisible="campaign_type == 'drip'">
-                            <group>
-                                <field name="template_id" domain="[('account_id', '=', account_id), ('status', '=', 'approved')]"/>
-                                <field name="message_body" widget="text" placeholder="Use {{1}}, {{2}} for personalization" required="not template_id"/>
+                            <field name="template_header_type" invisible="1"/>
+                            <group invisible="is_ab_test">
+                                <field name="template_id" domain="[('account_id', '=', account_id), ('status', '=', 'approved')]" options="{'no_create': True}" required="not message_body"/>
+                                <field name="message_body" widget="text" placeholder="Use {{name}} and {{company}} for personalization" invisible="template_id" required="not template_id"/>
+                            </group>
+                            <group string="Template Header Media Override" invisible="is_ab_test or not template_id or template_header_type not in ['image', 'video', 'document']">
+                                <div class="alert alert-warning" role="alert" colspan="2">
+                                    This template has a media header. Add a file or public URL here when this campaign needs a campaign-specific catalogue, image, video, or document.
+                                </div>
+                                <field name="template_header_media_file" filename="template_header_media_filename"/>
+                                <field name="template_header_media_filename" invisible="1"/>
+                                <field name="template_header_media_url" placeholder="https://example.com/catalogue.pdf or Meta media ID"/>
                             </group>
                             <div class="alert alert-info" role="alert">
-                                <strong>Personalization Variables:</strong>
-                                <ul>
-                                    <li>{{name}} - Contact name</li>
-                                    <li>{{company}} - Company name</li>
-                                </ul>
+                                <strong>Personalization:</strong>
+                                Use <code>{{name}}</code>, <code>{{company}}</code>, and the Configuration &gt; Placeholder Guide for supported fields. Click Draft Content for an AI draft; it is never sent until you schedule/send.
                             </div>
+                            <group string="AI Draft Review" invisible="not ai_variant_a and not ai_audience_warning">
+                                <field name="ai_spam_risk" readonly="1"/>
+                                <field name="ai_audience_warning" readonly="1"/>
+                                <field name="ai_reply_rule_suggestions" readonly="1"/>
+                                <field name="ai_variant_a" readonly="1"/>
+                                <field name="ai_variant_b" readonly="1"/>
+                            </group>
+                            <group string="Per-recipient Preview">
+                                <field name="preview_partner_id" domain="[('id', 'in', partner_ids)]"/>
+                                <div class="alert alert-light border" role="status" colspan="2">
+                                    <div class="fw-bold text-muted text-uppercase small mb-2">Customer Preview Checklist</div>
+                                    <field name="recipient_preview_text" nolabel="1" readonly="1" class="wa-safe-preview-text"/>
+                                </div>
+                            </group>
+                        </page>
+                        <page string="Reply Actions" name="reply_actions">
+                            <group>
+                                <button name="action_sync_template_reply_buttons" string="Sync Template Buttons" type="object" class="btn-secondary" invisible="not template_id"/>
+                            </group>
+                            <group string="Default Free-text Reply">
+                                <field name="default_reply_action"/>
+                                <field name="reply_flow_id" invisible="default_reply_action != 'start_flow'" options="{'no_create': True}"/>
+                                <field name="reply_response_message" invisible="default_reply_action != 'send_message'" placeholder="Thanks {{name}}, our team will reply shortly."/>
+                                <field name="reply_form_id" invisible="default_reply_action != 'send_form_link'" options="{'no_create': True}" placeholder="Leave empty to use Campaign Form or Account Default Form"/>
+                                <field name="reply_assign_user_id" invisible="default_reply_action != 'assign_user'"/>
+                                <field name="reply_assign_team_member_id" invisible="default_reply_action != 'assign_team_member'" options="{'no_create': True}"/>
+                                <field name="reply_assign_tag_id" invisible="default_reply_action != 'assign_tag'"/>
+                                <field name="reply_chat_status" invisible="default_reply_action != 'set_chat_status'"/>
+                                <field name="reply_lead_note" invisible="default_reply_action != 'update_lead_note'" placeholder="Lead note can use {{name}}, {{phone}}, and {{last_reply}}."/>
+                            </group>
+                            <field name="reply_rule_ids" context="{'default_campaign_id': id}">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="active"/>
+                                    <field name="name"/>
+                                    <field name="match_type"/>
+                                    <field name="match_value"/>
+                                    <field name="action_type"/>
+                                    <field name="flow_id" invisible="action_type != 'start_flow'"/>
+                                    <field name="form_id" invisible="action_type != 'send_form_link'"/>
+                                    <field name="response_message" invisible="action_type != 'send_message'"/>
+                                    <field name="assign_user_id" invisible="action_type != 'assign_user'"/>
+                                    <field name="assign_team_member_id" invisible="action_type != 'assign_team_member'"/>
+                                    <field name="assign_tag_id" invisible="action_type != 'assign_tag'"/>
+                                    <field name="chat_status" invisible="action_type != 'set_chat_status'"/>
+                                    <field name="lead_note" invisible="action_type != 'update_lead_note'"/>
+                                    <field name="handled_count" readonly="1"/>
+                                </list>
+                                <form string="Campaign Reply Action">
+                                    <group>
+                                        <group string="Match">
+                                            <field name="active"/>
+                                            <field name="sequence"/>
+                                            <field name="name"/>
+                                            <field name="match_type"/>
+                                            <field name="match_value" invisible="match_type == 'any_reply'"/>
+                                        </group>
+                                        <group string="Action">
+                                            <field name="action_type"/>
+                                            <field name="flow_id" invisible="action_type != 'start_flow'" options="{'no_create': True}"/>
+                                            <field name="form_id" invisible="action_type != 'send_form_link'" options="{'no_create': True}"/>
+                                            <field name="response_message" invisible="action_type != 'send_message'"/>
+                                            <field name="assign_user_id" invisible="action_type != 'assign_user'"/>
+                                            <field name="assign_team_member_id" invisible="action_type != 'assign_team_member'" options="{'no_create': True}"/>
+                                            <field name="assign_tag_id" invisible="action_type != 'assign_tag'"/>
+                                            <field name="chat_status" invisible="action_type != 'set_chat_status'"/>
+                                            <field name="lead_note" invisible="action_type != 'update_lead_note'" placeholder="Add this note to the existing or newly created CRM lead."/>
+                                            <field name="handled_count" readonly="1"/>
+                                        </group>
+                                    </group>
+                                </form>
+                            </field>
                         </page>
                         <page string="Messages" name="messages">
                             <field name="message_ids" readonly="1">
@@ -167,15 +291,22 @@
                                 </list>
                             </field>
                         </page>
-                        <page string="A/B Testing" name="ab_testing">
+                        <page string="A/B Testing" name="ab_testing" invisible="campaign_type == 'drip'">
+                            <field name="template_header_type" invisible="1"/>
+                            <field name="template_b_header_type" invisible="1"/>
                             <group>
                                 <field name="is_ab_test"/>
                             </group>
                             <group invisible="not is_ab_test">
                                 <group string="Version A (Standard)">
                                     <field name="split_percentage"/>
-                                    <field name="template_id" domain="[('account_id', '=', account_id), ('status', '=', 'approved')]"/>
-                                    <field name="message_body"/>
+                                    <field name="template_id" domain="[('account_id', '=', account_id), ('status', '=', 'approved')]" options="{'no_create': True}" required="not message_body"/>
+                                    <field name="message_body" widget="text" invisible="template_id" required="not template_id"/>
+                                    <group string="Header Media Override" invisible="not template_id or template_header_type not in ['image', 'video', 'document']">
+                                        <field name="template_header_media_file" filename="template_header_media_filename"/>
+                                        <field name="template_header_media_filename" invisible="1"/>
+                                        <field name="template_header_media_url" placeholder="https://example.com/catalogue.pdf or Meta media ID"/>
+                                    </group>
                                 </group>
                                 <group string="Version B">
                                     <label for="split_percentage" string="Split B %"/>
@@ -184,8 +315,13 @@
                                         <field name="split_percentage_b" class="fw-bold"/>
                                         <span class="fw-bold">%</span>
                                     </div>
-                                    <field name="template_id_b" domain="[('account_id', '=', account_id), ('status', '=', 'approved')]"/>
-                                    <field name="message_body_b"/>
+                                    <field name="template_id_b" domain="[('account_id', '=', account_id), ('status', '=', 'approved')]" options="{'no_create': True}" required="not message_body_b"/>
+                                    <field name="message_body_b" widget="text" invisible="template_id_b" required="not template_id_b"/>
+                                    <group string="Header Media Override (B)" invisible="not template_id_b or template_b_header_type not in ['image', 'video', 'document']">
+                                        <field name="template_b_header_media_file" filename="template_b_header_media_filename"/>
+                                        <field name="template_b_header_media_filename" invisible="1"/>
+                                        <field name="template_b_header_media_url" placeholder="https://example.com/catalogue-b.pdf or Meta media ID"/>
+                                    </group>
                                 </group>
                             </group>
                             <group string="Results" invisible="not is_ab_test or state == 'draft'">

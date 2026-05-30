@@ -18,5 +18,4 @@ Bridge module adding UX requirements to ease mass mailing of event attendees.
     ],
     'auto_install': True,
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

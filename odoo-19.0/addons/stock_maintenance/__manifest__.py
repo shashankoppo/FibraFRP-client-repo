@@ -17,5 +17,4 @@ Open the record of the serial number from an equipment form
     'summary': 'See lots used in maintenance',
     'auto_install': True,
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

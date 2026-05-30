@@ -8,5 +8,4 @@
     'depends': ['project_mrp', 'sale_mrp', 'sale_project'],
     'auto_install': True,
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

@@ -43,7 +43,6 @@
     ],
     'post_init_hook': '_account_peppol_post_init',
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
     'assets': {
         'web.assets_backend': [
             'account_peppol/static/src/components/**/*',

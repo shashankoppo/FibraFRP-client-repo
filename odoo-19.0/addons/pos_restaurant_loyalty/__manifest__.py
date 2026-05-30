@@ -22,5 +22,4 @@ This module correct some behaviors when both module are installed.
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

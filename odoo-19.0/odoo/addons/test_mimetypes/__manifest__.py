@@ -5,5 +5,4 @@
     'category': 'Hidden/Tests',
     'description': """A module to generate exceptions.""",
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

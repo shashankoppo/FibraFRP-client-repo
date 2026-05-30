@@ -40,5 +40,4 @@ only the country code will be validated.
         'views/res_partner_views.xml',
     ],
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

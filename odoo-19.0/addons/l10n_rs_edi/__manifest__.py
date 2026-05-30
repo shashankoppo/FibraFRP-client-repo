@@ -19,5 +19,4 @@ eFaktura E-invoice implementation for Serbia
     ],
     'installable': True,
     'auto_install': True,
-    'license': 'LGPL-3',
 }

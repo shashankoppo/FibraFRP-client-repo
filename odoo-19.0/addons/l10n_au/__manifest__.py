@@ -45,5 +45,4 @@ Also:
         'demo/res_bank.xml',
     ],
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

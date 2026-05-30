@@ -7,7 +7,7 @@ class WhatsAppNewChatWizard(models.TransientModel):
 
     @api.model
     def _default_account_id(self):
-        return self.env['whatsapp.account'].search([('active', '=', True)], limit=1)
+        return self.env['whatsapp.account']._get_default_account()
 
     account_id = fields.Many2one('whatsapp.account', string='WhatsApp Account', required=True, default=_default_account_id)
     partner_id = fields.Many2one('res.partner', string='Select Contact')

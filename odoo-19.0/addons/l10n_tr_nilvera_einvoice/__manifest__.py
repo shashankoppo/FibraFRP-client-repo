@@ -16,5 +16,4 @@ For sending and receiving electronic invoices to Nilvera.
     ],
     'auto_install': ['l10n_tr_nilvera'],
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

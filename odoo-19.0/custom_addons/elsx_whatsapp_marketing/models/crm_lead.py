@@ -32,7 +32,13 @@ class CrmLead(models.Model):
             if not phone:
                 continue
 
-            account = self.env['whatsapp.account'].search([('status', '=', 'connected')], limit=1)
+            if template and template.account_id:
+                account = template.account_id
+            else:
+                account = self.env['whatsapp.account']._get_default_account()
+            if account and account.status != 'connected' and not template:
+                connected_account = self.env['whatsapp.account'].search([('status', '=', 'connected')], limit=1)
+                account = connected_account or account
             if not account:
                 continue
 

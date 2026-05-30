@@ -21,5 +21,4 @@ You can easily assign grade to members/partners, with a specific pricelist.
         'views/partnership_menu.xml',
     ],
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

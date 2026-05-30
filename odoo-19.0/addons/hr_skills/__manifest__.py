@@ -69,5 +69,4 @@ This module introduces skills and resume management for employees.
         ],
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }

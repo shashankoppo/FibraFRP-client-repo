@@ -261,5 +261,4 @@ For more specific needs, you may also assign custom-defined actions
         ]
     },
     'author': 'Odoo S.A.',
-    'license': 'LGPL-3',
 }
