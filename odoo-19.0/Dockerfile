@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zlib1g-dev \
     python3-dev \
     postgresql-client \
+    ca-certificates \
     curl \
     node-less \
     libmagic1 \

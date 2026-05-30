@@ -1,12 +1,18 @@
 services:
   db:
     image: postgres:15
+    restart: unless-stopped
     environment:
       - POSTGRES_DB=postgres
-      - POSTGRES_PASSWORD=odoo
-      - POSTGRES_USER=odoo
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-odoo}
+      - POSTGRES_USER=${POSTGRES_USER:-odoo}
     volumes:
       - odoo-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-odoo} -d $${POSTGRES_DB:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     networks:
       - odoo-network
 
@@ -14,33 +20,59 @@ services:
     build: .
     image: odoo-custom:19.0
     container_name: odoo_app
+    restart: unless-stopped
+    init: true
     ports:
       - "8069:8069"
     environment:
       - DB_HOST=db
       - DB_PORT=5432
-      - DB_USER=odoo
-      - DB_PASSWORD=odoo
+      - DB_USER=${POSTGRES_USER:-odoo}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-odoo}
     volumes:
       - .:/opt/odoo
       - ./odoo.docker.conf:/etc/odoo/odoo.conf
       - odoo-web-data:/root/.local/share/Odoo
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8069/web/health >/dev/null || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 15
+      start_period: 60s
     networks:
       - odoo-network
 
   sidecar:
     image: node:18-alpine
     container_name: whatsapp_sidecar
+    restart: unless-stopped
+    init: true
     working_dir: /app
     volumes:
       - ./custom_addons/elsx_whatsapp_marketing/sidecar:/app
-    command: sh -c "npm install && npm start"
+    command: sh -c "npm ci --omit=dev && npm start"
+    environment:
+      - ODOO_URL=http://odoo:8069
+      - PORT=3000
+      - SIDECAR_SECRET=${SIDECAR_SECRET:-}
+      - VERIFY_TOKEN=${WHATSAPP_VERIFY_TOKEN:-}
+      - META_APP_SECRET=${META_APP_SECRET:-}
     ports:
       - "3000:3000"
     depends_on:
-      - odoo
+      odoo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/health || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
     networks:
       - odoo-network
 

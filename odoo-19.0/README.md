@@ -2,6 +2,12 @@
 
 Welcome to the central repository for the FibraFRP custom Odoo 19.0 deployment. This document outlines the technical architecture, custom module ecosystem, connection points, and workflow required to maintain and develop this system.
 
+## Ubuntu 24.04 Docker Deployment
+
+Use [UBUNTU_24_DOCKER_DEPLOYMENT.md](UBUNTU_24_DOCKER_DEPLOYMENT.md) for
+server setup, exact clone restore, fresh database setup, WhatsApp webhook checks,
+Tally routing, and post-deploy verification.
+
 ---
 
 ## 🏗️ System Architecture & Tech Stack
