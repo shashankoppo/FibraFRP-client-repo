@@ -3188,7 +3188,14 @@ export class WhatsAppChatHandler {
 
     // ── Helpers ────────────────────────────────────────────────────
     _getSidebarActiveChatId() {
-        const sidebarActive = document.querySelector('.o_whatsapp_sidebar_item.active');
+        const activeItems = Array.from(document.querySelectorAll('.o_whatsapp_sidebar_item.active'));
+        const sidebarActive = activeItems.find((item) => {
+            const pane = item.closest('.wa-pane-mount');
+            const sidebar = item.closest('.wa-left-sidebar');
+            if (!sidebar) return false;
+            if (pane && pane.classList.contains('d-none')) return false;
+            return item.offsetParent !== null || sidebar.classList.contains('wa-mobile-chat-list-drawer');
+        }) || null;
         if (!sidebarActive) return null;
         const id = parseInt(sidebarActive.getAttribute('data-chat-id'));
         return id || null;

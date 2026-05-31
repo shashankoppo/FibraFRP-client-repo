@@ -494,6 +494,14 @@ class WhatsAppCampaign(models.Model):
                 raise ValidationError("A/B split percentage must be between 0 and 100.")
             if record.is_ab_test and (record.split_percentage <= 0 or record.split_percentage >= 100):
                 raise ValidationError("A/B testing requires both versions to receive recipients. Use a split between 1 and 99.")
+
+            strict = (
+                self.env.context.get('strict_campaign_validation')
+                or record.state in ('scheduled', 'running', 'completed')
+            )
+            if not strict:
+                continue
+
             if record.schedule_type == 'scheduled' and not record.schedule_date:
                 raise ValidationError("Scheduled campaigns require a schedule date.")
             if record.campaign_type == 'drip' and not record.step_ids:

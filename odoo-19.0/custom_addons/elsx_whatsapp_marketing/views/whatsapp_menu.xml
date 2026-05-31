@@ -38,14 +38,6 @@
               sequence="5"
               action="action_whatsapp_console_direct"/>
 
-    <!-- 2. Messages -->
-    <record id="action_whatsapp_message" model="ir.actions.act_window">
-        <field name="name">Messages</field>
-        <field name="res_model">whatsapp.message</field>
-        <field name="view_mode">list,form</field>
-        <field name="context">{'search_default_group_direction': 1}</field>
-    </record>
-
     <menuitem id="menu_whatsapp_messages"
               name="All Messages"
               parent="menu_whatsapp_engage"
@@ -315,13 +307,6 @@
               parent="menu_whatsapp_root"
               sequence="100"
               groups="base.group_system"/>
-
-    <!-- WhatsApp Accounts -->
-    <record id="action_whatsapp_account" model="ir.actions.act_window">
-        <field name="name">WhatsApp Accounts</field>
-        <field name="res_model">whatsapp.account</field>
-        <field name="view_mode">list,form</field>
-    </record>
 
     <menuitem id="menu_whatsapp_accounts"
               name="WhatsApp Accounts"
