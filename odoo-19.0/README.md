@@ -34,6 +34,10 @@ script, for example `https://fibera.elsxglobal.com/whatsapp/webhook?db=FiberaFRP
 The Docker config loads the WhatsApp webhook controller server-wide so Meta can
 verify the URL before an Odoo browser session selects a database.
 
+The live configuration script installs `elsx_attendance_tracking` if it is
+missing. That also installs the standard Attendances dependency, then upgrades
+the WhatsApp, branding, attendance tracking, and Tally custom modules.
+
 ---
 
 ## 🏗️ System Architecture & Tech Stack

@@ -5,6 +5,7 @@ LIVE_DB_NAME="${1:-${LIVE_DB_NAME:-FiberaFRP_DB}}"
 LIVE_ACCOUNT_ID="${2:-${WHATSAPP_ACCOUNT_ID:-}}"
 LIVE_VERIFY_TOKEN="${3:-${WHATSAPP_VERIFY_TOKEN:-}}"
 MODULES="${MODULES:-elsx_client_restrictions,elsx_whatsapp_marketing,elsx_attendance_tracking,elsx_tally_integration}"
+INSTALL_MODULES="${INSTALL_MODULES:-elsx_attendance_tracking}"
 CONFIG="${ODOO_CONFIG:-/etc/odoo/odoo.conf}"
 DB_USER="${POSTGRES_USER:-odoo}"
 
@@ -27,6 +28,9 @@ if [ -n "${LIVE_VERIFY_TOKEN}" ]; then
   echo "==> Requested webhook verify token: $(printf '%s' "${LIVE_VERIFY_TOKEN}" | sed -E 's/^(.{3}).*(.{3})$/\1...\2/')"
 fi
 echo "==> Modules to upgrade: ${MODULES}"
+if [ -n "${INSTALL_MODULES}" ]; then
+  echo "==> Modules to install if missing: ${INSTALL_MODULES}"
+fi
 
 echo "==> Ensuring PostgreSQL is running"
 docker compose up -d db
@@ -104,12 +108,18 @@ BEGIN
 END $$;
 SQL
 
-echo "==> Upgrading live database modules"
+echo "==> Installing/upgrading live database modules"
+ODOO_MODULE_ARGS=()
+if [ -n "${INSTALL_MODULES}" ]; then
+  ODOO_MODULE_ARGS+=("-i" "${INSTALL_MODULES}")
+fi
+ODOO_MODULE_ARGS+=("-u" "${MODULES}")
+
 docker compose run --rm -T --no-deps odoo \
   python3 /opt/odoo/odoo-bin \
     -c "${CONFIG}" \
     -d "${LIVE_DB_NAME}" \
-    -u "${MODULES}" \
+    "${ODOO_MODULE_ARGS[@]}" \
     --stop-after-init
 
 echo "==> Marking ${LIVE_DB_NAME} as the primary WhatsApp webhook database"
