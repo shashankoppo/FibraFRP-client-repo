@@ -53,6 +53,11 @@ DECLARE
   own_view_id integer;
   target_view_id integer;
   updated_count integer;
+  safe_arch text := $body$<data>
+    <xpath expr="//t[@t-out]" position="replace">
+        <span>Powered by <span>ELSxGlobal</span></span>
+    </xpath>
+</data>$body$;
 BEGIN
   IF to_regclass('public.ir_ui_view') IS NULL
      OR to_regclass('public.ir_model_data') IS NULL THEN
@@ -84,18 +89,14 @@ BEGIN
   UPDATE ir_ui_view
      SET name = 'ELSxGlobal Brand Promotion Message',
          inherit_id = target_view_id,
-         arch_db = $body$<data>
-    <xpath expr="//t[@t-out]" position="replace">
-        <span>Powered by <span>ELSxGlobal</span></span>
-    </xpath>
-</data>$body$,
+         arch_db = jsonb_build_object('en_US', safe_arch),
          arch_prev = NULL,
          arch_updated = false
    WHERE id = own_view_id
      AND (
          inherit_id IS DISTINCT FROM target_view_id
-         OR COALESCE(arch_db, '') LIKE '%o_brand_promotion%'
-         OR COALESCE(arch_db, '') LIKE '%web.brand_promotion%'
+         OR COALESCE(arch_db::text, '') LIKE '%o_brand_promotion%'
+         OR COALESCE(arch_db::text, '') LIKE '%web.brand_promotion%'
      );
   GET DIAGNOSTICS updated_count = ROW_COUNT;
 
