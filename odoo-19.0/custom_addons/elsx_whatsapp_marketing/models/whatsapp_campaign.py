@@ -200,15 +200,16 @@ class WhatsAppCampaign(models.Model):
     pre_send_checklist_html = fields.Html('Pre-send Checklist', compute='_compute_pre_send_checklist_html')
     pre_send_checklist_text = fields.Text('Pre-send Checklist Text', compute='_compute_pre_send_checklist_html')
     
-    @api.depends('partner_ids', 'message_ids.status')
+    @api.depends('partner_ids', 'message_ids.status', 'message_ids.direction')
     def _compute_statistics(self):
         for record in self:
+            outbound_messages = record.message_ids.filtered(lambda m: m.direction == 'outbound')
             record.total_recipients = len(record.partner_ids)
-            record.queued_count = len(record.message_ids.filtered(lambda m: m.status in ['draft', 'queued']))
-            record.sent_count = len(record.message_ids.filtered(lambda m: m.status in ['sent', 'delivered', 'read']))
-            record.delivered_count = len(record.message_ids.filtered(lambda m: m.status in ['delivered', 'read']))
-            record.read_count = len(record.message_ids.filtered(lambda m: m.status == 'read'))
-            record.failed_count = len(record.message_ids.filtered(lambda m: m.status == 'failed'))
+            record.queued_count = len(outbound_messages.filtered(lambda m: m.status in ['draft', 'queued']))
+            record.sent_count = len(outbound_messages.filtered(lambda m: m.status in ['sent', 'delivered', 'read']))
+            record.delivered_count = len(outbound_messages.filtered(lambda m: m.status in ['delivered', 'read']))
+            record.read_count = len(outbound_messages.filtered(lambda m: m.status == 'read'))
+            record.failed_count = len(outbound_messages.filtered(lambda m: m.status == 'failed'))
             
             # Rates
             if record.total_recipients > 0:

@@ -279,6 +279,9 @@
                                     <field name="direction"/>
                                     <field name="message_type"/>
                                     <field name="body"/>
+                                    <field name="button_text" optional="hide"/>
+                                    <field name="list_item_title" optional="hide"/>
+                                    <field name="media_filename" optional="hide"/>
                                     <field name="status"/>
                                     <field name="sent_date"/>
                                     <field name="delivered_date"/>

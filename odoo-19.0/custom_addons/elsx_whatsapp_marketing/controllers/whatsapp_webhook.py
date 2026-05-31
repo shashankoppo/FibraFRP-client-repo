@@ -813,14 +813,16 @@ class WhatsAppWebhook(http.Controller):
             vals['interactive_type'] = itype
             if itype == 'button_reply':
                 reply = inter.get('button_reply', {})
-                vals['button_text'] = reply.get('title', '')
+                title = reply.get('title') or reply.get('id') or '[Button Reply]'
+                vals['button_text'] = title if title != '[Button Reply]' else ''
                 vals['button_payload'] = reply.get('id', '')
-                return reply.get('id', reply.get('title', '[Button Reply]'))  # Prefer ID for bot triggers
+                return title
             elif itype == 'list_reply':
                 reply = inter.get('list_reply', {})
+                title = reply.get('title') or reply.get('id') or '[List Reply]'
                 vals['list_item_id'] = reply.get('id', '')
-                vals['list_item_title'] = reply.get('title', '')
-                return reply.get('id', reply.get('title', '[List Reply]'))  # Prefer ID for bot triggers
+                vals['list_item_title'] = title if title != '[List Reply]' else ''
+                return title
             elif itype == 'nfm_reply':
                 nfm = inter.get('nfm_reply', {})
                 response_json_str = nfm.get('response_json', '{}')

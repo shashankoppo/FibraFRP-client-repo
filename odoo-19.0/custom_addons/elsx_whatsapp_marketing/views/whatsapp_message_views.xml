@@ -14,6 +14,9 @@
                 <field name="message_type"/>
                 <field name="interactive_type" optional="hide"/>
                 <field name="body"/>
+                <field name="button_text" optional="hide"/>
+                <field name="list_item_title" optional="hide"/>
+                <field name="media_filename" optional="hide"/>
                 <field name="status" decoration-success="status in ['delivered', 'read']" decoration-danger="status=='failed'"/>
                 <field name="campaign_id"/>
             </list>
@@ -50,11 +53,16 @@
                     <group>
                         <field name="body" widget="text"/>
                         <field name="media_url" invisible="message_type == 'text'"/>
+                        <field name="media_filename" invisible="message_type == 'text'"/>
+                        <field name="media_mime_type" invisible="message_type == 'text'"/>
                         <field name="caption" invisible="message_type == 'text'"/>
                     </group>
                     <group string="Interactive / Commerce" invisible="message_type != 'interactive'">
                         <field name="interactive_type"/>
                         <field name="button_text"/>
+                        <field name="button_payload"/>
+                        <field name="list_item_title"/>
+                        <field name="list_item_id"/>
                         <field name="button_url"/>
                         <field name="catalog_id"/>
                         <field name="product_retailer_id"/>
@@ -80,7 +88,7 @@
         <field name="name">WhatsApp Messages</field>
         <field name="res_model">whatsapp.message</field>
         <field name="view_mode">list,form</field>
-        <field name="context">{'search_default_outbound': 1}</field>
+        <field name="context">{}</field>
     </record>
 
     <!-- WhatsApp Message Search View -->
@@ -94,12 +102,17 @@
                 <field name="body"/>
                 <filter name="inbound" string="Inbound" domain="[('direction', '=', 'inbound')]"/>
                 <filter name="outbound" string="Outbound" domain="[('direction', '=', 'outbound')]"/>
+                <filter name="campaign_messages" string="Campaign Messages" domain="[('campaign_id', '!=', False)]"/>
+                <filter name="campaign_replies" string="Campaign Replies" domain="[('campaign_id', '!=', False), ('direction', '=', 'inbound')]"/>
+                <filter name="interactive" string="Interactive" domain="[('message_type', '=', 'interactive')]"/>
+                <filter name="media_messages" string="Media" domain="[('message_type', 'in', ['image', 'video', 'document', 'audio'])]"/>
                 <filter name="sent" string="Sent" domain="[('status', 'in', ['sent', 'delivered', 'read'])]"/>
                 <filter name="failed" string="Failed" domain="[('status', '=', 'failed')]"/>
                 <separator/>
                 <group>
                     <filter name="group_partner" string="Contact" context="{'group_by': 'partner_id'}"/>
                     <filter name="group_account" string="Account" context="{'group_by': 'account_id'}"/>
+                    <filter name="group_campaign" string="Campaign" context="{'group_by': 'campaign_id'}"/>
                     <filter name="group_status" string="Status" context="{'group_by': 'status'}"/>
                     <filter name="group_date" string="Date" context="{'group_by': 'create_date:day'}"/>
                 </group>
