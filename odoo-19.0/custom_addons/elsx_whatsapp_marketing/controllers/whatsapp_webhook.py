@@ -39,7 +39,11 @@ def _get_env(db_name=None, payload=None):
     )
 
     from odoo.service import db as db_service
-    dbs = db_service.list_dbs()
+    try:
+        dbs = db_service.list_dbs()
+    except Exception as exc:
+        _logger.warning('[WH-DB] Could not list databases while resolving webhook DB: %s', exc)
+        dbs = []
 
     def open_env(db):
         try:
@@ -69,10 +73,11 @@ def _get_env(db_name=None, payload=None):
         )
 
     # 0. Explicit DB pin wins. This is essential when several copied DBs exist.
-    if db_name and db_name in dbs:
+    if db_name:
         env, cr, db = open_env(db_name)
         if env:
             return env, cr, db
+        _logger.warning('[WH-DB] Explicit webhook database %s could not be opened.', db_name)
 
     # 1. Multi-tenant phone_number_id matching. Prefer the primary/verified
     # receiver if the same WABA was copied into several databases.
@@ -224,6 +229,12 @@ class WhatsAppWebhook(http.Controller):
         # DB lookup only. No hard-coded fallback verify token is accepted.
         try:
             env, cr, _ = _get_env()
+            if not env or not cr:
+                _logger.error(
+                    '[WH-VERIFY] Could not resolve an Odoo database for webhook verification. '
+                    'Check ?db=DB_NAME, dbfilter, and installed module state.'
+                )
+                return request.make_response('Database Not Found', status=503)
             try:
                 domain = [('webhook_verify_token', '=', token), ('active', '=', True)]
                 if account_id:
@@ -234,7 +245,8 @@ class WhatsAppWebhook(http.Controller):
                     account.sudo().write({'webhook_status': 'verified', 'webhook_last_error': False})
                     return request.make_response(challenge, headers=[('Content-Type', 'text/plain')])
             finally:
-                cr.close()
+                if cr:
+                    cr.close()
         except Exception as e:
             _logger.error(f'[WH-VERIFY] DB lookup failed: {e}')
 
