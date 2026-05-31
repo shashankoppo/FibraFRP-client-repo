@@ -157,6 +157,13 @@ WhatsApp account ID as the second argument to force the primary receiver:
 bash deploy/configure_live_db.sh FiberaFRP_DB 1
 ```
 
+If Meta verification is failing because the database token does not match the
+token entered in Meta, pass the verify token as the third argument:
+
+```bash
+bash deploy/configure_live_db.sh FiberaFRP_DB 1 elsx_verify_2024
+```
+
 After changing domains, verify:
 
 - Webhook verification succeeds.
@@ -226,7 +233,7 @@ For the current production database, prefer the live helper after build:
 ```bash
 git pull origin main
 docker compose build odoo
-bash deploy/configure_live_db.sh FiberaFRP_DB
+bash deploy/configure_live_db.sh FiberaFRP_DB 1 elsx_verify_2024
 ```
 
 The script:

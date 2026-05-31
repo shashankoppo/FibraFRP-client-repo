@@ -25,8 +25,12 @@ database and mark only that database as the WhatsApp webhook receiver:
 ```bash
 git pull origin main
 docker compose build odoo
-bash deploy/configure_live_db.sh FiberaFRP_DB
+bash deploy/configure_live_db.sh FiberaFRP_DB 1 elsx_verify_2024
 ```
+
+The second argument is the live WhatsApp account ID and the third argument is
+the Meta webhook verify token. In Meta, use the callback URL printed by the
+script, for example `https://fibera.elsxglobal.com/whatsapp/webhook?db=FiberaFRP_DB`.
 
 ---
 

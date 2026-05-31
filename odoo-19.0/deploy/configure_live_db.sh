@@ -3,6 +3,7 @@ set -euo pipefail
 
 LIVE_DB_NAME="${1:-${LIVE_DB_NAME:-FiberaFRP_DB}}"
 LIVE_ACCOUNT_ID="${2:-${WHATSAPP_ACCOUNT_ID:-}}"
+LIVE_VERIFY_TOKEN="${3:-${WHATSAPP_VERIFY_TOKEN:-}}"
 MODULES="${MODULES:-elsx_client_restrictions,elsx_whatsapp_marketing,elsx_attendance_tracking,elsx_tally_integration}"
 CONFIG="${ODOO_CONFIG:-/etc/odoo/odoo.conf}"
 DB_USER="${POSTGRES_USER:-odoo}"
@@ -21,6 +22,9 @@ if [ -n "${LIVE_ACCOUNT_ID}" ]; then
     exit 1
   fi
   echo "==> Requested primary WhatsApp account ID: ${LIVE_ACCOUNT_ID}"
+fi
+if [ -n "${LIVE_VERIFY_TOKEN}" ]; then
+  echo "==> Requested webhook verify token: $(printf '%s' "${LIVE_VERIFY_TOKEN}" | sed -E 's/^(.{3}).*(.{3})$/\1...\2/')"
 fi
 echo "==> Modules to upgrade: ${MODULES}"
 
@@ -102,6 +106,14 @@ for DB in "${DATABASES[@]}"; do
     docker compose exec -T db psql -U "${DB_USER}" -d "${DB}" -c \
       "UPDATE whatsapp_account
           SET is_primary_webhook_db = (id = ${PRIMARY_ACCOUNT_ID});" >/dev/null
+    if [ -n "${LIVE_VERIFY_TOKEN}" ]; then
+      LIVE_VERIFY_TOKEN_SQL="$(sql_quote "${LIVE_VERIFY_TOKEN}")"
+      docker compose exec -T db psql -U "${DB_USER}" -d "${DB}" -c \
+        "UPDATE whatsapp_account
+            SET webhook_verify_token = ${LIVE_VERIFY_TOKEN_SQL}
+          WHERE id = ${PRIMARY_ACCOUNT_ID};" >/dev/null
+      echo "---- ${DB}: webhook verify token updated on WhatsApp account ${PRIMARY_ACCOUNT_ID}"
+    fi
     echo "---- ${DB}: WhatsApp account ${PRIMARY_ACCOUNT_ID} marked primary; others disabled"
   else
     docker compose exec -T db psql -U "${DB_USER}" -d "${DB}" -c \
@@ -133,6 +145,12 @@ docker compose up -d odoo sidecar
 echo "==> Done."
 echo "Use this Meta webhook callback URL:"
 echo "    https://YOUR_DOMAIN/whatsapp/webhook?db=${LIVE_DB_NAME}"
+if [ -n "${LIVE_VERIFY_TOKEN}" ]; then
+  echo "Use this Meta verify token:"
+  echo "    ${LIVE_VERIFY_TOKEN}"
+  echo "Test verification from the server with:"
+  echo "    curl -i \"https://YOUR_DOMAIN/whatsapp/webhook?db=${LIVE_DB_NAME}&hub.mode=subscribe&hub.verify_token=${LIVE_VERIFY_TOKEN}&hub.challenge=12345\""
+fi
 echo "Then verify logs with:"
 echo "    docker logs --tail 200 odoo_app"
 echo "    docker logs --tail 100 whatsapp_sidecar"
