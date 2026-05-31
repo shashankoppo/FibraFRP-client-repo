@@ -226,4 +226,16 @@
         <field name="search_view_id" ref="view_whatsapp_template_search"/>
         <field name="context">{'active_test': False, 'search_default_active_records': 1}</field>
     </record>
+
+    <record id="action_whatsapp_template_archived" model="ir.actions.act_window">
+        <field name="name">Archived Templates</field>
+        <field name="res_model">whatsapp.template</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_whatsapp_template_search"/>
+        <field name="context">{'active_test': False, 'search_default_archived_records': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No archived templates</p>
+            <p>Archived templates appear here so users can open them and click Unarchive.</p>
+        </field>
+    </record>
 </odoo>

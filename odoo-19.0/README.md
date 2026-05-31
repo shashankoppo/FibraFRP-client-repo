@@ -8,6 +8,17 @@ Use [UBUNTU_24_DOCKER_DEPLOYMENT.md](UBUNTU_24_DOCKER_DEPLOYMENT.md) for
 server setup, exact clone restore, fresh database setup, WhatsApp webhook checks,
 Tally routing, and post-deploy verification.
 
+For production updates with multiple databases, pull/build the code and run the
+all-database module upgrade script so every database receives the latest stored
+views, menus, and actions:
+
+```bash
+git pull origin main
+docker compose down
+docker compose build odoo
+bash deploy/upgrade_module_all_dbs.sh elsx_whatsapp_marketing
+```
+
 ---
 
 ## 🏗️ System Architecture & Tech Stack

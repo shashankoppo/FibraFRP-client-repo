@@ -186,7 +186,46 @@ Manual acceptance checks:
 - Template and campaign screens open.
 - Tally sync/export path works.
 
-## 9. What Is Not in Git
+## 9. Updating Custom Modules Across All Databases
+
+Odoo stores module XML views, menus, actions, and fields inside each database.
+After pulling code, every database that uses WhatsApp Marketing must receive a
+module upgrade. Updating only `qwerty` leaves other databases with old stored
+views and can keep errors such as missing campaign fields alive.
+
+For normal WhatsApp Marketing deployments, run:
+
+```bash
+git pull origin main
+docker compose down
+docker compose build odoo
+bash deploy/upgrade_module_all_dbs.sh elsx_whatsapp_marketing
+```
+
+The script:
+
+- Starts PostgreSQL.
+- Stops Odoo and the sidecar while upgrades run.
+- Lists all non-template application databases.
+- Runs `-u elsx_whatsapp_marketing` once per database.
+- Starts Odoo and the sidecar again.
+
+To exclude additional databases, pass a comma-separated list:
+
+```bash
+DB_NAME_EXCLUDES=postgres,test_old bash deploy/upgrade_module_all_dbs.sh elsx_whatsapp_marketing
+```
+
+After the upgrade, verify:
+
+```bash
+docker logs --tail 200 odoo_app
+```
+
+Then open WhatsApp Marketing and check Campaigns, Templates, Flow Builder,
+Team Inbox, and Dashboard in every active client database.
+
+## 10. What Is Not in Git
 
 The Git repository contains application code and deployment files. It does not
 contain:

@@ -870,6 +870,18 @@
         </field>
     </record>
 
+    <record id="whatsapp_bot_flow_archived_action" model="ir.actions.act_window">
+        <field name="name">Inactive / Archived Bot Flows</field>
+        <field name="res_model">whatsapp.bot.flow</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="whatsapp_bot_flow_view_search"/>
+        <field name="context">{'active_test': False, 'search_default_archived_records': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No inactive flows</p>
+            <p>Inactive or archived flows appear here so admins can review and reactivate them.</p>
+        </field>
+    </record>
+
     <record id="whatsapp_bot_flow_step_action" model="ir.actions.act_window">
         <field name="name">Flow Steps</field>
         <field name="res_model">whatsapp.bot.flow.step</field>
