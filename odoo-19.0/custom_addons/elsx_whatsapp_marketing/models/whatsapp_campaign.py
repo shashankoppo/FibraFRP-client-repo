@@ -242,7 +242,9 @@ class WhatsAppCampaign(models.Model):
         Submission = self.env['whatsapp.form.submission'].sudo()
         for record in self:
             record.form_submission_count = Submission.search_count([('campaign_id', '=', record.id)])
-            record.tracked_reply_count = sum(record.reply_rule_ids.mapped('handled_count'))
+            linked_reply_count = len(record.message_ids.filtered(lambda msg: msg.direction == 'inbound'))
+            handled_reply_count = sum(record.reply_rule_ids.mapped('handled_count'))
+            record.tracked_reply_count = max(linked_reply_count, handled_reply_count)
             record.payment_action_count = sum(record.reply_rule_ids.filtered(lambda r: r.action_type == 'send_payment_link').mapped('handled_count'))
 
     @api.depends(
@@ -900,6 +902,12 @@ class WhatsAppCampaign(models.Model):
                     'direction': 'outbound',
                     'flow_id': self.flow_id.id if self.flow_id else False,
                 }
+                existing_chat = self.env['whatsapp.chat'].sudo().search([
+                    ('account_id', '=', self.account_id.id),
+                    ('phone_number', '=', phone),
+                ], limit=1)
+                if existing_chat:
+                    message_vals['chat_id_ref'] = existing_chat.id
                 message_vals.update(message_media_vals)
                 messages_to_create.append(message_vals)
             
@@ -1253,6 +1261,8 @@ class WhatsAppCampaign(models.Model):
             ], order='write_date desc', limit=1)
         if not campaign:
             return False
+        if message.campaign_id != campaign:
+            message.sudo().write({'campaign_id': campaign.id})
         campaign._mark_chat_source(message)
         return campaign._apply_reply_rules(message)
 

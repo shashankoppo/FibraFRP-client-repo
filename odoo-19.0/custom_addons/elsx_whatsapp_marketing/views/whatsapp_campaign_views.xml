@@ -276,10 +276,14 @@
                                     <field name="create_date"/>
                                     <field name="partner_id"/>
                                     <field name="phone_number"/>
+                                    <field name="direction"/>
+                                    <field name="message_type"/>
+                                    <field name="body"/>
                                     <field name="status"/>
                                     <field name="sent_date"/>
                                     <field name="delivered_date"/>
                                     <field name="read_date"/>
+                                    <field name="error_message" optional="hide"/>
                                 </list>
                             </field>
                         </page>
