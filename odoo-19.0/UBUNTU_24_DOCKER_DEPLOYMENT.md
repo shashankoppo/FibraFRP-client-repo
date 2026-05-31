@@ -141,13 +141,20 @@ Meta should call the public HTTPS callback URL for the active WhatsApp account.
 For the current live database, use the database-pinned URL:
 
 ```text
-https://fibera.elsxglobal.com/whatsapp/webhook/1?db=FiberaFRP_DB
+https://fibera.elsxglobal.com/whatsapp/webhook?db=FiberaFRP_DB
 ```
 
 After pulling code or restoring the live database, run:
 
 ```bash
 bash deploy/configure_live_db.sh FiberaFRP_DB
+```
+
+If there are multiple WhatsApp accounts in the live database, pass the Odoo
+WhatsApp account ID as the second argument to force the primary receiver:
+
+```bash
+bash deploy/configure_live_db.sh FiberaFRP_DB 1
 ```
 
 After changing domains, verify:

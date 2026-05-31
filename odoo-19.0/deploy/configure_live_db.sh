@@ -2,6 +2,7 @@
 set -euo pipefail
 
 LIVE_DB_NAME="${1:-${LIVE_DB_NAME:-FiberaFRP_DB}}"
+LIVE_ACCOUNT_ID="${2:-${WHATSAPP_ACCOUNT_ID:-}}"
 MODULES="${MODULES:-elsx_client_restrictions,elsx_whatsapp_marketing,elsx_attendance_tracking,elsx_tally_integration}"
 CONFIG="${ODOO_CONFIG:-/etc/odoo/odoo.conf}"
 DB_USER="${POSTGRES_USER:-odoo}"
@@ -14,6 +15,13 @@ sql_quote() {
 LIVE_DB_SQL="$(sql_quote "${LIVE_DB_NAME}")"
 
 echo "==> Production database: ${LIVE_DB_NAME}"
+if [ -n "${LIVE_ACCOUNT_ID}" ]; then
+  if ! [[ "${LIVE_ACCOUNT_ID}" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: WhatsApp account ID must be numeric: ${LIVE_ACCOUNT_ID}" >&2
+    exit 1
+  fi
+  echo "==> Requested primary WhatsApp account ID: ${LIVE_ACCOUNT_ID}"
+fi
 echo "==> Modules to upgrade: ${MODULES}"
 
 echo "==> Ensuring PostgreSQL is running"
@@ -64,11 +72,37 @@ for DB in "${DATABASES[@]}"; do
   fi
 
   if [ "${DB}" = "${LIVE_DB_NAME}" ]; then
+    if [ -n "${LIVE_ACCOUNT_ID}" ]; then
+      PRIMARY_ACCOUNT_ID="$(
+        docker compose exec -T db psql -U "${DB_USER}" -d "${DB}" -Atc \
+          "SELECT id
+             FROM whatsapp_account
+            WHERE active = true
+              AND id = ${LIVE_ACCOUNT_ID}
+            LIMIT 1;"
+      )"
+    else
+      PRIMARY_ACCOUNT_ID="$(
+        docker compose exec -T db psql -U "${DB_USER}" -d "${DB}" -Atc \
+          "SELECT id
+             FROM whatsapp_account
+            WHERE active = true
+            ORDER BY (webhook_status = 'verified') DESC,
+                     (status = 'connected') DESC,
+                     id ASC
+            LIMIT 1;"
+      )"
+    fi
+
+    if [ -z "${PRIMARY_ACCOUNT_ID}" ]; then
+      echo "---- ${DB}: no active WhatsApp account found; skipping primary webhook flag" >&2
+      continue
+    fi
+
     docker compose exec -T db psql -U "${DB_USER}" -d "${DB}" -c \
       "UPDATE whatsapp_account
-          SET is_primary_webhook_db = true
-        WHERE active = true;" >/dev/null
-    echo "---- ${DB}: active WhatsApp account(s) marked primary"
+          SET is_primary_webhook_db = (id = ${PRIMARY_ACCOUNT_ID});" >/dev/null
+    echo "---- ${DB}: WhatsApp account ${PRIMARY_ACCOUNT_ID} marked primary; others disabled"
   else
     docker compose exec -T db psql -U "${DB_USER}" -d "${DB}" -c \
       "UPDATE whatsapp_account
@@ -79,7 +113,17 @@ done
 
 echo "==> Live WhatsApp account status"
 docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
-  "SELECT id, name, phone_number, webhook_status, is_primary_webhook_db
+  "SELECT id,
+          name,
+          phone_number,
+          status,
+          webhook_status,
+          is_primary_webhook_db,
+          CASE
+            WHEN webhook_verify_token IS NULL OR webhook_verify_token = '' THEN ''
+            WHEN length(webhook_verify_token) <= 8 THEN '***'
+            ELSE left(webhook_verify_token, 3) || '...' || right(webhook_verify_token, 3)
+          END AS verify_token_hint
      FROM whatsapp_account
     ORDER BY id;"
 
@@ -88,7 +132,7 @@ docker compose up -d odoo sidecar
 
 echo "==> Done."
 echo "Use this Meta webhook callback URL:"
-echo "    https://YOUR_DOMAIN/whatsapp/webhook/1?db=${LIVE_DB_NAME}"
+echo "    https://YOUR_DOMAIN/whatsapp/webhook?db=${LIVE_DB_NAME}"
 echo "Then verify logs with:"
 echo "    docker logs --tail 200 odoo_app"
 echo "    docker logs --tail 100 whatsapp_sidecar"
