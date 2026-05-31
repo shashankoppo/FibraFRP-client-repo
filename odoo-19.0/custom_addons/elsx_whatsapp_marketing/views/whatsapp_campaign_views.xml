@@ -428,7 +428,7 @@
                 <filter name="archived_records" string="Archived" domain="[('state', '=', 'archived')]"/>
                 <filter name="draft_campaigns" string="Draft" domain="[('state', '=', 'draft')]"/>
                 <filter name="running_campaigns" string="Running" domain="[('state', '=', 'running')]"/>
-                <group string="Group By">
+                <group>
                     <filter name="group_by_state" string="State" context="{'group_by': 'state'}"/>
                     <filter name="group_by_account" string="Account" context="{'group_by': 'account_id'}"/>
                     <filter name="group_by_type" string="Type" context="{'group_by': 'campaign_type'}"/>

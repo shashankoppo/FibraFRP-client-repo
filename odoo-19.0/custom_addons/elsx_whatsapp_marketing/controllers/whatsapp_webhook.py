@@ -30,65 +30,115 @@ class WebhookSerializationRetry(Exception):
 
 def _get_env(db_name=None, payload=None):
     """Get a fresh Odoo environment for webhook context (no request session)"""
-    db_name = db_name or request.session.db or getattr(request, 'db', None)
+    db_name = (
+        db_name
+        or request.params.get('db')
+        or request.httprequest.headers.get('X-Odoo-Db')
+        or request.session.db
+        or getattr(request, 'db', None)
+    )
 
     from odoo.service import db as db_service
     dbs = db_service.list_dbs()
 
-    # 0. Multi-tenant phone_number_id matching
-    if payload:
-        try:
-            meta = payload.get('entry', [{}])[0].get('changes', [{}])[0].get('value', {}).get('metadata', {})
-            phone_number_id = meta.get('phone_number_id')
-            if phone_number_id:
-                for db in dbs:
-                    try:
-                        registry = Registry(db)
-                        if 'whatsapp.account' in registry.models:
-                            cr = registry.cursor()
-                            env = api.Environment(cr, odoo.SUPERUSER_ID, {})
-                            if env['whatsapp.account'].sudo().search_count([('phone_number_id', '=', phone_number_id)]):
-                                return env, cr, db
-                            cr.close()
-                    except Exception:
-                        continue
-        except Exception:
-            pass
-
-    # 1. Try specified/guessed DB
-    if db_name and db_name in dbs:
-        try:
-            registry = Registry(db_name)
-            if 'whatsapp.account' in registry.models:
-                cr = registry.cursor()
-                return api.Environment(cr, odoo.SUPERUSER_ID, {}), cr, db_name
-        except Exception:
-            pass
-
-    # 2. Iterate through all DBs, looking for the marked "Primary Webhook DB"
-    for db in dbs:
+    def open_env(db):
         try:
             registry = Registry(db)
-            if 'whatsapp.account' in registry.models:
-                cr = registry.cursor()
-                env = api.Environment(cr, odoo.SUPERUSER_ID, {})
-                # Check if this DB is marked as primary
-                primary_acc = env['whatsapp.account'].sudo().search([('is_primary_webhook_db', '=', True)], limit=1)
-                if primary_acc:
-                    return env, cr, db
-                cr.close()
+            if 'whatsapp.account' not in registry.models:
+                return None, None, None
+            cr = registry.cursor()
+            return api.Environment(cr, odoo.SUPERUSER_ID, {}), cr, db
         except Exception:
+            return None, None, None
+
+    def payload_phone_number_id():
+        if not payload:
+            return False
+        try:
+            meta = payload.get('entry', [{}])[0].get('changes', [{}])[0].get('value', {}).get('metadata', {})
+            return meta.get('phone_number_id')
+        except Exception:
+            return False
+
+    def account_score(account):
+        return (
+            10 if account.is_primary_webhook_db else 0,
+            5 if account.webhook_status == 'verified' else 0,
+            3 if account.status == 'connected' else 0,
+            account.last_inbound_webhook_at or account.last_webhook_at or fields.Datetime.to_datetime('1970-01-01 00:00:00'),
+        )
+
+    # 0. Explicit DB pin wins. This is essential when several copied DBs exist.
+    if db_name and db_name in dbs:
+        env, cr, db = open_env(db_name)
+        if env:
+            return env, cr, db
+
+    # 1. Multi-tenant phone_number_id matching. Prefer the primary/verified
+    # receiver if the same WABA was copied into several databases.
+    phone_number_id = payload_phone_number_id()
+    if phone_number_id:
+        matches = []
+        for db in dbs:
+            env, cr, _ = open_env(db)
+            if not env:
+                continue
+            try:
+                account = env['whatsapp.account'].sudo().search([
+                    ('phone_number_id', '=', phone_number_id),
+                    ('active', '=', True),
+                ], limit=1)
+                if account:
+                    matches.append((account_score(account), db))
+            except Exception:
+                pass
+            finally:
+                cr.close()
+        if matches:
+            matches.sort(key=lambda item: item[0], reverse=True)
+            if len(matches) > 1:
+                _logger.warning(
+                    '[WH-DB] phone_number_id=%s exists in multiple DBs. Selected %s. Matches=%s. '
+                    'Set only one WhatsApp account as primary, or use ?db=DB_NAME in the webhook URL.',
+                    phone_number_id, matches[0][1], [db for _, db in matches],
+                )
+            env, cr, db = open_env(matches[0][1])
+            if env:
+                return env, cr, db
+
+    # 2. Iterate through all DBs, looking for the marked "Primary Webhook DB"
+    primary_matches = []
+    for db in dbs:
+        env, cr, _ = open_env(db)
+        if not env:
             continue
+        try:
+            primary_acc = env['whatsapp.account'].sudo().search([
+                ('is_primary_webhook_db', '=', True),
+                ('active', '=', True),
+            ], limit=1)
+            if primary_acc:
+                primary_matches.append((account_score(primary_acc), db))
+        except Exception:
+            pass
+        finally:
+            cr.close()
+    if primary_matches:
+        primary_matches.sort(key=lambda item: item[0], reverse=True)
+        if len(primary_matches) > 1:
+            _logger.warning(
+                '[WH-DB] Multiple primary webhook DBs found. Selected %s. Matches=%s.',
+                primary_matches[0][1], [db for _, db in primary_matches],
+            )
+        env, cr, db = open_env(primary_matches[0][1])
+        if env:
+            return env, cr, db
 
     # 3. Final fallback: search for ANY DB with our model
     for db in dbs:
-        try:
-            registry = Registry(db)
-            if 'whatsapp.account' in registry.models:
-                cr = registry.cursor()
-                return api.Environment(cr, odoo.SUPERUSER_ID, {}), cr, db
-        except Exception:
-            continue
+        env, cr, db = open_env(db)
+        if env:
+            return env, cr, db
 
     # 4. Critical failure
     return None, None, None
@@ -1256,9 +1306,16 @@ class WhatsAppWebhook(http.Controller):
         Used when Sidecar receives Meta Webhook FIRST and forwards to Odoo.
         """
         secret = request.httprequest.headers.get('x-sidecar-key')
+        raw_body = request.httprequest.data or b''
+        signature = request.httprequest.headers.get('X-Hub-Signature-256', '')
+        try:
+            payload = json.loads(raw_body.decode('utf-8') or '{}')
+        except json.JSONDecodeError:
+            return request.make_json_response({'status': 'error', 'message': 'Invalid JSON'}, status=400)
 
-        # We need a valid environment to check config parameters in auth='none'
-        env, cr, _ = _get_env()
+        # We need the payload before auth so copied databases can be resolved by
+        # phone_number_id and sidecar secrets are read from the correct DB.
+        env, cr, _ = _get_env(payload=payload)
         if not env:
             _logger.error('[SIDECAR-IN] Could not initialize environment for security check')
             return request.make_json_response({'status': 'error', 'message': 'System Initialization Error'}, status=500)
@@ -1271,12 +1328,6 @@ class WhatsAppWebhook(http.Controller):
         finally:
             cr.close()
 
-        raw_body = request.httprequest.data or b''
-        signature = request.httprequest.headers.get('X-Hub-Signature-256', '')
-        try:
-            payload = json.loads(raw_body.decode('utf-8') or '{}')
-        except json.JSONDecodeError:
-            return request.make_json_response({'status': 'error', 'message': 'Invalid JSON'}, status=400)
         _logger.info('[SIDECAR-IN] Received payload for processing')
 
         # We reuse the POST logic by calling _handle_post with raw JSON
@@ -1291,7 +1342,9 @@ class WhatsAppWebhook(http.Controller):
         if payload.get('object') != 'whatsapp_business_account':
             return {'status': 'ignored'}
 
-        env, cr, _ = _get_env()
+        env, cr, _ = _get_env(payload=payload)
+        if not env:
+            return {'status': 'error', 'message': 'Database unavailable', 'http_status': 503}
         with cr:
             # We'll use the same processing logic as _handle_post
             # but we need to pass the payload object

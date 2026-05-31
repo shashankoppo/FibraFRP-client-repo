@@ -9,6 +9,7 @@ import io
 import mimetypes
 import random
 import secrets
+from urllib.parse import quote
 from datetime import timedelta
 
 _logger = logging.getLogger(__name__)
@@ -258,8 +259,9 @@ class WhatsAppAccount(models.Model):
     
     def _compute_webhook_url(self):
         base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
+        db_query = quote(self.env.cr.dbname or '')
         for record in self:
-            record.webhook_url = f"{base_url}/whatsapp/webhook/{record.id}"
+            record.webhook_url = f"{base_url}/whatsapp/webhook/{record.id}?db={db_query}"
 
     @api.model
     def _get_default_account(self):
