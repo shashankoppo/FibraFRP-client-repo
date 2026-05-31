@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_attendance_tree_tracking_inherit" model="ir.ui.view">
+        <field name="name">hr.attendance.list.elsx.tunnel.tracking</field>
+        <field name="model">hr.attendance</field>
+        <field name="inherit_id" ref="hr_attendance.view_attendance_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='in_location']" position="attributes">
+                <attribute name="string">Location (In)</attribute>
+                <attribute name="optional">show</attribute>
+            </xpath>
+            <xpath expr="//field[@name='out_location']" position="attributes">
+                <attribute name="string">Location (Out)</attribute>
+                <attribute name="optional">show</attribute>
+            </xpath>
+            <xpath expr="//field[@name='in_location']" position="after">
+                <field name="in_ip_address" string="IP Address (In)" optional="show"/>
+                <field name="in_browser" string="Browser (In)" optional="hidden"/>
+            </xpath>
+            <xpath expr="//field[@name='out_location']" position="after">
+                <field name="out_ip_address" string="IP Address (Out)" optional="show"/>
+                <field name="out_browser" string="Browser (Out)" optional="hidden"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="hr_attendance_view_filter_tracking_inherit" model="ir.ui.view">
+        <field name="name">hr.attendance.search.elsx.tunnel.tracking</field>
+        <field name="model">hr.attendance</field>
+        <field name="inherit_id" ref="hr_attendance.hr_attendance_view_filter"/>
+        <field name="arch" type="xml">
+            <xpath expr="//filter[@name='auto_check']" position="after">
+                <filter string="With IP Address" name="elsx_with_ip" domain="['|', ('in_ip_address', '!=', False), ('out_ip_address', '!=', False)]"/>
+                <filter string="With GPS Coordinates" name="elsx_with_gps" domain="['|', ('in_latitude', '!=', False), ('out_latitude', '!=', False)]"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
