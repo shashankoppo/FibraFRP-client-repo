@@ -137,6 +137,11 @@ Fresh databases must not reuse live Meta credentials unless that is deliberate.
 For production, expose Odoo through HTTPS using a reverse proxy such as Nginx,
 Traefik, or Caddy.
 
+The Docker config loads `elsx_whatsapp_marketing` in `server_wide_modules`
+because Meta verifies the webhook before an Odoo browser session has selected a
+database. The webhook controller then opens the explicit database from
+`?db=FiberaFRP_DB`.
+
 Meta should call the public HTTPS callback URL for the active WhatsApp account.
 For the current live database, use the database-pinned URL:
 

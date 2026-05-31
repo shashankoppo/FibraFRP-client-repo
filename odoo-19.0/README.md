@@ -31,6 +31,8 @@ bash deploy/configure_live_db.sh FiberaFRP_DB 1 elsx_verify_2024
 The second argument is the live WhatsApp account ID and the third argument is
 the Meta webhook verify token. In Meta, use the callback URL printed by the
 script, for example `https://fibera.elsxglobal.com/whatsapp/webhook?db=FiberaFRP_DB`.
+The Docker config loads the WhatsApp webhook controller server-wide so Meta can
+verify the URL before an Odoo browser session selects a database.
 
 ---
 
