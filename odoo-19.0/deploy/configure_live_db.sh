@@ -54,7 +54,7 @@ echo "==> Repairing stale ELSxGlobal branding view if present"
 docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -v ON_ERROR_STOP=1 <<'SQL'
 DO $$
 DECLARE
-  own_view_id integer;
+  parent_view_id integer;
   target_view_id integer;
   updated_count integer;
   safe_arch text := $body$<data>
@@ -70,10 +70,10 @@ BEGIN
   END IF;
 
   SELECT res_id
-    INTO own_view_id
+    INTO parent_view_id
     FROM ir_model_data
-   WHERE module = 'elsx_client_restrictions'
-     AND name = 'elsx_brand_promotion'
+   WHERE module = 'web'
+     AND name = 'brand_promotion'
      AND model = 'ir.ui.view'
    LIMIT 1;
 
@@ -85,22 +85,47 @@ BEGIN
      AND model = 'ir.ui.view'
    LIMIT 1;
 
-  IF own_view_id IS NULL OR target_view_id IS NULL THEN
-    RAISE NOTICE 'Branding view or target message template is missing; skipping branding rescue.';
+  IF target_view_id IS NULL THEN
+    RAISE NOTICE 'Target brand promotion message template is missing; skipping branding rescue.';
     RETURN;
   END IF;
 
-  UPDATE ir_ui_view
+  UPDATE ir_ui_view AS v
      SET name = 'ELSxGlobal Brand Promotion Message',
          inherit_id = target_view_id,
          arch_db = jsonb_build_object('en_US', safe_arch),
          arch_prev = NULL,
          arch_updated = false
-   WHERE id = own_view_id
+   WHERE (
+       EXISTS (
+         SELECT 1
+           FROM ir_model_data d
+          WHERE d.model = 'ir.ui.view'
+            AND d.res_id = v.id
+            AND d.module = 'elsx_client_restrictions'
+            AND d.name = 'elsx_brand_promotion'
+       )
+       OR (
+         parent_view_id IS NOT NULL
+         AND v.inherit_id = parent_view_id
+         AND (
+             lower(v.name) LIKE '%elsx%'
+             OR lower(COALESCE(v.arch_db::text, '')) LIKE '%elsxglobal%'
+             OR COALESCE(v.arch_db::text, '') LIKE '%o_brand_promotion%'
+         )
+         AND NOT EXISTS (
+           SELECT 1
+             FROM ir_model_data d
+            WHERE d.model = 'ir.ui.view'
+              AND d.res_id = v.id
+              AND d.module IN ('web', 'website')
+         )
+       )
+     )
      AND (
-         inherit_id IS DISTINCT FROM target_view_id
-         OR COALESCE(arch_db::text, '') LIKE '%o_brand_promotion%'
-         OR COALESCE(arch_db::text, '') LIKE '%web.brand_promotion%'
+         v.inherit_id IS DISTINCT FROM target_view_id
+         OR COALESCE(v.arch_db::text, '') LIKE '%o_brand_promotion%'
+         OR COALESCE(v.arch_db::text, '') LIKE '%web.brand_promotion%'
      );
   GET DIAGNOSTICS updated_count = ROW_COUNT;
 

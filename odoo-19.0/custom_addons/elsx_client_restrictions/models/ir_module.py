@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import models, api, fields
+from odoo import models
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ class IrModuleModule(models.Model):
         but move the override to the child message template.
         """
         try:
-            view = self.env.ref(
+            current_view = self.env.ref(
                 "elsx_client_restrictions.elsx_brand_promotion",
                 raise_if_not_found=False,
             )
@@ -26,7 +26,8 @@ class IrModuleModule(models.Model):
                 "web.brand_promotion_message",
                 raise_if_not_found=False,
             )
-            if not view or not target:
+            parent = self.env.ref("web.brand_promotion", raise_if_not_found=False)
+            if not target:
                 return
             safe_arch = """
 <data>
@@ -35,12 +36,33 @@ class IrModuleModule(models.Model):
     </xpath>
 </data>
 """
-            needs_rescue = (
-                view.inherit_id.id != target.id
-                or "o_brand_promotion" in (view.arch_db or "")
-                or "web.brand_promotion" in (view.arch_db or "")
-            )
-            if needs_rescue:
+            views = self.env["ir.ui.view"]
+            if current_view:
+                views |= current_view
+            if parent:
+                for view in self.env["ir.ui.view"].sudo().search([("inherit_id", "=", parent.id)]):
+                    xmlid = next(iter(view.get_external_id().values()), "")
+                    arch = view.arch_db or ""
+                    is_elsx_view = (
+                        xmlid.startswith("elsx_client_restrictions.")
+                        or "elsx" in (view.name or "").lower()
+                        or "elsxglobal" in arch.lower()
+                        or "o_brand_promotion" in arch
+                    )
+                    is_core_view = xmlid.startswith("web.") or xmlid.startswith("website.")
+                    if is_elsx_view and not is_core_view:
+                        views |= view
+
+            repaired = 0
+            for view in views:
+                arch = view.arch_db or ""
+                needs_rescue = (
+                    view.inherit_id.id != target.id
+                    or "o_brand_promotion" in arch
+                    or "web.brand_promotion" in arch
+                )
+                if not needs_rescue:
+                    continue
                 view.sudo().with_context(lang=None, no_save_prev=True).write({
                     "name": "ELSxGlobal Brand Promotion Message",
                     "inherit_id": target.id,
@@ -48,8 +70,13 @@ class IrModuleModule(models.Model):
                     "arch_prev": False,
                     "arch_updated": False,
                 })
-                self.env.registry.clear_cache("templates")
-                _logger.info("Repaired stale ELSxGlobal brand promotion view before module operation.")
+                repaired += 1
+            if repaired:
+                self.env.registry.clear_cache()
+                _logger.info(
+                    "Repaired %s stale ELSxGlobal brand promotion view(s) before module operation.",
+                    repaired,
+                )
         except Exception:
             _logger.exception("Could not repair stale ELSxGlobal brand promotion view before module operation.")
 
