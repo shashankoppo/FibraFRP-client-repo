@@ -756,6 +756,31 @@ class WhatsAppCampaign(models.Model):
         }
     
     def action_send_campaign(self):
+        """Send campaign messages and turn unexpected failures into operator-safe errors."""
+        self.ensure_one()
+        try:
+            return self._action_send_campaign_impl()
+        except (UserError, ValidationError):
+            raise
+        except Exception as e:
+            detail = str(e) or e.__class__.__name__
+            hint = _(
+                "Please check the campaign readiness checklist, template media, recipient phone numbers, "
+                "and make sure the WhatsApp module was upgraded on this database."
+            )
+            if 'UndefinedColumn' in detail or 'does not exist' in detail:
+                hint = _(
+                    "This usually means the server code was updated but this database schema was not upgraded. "
+                    "Upgrade elsx_whatsapp_marketing on the live database, then try again."
+                )
+            _logger.exception(
+                "Unexpected WhatsApp campaign queue failure. campaign_id=%s campaign_name=%s",
+                self.id,
+                self.name,
+            )
+            raise UserError(_("Campaign could not be queued.\n\nReason: %s\n\n%s") % (detail, hint))
+
+    def _action_send_campaign_impl(self):
         """Send campaign messages or start drip sequence"""
         self.ensure_one()
         if self.campaign_type not in ('broadcast', 'drip'):
@@ -825,7 +850,18 @@ class WhatsAppCampaign(models.Model):
                 if current_template:
                     message_body = self._render_body_for_partner(message_body, partner, current_template)
                     media_kwargs = self._campaign_header_media_kwargs(version)
-                    raw_data = json.dumps(self._template_payload_for_partner(current_template, partner, version=version))
+                    try:
+                        template_payload = self._template_payload_for_partner(current_template, partner, version=version)
+                    except (UserError, ValidationError) as e:
+                        raise UserError(_(
+                            "Campaign cannot be queued for recipient %(recipient)s using template %(template)s.\n\n"
+                            "Reason: %(reason)s"
+                        ) % {
+                            'recipient': partner.display_name or partner.name or partner.id,
+                            'template': current_template.display_name or current_template.name,
+                            'reason': str(e),
+                        })
+                    raw_data = json.dumps(template_payload)
                     if current_template.header_type in ('image', 'video', 'document'):
                         media_file = media_kwargs.get('header_media_file')
                         media_url = media_kwargs.get('header_media_url')

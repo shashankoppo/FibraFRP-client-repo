@@ -599,7 +599,7 @@ class WhatsAppCampaignScheduleWizard(models.TransientModel):
         self.ensure_one()
         
         if self.schedule_type == 'immediate':
-            self.campaign_id.action_send_campaign()
+            return self.campaign_id.action_send_campaign()
         elif self.schedule_type == 'scheduled':
             if not self.scheduled_date:
                 raise UserError("Please select a scheduled date.")
