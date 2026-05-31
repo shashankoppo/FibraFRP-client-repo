@@ -197,17 +197,9 @@ export class WhatsAppChatHandler {
                 // --- Mobile Initial State Setup ---
                 if (window.innerWidth <= 991) {
                     setTimeout(() => {
-                        const sidebar = lastDialog.querySelector('.wa-left-sidebar');
-                        const main = lastDialog.querySelector('.o_whatsapp_chat_main');
                         const chatId = this._getActiveChatId();
-                        
-                        if (!chatId) {
-                            if (sidebar) { sidebar.classList.remove('d-none'); sidebar.classList.add('d-flex'); }
-                            if (main) { main.classList.add('d-none'); main.classList.remove('d-flex'); }
-                        } else {
-                            if (sidebar) { sidebar.classList.add('d-none'); sidebar.classList.remove('d-flex'); }
-                            if (main) { main.classList.remove('d-none'); main.classList.add('d-flex'); }
-                        }
+                        this._syncMobileLayout();
+                        this._setMobilePanel(chatId ? 'chat' : 'list', { persist: false });
                     }, 100);
                 }
                 
@@ -1975,12 +1967,8 @@ export class WhatsAppChatHandler {
                     this._lastHtml = null;
                     sessionStorage.removeItem('wa_selected_chat_id');
 
-                    // On mobile: show sidebar, hide chat area
                     if (window.innerWidth <= 991) {
-                        const sidebar = document.querySelector('.wa-left-sidebar');
-                        const main = document.querySelector('.o_whatsapp_chat_main');
-                        if (sidebar) { sidebar.classList.remove('d-none'); sidebar.classList.add('d-flex'); }
-                        if (main) main.classList.add('d-none');
+                        this._setMobilePanel('list', { persist: false });
                     }
 
                     // Navigate away first, then refresh panes after navigation settles
@@ -2005,10 +1993,7 @@ export class WhatsAppChatHandler {
                     sessionStorage.removeItem('wa_selected_chat_id');
 
                     if (window.innerWidth <= 991) {
-                        const sidebar = document.querySelector('.wa-left-sidebar');
-                        const main = document.querySelector('.o_whatsapp_chat_main');
-                        if (sidebar) { sidebar.classList.remove('d-none'); sidebar.classList.add('d-flex'); }
-                        if (main) main.classList.add('d-none');
+                        this._setMobilePanel('list', { persist: false });
                     }
 
                     this._hardRefresh();

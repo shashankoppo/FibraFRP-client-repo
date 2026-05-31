@@ -430,7 +430,7 @@
         <field name="name">whatsapp.bot.flow.form</field>
         <field name="model">whatsapp.bot.flow</field>
         <field name="arch" type="xml">
-            <form string="Bot Flow">
+            <form string="Bot Flow" class="o_whatsapp_bot_flow_form">
                 <header>
                     <button name="action_open_visual_builder" type="object" string="Open Visual Builder" class="btn-primary" icon="fa-sitemap"/>
                     <button name="action_view_steps" type="object" string="Manage Steps" class="btn-secondary" icon="fa-list"/>

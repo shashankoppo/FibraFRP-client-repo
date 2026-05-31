@@ -3372,6 +3372,118 @@ textarea.wa-premium-input:focus {
         overflow-x: auto !important;
         -webkit-overflow-scrolling: touch;
     }
+
+    .o_whatsapp_campaign_form .o_notebook,
+    .o_whatsapp_template_form .o_notebook,
+    .o_whatsapp_bot_flow_form .o_notebook,
+    .o_whatsapp_campaign_form .o_notebook_content,
+    .o_whatsapp_template_form .o_notebook_content,
+    .o_whatsapp_bot_flow_form .o_notebook_content,
+    .o_whatsapp_campaign_form .tab-pane,
+    .o_whatsapp_template_form .tab-pane,
+    .o_whatsapp_bot_flow_form .tab-pane {
+        max-width: 100% !important;
+        min-width: 0 !important;
+    }
+
+    .o_whatsapp_campaign_form .nav-tabs,
+    .o_whatsapp_template_form .nav-tabs,
+    .o_whatsapp_bot_flow_form .nav-tabs {
+        flex-wrap: nowrap !important;
+        max-width: 100% !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+    }
+
+    .o_whatsapp_campaign_form .nav-tabs .nav-link,
+    .o_whatsapp_template_form .nav-tabs .nav-link,
+    .o_whatsapp_bot_flow_form .nav-tabs .nav-link {
+        min-height: 42px !important;
+        white-space: nowrap !important;
+    }
+
+    .o_whatsapp_campaign_form .o_field_x2many,
+    .o_whatsapp_template_form .o_field_x2many,
+    .o_whatsapp_bot_flow_form .o_field_x2many,
+    .o_whatsapp_campaign_form .o_list_renderer,
+    .o_whatsapp_template_form .o_list_renderer,
+    .o_whatsapp_bot_flow_form .o_list_renderer,
+    .o_whatsapp_campaign_form .o_list_view,
+    .o_whatsapp_template_form .o_list_view,
+    .o_whatsapp_bot_flow_form .o_list_view {
+        max-width: 100% !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .o_whatsapp_campaign_form .o_field_x2many .o_list_table,
+    .o_whatsapp_template_form .o_field_x2many .o_list_table,
+    .o_whatsapp_bot_flow_form .o_field_x2many .o_list_table,
+    .o_whatsapp_campaign_form .o_list_table,
+    .o_whatsapp_template_form .o_list_table,
+    .o_whatsapp_bot_flow_form .o_list_table {
+        min-width: 920px !important;
+        width: max-content !important;
+        table-layout: auto !important;
+    }
+
+    .o_whatsapp_campaign_form .o_list_table th,
+    .o_whatsapp_campaign_form .o_list_table td,
+    .o_whatsapp_template_form .o_list_table th,
+    .o_whatsapp_template_form .o_list_table td,
+    .o_whatsapp_bot_flow_form .o_list_table th,
+    .o_whatsapp_bot_flow_form .o_list_table td {
+        vertical-align: top !important;
+        white-space: nowrap !important;
+    }
+
+    .o_whatsapp_campaign_form .o_list_table th[data-name="body"],
+    .o_whatsapp_campaign_form .o_list_table td[name="body"],
+    .o_whatsapp_campaign_form .o_list_table .o_data_cell[name="body"],
+    .o_whatsapp_campaign_form .o_list_table th[data-name="message_body"],
+    .o_whatsapp_campaign_form .o_list_table td[name="message_body"],
+    .o_whatsapp_template_form .o_list_table th[data-name="body"],
+    .o_whatsapp_template_form .o_list_table td[name="body"],
+    .o_whatsapp_template_form .o_list_table .o_data_cell[name="body"] {
+        min-width: 280px !important;
+        max-width: 460px !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        word-break: normal !important;
+        line-height: 1.35 !important;
+    }
+
+    .o_whatsapp_campaign_form .o_list_table td[name="error_message"],
+    .o_whatsapp_campaign_form .o_list_table td[name="media_filename"],
+    .o_whatsapp_campaign_form .o_list_table td[name="button_text"],
+    .o_whatsapp_campaign_form .o_list_table td[name="list_item_title"],
+    .o_whatsapp_template_form .o_list_table td[name="error_message"],
+    .o_whatsapp_template_form .o_list_table td[name="media_filename"] {
+        min-width: 180px !important;
+        max-width: 320px !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+    }
+
+    .o_whatsapp_campaign_form .o_list_table td[name="phone_number"],
+    .o_whatsapp_template_form .o_list_table td[name="phone_number"] {
+        min-width: 132px !important;
+    }
+
+    .o_whatsapp_campaign_form .o_list_table td[name$="_date"],
+    .o_whatsapp_campaign_form .o_list_table th[data-name$="_date"] {
+        min-width: 142px !important;
+    }
+
+    .o_whatsapp_campaign_form .o_form_statusbar,
+    .o_whatsapp_template_form .o_form_statusbar,
+    .o_whatsapp_bot_flow_form .o_form_statusbar {
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        -webkit-overflow-scrolling: touch;
+    }
 }
 
 @keyframes wa-mobile-drawer-in {
@@ -3413,6 +3525,19 @@ textarea.wa-premium-input:focus {
 
     .elsx-wa-dashboard h2 {
         font-size: 1.25rem !important;
+    }
+
+    .o_whatsapp_campaign_form .o_form_sheet,
+    .o_whatsapp_template_form .o_form_sheet,
+    .o_whatsapp_bot_flow_form .o_form_sheet {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+
+    .o_whatsapp_campaign_form .wa-kpi-grid,
+    .o_whatsapp_template_form .wa-kpi-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 10px !important;
     }
 }
 
@@ -3469,5 +3594,17 @@ textarea.wa-premium-input:focus {
     .o_whatsapp_chat_form_view .wa-message-input-frame textarea,
     .o_whatsapp_chat_form_view .wa-premium-input textarea {
         max-height: 88px !important;
+    }
+
+    .o_whatsapp_campaign_form .o_form_sheet,
+    .o_whatsapp_template_form .o_form_sheet,
+    .o_whatsapp_bot_flow_form .o_form_sheet {
+        padding-left: 8px !important;
+        padding-right: 8px !important;
+    }
+
+    .o_whatsapp_campaign_form .wa-kpi-grid,
+    .o_whatsapp_template_form .wa-kpi-grid {
+        grid-template-columns: 1fr !important;
     }
 }

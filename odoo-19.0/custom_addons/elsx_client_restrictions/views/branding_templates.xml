@@ -15,9 +15,9 @@
         </xpath>
     </template>
 
-    <template id="elsx_brand_promotion" inherit_id="web.brand_promotion" name="ELSxGlobal Brand Promotion">
-        <xpath expr="//div[hasclass('o_brand_promotion')]" position="replace">
-            <div class="o_brand_promotion">Powered by <span>ELSxGlobal</span></div>
+    <template id="elsx_brand_promotion" inherit_id="web.brand_promotion_message" name="ELSxGlobal Brand Promotion Message">
+        <xpath expr="//t[@t-out]" position="replace">
+            <span>Powered by <span>ELSxGlobal</span></span>
         </xpath>
     </template>
 

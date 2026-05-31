@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'ELSX System Access Helpers',
-    'version': '2.1.0',
+    'version': '2.1.2',
     'category': 'Administration',
     'summary': 'Hidden Apps menu with controlled admin shortcut',
     'description': '''

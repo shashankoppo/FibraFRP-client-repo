@@ -46,6 +46,63 @@ echo "==> Stopping Odoo and sidecar for a clean module upgrade"
 docker compose stop sidecar >/dev/null 2>&1 || true
 docker compose stop odoo >/dev/null 2>&1 || true
 
+echo "==> Repairing stale ELSxGlobal branding view if present"
+docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -v ON_ERROR_STOP=1 <<'SQL'
+DO $$
+DECLARE
+  own_view_id integer;
+  target_view_id integer;
+  updated_count integer;
+BEGIN
+  IF to_regclass('public.ir_ui_view') IS NULL
+     OR to_regclass('public.ir_model_data') IS NULL THEN
+    RAISE NOTICE 'Base view tables are not present; skipping branding rescue.';
+    RETURN;
+  END IF;
+
+  SELECT res_id
+    INTO own_view_id
+    FROM ir_model_data
+   WHERE module = 'elsx_client_restrictions'
+     AND name = 'elsx_brand_promotion'
+     AND model = 'ir.ui.view'
+   LIMIT 1;
+
+  SELECT res_id
+    INTO target_view_id
+    FROM ir_model_data
+   WHERE module = 'web'
+     AND name = 'brand_promotion_message'
+     AND model = 'ir.ui.view'
+   LIMIT 1;
+
+  IF own_view_id IS NULL OR target_view_id IS NULL THEN
+    RAISE NOTICE 'Branding view or target message template is missing; skipping branding rescue.';
+    RETURN;
+  END IF;
+
+  UPDATE ir_ui_view
+     SET name = 'ELSxGlobal Brand Promotion Message',
+         inherit_id = target_view_id,
+         arch_db = $body$<data>
+    <xpath expr="//t[@t-out]" position="replace">
+        <span>Powered by <span>ELSxGlobal</span></span>
+    </xpath>
+</data>$body$,
+         arch_prev = NULL,
+         arch_updated = false
+   WHERE id = own_view_id
+     AND (
+         inherit_id IS DISTINCT FROM target_view_id
+         OR COALESCE(arch_db, '') LIKE '%o_brand_promotion%'
+         OR COALESCE(arch_db, '') LIKE '%web.brand_promotion%'
+     );
+  GET DIAGNOSTICS updated_count = ROW_COUNT;
+
+  RAISE NOTICE 'Branding rescue updated % view(s).', updated_count;
+END $$;
+SQL
+
 echo "==> Upgrading live database modules"
 docker compose run --rm -T --no-deps odoo \
   python3 /opt/odoo/odoo-bin \
