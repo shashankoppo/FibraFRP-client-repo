@@ -211,7 +211,7 @@
                 <filter name="active_records" string="Active" domain="[('active', '=', True)]"/>
                 <filter name="archived_records" string="Archived" domain="[('active', '=', False)]"/>
                 <filter name="approved_templates" string="Approved" domain="[('status', '=', 'approved')]"/>
-                <group expand="0" string="Group By">
+                <group string="Group By">
                     <filter name="group_by_status" string="Status" context="{'group_by': 'status'}"/>
                     <filter name="group_by_account" string="Account" context="{'group_by': 'account_id'}"/>
                 </group>

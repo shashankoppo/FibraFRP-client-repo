@@ -847,7 +847,7 @@
                 <field name="trigger_type"/>
                 <filter name="active_records" string="Active" domain="[('active', '=', True)]"/>
                 <filter name="archived_records" string="Inactive / Archived" domain="[('active', '=', False)]"/>
-                <group expand="0" string="Group By">
+                <group string="Group By">
                     <filter name="group_by_type" string="Type" context="{'group_by': 'flow_type'}"/>
                     <filter name="group_by_trigger" string="Trigger" context="{'group_by': 'trigger_type'}"/>
                     <filter name="group_by_account" string="Account" context="{'group_by': 'account_id'}"/>
