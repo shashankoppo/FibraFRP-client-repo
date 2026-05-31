@@ -2436,6 +2436,12 @@ export class WhatsAppChatHandler {
             .replace(/'/g, '&#039;');
     }
 
+    _getDisplayedHistoryChatId(mount = null) {
+        const historyMount = mount || document.getElementById('wa-custom-history-mount');
+        const id = parseInt(historyMount?.dataset?.waChatId || '', 10);
+        return id || null;
+    }
+
     async _switchChatContext(chatId, sidebarEl) {
         if (!chatId) return;
         const switchToken = ++this._activeChatSwitchToken;
@@ -2444,11 +2450,12 @@ export class WhatsAppChatHandler {
         // The old guard `chatId === this._lastChatId` prevented re-opening a chat
         // that appeared selected but whose form view hadn't actually rendered.
         const mount = document.getElementById('wa-custom-history-mount');
-        if (chatId === this._lastChatId && mount && mount.querySelector('[data-wa-message-id]')) {
+        const displayedChatId = this._getDisplayedHistoryChatId(mount);
+        if (Number(chatId) === Number(this._lastChatId) && Number(displayedChatId) === Number(chatId) && mount && mount.querySelector('[data-wa-message-id]')) {
             // Chat is already displayed with messages — just ensure sidebar highlight
             document.querySelectorAll('.o_whatsapp_sidebar_item').forEach(el => {
                 const elId = parseInt(el.getAttribute('data-chat-id'));
-                el.classList.toggle('active', el === sidebarEl || elId === chatId);
+                el.classList.toggle('active', el === sidebarEl || Number(elId) === Number(chatId));
             });
             if (this._isMobileViewport()) {
                 this._setMobilePanel('chat');
@@ -2470,7 +2477,7 @@ export class WhatsAppChatHandler {
         // 2. Mark active sidebar item immediately (zero-latency visual)
         document.querySelectorAll('.o_whatsapp_sidebar_item').forEach(el => {
             const elId = parseInt(el.getAttribute('data-chat-id'));
-            el.classList.toggle('active', el === sidebarEl || elId === chatId);
+            el.classList.toggle('active', el === sidebarEl || Number(elId) === Number(chatId));
         });
 
         // 3. Mark as read immediately to clear badge
@@ -2481,6 +2488,8 @@ export class WhatsAppChatHandler {
         // 4. Show loading skeleton in the history canvas instantly
         if (mount) {
             mount.classList.add('wa-history-switching');
+            mount.dataset.waChatId = '';
+            mount.dataset.waLoadingChatId = String(chatId);
             mount.innerHTML = `
                 <div class="d-flex flex-column gap-3 p-4 wa-loading-skeleton">
                     <div class="d-flex justify-content-start"><div class="wa-skeleton-item rounded-3" style="width:55%;height:48px;"></div></div>
@@ -2516,6 +2525,8 @@ export class WhatsAppChatHandler {
             const nextMount = await this._waitForHistoryMount(24, 80);
             if (nextMount) {
                 nextMount.classList.add('wa-history-switching');
+                nextMount.dataset.waChatId = '';
+                nextMount.dataset.waLoadingChatId = String(chatId);
             }
             this._lastHtml = null;
             await this._surgicalRefresh(chatId);
@@ -2664,10 +2675,9 @@ export class WhatsAppChatHandler {
         if (chatId) {
             document.querySelectorAll('.o_whatsapp_sidebar_item').forEach(el => {
                 const elId = parseInt(el.getAttribute('data-chat-id'));
-                el.classList.toggle('active', elId === chatId);
+                el.classList.toggle('active', Number(elId) === Number(chatId));
             });
             this._selectedChatId = chatId;
-            this._lastChatId = chatId;
             sessionStorage.setItem('wa_selected_chat_id', chatId);
         }
 
@@ -2683,10 +2693,15 @@ export class WhatsAppChatHandler {
             );
             
             if (res_array && res_array[0]) {
+                if (this._selectedChatId && Number(chatId) !== Number(this._selectedChatId)) {
+                    return;
+                }
                 const res = res_array[0];
                 const newHtml = res.history_html || '';
                 if (this._lastHtml !== newHtml) {
                     const mount = document.getElementById('wa-custom-history-mount') || historyDiv;
+                    mount.dataset.waChatId = String(chatId);
+                    delete mount.dataset.waLoadingChatId;
                     
                     try {
                         const historyMount = document.getElementById('wa-custom-history-mount');
@@ -2719,6 +2734,7 @@ export class WhatsAppChatHandler {
                         this._mergeHistoryHtml(mount, newHtml);
                     }
                     this._lastHtml = newHtml;
+                    this._lastChatId = chatId;
                     // Update footer session state in real-time
                     this._updateFooterSessionState(res.session_open);
 
@@ -2742,6 +2758,12 @@ export class WhatsAppChatHandler {
                         animateInboxRefresh(mount, { level: "subtle" });
                     }
                     mount.classList.remove('wa-history-switching');
+                } else {
+                    const mount = document.getElementById('wa-custom-history-mount') || historyDiv;
+                    mount.dataset.waChatId = String(chatId);
+                    delete mount.dataset.waLoadingChatId;
+                    this._lastChatId = chatId;
+                    mount.classList.remove('wa-history-switching');
                 }
             }
         } catch (e) {
@@ -2749,6 +2771,7 @@ export class WhatsAppChatHandler {
             const mount = document.getElementById('wa-custom-history-mount') || historyDiv;
             if (mount && (!forceChatId || Number(forceChatId) === Number(this._selectedChatId))) {
                 mount.classList.remove('wa-history-switching');
+                delete mount.dataset.waLoadingChatId;
                 mount.innerHTML = '<div class="alert alert-danger m-4">RPC Error: ' + String(e.message || e) + '</div>';
             }
         }
@@ -3172,14 +3195,14 @@ export class WhatsAppChatHandler {
     }
 
     _getChatIdForUserAction(triggerEl = null) {
-        const sidebarId = this._getSidebarActiveChatId();
-        if (sidebarId) return sidebarId;
-
         const formView = triggerEl?.closest?.('.o_form_view[data-model="whatsapp.chat"][data-res-id]');
         if (formView) {
             const id = parseInt(formView.getAttribute('data-res-id'));
             if (id) return id;
         }
+
+        const sidebarId = this._getSidebarActiveChatId();
+        if (sidebarId) return sidebarId;
 
         return this._getActiveChatId();
     }

@@ -24,7 +24,12 @@ class WhatsAppCampaign(models.Model):
     _campaign_state_schedule_idx = models.Index("(state, schedule_date, create_date)")
 
     name = fields.Char('Campaign Name', required=True)
-    active = fields.Boolean('Active', default=True)
+    active = fields.Boolean(
+        'Active',
+        compute='_compute_active',
+        inverse='_inverse_active',
+        search='_search_active',
+    )
     account_id = fields.Many2one('whatsapp.account', string='WhatsApp Account', required=True)
     
     # Campaign type
@@ -103,6 +108,26 @@ class WhatsAppCampaign(models.Model):
         for rec in self:
             rec.split_percentage_b = 100.0 - (rec.split_percentage or 50.0)
 
+    @api.depends('state')
+    def _compute_active(self):
+        for rec in self:
+            rec.active = rec.state != 'archived'
+
+    def _inverse_active(self):
+        for rec in self:
+            if rec.active and rec.state == 'archived':
+                rec.state = 'draft'
+            elif not rec.active and rec.state != 'archived':
+                rec.state = 'archived'
+
+    def _search_active(self, operator, value):
+        if operator not in ('=', '!='):
+            return []
+        is_active = bool(value)
+        if operator == '!=':
+            is_active = not is_active
+        return [('state', '!=', 'archived')] if is_active else [('state', '=', 'archived')]
+
     # Scheduling
     schedule_type = fields.Selection([
         ('immediate', 'Send Immediately'),
@@ -118,6 +143,7 @@ class WhatsAppCampaign(models.Model):
         ('running', 'Running'),
         ('completed', 'Completed'),
         ('cancelled', 'Cancelled'),
+        ('archived', 'Archived'),
     ], string='Status', default='draft', required=True)
     
     # Statistics
@@ -1156,11 +1182,11 @@ class WhatsAppCampaign(models.Model):
         self.state = 'cancelled'
 
     def action_archive_record(self):
-        self.write({'active': False})
+        self.write({'state': 'archived'})
         return True
 
     def action_unarchive_record(self):
-        self.write({'active': True})
+        self.filtered(lambda campaign: campaign.state == 'archived').write({'state': 'draft'})
         return True
 
     def action_retry_failed_messages(self):
