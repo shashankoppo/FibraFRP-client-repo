@@ -121,7 +121,7 @@
                                              <h4 class="mb-0 fw-bold" style="color: #111B21;">Team Inbox</h4>
                                          </div>
                                          <div class="d-flex gap-3 text-muted align-items-center">
-                                             <button type="action" name="%(elsx_whatsapp_marketing.action_whatsapp_bot_flow)d" class="btn btn-link p-0 text-muted" title="Automation Flows">
+                                             <button type="action" name="%(elsx_whatsapp_marketing.whatsapp_bot_flow_action)d" class="btn btn-link p-0 text-muted" title="Automation Flows">
                                                  <i class="fa fa-code-fork" title="Flows"/>
                                              </button>
                                              <button name="action_open_meta_manager" type="object" class="btn btn-link p-0 text-success" title="Meta Template Manager">

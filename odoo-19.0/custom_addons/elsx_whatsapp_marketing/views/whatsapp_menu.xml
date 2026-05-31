@@ -248,6 +248,12 @@
               sequence="71"
               action="action_whatsapp_dashboard_client"/>
 
+    <menuitem id="menu_whatsapp_api_log"
+              name="Outbound API Logs"
+              parent="menu_whatsapp_analytics_section"
+              action="action_whatsapp_api_log"
+              sequence="73"/>
+
     <!-- Media Library -->
     <record id="action_whatsapp_media_library" model="ir.actions.act_window">
         <field name="name">Media Library</field>
@@ -382,6 +388,12 @@
               parent="menu_whatsapp_config"
               sequence="30"
               action="action_whatsapp_placeholder"/>
+
+    <menuitem id="menu_whatsapp_import"
+              name="Bulk Import"
+              parent="menu_whatsapp_config"
+              sequence="31"
+              action="action_whatsapp_import_wizard"/>
 
     <menuitem id="menu_whatsapp_ai_jobs"
               name="AI Jobs"

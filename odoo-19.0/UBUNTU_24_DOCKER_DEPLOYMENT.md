@@ -74,8 +74,8 @@ working machine.
 
 Required files:
 
-- PostgreSQL dump, for example `qwerty.pg_dump`.
-- Filestore archive, for example `qwerty_filestore.tar.gz`.
+- PostgreSQL dump, for example `FiberaFRP_DB.pg_dump`.
+- Filestore archive, for example `FiberaFRP_DB_filestore.tar.gz`.
 
 Stop Odoo while restoring:
 
@@ -86,9 +86,9 @@ docker compose stop odoo sidecar
 Restore database:
 
 ```bash
-docker compose exec -T db dropdb -U odoo --if-exists qwerty
-docker compose exec -T db createdb -U odoo qwerty
-docker compose exec -T db pg_restore -U odoo -d qwerty --clean --if-exists < /path/to/qwerty.pg_dump
+docker compose exec -T db dropdb -U odoo --if-exists FiberaFRP_DB
+docker compose exec -T db createdb -U odoo FiberaFRP_DB
+docker compose exec -T db pg_restore -U odoo -d FiberaFRP_DB --clean --if-exists < /path/to/FiberaFRP_DB.pg_dump
 ```
 
 Restore filestore:
@@ -100,13 +100,13 @@ docker volume inspect odoo-190_odoo-web-data
 Copy the filestore archive to the server, then extract it so the final folder is:
 
 ```text
-/root/.local/share/Odoo/filestore/qwerty
+/root/.local/share/Odoo/filestore/FiberaFRP_DB
 ```
 
 A typical command is:
 
 ```bash
-docker run --rm -v odoo-190_odoo-web-data:/data -v /path/to/backups:/backup alpine sh -c "mkdir -p /data/filestore && tar -xzf /backup/qwerty_filestore.tar.gz -C /data/filestore"
+docker run --rm -v odoo-190_odoo-web-data:/data -v /path/to/backups:/backup alpine sh -c "mkdir -p /data/filestore && tar -xzf /backup/FiberaFRP_DB_filestore.tar.gz -C /data/filestore"
 ```
 
 Start again:
@@ -138,6 +138,18 @@ For production, expose Odoo through HTTPS using a reverse proxy such as Nginx,
 Traefik, or Caddy.
 
 Meta should call the public HTTPS callback URL for the active WhatsApp account.
+For the current live database, use the database-pinned URL:
+
+```text
+https://fibera.elsxglobal.com/whatsapp/webhook/1?db=FiberaFRP_DB
+```
+
+After pulling code or restoring the live database, run:
+
+```bash
+bash deploy/configure_live_db.sh FiberaFRP_DB
+```
+
 After changing domains, verify:
 
 - Webhook verification succeeds.
@@ -190,7 +202,7 @@ Manual acceptance checks:
 
 Odoo stores module XML views, menus, actions, and fields inside each database.
 After pulling code, every database that uses WhatsApp Marketing must receive a
-module upgrade. Updating only `qwerty` leaves other databases with old stored
+module upgrade. Updating only one database leaves other databases with old stored
 views and can keep errors such as missing campaign fields alive.
 
 For normal WhatsApp Marketing deployments, run:
@@ -200,6 +212,14 @@ git pull origin main
 docker compose down
 docker compose build odoo
 bash deploy/upgrade_module_all_dbs.sh elsx_whatsapp_marketing
+```
+
+For the current production database, prefer the live helper after build:
+
+```bash
+git pull origin main
+docker compose build odoo
+bash deploy/configure_live_db.sh FiberaFRP_DB
 ```
 
 The script:

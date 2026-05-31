@@ -19,6 +19,15 @@ docker compose build odoo
 bash deploy/upgrade_module_all_dbs.sh elsx_whatsapp_marketing
 ```
 
+For the current production/live database, use `FiberaFRP_DB` as the primary
+database and mark only that database as the WhatsApp webhook receiver:
+
+```bash
+git pull origin main
+docker compose build odoo
+bash deploy/configure_live_db.sh FiberaFRP_DB
+```
+
 ---
 
 ## 🏗️ System Architecture & Tech Stack

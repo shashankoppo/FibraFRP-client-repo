@@ -38,7 +38,4 @@
         <field name="view_mode">form</field>
         <field name="target">new</field>
     </record>
-
-    <!-- Add to Menu -->
-    <menuitem id="menu_whatsapp_import" name="Bulk Import" parent="menu_whatsapp_config" action="action_whatsapp_import_wizard" sequence="30"/>
 </odoo>
