@@ -132,6 +132,7 @@
                         </group>
                         <group string="API Configuration">
                             <field name="access_token" password="True"/>
+                            <field name="app_id"/>
                             <field name="is_sandbox"/>
                             <field name="two_factor_pin" password="1"/>
                             <button name="action_register_phone" string="Register Phone" type="object" class="oe_highlight"/>

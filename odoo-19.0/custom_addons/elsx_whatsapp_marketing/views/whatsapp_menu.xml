@@ -86,13 +86,6 @@
               parent="menu_whatsapp_root"
               sequence="30"/>
 
-    <record id="action_whatsapp_campaign" model="ir.actions.act_window">
-        <field name="name">Campaigns</field>
-        <field name="res_model">whatsapp.campaign</field>
-        <field name="view_mode">list,form</field>
-        <field name="context">{'search_default_active': 1}</field>
-    </record>
-
     <menuitem id="menu_whatsapp_campaigns"
               name="All Campaigns"
               parent="menu_whatsapp_campaigns_section"

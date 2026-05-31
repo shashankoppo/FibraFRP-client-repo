@@ -1226,6 +1226,68 @@ class WhatsAppAccount(models.Model):
             _logger.error(f"Media upload exception: {e}")
             raise
 
+    def _upload_template_sample_media_handle(self, binary_data, filename, media_type):
+        """Upload media for Meta template approval and return a header_handle.
+
+        WhatsApp message sending uses /PHONE_NUMBER_ID/media and returns a media ID.
+        Template approval examples use Meta's resumable upload API and return a
+        header handle. Using the normal media ID as header_handle causes Meta
+        error [131009] "Parameter value is not valid".
+        """
+        self.ensure_one()
+        if not self.app_id:
+            raise UserError(_(
+                "Meta App ID is required to submit image/video/document header templates. "
+                "Open the WhatsApp Account and fill App ID under API Configuration."
+            ))
+
+        file_content = self._check_media_upload_size(binary_data, media_type, filename)
+        if not filename:
+            extension = {
+                'image': 'jpg',
+                'video': 'mp4',
+                'document': 'pdf',
+            }.get(media_type, 'bin')
+            filename = f"template_sample_{fields.Datetime.now().strftime('%Y%m%d%H%M%S')}.{extension}"
+
+        mime_type, _ = mimetypes.guess_type(filename)
+        if not mime_type:
+            mime_type = {
+                'image': 'image/jpeg',
+                'video': 'video/mp4',
+                'document': 'application/pdf',
+            }.get(media_type, 'application/octet-stream')
+
+        upload_url = f"https://graph.facebook.com/{self.api_version}/{self.app_id}/uploads"
+        params = {
+            'file_name': filename,
+            'file_length': len(file_content),
+            'file_type': mime_type,
+            'access_token': self.access_token,
+        }
+        start_response = requests.post(upload_url, params=params, timeout=30)
+        start_data = start_response.json() if start_response.content else {}
+        if start_response.status_code not in (200, 201) or not start_data.get('id'):
+            error_msg = start_data.get('error', {}).get('message') or 'Could not start template media upload.'
+            _logger.error("Meta template media upload start failed: %s", start_data)
+            raise UserError(_("Template media upload failed: %s") % error_msg)
+
+        upload_id = start_data['id']
+        finish_url = f"https://graph.facebook.com/{self.api_version}/{upload_id}"
+        finish_headers = {
+            'Authorization': f'OAuth {self.access_token}',
+            'file_offset': '0',
+            'Content-Type': 'application/octet-stream',
+        }
+        finish_response = requests.post(finish_url, headers=finish_headers, data=file_content, timeout=60)
+        finish_data = finish_response.json() if finish_response.content else {}
+        media_handle = finish_data.get('h') or finish_data.get('handle')
+        if finish_response.status_code not in (200, 201) or not media_handle:
+            error_msg = finish_data.get('error', {}).get('message') or 'Could not finish template media upload.'
+            _logger.error("Meta template media upload finish failed: %s", finish_data)
+            raise UserError(_("Template media upload failed: %s") % error_msg)
+        return media_handle
+
     def action_get_business_profile(self):
         """Fetch profile from Meta"""
         self.ensure_one()

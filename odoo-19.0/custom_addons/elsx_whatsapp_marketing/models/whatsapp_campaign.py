@@ -24,12 +24,6 @@ class WhatsAppCampaign(models.Model):
     _campaign_state_schedule_idx = models.Index("(state, schedule_date, create_date)")
 
     name = fields.Char('Campaign Name', required=True)
-    active = fields.Boolean(
-        'Active',
-        compute='_compute_active',
-        inverse='_inverse_active',
-        search='_search_active',
-    )
     account_id = fields.Many2one('whatsapp.account', string='WhatsApp Account', required=True)
     
     # Campaign type
@@ -107,26 +101,6 @@ class WhatsAppCampaign(models.Model):
     def _compute_split_b(self):
         for rec in self:
             rec.split_percentage_b = 100.0 - (rec.split_percentage or 50.0)
-
-    @api.depends('state')
-    def _compute_active(self):
-        for rec in self:
-            rec.active = rec.state != 'archived'
-
-    def _inverse_active(self):
-        for rec in self:
-            if rec.active and rec.state == 'archived':
-                rec.state = 'draft'
-            elif not rec.active and rec.state != 'archived':
-                rec.state = 'archived'
-
-    def _search_active(self, operator, value):
-        if operator not in ('=', '!='):
-            return []
-        is_active = bool(value)
-        if operator == '!=':
-            is_active = not is_active
-        return [('state', '!=', 'archived')] if is_active else [('state', '=', 'archived')]
 
     # Scheduling
     schedule_type = fields.Selection([

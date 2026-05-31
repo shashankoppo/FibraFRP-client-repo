@@ -5,7 +5,7 @@
         <field name="name">whatsapp.campaign.tree</field>
         <field name="model">whatsapp.campaign</field>
         <field name="arch" type="xml">
-            <list string="WhatsApp Campaigns" decoration-success="state=='completed'" decoration-info="state=='running'">
+            <list string="WhatsApp Campaigns" decoration-success="state=='completed'" decoration-info="state=='running'" decoration-muted="state=='archived'">
                 <field name="name"/>
                 <field name="account_id"/>
                 <field name="campaign_type"/>
@@ -18,7 +18,6 @@
                 <field name="read_rate" widget="percentage"/>
                 <field name="roi" widget="percentage"/>
                 <field name="state"/>
-                <field name="active" optional="hide"/>
             </list>
         </field>
     </record>
@@ -37,13 +36,12 @@
                     <button name="action_retry_failed_messages" string="Retry Failed" type="object" class="btn-secondary" invisible="failed_count == 0"/>
                     <button name="action_view_failed_recipients" string="Failed Recipients" type="object" class="btn-secondary" invisible="failed_count == 0"/>
                     <button name="action_export_failed_recipients" string="Export Failed" type="object" class="btn-secondary" invisible="failed_count == 0"/>
-                    <button name="action_cancel" string="Cancel" type="object" class="btn-danger" invisible="state in ['completed', 'cancelled']"/>
-                    <button name="action_archive_record" string="Archive" type="object" class="btn-secondary" invisible="not active"/>
-                    <button name="action_unarchive_record" string="Unarchive" type="object" class="btn-primary" invisible="active"/>
+                    <button name="action_cancel" string="Cancel" type="object" class="btn-danger" invisible="state in ['completed', 'cancelled', 'archived']"/>
+                    <button name="action_archive_record" string="Archive" type="object" class="btn-secondary" invisible="state == 'archived'"/>
+                    <button name="action_unarchive_record" string="Unarchive" type="object" class="btn-primary" invisible="state != 'archived'"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,scheduled,running,completed"/>
                 </header>
                 <sheet>
-                    <field name="active" invisible="1"/>
                     <div class="oe_title">
                         <h1>
                             <field name="name" placeholder="Campaign Name"/>
@@ -426,8 +424,8 @@
                 <field name="account_id"/>
                 <field name="state"/>
                 <field name="campaign_type"/>
-                <filter name="active_records" string="Active" domain="[('active', '=', True)]"/>
-                <filter name="archived_records" string="Archived" domain="[('active', '=', False)]"/>
+                <filter name="active_records" string="Active" domain="[('state', '!=', 'archived')]"/>
+                <filter name="archived_records" string="Archived" domain="[('state', '=', 'archived')]"/>
                 <filter name="draft_campaigns" string="Draft" domain="[('state', '=', 'draft')]"/>
                 <filter name="running_campaigns" string="Running" domain="[('state', '=', 'running')]"/>
                 <group expand="0" string="Group By">
@@ -444,7 +442,7 @@
         <field name="res_model">whatsapp.campaign</field>
         <field name="view_mode">kanban,list,form</field>
         <field name="search_view_id" ref="view_whatsapp_campaign_search"/>
-        <field name="context">{'active_test': False, 'search_default_active_records': 1}</field>
+        <field name="context">{'search_default_active_records': 1}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 Create your first WhatsApp Campaign

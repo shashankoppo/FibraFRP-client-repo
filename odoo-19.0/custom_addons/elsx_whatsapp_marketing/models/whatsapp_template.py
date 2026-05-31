@@ -1294,60 +1294,43 @@ class WhatsAppTemplate(models.Model):
         self.write({'active': True})
         return True
 
+    def _is_template_header_handle(self, value):
+        value = str(value or '').strip()
+        return bool(value and not value.isdigit() and not value.startswith(('http://', 'https://', '/')))
+
     def _upload_header_media(self):
-        """Upload header_media_file to Meta and return the media handle for template submission"""
+        """Upload header media for template approval and return a Meta header_handle."""
         self.ensure_one()
         if not self.header_media_file or not self.account_id:
             return None
 
-        import base64
-        import io
-        import mimetypes
-
-        url = f"https://graph.facebook.com/{self.account_id.api_version}/{self.account_id.phone_number_id}/media"
-        headers = {
-            'Authorization': f'Bearer {self.account_id.access_token}',
-        }
-
-        file_content = base64.b64decode(self.header_media_file)
-        # Ensure filename has an appropriate extension for Meta
         ext_map = {'image': '.jpg', 'video': '.mp4', 'document': '.pdf'}
         extension = ext_map.get(self.header_type, '')
-        
         orig_filename = self.header_media_filename or 'header_media'
         if extension and not orig_filename.lower().endswith(extension):
             filename = orig_filename + extension
         else:
             filename = orig_filename
 
-        self.account_id._check_media_upload_size(self.header_media_file, self.header_type, filename)
+        return self.account_id._upload_template_sample_media_handle(
+            self.header_media_file,
+            filename,
+            self.header_type,
+        )
 
-        mime_type, _ = mimetypes.guess_type(filename)
-        if not mime_type:
-            type_map = {'image': 'image/jpeg', 'video': 'video/mp4', 'document': 'application/pdf'}
-            mime_type = type_map.get(self.header_type, 'application/octet-stream')
-
-        files = {'file': (filename, io.BytesIO(file_content), mime_type)}
-        # Meta expects simple 'type' like 'image', 'video' or 'document'
-        data = {'messaging_product': 'whatsapp', 'type': self.header_type}
-
-        try:
-            response = requests.post(url, headers=headers, files=files, data=data, timeout=60)
-            resp_data = response.json() if response.content else {}
-            if response.status_code in (200, 201):
-                media_handle = resp_data.get('id')
-                self.header_media_url = media_handle
-                _logger.info(f"Header media uploaded: {media_handle}")
-                return media_handle
-            else:
-                error = resp_data.get('error', {})
-                _logger.error(f"Header media upload failed: {error.get('message', '')}")
-                return None
-        except Exception as e:
-            _logger.error(f"Header media upload exception: {e}")
-            return None
-
-
+    def _get_template_header_handle(self):
+        self.ensure_one()
+        if self._is_template_header_handle(self.header_media_url):
+            return self.header_media_url.strip()
+        if self.header_media_file:
+            return self._upload_header_media()
+        if self.header_media_url:
+            raise UserError(
+                "This template has a normal media URL/ID saved for sending, but Meta approval needs "
+                "a template header handle. Upload the header media file on the template, or paste a "
+                "valid Meta template header handle."
+            )
+        raise UserError(f"{self.header_type.title()} header templates require a header media file before Submit to Meta.")
 
     def action_open_meta_manager(self):
         return {
@@ -1385,16 +1368,15 @@ class WhatsAppTemplate(models.Model):
         if self.is_carousel and len(self.card_ids) > 10:
             raise UserError("Meta allows a maximum of 10 cards per carousel template.")
 
-        if self.header_type in ['image', 'video', 'document'] and not self.header_media_url:
-            media_handle = self._upload_header_media()
-            if not media_handle:
+        header_media_handle = False
+        if self.header_type in ['image', 'video', 'document']:
+            header_media_handle = self._get_template_header_handle()
+            if not header_media_handle:
                 raise UserError("Failed to upload header media. Please try again or provide a valid media file.")
+        carousel_header_handles = {}
         if self.is_carousel:
             for card in self.card_ids:
-                if card.header_media_file and not card.header_media_url:
-                    handle = card._upload_media_to_meta(self.account_id)
-                    if not handle:
-                        raise UserError(f"Failed to upload carousel media for card '{card.body[:30] or card.id}'.")
+                carousel_header_handles[card.id] = card._get_template_header_handle(self.account_id)
 
         url = f"https://graph.facebook.com/{self.account_id.api_version}/{self.account_id.business_account_id}/message_templates"
         headers = {
@@ -1422,7 +1404,7 @@ class WhatsAppTemplate(models.Model):
                     {
                         "type": "HEADER",
                         "format": card.header_type.upper(),
-                        "example": {"header_handle": [card.header_media_url or "DUMMY_HANDLE"]}
+                        "example": {"header_handle": [carousel_header_handles.get(card.id)]}
                     },
                     {
                         "type": "BODY",
@@ -1454,7 +1436,7 @@ class WhatsAppTemplate(models.Model):
                         sample = var_rec[0].sample_value if var_rec else 'Sample Header'
                         header_comp['example'] = {'header_text': [sample]}
                 elif self.header_type in ['image', 'video', 'document']:
-                    header_comp['example'] = {'header_handle': [self.header_media_url]}
+                    header_comp['example'] = {'header_handle': [header_media_handle]}
                 components.append(header_comp)
 
             # Standard Body
@@ -1623,6 +1605,18 @@ class WhatsAppTemplateCard(models.Model):
     
     button_url_1 = fields.Char('Button 1 URL')
 
+    def _is_template_header_handle(self, value):
+        value = str(value or '').strip()
+        return bool(value and not value.isdigit() and not value.startswith(('http://', 'https://', '/')))
+
+    def _get_template_header_handle(self, account):
+        self.ensure_one()
+        if self._is_template_header_handle(self.header_media_url):
+            return self.header_media_url.strip()
+        if not self.header_media_file:
+            raise UserError("Carousel card media file is required before Submit to Meta.")
+        return self._upload_media_to_meta(account)
+
     def _upload_media_to_meta(self, account):
         """Upload card media and return Meta media handle."""
         self.ensure_one()
@@ -1636,7 +1630,5 @@ class WhatsAppTemplateCard(models.Model):
         if extension and not filename.lower().endswith(extension):
             filename = f"{filename}{extension}"
 
-        media_id = account._upload_media_to_meta(self.header_media_file, filename, self.header_type)
-        self.write({'header_media_url': media_id})
-        return media_id
+        return account._upload_template_sample_media_handle(self.header_media_file, filename, self.header_type)
 
