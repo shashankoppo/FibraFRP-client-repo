@@ -969,8 +969,18 @@ class WhatsAppTemplate(models.Model):
     @api.depends('body', 'header_type', 'header_text', 'footer', 'has_buttons', 'button_type', 'button_text_1', 'button_text_2', 'button_text_3', 'cta_url_text', 'cta_url_link', 'cta_phone_text', 'cta_phone_number', 'copy_code_example', 'variable_ids.sample_value', 'header_media_file', 'header_media_filename', 'header_media_url', 'is_carousel', 'card_ids.body', 'card_ids.header_media_file', 'card_ids.header_media_url', 'card_ids.button_type_1', 'card_ids.button_text_1', 'card_ids.button_text_2', 'card_ids.button_url_1')
     def _compute_preview_html(self):
         for rec in self:
-            rec.preview_html = rec._render_customer_preview_html(shell=True)
-            rec.preview_text = rec._render_customer_preview_text()
+            try:
+                rec.preview_html = rec._render_customer_preview_html(shell=True)
+                rec.preview_text = rec._render_customer_preview_text()
+            except Exception as exc:
+                _logger.warning("Template preview failed for %s: %s", rec.id or rec.name, exc)
+                safe_msg = html_escape(str(exc) or 'Template preview is not ready yet.')
+                rec.preview_html = (
+                    "<div class='alert alert-warning mb-0'>"
+                    "<strong>Preview not ready.</strong><br/>%s"
+                    "</div>"
+                ) % safe_msg
+                rec.preview_text = "Preview not ready. %s" % safe_msg
             continue
             if rec.is_carousel:
                 cards_html = ""
@@ -1276,6 +1286,14 @@ class WhatsAppTemplate(models.Model):
             'target': 'current',
         }
 
+    def action_archive_record(self):
+        self.write({'active': False})
+        return True
+
+    def action_unarchive_record(self):
+        self.write({'active': True})
+        return True
+
     def _upload_header_media(self):
         """Upload header_media_file to Meta and return the media handle for template submission"""
         self.ensure_one()
@@ -1559,7 +1577,7 @@ class WhatsAppTemplateVariable(models.Model):
     name = fields.Char('Variable', required=True, help="e.g. {{1}}")
     sequence = fields.Integer('Sequence', default=1)
     
-    sample_value = fields.Char('Sample Value', required=True, help="Dummy value sent to Meta for approval")
+    sample_value = fields.Char('Sample Value', help="Dummy value sent to Meta for approval")
     
     field_type = fields.Selection([
         ('text', 'Text (e.g. Name, City)'),
@@ -1588,11 +1606,11 @@ class WhatsAppTemplateCard(models.Model):
         ('video', 'Video'),
     ], string='Header Type', default='image', required=True)
     
-    header_media_file = fields.Binary('Card Media', required=True)
+    header_media_file = fields.Binary('Card Media')
     header_media_filename = fields.Char('Filename')
     header_media_url = fields.Char('Media Handle/URL')
     
-    body = fields.Text('Card Body', required=True, help="Max 160 characters")
+    body = fields.Text('Card Body', help="Max 160 characters")
     
     # Buttons (Max 2 per card)
     button_text_1 = fields.Char('Button 1', help="Max 25 characters")

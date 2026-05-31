@@ -409,11 +409,17 @@ class WhatsAppWebhook(http.Controller):
             _logger.info(f'[WH-MSG] Auto-created partner "{contact_name}" for {phone_number}')
 
         # --- Build base vals ---
+        normalized_msg_type = msg_type
+        if msg_type == 'button':
+            normalized_msg_type = 'interactive'
+        elif msg_type not in ('text', 'image', 'video', 'document', 'audio', 'template', 'interactive'):
+            normalized_msg_type = 'text'
+
         vals = {
             'account_id': account.id,
             'phone_number': phone_number,
             'message_id': wamid,
-            'message_type': msg_type if msg_type in ('text', 'image', 'video', 'document', 'audio', 'template', 'interactive') else 'text',
+            'message_type': normalized_msg_type,
             'direction': 'inbound',
             'status': 'delivered',
             'raw_data': json.dumps(msg_data),
@@ -706,26 +712,35 @@ class WhatsAppWebhook(http.Controller):
         elif msg_type == 'image':
             img = msg_data.get('image', {})
             vals['media_url'] = img.get('id', '')
+            vals['media_mime_type'] = img.get('mime_type', '')
+            vals['caption'] = img.get('caption', '')
             return img.get('caption', '[Image]')
 
         elif msg_type == 'video':
             vid = msg_data.get('video', {})
             vals['media_url'] = vid.get('id', '')
+            vals['media_mime_type'] = vid.get('mime_type', '')
+            vals['caption'] = vid.get('caption', '')
             return vid.get('caption', '[Video]')
 
         elif msg_type == 'audio':
             aud = msg_data.get('audio', {})
             vals['media_url'] = aud.get('id', '')
+            vals['media_mime_type'] = aud.get('mime_type', '')
             return '[Voice Note]' if aud.get('voice') else '[Audio]'
 
         elif msg_type == 'document':
             doc = msg_data.get('document', {})
             vals['media_url'] = doc.get('id', '')
             vals['media_filename'] = doc.get('filename', 'document')
+            vals['media_mime_type'] = doc.get('mime_type', '')
+            vals['caption'] = doc.get('caption', '')
             return doc.get('caption', f'[Document: {doc.get("filename", "")}]')
 
         elif msg_type == 'button':
             btn = msg_data.get('button', {})
+            vals['message_type'] = 'interactive'
+            vals['interactive_type'] = 'button_reply'
             vals['button_text'] = btn.get('text', '')
             vals['button_payload'] = btn.get('payload', '')
             return btn.get('text', '[Button]')
@@ -733,6 +748,7 @@ class WhatsAppWebhook(http.Controller):
         elif msg_type == 'interactive':
             inter = msg_data.get('interactive', {})
             itype = inter.get('type', '')
+            vals['interactive_type'] = itype
             if itype == 'button_reply':
                 reply = inter.get('button_reply', {})
                 vals['button_text'] = reply.get('title', '')

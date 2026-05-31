@@ -1837,6 +1837,29 @@ export class WhatsAppChatHandler {
             this._hardRefresh();
             return;
         }
+        // Manual media retry for inbound Meta media that has not been stored yet.
+        const retryMediaBtn = e.target.closest('[data-wa-retry-media-id]');
+        if (retryMediaBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            const messageId = parseInt(retryMediaBtn.getAttribute('data-wa-retry-media-id'), 10);
+            if (messageId) {
+                this._setButtonBusy(retryMediaBtn, true, 'Downloading...');
+                this._rpc('whatsapp.message', 'action_retry_media_download', [[messageId]])
+                    .then((action) => {
+                        if (action) {
+                            this.actionService.doAction(action);
+                        }
+                        this._lastHtml = null;
+                        this._surgicalRefresh();
+                    })
+                    .catch((error) => {
+                        console.warn('[WhatsApp] Media retry failed:', error);
+                    })
+                    .finally(() => this._setButtonBusy(retryMediaBtn, false));
+            }
+            return;
+        }
         // Media Lightbox
         const lightbox = e.target.closest('.wa-lightbox-trigger');
         if (lightbox) {

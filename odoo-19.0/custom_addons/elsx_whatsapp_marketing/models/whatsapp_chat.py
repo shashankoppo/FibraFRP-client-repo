@@ -1424,7 +1424,13 @@ class WhatsAppChat(models.Model):
     @api.depends('message_ids', 'message_ids.body', 'message_ids.status',
                  'message_ids.create_date', 'message_ids.direction',
                  'message_ids.message_type', 'message_ids.media_file',
-                 'message_ids.media_url')
+                 'message_ids.media_url', 'message_ids.media_filename',
+                 'message_ids.media_mime_type', 'message_ids.caption',
+                 'message_ids.button_text', 'message_ids.button_payload',
+                 'message_ids.list_item_id', 'message_ids.list_item_title',
+                 'message_ids.interactive_type', 'message_ids.button_url',
+                 'message_ids.catalog_id', 'message_ids.product_retailer_id',
+                 'message_ids.raw_data', 'message_ids.attachment_ids')
     @api.depends_context('wa_ts', 'wa_history_limit')
     def _compute_history_html(self):
         for record in self:
@@ -1470,6 +1476,225 @@ class WhatsAppChat(models.Model):
                 if name.endswith('.pdf'):
                     return 'fa-file-pdf-o text-danger'
                 return 'fa-file-text-o text-muted'
+
+            def _is_http_url(value):
+                return bool(value and str(value).strip().startswith(('http://', 'https://')))
+
+            def _media_urls(message):
+                if message.media_file:
+                    content_url = f"/web/content/whatsapp.message/{message.id}/media_file"
+                    image_url = f"/web/image/whatsapp.message/{message.id}/media_file"
+                    return {
+                        'open': content_url,
+                        'preview': image_url if message.message_type == 'image' else content_url,
+                        'download': f"{content_url}?download=1",
+                        'pending': False,
+                    }
+                if _is_http_url(message.media_url):
+                    return {
+                        'open': str(message.media_url).strip(),
+                        'preview': str(message.media_url).strip(),
+                        'download': str(message.media_url).strip(),
+                        'pending': False,
+                    }
+                return {
+                    'open': False,
+                    'preview': False,
+                    'download': False,
+                    'pending': bool(message.media_url),
+                }
+
+            def _render_media_actions(message, urls):
+                if urls.get('open'):
+                    return Markup(
+                        '<div class="wa-msg-media-actions d-flex gap-1 flex-wrap mt-2">'
+                        '<a href="%s" target="_blank" class="btn btn-sm btn-outline-secondary py-1 px-2">'
+                        '<i class="fa fa-external-link me-1"></i>Open</a>'
+                        '<a href="%s" target="_blank" download class="btn btn-sm btn-outline-primary py-1 px-2">'
+                        '<i class="fa fa-download me-1"></i>Download</a>'
+                        '</div>'
+                    ) % (escape(urls['open']), escape(urls.get('download') or urls['open']))
+                if urls.get('pending'):
+                    return Markup(
+                        '<div class="wa-msg-media-actions mt-2">'
+                        '<button type="button" class="btn btn-sm btn-outline-primary py-1 px-2" '
+                        'data-wa-retry-media-id="%s">'
+                        '<i class="fa fa-refresh me-1"></i>Retry download</button>'
+                        '</div>'
+                    ) % message.id
+                return Markup('')
+
+            def _render_media_message(message, fallback_content):
+                urls = _media_urls(message)
+                filename = message.media_filename or {
+                    'image': 'Image',
+                    'video': 'Video',
+                    'document': 'Document',
+                    'audio': 'Audio',
+                }.get(message.message_type, 'Media')
+                meta = message.media_mime_type or message.message_type.title()
+                actions = _render_media_actions(message, urls)
+                if urls.get('preview') and message.message_type == 'image':
+                    media = Markup(
+                        '<div class="wa-msg-media mb-2">'
+                        '<a href="%s" class="wa-lightbox-trigger" data-media-type="image">'
+                        '<img src="%s" class="img-fluid rounded shadow-sm" style="max-height:250px;"/>'
+                        '</a>%s</div>'
+                    ) % (escape(urls['open'] or urls['preview']), escape(urls['preview']), actions)
+                    return media + fallback_content
+                if urls.get('preview') and message.message_type == 'video':
+                    media = Markup(
+                        '<div class="wa-msg-media mb-2">'
+                        '<video src="%s" controls class="img-fluid rounded shadow-sm" style="max-height:250px;"></video>'
+                        '%s</div>'
+                    ) % (escape(urls['preview']), actions)
+                    return media + fallback_content
+                if urls.get('preview') and message.message_type == 'audio':
+                    media = Markup(
+                        '<div class="wa-msg-media mb-2">'
+                        '<audio src="%s" controls style="height:40px;width:100%%;"></audio>'
+                        '%s</div>'
+                    ) % (escape(urls['preview']), actions)
+                    return media + fallback_content
+
+                icon = _document_icon_class(filename) if message.message_type == 'document' else {
+                    'image': 'fa-image text-muted',
+                    'video': 'fa-video-camera text-muted',
+                    'audio': 'fa-microphone text-muted',
+                }.get(message.message_type, 'fa-file text-muted')
+                if urls.get('open'):
+                    title = Markup(
+                        '<a href="%s" target="_blank" class="text-decoration-none text-dark fw-semibold text-truncate">%s</a>'
+                    ) % (escape(urls['open']), escape(filename))
+                    state_text = escape(meta)
+                else:
+                    title = escape(filename)
+                    state_text = escape('Media is being downloaded from Meta.' if urls.get('pending') else 'Media not attached yet.')
+                media = Markup(
+                    '<div class="wa-msg-media mb-2 bg-white p-2 rounded border shadow-sm">'
+                    '<div class="d-flex align-items-center gap-2">'
+                    '<i class="fa %s fa-2x"></i>'
+                    '<div class="min-w-0 flex-grow-1">%s'
+                    '<div class="small text-muted text-truncate">%s</div></div>'
+                    '</div>%s</div>'
+                ) % (icon, title, state_text, actions)
+                return media + fallback_content
+
+            def _raw_interactive_payload(message):
+                try:
+                    raw = json.loads(message.raw_data or '{}')
+                except Exception:
+                    return {}
+                if isinstance(raw, dict) and isinstance(raw.get('interactive'), dict):
+                    return raw['interactive']
+                if isinstance(raw, dict) and raw.get('type') and (raw.get('body') or raw.get('action')):
+                    return raw
+                return {}
+
+            def _render_interactive_message(message, fallback_content):
+                payload = _raw_interactive_payload(message)
+                itype = message.interactive_type or payload.get('type') or 'interactive'
+                if message.direction == 'inbound' and (
+                    message.button_text or message.button_payload or message.list_item_title or message.list_item_id
+                ):
+                    label = message.button_text or message.list_item_title or message.body or 'Selected option'
+                    value = message.button_payload or message.list_item_id or ''
+                    return Markup(
+                        '<div class="wa-msg-interactive wa-msg-interactive-reply bg-white border rounded p-2 shadow-sm">'
+                        '<div class="small text-muted mb-1"><i class="fa fa-reply me-1"></i>Customer selected</div>'
+                        '<div class="fw-semibold">%s</div>'
+                        '%s'
+                        '</div>'
+                    ) % (
+                        escape(label),
+                        Markup('<div class="small text-muted text-break">%s</div>' % escape(value)) if value else Markup(''),
+                    )
+
+                header = payload.get('header') or {}
+                body = (payload.get('body') or {}).get('text') or message.body or ''
+                footer = (payload.get('footer') or {}).get('text') or ''
+                header_html = Markup('')
+                if header.get('type') == 'text' and header.get('text'):
+                    header_html = Markup('<div class="fw-bold mb-1">%s</div>') % escape(header.get('text'))
+                body_html = Markup('<div style="white-space:pre-wrap;">%s</div>') % escape(body)
+                footer_html = Markup('<div class="small text-muted mt-2">%s</div>') % escape(footer) if footer else Markup('')
+                action_html = Markup('')
+                action = payload.get('action') or {}
+
+                if itype == 'button':
+                    buttons = action.get('buttons') or []
+                    items = []
+                    for btn in buttons:
+                        reply = btn.get('reply') if isinstance(btn, dict) else {}
+                        title = (reply or {}).get('title') or btn.get('title') if isinstance(btn, dict) else ''
+                        button_id = (reply or {}).get('id') or ''
+                        if title:
+                            items.append(
+                                '<div class="wa-template-button text-center fw-semibold" '
+                                'style="border-top:1px solid #e9edef;padding:9px 10px;color:#00a884;background:#fff;">'
+                                '<i class="fa fa-reply me-1"></i>%s%s</div>' % (
+                                    escape(title),
+                                    ('<div class="small text-muted fw-normal">%s</div>' % escape(button_id)) if button_id else '',
+                                )
+                            )
+                    if items:
+                        action_html = Markup('<div class="rounded overflow-hidden mt-2">%s</div>') % Markup(''.join(items))
+                elif itype == 'list':
+                    sections = action.get('sections') or []
+                    rows_html = []
+                    for section in sections:
+                        section_title = section.get('title') or 'Options'
+                        rows_html.append('<div class="small text-muted fw-bold mt-2">%s</div>' % escape(section_title))
+                        for row in section.get('rows') or []:
+                            rows_html.append(
+                                '<div class="border-top py-2">'
+                                '<div class="fw-semibold">%s</div>'
+                                '%s'
+                                '%s'
+                                '</div>' % (
+                                    escape(row.get('title') or row.get('id') or 'Option'),
+                                    ('<div class="small text-muted">%s</div>' % escape(row.get('description'))) if row.get('description') else '',
+                                    ('<div class="small text-muted text-break">%s</div>' % escape(row.get('id'))) if row.get('id') else '',
+                                )
+                            )
+                    if rows_html:
+                        action_html = Markup('<div class="wa-msg-list-options bg-white rounded mt-2 px-2">%s</div>') % Markup(''.join(rows_html))
+                elif itype == 'cta_url':
+                    params = action.get('parameters') or {}
+                    label = message.button_text or params.get('display_text') or 'Open link'
+                    url = message.button_url or params.get('url')
+                    if url:
+                        action_html = Markup(
+                            '<div class="mt-2"><a href="%s" target="_blank" '
+                            'class="btn btn-sm btn-outline-primary w-100">'
+                            '<i class="fa fa-external-link me-1"></i>%s</a></div>'
+                        ) % (escape(url), escape(label))
+                elif itype in ('product', 'product_list', 'catalog_message'):
+                    product_label = {
+                        'product': 'Single product message',
+                        'product_list': 'Product list message',
+                        'catalog_message': 'Catalogue / shop message',
+                    }.get(itype, 'Commerce message')
+                    details = []
+                    catalog_id = message.catalog_id or action.get('catalog_id')
+                    if catalog_id:
+                        details.append('Catalog: %s' % catalog_id)
+                    if message.product_retailer_id:
+                        details.append('Product: %s' % message.product_retailer_id)
+                    action_html = Markup(
+                        '<div class="wa-msg-commerce bg-white border rounded p-2 mt-2">'
+                        '<div class="fw-semibold"><i class="fa fa-shopping-bag me-1"></i>%s</div>'
+                        '%s</div>'
+                    ) % (
+                        escape(product_label),
+                        Markup('<div class="small text-muted text-break">%s</div>' % escape(' | '.join(details))) if details else Markup(''),
+                    )
+
+                return Markup(
+                    '<div class="wa-msg-interactive bg-light border rounded p-2">'
+                    '<div class="small text-muted mb-1"><i class="fa fa-hand-pointer-o me-1"></i>%s</div>'
+                    '%s%s%s%s</div>'
+                ) % (escape(itype.replace('_', ' ').title()), header_html, body_html, footer_html, action_html)
 
             def _render_template_header(message, template):
                 header_type = template.header_type
@@ -1690,51 +1915,9 @@ class WhatsAppChat(models.Model):
                         '%s<div style="white-space:pre-wrap;">%s</div>%s%s</div>'
                     ) % (template_name, header_html, body_html, footer_html, buttons_html)
                 elif msg.message_type in ('image', 'video', 'document', 'audio'):
-                    if msg.media_file or msg.media_url:
-                        if msg.media_file:
-                            url = f"/web/image/whatsapp.message/{msg.id}/media_file"
-                            if msg.message_type in ('video', 'document', 'audio'):
-                                url = f"/web/content/whatsapp.message/{msg.id}/media_file"
-                        else:
-                            url = msg.media_url
-                        if msg.message_type == 'image':
-                            content = Markup(
-                                f'<div class="wa-msg-media mb-1">'
-                                f'<a href="{url}" class="wa-lightbox-trigger" data-media-type="image">'
-                                f'<img src="{url}" class="img-fluid rounded shadow-sm" style="max-height:250px;"/>'
-                                f'</a></div>'
-                            ) + content
-                        elif msg.message_type == 'video':
-                            content = Markup(
-                                f'<div class="wa-msg-media mb-1">'
-                                f'<video src="{url}" controls class="img-fluid rounded shadow-sm" style="max-height:250px;"></video>'
-                                f'</div>'
-                            ) + content
-                        elif msg.message_type == 'document':
-                            fname = escape(msg.media_filename or 'Document')
-                            content = Markup(
-                                f'<div class="wa-msg-media mb-1 d-flex align-items-center bg-white p-2 rounded border shadow-sm">'
-                                f'<i class="fa fa-file-pdf-o fa-2x me-2 text-danger"></i>'
-                                f'<a href="{url}" target="_blank" class="text-decoration-none text-dark fw-bold text-truncate" style="max-width:200px;">{fname}</a>'
-                                f'</div>'
-                            ) + content
-                        elif msg.message_type == 'audio':
-                            content = Markup(
-                                f'<div class="wa-msg-media mb-1">'
-                                f'<audio src="{url}" controls style="height:40px;width:100%;"></audio>'
-                                f'</div>'
-                            ) + content
-                    else:
-                        icons = {'image': 'fa-image', 'video': 'fa-video-camera', 'document': 'fa-file-text-o', 'audio': 'fa-microphone'}
-                        labels = {'image': 'Processing Image...', 'video': 'Processing Video...', 'document': 'Processing Document...', 'audio': 'Processing Audio...'}
-                        icon_cls = icons.get(msg.message_type, 'fa-file')
-                        label_txt = labels.get(msg.message_type, 'Processing...')
-                        content = Markup(
-                            f'<div class="wa-msg-media d-flex align-items-center bg-light p-2 rounded border mb-1">'
-                            f'<i class="fa {icon_cls} fa-2x me-2 text-muted"></i>'
-                            f'<span class="text-muted small ms-2">{label_txt}</span>'
-                            f'</div>'
-                        ) + content
+                    content = _render_media_message(msg, content)
+                elif msg.message_type == 'interactive' or msg.button_text or msg.button_payload or msg.list_item_title or msg.list_item_id:
+                    content = _render_interactive_message(msg, content)
 
                 date_key = m_date.isoformat() if m_date else ''
                 is_note = getattr(msg, 'is_internal_note', False)

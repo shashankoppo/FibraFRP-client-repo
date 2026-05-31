@@ -333,7 +333,15 @@ class WhatsAppMessage(models.Model):
 
     def write(self, vals):
         res = super(WhatsAppMessage, self).write(vals)
-        if 'status' in vals or 'body' in vals:
+        notify_fields = {
+            'status',
+            'body',
+            'media_file',
+            'media_filename',
+            'media_mime_type',
+            'attachment_ids',
+        }
+        if notify_fields.intersection(vals):
             for record in self:
                 event_type = 'status_update' if 'status' in vals else 'message_update'
                 notify_sidecar_background(self.env, record.id, event_type=event_type)
@@ -354,6 +362,19 @@ class WhatsAppMessage(models.Model):
                         )
                     except Exception as exc:
                         _logger.debug("WhatsApp status bus notification failed: %s", exc)
+                elif record.chat_id_ref:
+                    try:
+                        self.env['bus.bus']._sendone(
+                            'elsx_whatsapp_channel',
+                            'elsx_whatsapp_channel',
+                            {
+                                'chat_id': record.chat_id_ref.id,
+                                'message_id': record.id,
+                                'type': 'message_update',
+                            }
+                        )
+                    except Exception as exc:
+                        _logger.debug("WhatsApp message update bus notification failed: %s", exc)
         if vals.get('chat_id_ref'):
             for record in self.filtered(lambda msg: msg.chat_id_ref):
                 record.chat_id_ref.sudo()._sync_message_to_lead_chatter(record)
@@ -481,7 +502,10 @@ class WhatsAppMessage(models.Model):
             interactive['header'] = {'type': 'text', 'text': str(header_text)[:60]}
         if footer_text:
             interactive['footer'] = {'text': str(footer_text)[:60]}
-        write_vals = {'raw_data': json.dumps(interactive)}
+        write_vals = {
+            'raw_data': json.dumps(interactive),
+            'interactive_type': 'button',
+        }
         if self.message_type != 'interactive':
             write_vals['message_type'] = 'interactive'
         if body_text and not self.body:
@@ -532,7 +556,10 @@ class WhatsAppMessage(models.Model):
             interactive['header'] = {'type': 'text', 'text': str(header_text)[:60]}
         if footer_text:
             interactive['footer'] = {'text': str(footer_text)[:60]}
-        write_vals = {'raw_data': json.dumps(interactive)}
+        write_vals = {
+            'raw_data': json.dumps(interactive),
+            'interactive_type': 'list',
+        }
         if self.message_type != 'interactive':
             write_vals['message_type'] = 'interactive'
         if body_text and not self.body:
@@ -848,6 +875,50 @@ class WhatsAppMessage(models.Model):
                 thread.start()
 
             self.env.cr.postcommit.add(_after_commit)
+
+    def action_retry_media_download(self):
+        """Manual, safe retry for inbound media cards shown in Team Inbox."""
+        success_count = 0
+        failed = []
+        for message in self:
+            try:
+                if message.download_media_from_meta():
+                    success_count += 1
+                    if message.chat_id_ref:
+                        self.env['bus.bus']._sendone(
+                            'elsx_whatsapp_channel',
+                            'elsx_whatsapp_channel',
+                            {
+                                'chat_id': message.chat_id_ref.id,
+                                'message_id': message.id,
+                                'type': 'message_update',
+                            }
+                        )
+                else:
+                    failed.append(message.id)
+            except Exception as exc:
+                _logger.warning("[MEDIA-DL] Manual retry failed for message %s: %s", message.id, exc)
+                failed.append(message.id)
+
+        if success_count:
+            message = _("Media downloaded. Refreshing the chat preview.")
+            notif_type = 'success'
+        elif failed:
+            message = _("Media is still unavailable from Meta. Please retry after a moment or check the account token.")
+            notif_type = 'warning'
+        else:
+            message = _("No media message was selected.")
+            notif_type = 'info'
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('WhatsApp Media'),
+                'message': message,
+                'type': notif_type,
+                'sticky': False,
+            },
+        }
 
     def _get_active_compliance_policy(self):
         self.ensure_one()

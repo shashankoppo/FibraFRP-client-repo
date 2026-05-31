@@ -24,6 +24,7 @@ class WhatsAppCampaign(models.Model):
     _campaign_state_schedule_idx = models.Index("(state, schedule_date, create_date)")
 
     name = fields.Char('Campaign Name', required=True)
+    active = fields.Boolean('Active', default=True)
     account_id = fields.Many2one('whatsapp.account', string='WhatsApp Account', required=True)
     
     # Campaign type
@@ -1153,6 +1154,14 @@ class WhatsAppCampaign(models.Model):
     def action_cancel(self):
         """Cancel the campaign"""
         self.state = 'cancelled'
+
+    def action_archive_record(self):
+        self.write({'active': False})
+        return True
+
+    def action_unarchive_record(self):
+        self.write({'active': True})
+        return True
 
     def action_retry_failed_messages(self):
         for campaign in self:

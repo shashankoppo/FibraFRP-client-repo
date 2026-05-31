@@ -467,6 +467,34 @@ class WhatsAppBotFlow(models.Model):
                 warnings.append(f'Step "{step.name}" routes to itself.')
             if step.node_id and known_node_ids and step.node_id not in known_node_ids:
                 warnings.append(f'Step "{step.name}" points to missing canvas node {step.node_id}.')
+            if step.action_type == 'send_template' and not step.template_id:
+                warnings.append(f'Step "{step.name}" needs an approved template.')
+            if step.action_type == 'send_media' and not step.media_id:
+                warnings.append(f'Step "{step.name}" needs a media record.')
+            if step.action_type == 'ask_question':
+                if not (step.message_text or '').strip():
+                    warnings.append(f'Step "{step.name}" needs a question/prompt.')
+                if not step.response_variable:
+                    warnings.append(f'Step "{step.name}" needs a response variable.')
+                if step.max_attempts <= 0:
+                    warnings.append(f'Step "{step.name}" needs max attempts of at least 1.')
+                if step.timeout_minutes < 0:
+                    warnings.append(f'Step "{step.name}" has a negative timeout.')
+            if step.action_type == 'condition':
+                if not step.condition_type:
+                    warnings.append(f'Step "{step.name}" needs a condition type.')
+                if not step.condition_true_step and not step.condition_false_step and not step.condition_branch_ids:
+                    warnings.append(f'Step "{step.name}" needs at least one condition route.')
+            if step.action_type == 'http_request' and not step.http_url:
+                warnings.append(f'Step "{step.name}" needs a request URL.')
+            if step.action_type == 'send_cta_url':
+                if not (step.cta_button_text or '').strip():
+                    warnings.append(f'Step "{step.name}" needs URL button text.')
+                url = (step.cta_button_url or step.account_id.commerce_shop_url or '').strip()
+                if not url:
+                    warnings.append(f'Step "{step.name}" needs a URL button link or account Shop / Catalogue URL.')
+                elif not url.startswith(('http://', 'https://')):
+                    warnings.append(f'Step "{step.name}" has an invalid URL button link.')
             if step.action_type in ('send_buttons', 'send_list'):
                 if not step.button_ids:
                     warnings.append(f'Step "{step.name}" has no option rows.')
@@ -478,6 +506,20 @@ class WhatsAppBotFlow(models.Model):
                 )
                 if unrouted:
                     warnings.append(f'Step "{step.name}" has reply option(s) without routes or fallback.')
+                for button in step.button_ids:
+                    label_limit = 24 if step.action_type == 'send_list' else 20
+                    if button.name and len(button.name) > label_limit:
+                        warnings.append(f'Button "{button.name}" exceeds the WhatsApp label limit.')
+                    if button.button_action == 'url':
+                        if not button.url:
+                            warnings.append(f'Button "{button.name}" needs a URL.')
+                        elif not button.url.startswith(('http://', 'https://')):
+                            warnings.append(f'Button "{button.name}" has an invalid URL.')
+                    if button.button_action == 'catalog_product':
+                        if not button.product_retailer_id:
+                            warnings.append(f'Button "{button.name}" needs a Product Retailer ID.')
+                        if not (button.catalog_id or step.account_id.commerce_catalog_id):
+                            warnings.append(f'Button "{button.name}" needs a Catalog ID or account default Meta Catalog ID.')
             if step.action_type == 'send_form_link' and not step.form_id and not step.account_id.default_form_id:
                 warnings.append(f'Step "{step.name}" needs a form or an account default form.')
             if step.action_type == 'send_payment_link':
@@ -502,6 +544,11 @@ class WhatsAppBotFlow(models.Model):
                     not catalog_id or not (step.product_retailer_ids or step.product_retailer_id or '').strip()
                 ):
                     warnings.append(f'Step "{step.name}" needs Catalog ID and product rows for the product list.')
+            if step.action_type == 'delay':
+                if step.delay_seconds < 0:
+                    warnings.append(f'Step "{step.name}" has a negative delay.')
+                if step.delay_seconds > 86400:
+                    warnings.append(f'Step "{step.name}" has a delay longer than 24 hours.')
 
         return warnings
 
@@ -610,6 +657,9 @@ class WhatsAppBotFlow(models.Model):
                 'without routes',
                 'invalid',
                 'disabled',
+                'exceeds',
+                'negative',
+                'longer than',
             ))
         ]
         if blocking:
@@ -633,6 +683,14 @@ class WhatsAppBotFlow(models.Model):
                 'type': 'success',
             },
         }
+
+    def action_archive_record(self):
+        self.write({'active': False})
+        return True
+
+    def action_unarchive_record(self):
+        self.write({'active': True})
+        return True
 
     def action_open_visual_builder(self):
         self.ensure_one()
@@ -1577,6 +1635,8 @@ class WhatsAppBotFlow(models.Model):
     
     def action_test_flow(self):
         """Test this flow by manually triggering it"""
+        for flow in self:
+            flow._raise_if_flow_has_activation_warnings()
         return {
             'type': 'ir.actions.act_window',
             'name': 'Test Flow',
@@ -4460,6 +4520,7 @@ class WhatsAppBotFlowButton(models.Model):
     @api.constrains('step_id', 'name', 'button_action', 'url', 'catalog_id', 'product_retailer_id')
     def _check_button_configuration(self):
         for button in self:
+            strict = self.env.context.get('strict_flow_validation') or bool(button.step_id.flow_id.active)
             if button.step_id.action_type == 'send_list' and button.button_action != 'reply':
                 raise ValidationError('List menu rows can only use Reply / Route actions.')
             label_limit = 24 if button.step_id.action_type == 'send_list' else 20
@@ -4468,14 +4529,14 @@ class WhatsAppBotFlowButton(models.Model):
                     f'Button "{button.name}" exceeds WhatsApp label limit of {label_limit} characters.'
                 )
             if button.button_action == 'url':
-                if not button.url:
+                if strict and not button.url:
                     raise ValidationError(f'Button "{button.name}" requires a URL.')
-                if not button.url.startswith(('http://', 'https://')):
+                if button.url and not button.url.startswith(('http://', 'https://')):
                     raise ValidationError(f'Button "{button.name}" URL must start with http:// or https://.')
             if button.button_action == 'catalog_product':
-                if not button.product_retailer_id:
+                if strict and not button.product_retailer_id:
                     raise ValidationError(f'Button "{button.name}" requires a Product Retailer ID.')
-                if not (button.catalog_id or button.step_id.account_id.commerce_catalog_id):
+                if strict and not (button.catalog_id or button.step_id.account_id.commerce_catalog_id):
                     raise ValidationError(
                         f'Button "{button.name}" requires a Catalog ID or an account default Meta Catalog ID.'
                     )

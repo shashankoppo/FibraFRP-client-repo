@@ -18,6 +18,7 @@
                 <field name="read_rate" widget="percentage"/>
                 <field name="roi" widget="percentage"/>
                 <field name="state"/>
+                <field name="active" optional="hide"/>
             </list>
         </field>
     </record>
@@ -37,9 +38,12 @@
                     <button name="action_view_failed_recipients" string="Failed Recipients" type="object" class="btn-secondary" invisible="failed_count == 0"/>
                     <button name="action_export_failed_recipients" string="Export Failed" type="object" class="btn-secondary" invisible="failed_count == 0"/>
                     <button name="action_cancel" string="Cancel" type="object" class="btn-danger" invisible="state in ['completed', 'cancelled']"/>
+                    <button name="action_archive_record" string="Archive" type="object" class="btn-secondary" invisible="not active"/>
+                    <button name="action_unarchive_record" string="Unarchive" type="object" class="btn-primary" invisible="active"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,scheduled,running,completed"/>
                 </header>
                 <sheet>
+                    <field name="active" invisible="1"/>
                     <div class="oe_title">
                         <h1>
                             <field name="name" placeholder="Campaign Name"/>
@@ -413,10 +417,34 @@
     </record>
 
     <!-- WhatsApp Campaign Action -->
+    <record id="view_whatsapp_campaign_search" model="ir.ui.view">
+        <field name="name">whatsapp.campaign.search</field>
+        <field name="model">whatsapp.campaign</field>
+        <field name="arch" type="xml">
+            <search string="WhatsApp Campaigns">
+                <field name="name"/>
+                <field name="account_id"/>
+                <field name="state"/>
+                <field name="campaign_type"/>
+                <filter name="active_records" string="Active" domain="[('active', '=', True)]"/>
+                <filter name="archived_records" string="Archived" domain="[('active', '=', False)]"/>
+                <filter name="draft_campaigns" string="Draft" domain="[('state', '=', 'draft')]"/>
+                <filter name="running_campaigns" string="Running" domain="[('state', '=', 'running')]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_by_state" string="State" context="{'group_by': 'state'}"/>
+                    <filter name="group_by_account" string="Account" context="{'group_by': 'account_id'}"/>
+                    <filter name="group_by_type" string="Type" context="{'group_by': 'campaign_type'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
     <record id="action_whatsapp_campaign" model="ir.actions.act_window">
         <field name="name">WhatsApp Campaigns</field>
         <field name="res_model">whatsapp.campaign</field>
         <field name="view_mode">kanban,list,form</field>
+        <field name="search_view_id" ref="view_whatsapp_campaign_search"/>
+        <field name="context">{'active_test': False, 'search_default_active_records': 1}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 Create your first WhatsApp Campaign
