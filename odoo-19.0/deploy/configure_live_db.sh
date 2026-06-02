@@ -5,7 +5,7 @@ LIVE_DB_NAME="${1:-${LIVE_DB_NAME:-FiberaFRP_DB}}"
 LIVE_ACCOUNT_ID="${2:-${WHATSAPP_ACCOUNT_ID:-}}"
 LIVE_VERIFY_TOKEN="${3:-${WHATSAPP_VERIFY_TOKEN:-}}"
 MODULES="${MODULES:-elsx_client_restrictions,elsx_whatsapp_marketing,elsx_attendance_tracking,elsx_tally_integration}"
-INSTALL_MODULES="${INSTALL_MODULES:-elsx_attendance_tracking}"
+INSTALL_MODULES="${INSTALL_MODULES:-elsx_client_restrictions,elsx_whatsapp_marketing,elsx_attendance_tracking,elsx_tally_integration}"
 CONFIG="${ODOO_CONFIG:-/etc/odoo/odoo.conf}"
 DB_USER="${POSTGRES_USER:-odoo}"
 
@@ -184,6 +184,37 @@ docker compose run --rm -T --no-deps odoo \
     -d "${LIVE_DB_NAME}" \
     "${ODOO_MODULE_ARGS[@]}" \
     --stop-after-init
+
+echo "==> Re-merging safe WhatsApp forms/templates/flow blueprints"
+docker compose run --rm -T --no-deps odoo \
+  python3 /opt/odoo/odoo-bin shell \
+    -c "${CONFIG}" \
+    -d "${LIVE_DB_NAME}" <<'PY'
+params = env['ir.config_parameter'].sudo()
+if 'whatsapp.account' not in env.registry.models:
+    print("WhatsApp module is not available after install/upgrade; skipping default merge.")
+else:
+    env['whatsapp.sample.template'].sudo()._seed_sample_templates()
+    env['whatsapp.form'].sudo()._seed_fiberafrp_production_forms()
+    accounts = env['whatsapp.account'].sudo().search([('active', '=', True)])
+    if not accounts:
+        print("No active WhatsApp account found. Create/recover the account, then click Initialize Defaults.")
+    else:
+        if not params.get_param('whatsapp.default.account.id'):
+            params.set_param('whatsapp.default.account.id', str(accounts[0].id))
+        for account in accounts:
+            ctx = dict(
+                env.context,
+                whatsapp_seed_account_id=account.id,
+                restore_defaults_inactive=True,
+            )
+            env['whatsapp.sample.template'].with_context(ctx).sudo()._seed_sample_templates()
+            env['whatsapp.form'].with_context(ctx).sudo()._seed_fiberafrp_production_forms()
+            env['whatsapp.bot.flow'].with_context(ctx).sudo()._seed_fiberafrp_assistant_flow()
+            env['whatsapp.bot.flow'].with_context(ctx).sudo()._seed_fiberafrp_advanced_business_flows()
+        print("Defaults re-merged for %s active WhatsApp account(s). Blueprints stay inactive unless already active." % len(accounts))
+    env.cr.commit()
+PY
 
 echo "==> Marking ${LIVE_DB_NAME} as the primary WhatsApp webhook database"
 mapfile -t DATABASES < <(

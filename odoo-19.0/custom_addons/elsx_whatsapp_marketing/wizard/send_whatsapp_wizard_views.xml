@@ -16,7 +16,7 @@
                             <field name="partner_ids" widget="many2many_tags" invisible="phone_number != False"/>
                             <field name="template_requires_header_media" invisible="1"/>
                             <div invisible="not template_requires_header_media" class="alert alert-warning py-2 mb-2" role="alert">
-                                This template uses a media header. Upload a file here if the template does not already have a default header file or Meta media URL.
+                                This approved template uses an image, video, or document header. Meta still requires the actual header media for each send. Upload it here, or set a default Header Media File/URL on the template.
                             </div>
                             <field name="media_file" filename="media_filename" invisible="template_id != False and not template_requires_header_media"/>
                             <field name="media_filename" invisible="1"/>
