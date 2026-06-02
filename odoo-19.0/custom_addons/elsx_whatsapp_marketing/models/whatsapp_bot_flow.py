@@ -2443,13 +2443,50 @@ class WhatsAppBotFlow(models.Model):
                 return flow, True
 
             flow.with_context(skip_canvas_sync=True).write(vals)
-            if flow.step_ids:
-                flow.step_ids.with_context(
-                    skip_canvas_sync=True,
-                    skip_flow_step_validation=True,
-                ).unlink()
+            reset_blueprint_steps(flow)
             flow.with_context(skip_canvas_sync=True).write({'canvas_data': '{}'})
             return flow, True
+
+        def reset_blueprint_steps(flow):
+            """Clear an inactive blueprint safely before rebuilding its steps.
+
+            Branches, buttons, logs, and step-to-step routes can point at steps
+            that are about to be replaced. Clear those references first so a
+            repair run cannot be blocked by PostgreSQL foreign keys.
+            """
+            steps = flow.step_ids.with_context(
+                skip_canvas_sync=True,
+                skip_flow_step_validation=True,
+            )
+            if not steps:
+                return
+            step_ids = steps.ids
+            flow.edge_ids.with_context(skip_canvas_sync=True).unlink()
+            flow.node_ids.with_context(skip_canvas_sync=True).unlink()
+            self.env['whatsapp.bot.flow.log'].sudo().search([
+                ('current_step', 'in', step_ids),
+            ]).write({'current_step': False})
+            Branch.sudo().search([
+                '|',
+                ('step_id', 'in', step_ids),
+                ('next_step_id', 'in', step_ids),
+            ]).unlink()
+            Button.sudo().search([
+                '|',
+                ('step_id', 'in', step_ids),
+                ('next_step_id', 'in', step_ids),
+            ]).unlink()
+            steps.write({
+                'next_step_id': False,
+                'condition_true_step': False,
+                'condition_false_step': False,
+                'http_success_step_id': False,
+                'http_failure_step_id': False,
+                'invalid_step_id': False,
+                'timeout_step_id': False,
+                'fallback_step_id': False,
+            })
+            steps.unlink()
 
         def create_step(flow, number, name, action, **vals):
             vals.update({
