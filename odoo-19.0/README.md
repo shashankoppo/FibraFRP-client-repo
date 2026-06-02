@@ -38,6 +38,21 @@ The live configuration script installs `elsx_attendance_tracking` if it is
 missing. That also installs the standard Attendances dependency, then upgrades
 the WhatsApp, branding, attendance tracking, and Tally custom modules.
 
+If Invoicing/Accounting or WhatsApp Marketing is accidentally uninstalled on
+the live database, use the recovery script instead of guessing module commands.
+It creates a PostgreSQL dump and filestore backup first, then reinstalls the
+focused recovery module set on `FiberaFRP_DB`:
+
+```bash
+git pull origin main
+docker compose build odoo
+bash deploy/recover_live_modules.sh FiberaFRP_DB
+```
+
+This restores the apps, menus, schema, and custom module logic. If the uninstall
+already deleted business records, restore those records from a pre-uninstall
+database/filestore backup.
+
 ---
 
 ## 🏗️ System Architecture & Tech Stack
