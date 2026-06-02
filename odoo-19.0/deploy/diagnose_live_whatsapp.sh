@@ -70,6 +70,7 @@ docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
           is_primary_webhook_db,
           (access_token IS NOT NULL AND access_token <> '') AS has_access_token,
           (app_secret IS NOT NULL AND app_secret <> '') AS has_app_secret,
+          skip_webhook_hmac,
           CASE
             WHEN webhook_verify_token IS NULL OR webhook_verify_token = '' THEN ''
             WHEN length(webhook_verify_token) <= 8 THEN '***'
@@ -77,7 +78,8 @@ docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
           END AS verify_token_hint,
           last_webhook_at,
           last_inbound_webhook_at,
-          last_status_webhook_at
+          last_status_webhook_at,
+          left(coalesce(webhook_last_error, ''), 180) AS webhook_last_error
      FROM whatsapp_account
     ORDER BY id;"
 

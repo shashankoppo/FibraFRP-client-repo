@@ -4,6 +4,7 @@ set -euo pipefail
 LIVE_DB_NAME="${1:-${LIVE_DB_NAME:-FiberaFRP_DB}}"
 LIVE_ACCOUNT_ID="${2:-${WHATSAPP_ACCOUNT_ID:-}}"
 LIVE_VERIFY_TOKEN="${3:-${WHATSAPP_VERIFY_TOKEN:-}}"
+LIVE_APP_SECRET="${4:-${WHATSAPP_APP_SECRET:-}}"
 MODULES="${MODULES:-elsx_client_restrictions,elsx_whatsapp_marketing,elsx_attendance_tracking,elsx_tally_integration}"
 INSTALL_MODULES="${INSTALL_MODULES:-elsx_client_restrictions,elsx_whatsapp_marketing,elsx_attendance_tracking,elsx_tally_integration}"
 CONFIG="${ODOO_CONFIG:-/etc/odoo/odoo.conf}"
@@ -26,6 +27,9 @@ if [ -n "${LIVE_ACCOUNT_ID}" ]; then
 fi
 if [ -n "${LIVE_VERIFY_TOKEN}" ]; then
   echo "==> Requested webhook verify token: $(printf '%s' "${LIVE_VERIFY_TOKEN}" | sed -E 's/^(.{3}).*(.{3})$/\1...\2/')"
+fi
+if [ -n "${LIVE_APP_SECRET}" ]; then
+  echo "==> Meta app secret will be updated on the primary WhatsApp account"
 fi
 echo "==> Modules to upgrade: ${MODULES}"
 if [ -n "${INSTALL_MODULES}" ]; then
@@ -276,6 +280,16 @@ for DB in "${DATABASES[@]}"; do
           WHERE id = ${PRIMARY_ACCOUNT_ID};" >/dev/null
       echo "---- ${DB}: webhook verify token updated on WhatsApp account ${PRIMARY_ACCOUNT_ID}"
     fi
+    if [ -n "${LIVE_APP_SECRET}" ]; then
+      LIVE_APP_SECRET_SQL="$(sql_quote "${LIVE_APP_SECRET}")"
+      docker compose exec -T db psql -U "${DB_USER}" -d "${DB}" -c \
+        "UPDATE whatsapp_account
+            SET app_secret = ${LIVE_APP_SECRET_SQL},
+                skip_webhook_hmac = false,
+                webhook_last_error = NULL
+          WHERE id = ${PRIMARY_ACCOUNT_ID};" >/dev/null
+      echo "---- ${DB}: Meta app secret updated on WhatsApp account ${PRIMARY_ACCOUNT_ID}"
+    fi
     echo "---- ${DB}: WhatsApp account ${PRIMARY_ACCOUNT_ID} marked primary; others disabled"
   else
     docker compose exec -T db psql -U "${DB_USER}" -d "${DB}" -c \
@@ -293,6 +307,8 @@ docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
           status,
           webhook_status,
           is_primary_webhook_db,
+          (app_secret IS NOT NULL AND app_secret <> '') AS has_app_secret,
+          skip_webhook_hmac,
           CASE
             WHEN webhook_verify_token IS NULL OR webhook_verify_token = '' THEN ''
             WHEN length(webhook_verify_token) <= 8 THEN '***'
