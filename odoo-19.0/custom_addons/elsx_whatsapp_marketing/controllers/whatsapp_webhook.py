@@ -454,6 +454,9 @@ class WhatsAppWebhook(http.Controller):
         self._touch_account_webhook(env, account, inbound=True)
 
         phone_number = env['whatsapp.message'].sudo()._normalize_phone(phone_number, account=account, strict=False)
+        if not phone_number:
+            _logger.warning('[WH-MSG] Inbound payload has no usable sender number; skipping message %s', wamid)
+            return
 
         # --- Duplicate guard ---
         if wamid and env['whatsapp.message'].sudo().search_count([('message_id', '=', wamid)]):
@@ -463,12 +466,13 @@ class WhatsAppWebhook(http.Controller):
         # --- Resolve or create partner ---
         contact_name = contacts.get(phone_number, phone_number)
         partner = env['whatsapp.message'].sudo()._find_partner_by_phone(phone_number)
-        if not partner and contact_name and contact_name != phone_number:
-            create_vals = {'name': contact_name, 'phone': phone_number}
+        if not partner:
+            display_name = contact_name if contact_name and contact_name != phone_number else f'WhatsApp {phone_number}'
+            create_vals = {'name': display_name, 'phone': phone_number}
             if 'mobile' in env['res.partner']._fields:
                 create_vals['mobile'] = phone_number
             partner = env['res.partner'].sudo().create(create_vals)
-            _logger.info(f'[WH-MSG] Auto-created partner "{contact_name}" for {phone_number}')
+            _logger.info(f'[WH-MSG] Auto-created partner "{display_name}" for {phone_number}')
 
         # --- Build base vals ---
         normalized_msg_type = msg_type

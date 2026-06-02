@@ -2885,6 +2885,151 @@ class WhatsAppBotFlow(models.Model):
             created |= finish(flow)
 
         flow, is_new = create_flow(
+            'Fibera Composite Support Assistant - 4 Option Menu',
+            'support',
+            'support, assistant, assist, help, menu, hi, hello, agent, catalogue, catalog, website, quote, price',
+            (
+                'Inactive compact support assistant for Fibera Composite India Pvt Ltd. Shows four list options: '
+                'Agent Connect, Catalogue, Website, and Quote.'
+            ),
+            priority=90,
+        )
+        if is_new:
+            menu = create_step(
+                flow, 1, 'Support Assistant Menu', 'send_list',
+                message_text=(
+                    'Hi {{name}}, welcome to Fibera Composite India Pvt Ltd support assistant.\n\n'
+                    'Please choose one option so we can help you quickly.'
+                ),
+                button_header_text='Support Assistant',
+                button_footer_text='For anything urgent, choose Agent Connect.',
+                list_button_text='Choose option',
+                list_section_title='Help Menu',
+            )
+
+            agent_tag = create_step(flow, 10, 'Tag Agent Connect Requested', 'assign_tag', assign_tag_id=tags['Agent Requested'].id)
+            assign_team_step = create_step(flow, 20, 'Assign Support Team', 'assign_team')
+            assign_fallback = create_step(flow, 30, 'Assign Fallback Agent', 'transfer', assign_user_id=assign_user.id)
+            open_chat = create_step(flow, 40, 'Keep Chat Open', 'chat_status', chat_status='open')
+            agent_confirm = create_step(
+                flow, 50, 'Agent Connect Confirmation', 'send_text',
+                message_text='Thanks {{name}}. I have connected this chat to our team. A person will reply here shortly.',
+            )
+
+            catalogue_tag = create_step(flow, 100, 'Tag Catalogue Requested', 'assign_tag', assign_tag_id=tags['Catalogue Requested'].id)
+            catalogue_link = create_step(
+                flow, 110, 'Catalogue Link', 'send_cta_url',
+                message_text='Open the Fibera Composite catalogue/online product page below.',
+                cta_button_text='Open Catalogue',
+                cta_button_url=shop_url,
+                button_footer_text='Reply with product, size, quantity, and city if you need pricing.',
+            )
+            if has_catalog_config:
+                catalogue_meta = create_step(
+                    flow, 120, 'Meta Catalogue Message', 'send_catalog',
+                    message_text='You can also browse available catalogue products here.',
+                    catalog_message_type='catalog_message',
+                    thumbnail_product_retailer_id=account.commerce_default_product_retailer_id,
+                    button_footer_text='Tap the catalogue card to view product details.',
+                )
+            else:
+                catalogue_meta = False
+            catalogue_form = create_step(
+                flow, 130, 'Catalogue Request Form', 'send_form_link',
+                message_text='For a specific catalogue or brochure request, please use this quick form: {{form_url}}',
+                form_id=forms.get('Catalogue Request').id if forms.get('Catalogue Request') else False,
+            )
+            catalogue_done = create_step(
+                flow, 140, 'Catalogue Done', 'send_text',
+                message_text='Catalogue details have been shared. Choose Quote from the menu if you want pricing.',
+            )
+
+            website_tag = create_step(flow, 200, 'Tag Website Shared', 'assign_tag', assign_tag_id=tags['Website Shared'].id)
+            website_step = create_step(
+                flow, 210, 'Website Link', 'send_cta_url',
+                message_text='Open the Fibera Composite India Pvt Ltd website/catalogue page below.',
+                cta_button_text='Open Website',
+                cta_button_url=shop_url,
+                button_footer_text='You can reply here for sales or support help.',
+            )
+
+            quote_tag = create_step(flow, 300, 'Tag Quote Requested', 'assign_tag', assign_tag_id=tags['Quote Requested'].id)
+            quote_product = create_step(
+                flow, 310, 'Ask Quote Product', 'ask_question',
+                message_text='Which product do you need a quote for? Example: FRP manhole cover, drain cover, grating, tank cover.',
+                input_validation_type='text',
+                save_response=True,
+                response_variable='simple_quote_product',
+                max_attempts=2,
+            )
+            quote_qty = create_step(
+                flow, 320, 'Ask Quote Quantity', 'ask_question',
+                message_text='Please share quantity and size/load rating if available.',
+                input_validation_type='text',
+                save_response=True,
+                response_variable='simple_quote_quantity',
+                max_attempts=2,
+            )
+            quote_city = create_step(
+                flow, 330, 'Ask Quote City', 'ask_question',
+                message_text='Which city or project location should we quote for?',
+                input_validation_type='text',
+                save_response=True,
+                response_variable='simple_quote_city',
+                max_attempts=2,
+            )
+            quote_lead = create_step(
+                flow, 340, 'Create Quote Lead', 'create_lead',
+                message_text=(
+                    'Quote request from 4-option support assistant.\n'
+                    'Product: {{simple_quote_product}}\n'
+                    'Quantity/size: {{simple_quote_quantity}}\n'
+                    'City/location: {{simple_quote_city}}\n'
+                    'Phone: {{phone}}'
+                ),
+            )
+            quote_form = create_step(
+                flow, 350, 'Quote Request Form', 'send_form_link',
+                message_text='Please complete this quote form for drawings, BOQ, GST/company details, or exact specs: {{form_url}}',
+                form_id=forms.get('Quote Request').id if forms.get('Quote Request') else False,
+            )
+            quote_qualified = create_step(flow, 360, 'Tag Quote Qualified', 'assign_tag', assign_tag_id=tags['Quote Qualified'].id)
+            end = create_step(flow, 999, 'End', 'end')
+
+            route(agent_tag, assign_team_step)
+            route(assign_team_step, assign_fallback)
+            route(assign_fallback, open_chat)
+            route(open_chat, agent_confirm)
+            route(agent_confirm, end)
+
+            route(catalogue_tag, catalogue_link)
+            route(catalogue_link, catalogue_meta or catalogue_form)
+            if catalogue_meta:
+                route(catalogue_meta, catalogue_form)
+            route(catalogue_form, catalogue_done)
+            route(catalogue_done, end)
+
+            route(website_tag, website_step)
+            route(website_step, end)
+
+            route(quote_tag, quote_product)
+            route(quote_product, quote_qty)
+            route(quote_qty, quote_city)
+            route(quote_city, quote_lead)
+            route(quote_lead, quote_form)
+            route(quote_form, quote_qualified)
+            route(quote_qualified, assign_team_step)
+
+            menu.with_context(skip_canvas_sync=True).write({'fallback_step_id': agent_tag.id})
+            add_buttons(menu, [
+                ('Agent Connect', 'fci_simple_agent', 'Talk to a human team member', agent_tag),
+                ('Catalogue', 'fci_simple_catalogue', 'Catalogue link and request form', catalogue_tag),
+                ('Website', 'fci_simple_website', 'Open website/catalogue page', website_tag),
+                ('Quote', 'fci_simple_quote', 'Collect quote details and create lead', quote_tag),
+            ])
+            created |= finish(flow)
+
+        flow, is_new = create_flow(
             'FiberaFRP Full Business Assistant - Blueprint',
             'custom',
             'menu, business, fibera, hi, hello, start',
