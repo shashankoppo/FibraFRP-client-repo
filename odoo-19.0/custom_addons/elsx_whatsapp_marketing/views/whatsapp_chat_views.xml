@@ -9,6 +9,7 @@
                 <field name="display_name"/>
                 <field name="display_name_initial"/>
                 <field name="last_message_date"/>
+                <field name="last_message_date_str"/>
                 <field name="last_message_body"/>
                 <field name="last_message_status"/>
                 <field name="last_message_direction"/>
@@ -39,7 +40,7 @@
                                         <i t-if="record.is_pinned.raw_value" class="fa fa-thumb-tack ms-1 text-muted" title="Pinned" style="font-size: 0.7rem;"/>
                                     </h6>
                                     <span class="small text-muted" style="font-size: 0.75rem;">
-                                        <t t-out="record.last_message_date_str.value"/>
+                                        <t t-out="record.last_message_date_str ? record.last_message_date_str.value : ''"/>
                                     </span>
                                 </div>
                                 
