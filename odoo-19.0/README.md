@@ -55,6 +55,26 @@ database/filestore backup. The script also re-merges WhatsApp sample templates,
 production forms, and FiberaFRP flow blueprints as inactive reviewable defaults;
 it does not push or recreate live Meta credentials from Git.
 
+Do not commit live customer data, invoice records, WhatsApp messages, Meta
+tokens, app secrets, or database dumps to GitHub. To move a live system exactly
+to another Docker host, create an encrypted portable backup instead:
+
+```bash
+export BACKUP_PASSPHRASE='use-a-long-private-passphrase'
+bash deploy/export_live_encrypted_backup.sh FiberaFRP_DB
+```
+
+Copy the generated `.enc` file through private storage only. On the target host,
+restore it with an explicit confirmation:
+
+```bash
+export BACKUP_PASSPHRASE='use-the-same-private-passphrase'
+CONFIRM_RESTORE=YES bash deploy/restore_live_encrypted_backup.sh /path/to/FiberaFRP_DB_portable.tar.gz.enc FiberaFRP_DB
+```
+
+Add `RESTORE_CONFIG=YES` only when you intentionally want the archive to
+overwrite local `.env` and `odoo.docker.conf` on the target host.
+
 ---
 
 ## 🏗️ System Architecture & Tech Stack

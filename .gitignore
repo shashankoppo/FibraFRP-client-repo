@@ -1,0 +1,34 @@
+# Local secrets and environment files
+.env
+*.env
+!.env.example
+!*.env.example
+odoo-19.0/.env
+odoo-19.0/odoo.conf
+
+# Database, filestore, and portable production backups
+backups/
+secure_backups/
+odoo-19.0/backups/
+odoo-19.0/secure_backups/
+*.dump
+*.pg_dump
+*.sql
+*.sql.gz
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.enc
+
+# Runtime/cache noise
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+node_modules/
+
+# Local editor/OS noise
+.DS_Store
+Thumbs.db

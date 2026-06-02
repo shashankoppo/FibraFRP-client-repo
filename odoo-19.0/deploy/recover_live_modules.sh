@@ -55,9 +55,9 @@ docker compose exec -T db pg_dump -U "${DB_USER}" -d "${LIVE_DB_NAME}" \
   > "${BACKUP_DIR}/${SAFE_DB_NAME}.sql"
 
 echo "==> Backing up filestore for ${LIVE_DB_NAME} if present"
-if docker compose run --rm -T --no-deps -e LIVE_DB_NAME="${LIVE_DB_NAME}" odoo sh -c \
+if docker compose run --rm -T --no-deps --entrypoint sh -e LIVE_DB_NAME="${LIVE_DB_NAME}" odoo -c \
   'test -d "/root/.local/share/Odoo/filestore/${LIVE_DB_NAME}"'; then
-  docker compose run --rm -T --no-deps -e LIVE_DB_NAME="${LIVE_DB_NAME}" odoo sh -c \
+  docker compose run --rm -T --no-deps --entrypoint sh -e LIVE_DB_NAME="${LIVE_DB_NAME}" odoo -c \
     'tar -C /root/.local/share/Odoo/filestore -czf - "${LIVE_DB_NAME}"' \
     > "${BACKUP_DIR}/${SAFE_DB_NAME}_filestore.tgz"
 else
