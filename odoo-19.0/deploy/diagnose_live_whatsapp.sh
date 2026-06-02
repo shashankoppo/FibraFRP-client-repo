@@ -102,17 +102,32 @@ docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
 echo
 echo "==> Template media readiness"
 docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
-  "SELECT status,
-          header_type,
-          count(*) AS total,
-          count(*) FILTER (
-            WHERE header_type IN ('image', 'video', 'document')
-              AND COALESCE(header_media_url, '') = ''
-              AND header_media_file IS NULL
-          ) AS missing_header_media
-     FROM whatsapp_template
-    GROUP BY status, header_type
-    ORDER BY status, header_type;"
+  "WITH template_media AS (
+      SELECT t.id,
+             t.status,
+             t.header_type,
+             COALESCE(t.header_media_url, '') AS header_media_url,
+             EXISTS (
+               SELECT 1
+                 FROM ir_attachment a
+                WHERE a.res_model = 'whatsapp.template'
+                  AND a.res_id = t.id
+                  AND a.res_field = 'header_media_file'
+                  AND COALESCE(a.store_fname, '') <> ''
+             ) AS has_header_media_file
+        FROM whatsapp_template t
+    )
+    SELECT status,
+           header_type,
+           count(*) AS total,
+           count(*) FILTER (
+             WHERE header_type IN ('image', 'video', 'document')
+               AND header_media_url = ''
+               AND NOT has_header_media_file
+           ) AS missing_header_media
+      FROM template_media
+     GROUP BY status, header_type
+     ORDER BY status, header_type;"
 
 echo
 echo "==> Recent webhook logs"
