@@ -2352,6 +2352,15 @@ class WhatsAppBotFlow(models.Model):
             'Payment Follow-up',
             'Dealer / Project Lead',
             'Feedback Received',
+            'Business Concierge',
+            'Website Shared',
+            'Quote Qualified',
+            'Agent Requested',
+            'Order Help',
+            'Invoice Help',
+            'Warranty Requested',
+            'Product Issue',
+            'Forms Shared',
         ]
         tags = {
             name: Tag.search([('name', '=', name)], limit=1) or Tag.create({'name': name})
@@ -2371,6 +2380,7 @@ class WhatsAppBotFlow(models.Model):
             skip_canvas_sync=True,
         )
         Button = self.env['whatsapp.bot.flow.button'].with_context(skip_canvas_sync=True)
+        Branch = self.env['whatsapp.bot.flow.branch'].with_context(skip_canvas_sync=True)
         created = self.browse()
 
         def create_flow(name, flow_type, keywords, description, priority=40):
@@ -2419,10 +2429,460 @@ class WhatsAppBotFlow(models.Model):
                 for label, button_id, description, target in button_defs
             ])
 
+        def add_branches(step, branch_defs):
+            Branch.create([
+                {
+                    'step_id': step.id,
+                    'sequence': sequence,
+                    'name': label,
+                    'operator': operator,
+                    'value': value,
+                    'next_step_id': target.id,
+                }
+                for sequence, label, operator, value, target in branch_defs
+                if target
+            ])
+
         def finish(flow):
             flow._sync_steps_to_canvas()
             flow._sync_node_edge_records_from_canvas()
             return flow
+
+        shop_url = (
+            account.commerce_shop_url
+            or (account.business_websites.split(',')[0].strip() if account.business_websites else '')
+            or 'https://fiberafrp.com'
+        )
+        has_catalog_config = bool(
+            account.commerce_catalog_id
+            and (
+                account.commerce_default_product_retailer_id
+                or account.commerce_shop_url
+            )
+        )
+        payment_enabled = account.payment_link_mode == 'manual_url' and bool(account.payment_manual_url)
+
+        flow, is_new = create_flow(
+            'Fibera Composite India Business Concierge - Blueprint',
+            'custom',
+            (
+                'hi, hello, start, menu, fibera, fibera composite, catalogue, catalog, website, '
+                'price, quote, quotation, support, warranty, dealer, project, payment, invoice, agent'
+            ),
+            (
+                'Inactive enterprise concierge for Fibera Composite India Pvt Ltd. Routes customers through '
+                'catalogue/website, quote qualification, dealer/project enquiries, support/warranty, order/payment, '
+                'forms/uploads, feedback, and human handoff.'
+            ),
+            priority=95,
+        )
+        if is_new:
+            main_menu = create_step(
+                flow, 10, 'Business Concierge Menu', 'send_list',
+                message_text=(
+                    'Hi {{name}}, welcome to Fibera Composite India Pvt Ltd.\n\n'
+                    'Please choose how we can help you today.'
+                ),
+                button_header_text='Fibera Composite',
+                button_footer_text='You can also type your requirement.',
+                list_button_text='Choose help',
+                list_section_title='Business Desk',
+            )
+            business_tag = create_step(flow, 1, 'Tag Business Concierge', 'assign_tag', assign_tag_id=tags['Business Concierge'].id)
+            free_text_router = create_step(
+                flow, 20, 'Free Text Intent Router', 'condition',
+                condition_type='keyword_match',
+                condition_source='incoming_text',
+                condition_operator='regex',
+                condition_value='price|quote|quotation|rate|cost',
+            )
+
+            catalogue_tag = create_step(flow, 100, 'Tag Catalogue / Website Interest', 'assign_tag', assign_tag_id=tags['Catalogue Requested'].id)
+            website_tag = create_step(flow, 105, 'Tag Website Shared', 'assign_tag', assign_tag_id=tags['Website Shared'].id)
+            website_link = create_step(
+                flow, 110, 'Open Catalogue / Website', 'send_cta_url',
+                message_text=(
+                    'Please open our catalogue/website for Fibera Composite India Pvt Ltd products. '
+                    'Reply here if you want pricing, technical details, or dealer support.'
+                ),
+                cta_button_text='Open Catalogue',
+                cta_button_url=shop_url,
+                button_footer_text='FRP manhole covers, drain covers, gratings, tank covers, and project products.',
+            )
+            if has_catalog_config:
+                catalog_message = create_step(
+                    flow, 115, 'Send Meta Catalog Message', 'send_catalog',
+                    message_text='You can also browse available product cards here.',
+                    catalog_message_type='catalog_message',
+                    thumbnail_product_retailer_id=account.commerce_default_product_retailer_id,
+                    button_footer_text='Tap the catalogue card to view product details.',
+                )
+            else:
+                catalog_message = False
+            catalogue_form = create_step(
+                flow, 120, 'Send Catalogue Request Form', 'send_form_link',
+                message_text='If you want a specific catalogue range, please fill this quick request form: {{form_url}}',
+                form_id=forms.get('Catalogue Request').id if forms.get('Catalogue Request') else False,
+            )
+            catalogue_question = create_step(
+                flow, 130, 'Ask Catalogue Requirement', 'ask_question',
+                message_text='Which product range do you want to discuss? Example: manhole cover, drain cover, FRP grating, tank cover.',
+                input_validation_type='text',
+                save_response=True,
+                response_variable='catalogue_product_interest',
+                max_attempts=2,
+            )
+            catalogue_city = create_step(
+                flow, 140, 'Ask Catalogue City', 'ask_question',
+                message_text='Which city or project location should our team consider?',
+                input_validation_type='text',
+                save_response=True,
+                response_variable='catalogue_city',
+                max_attempts=2,
+            )
+            catalogue_lead = create_step(
+                flow, 150, 'Create Catalogue Lead', 'create_lead',
+                message_text=(
+                    'Catalogue/website lead from WhatsApp.\n'
+                    'Product interest: {{catalogue_product_interest}}\n'
+                    'City: {{catalogue_city}}\n'
+                    'Phone: {{phone}}'
+                ),
+            )
+
+            quote_tag = create_step(flow, 200, 'Tag Quote Requested', 'assign_tag', assign_tag_id=tags['Quote Requested'].id)
+            quote_product = create_step(
+                flow, 210, 'Ask Quote Product', 'ask_question',
+                message_text='Which product do you need? Example: FRP manhole cover, gully cover, drain cover, grating, tank cover.',
+                input_validation_type='text',
+                save_response=True,
+                response_variable='quote_product',
+                max_attempts=2,
+            )
+            quote_size = create_step(
+                flow, 220, 'Ask Size / Load', 'ask_question',
+                message_text='Please share size and load rating. Example: 600x600 heavy duty, 10T, 25T, custom size.',
+                input_validation_type='text',
+                save_response=True,
+                response_variable='quote_size_load',
+                max_attempts=2,
+            )
+            quote_qty = create_step(
+                flow, 230, 'Ask Quantity', 'ask_question',
+                message_text='How many pieces or approximate quantity do you require?',
+                input_validation_type='number',
+                save_response=True,
+                response_variable='quote_quantity',
+                max_attempts=2,
+            )
+            quote_city = create_step(
+                flow, 240, 'Ask Delivery City', 'ask_question',
+                message_text='Which delivery city or site location should we quote for?',
+                input_validation_type='text',
+                save_response=True,
+                response_variable='quote_city',
+                max_attempts=2,
+            )
+            quote_timeline = create_step(
+                flow, 250, 'Ask Timeline / Notes', 'ask_question',
+                message_text='Please share timeline, project name, drawings/BOQ note, or any special requirement.',
+                input_validation_type='text',
+                save_response=True,
+                response_variable='quote_notes',
+                max_attempts=2,
+            )
+            quote_contact_update = create_step(
+                flow, 260, 'Save Product Interest', 'update_contact',
+                contact_attribute_name='fibera_last_quote_interest',
+                contact_attribute_value='{{quote_product}} | {{quote_size_load}} | Qty {{quote_quantity}} | {{quote_city}}',
+            )
+            quote_lead = create_step(
+                flow, 270, 'Create Qualified Quote Lead', 'create_lead',
+                message_text=(
+                    'Qualified WhatsApp quotation request for Fibera Composite India Pvt Ltd.\n'
+                    'Product: {{quote_product}}\n'
+                    'Size/load: {{quote_size_load}}\n'
+                    'Quantity: {{quote_quantity}}\n'
+                    'City: {{quote_city}}\n'
+                    'Notes: {{quote_notes}}\n'
+                    'Phone: {{phone}}'
+                ),
+            )
+            quote_qualified = create_step(flow, 275, 'Tag Quote Qualified', 'assign_tag', assign_tag_id=tags['Quote Qualified'].id)
+            quote_form = create_step(
+                flow, 280, 'Send Quote Request Form', 'send_form_link',
+                message_text='For drawings, BOQ, GST/company details, or exact specs, please use this quote form: {{form_url}}',
+                form_id=forms.get('Quote Request').id if forms.get('Quote Request') else False,
+            )
+
+            dealer_tag = create_step(flow, 300, 'Tag Dealer / Project Lead', 'assign_tag', assign_tag_id=tags['Dealer / Project Lead'].id)
+            dealer_type = create_step(
+                flow, 310, 'Ask Dealer / Project Type', 'ask_question',
+                message_text='Is this for dealership, distribution, project supply, tender, contractor work, or resale?',
+                input_validation_type='text',
+                save_response=True,
+                response_variable='dealer_project_type',
+                max_attempts=2,
+            )
+            dealer_city = create_step(
+                flow, 320, 'Ask Dealer Area', 'ask_question',
+                message_text='Which city/state/territory are you covering or supplying to?',
+                input_validation_type='text',
+                save_response=True,
+                response_variable='dealer_city',
+                max_attempts=2,
+            )
+            dealer_requirement = create_step(
+                flow, 330, 'Ask Dealer Requirement', 'ask_question',
+                message_text='Please share expected product range, monthly volume, project size, or tender details.',
+                input_validation_type='text',
+                save_response=True,
+                response_variable='dealer_requirement',
+                max_attempts=2,
+            )
+            dealer_form = create_step(
+                flow, 340, 'Send Lead Enquiry Form', 'send_form_link',
+                message_text='Please complete this lead enquiry form so our business team has full details: {{form_url}}',
+                form_id=forms.get('Lead Enquiry').id if forms.get('Lead Enquiry') else False,
+            )
+            dealer_lead = create_step(
+                flow, 350, 'Create Dealer / Project Lead', 'create_lead',
+                message_text=(
+                    'Dealer/project enquiry from WhatsApp.\n'
+                    'Type: {{dealer_project_type}}\n'
+                    'City/territory: {{dealer_city}}\n'
+                    'Requirement: {{dealer_requirement}}\n'
+                    'Phone: {{phone}}'
+                ),
+            )
+
+            order_menu = create_step(
+                flow, 400, 'Order / Payment Menu', 'send_buttons',
+                message_text='Choose what you need for order, invoice, or payment help.',
+                button_header_text='Order Desk',
+            )
+            payment_step = create_step(
+                flow, 410, 'Send Payment Link Or Guidance',
+                'send_payment_link' if payment_enabled else 'send_text',
+                message_text=(
+                    'Please use this secure payment link: {{payment_url}}'
+                    if payment_enabled
+                    else 'Payment links are handled by our accounts team. Please share invoice/order reference and we will assist.'
+                ),
+                payment_mode='account_default',
+            )
+            order_ref = create_step(
+                flow, 420, 'Ask Order Reference', 'ask_question',
+                message_text='Please share your order number, quotation number, invoice number, or payment reference.',
+                input_validation_type='text',
+                save_response=True,
+                response_variable='order_reference',
+                max_attempts=2,
+            )
+            invoice_tag = create_step(flow, 430, 'Tag Invoice Help', 'assign_tag', assign_tag_id=tags['Invoice Help'].id)
+            order_tag = create_step(flow, 440, 'Tag Order Help', 'assign_tag', assign_tag_id=tags['Order Help'].id)
+            payment_tag = create_step(flow, 450, 'Tag Payment Follow-Up', 'assign_tag', assign_tag_id=tags['Payment Follow-up'].id)
+
+            support_menu = create_step(
+                flow, 500, 'Support / Warranty Menu', 'send_list',
+                message_text='Please choose the closest support topic.',
+                button_header_text='Support Desk',
+                list_button_text='Select issue',
+                list_section_title='Support Topics',
+            )
+            support_ref = create_step(
+                flow, 510, 'Ask Support Reference', 'ask_question',
+                message_text='Please share order, invoice, delivery, or project reference if available.',
+                input_validation_type='text',
+                save_response=True,
+                response_variable='support_reference',
+                max_attempts=2,
+            )
+            support_details = create_step(
+                flow, 520, 'Ask Support Details', 'ask_question',
+                message_text='Describe the issue clearly. Mention product, size, site, date, and what happened.',
+                input_validation_type='text',
+                save_response=True,
+                response_variable='support_details',
+                max_attempts=2,
+            )
+            support_form = create_step(
+                flow, 530, 'Send Support Ticket Form', 'send_form_link',
+                message_text='Please upload photos, invoice, delivery proof, or documents in this support form: {{form_url}}',
+                form_id=forms.get('Support Ticket').id if forms.get('Support Ticket') else False,
+            )
+            support_tag = create_step(flow, 540, 'Tag Support Required', 'assign_tag', assign_tag_id=tags['Support Required'].id)
+            warranty_tag = create_step(flow, 545, 'Tag Warranty Requested', 'assign_tag', assign_tag_id=tags['Warranty Requested'].id)
+            product_issue_tag = create_step(flow, 550, 'Tag Product Issue', 'assign_tag', assign_tag_id=tags['Product Issue'].id)
+
+            forms_menu = create_step(
+                flow, 600, 'Forms / Upload Menu', 'send_list',
+                message_text='Choose the form you want to open.',
+                list_button_text='Choose form',
+                list_section_title='Forms',
+            )
+            forms_tag = create_step(flow, 605, 'Tag Forms Shared', 'assign_tag', assign_tag_id=tags['Forms Shared'].id)
+            form_quote = create_step(flow, 610, 'Open Quote Form', 'send_form_link',
+                                     message_text='Quote request form: {{form_url}}',
+                                     form_id=forms.get('Quote Request').id if forms.get('Quote Request') else False)
+            form_support = create_step(flow, 620, 'Open Support Form', 'send_form_link',
+                                       message_text='Support ticket form: {{form_url}}',
+                                       form_id=forms.get('Support Ticket').id if forms.get('Support Ticket') else False)
+            form_lead = create_step(flow, 630, 'Open Lead Form', 'send_form_link',
+                                    message_text='Lead enquiry form: {{form_url}}',
+                                    form_id=forms.get('Lead Enquiry').id if forms.get('Lead Enquiry') else False)
+            form_catalogue = create_step(flow, 640, 'Open Catalogue Form', 'send_form_link',
+                                         message_text='Catalogue request form: {{form_url}}',
+                                         form_id=forms.get('Catalogue Request').id if forms.get('Catalogue Request') else False)
+            form_feedback = create_step(flow, 650, 'Open Feedback Form', 'send_form_link',
+                                        message_text='Feedback form: {{form_url}}',
+                                        form_id=forms.get('Feedback').id if forms.get('Feedback') else False)
+
+            feedback_prompt = create_step(
+                flow, 700, 'Feedback Rating Menu', 'send_buttons',
+                message_text='How was your experience with Fibera Composite India Pvt Ltd?',
+                button_header_text='Feedback',
+            )
+            feedback_form = create_step(
+                flow, 710, 'Send Feedback Form', 'send_form_link',
+                message_text='Thank you. Please share details here: {{form_url}}',
+                form_id=forms.get('Feedback').id if forms.get('Feedback') else False,
+            )
+            feedback_tag = create_step(flow, 720, 'Tag Feedback Received', 'assign_tag', assign_tag_id=tags['Feedback Received'].id)
+
+            company_info = create_step(
+                flow, 800, 'Company Info Reply', 'send_text',
+                message_text=(
+                    'Fibera Composite India Pvt Ltd manufactures FRP/composite products for infrastructure and project supply, '
+                    'including manhole covers, drain/gully covers, FRP gratings, tank covers, and custom composite requirements.'
+                ),
+            )
+            company_website = create_step(
+                flow, 810, 'Company Website CTA', 'send_cta_url',
+                message_text='Open our website/catalogue page for product information.',
+                cta_button_text='Open Website',
+                cta_button_url=shop_url,
+            )
+
+            agent_tag = create_step(flow, 900, 'Tag Agent Requested', 'assign_tag', assign_tag_id=tags['Agent Requested'].id)
+            assign_team_step = create_step(flow, 910, 'Assign Available Team', 'assign_team')
+            assign_fallback = create_step(flow, 920, 'Assign Fallback Agent', 'transfer', assign_user_id=assign_user.id)
+            open_chat = create_step(flow, 930, 'Keep Chat Open', 'chat_status', chat_status='open')
+            agent_confirm = create_step(
+                flow, 940, 'Agent Handoff Confirmation', 'send_text',
+                message_text='Thanks {{name}}. I have handed this chat to our team. A person will reply here shortly.',
+            )
+            end = create_step(flow, 999, 'End', 'end')
+
+            route(business_tag, main_menu)
+            route(catalogue_tag, website_tag)
+            route(website_tag, website_link)
+            route(website_link, catalog_message or catalogue_form)
+            if catalog_message:
+                route(catalog_message, catalogue_form)
+            route(catalogue_form, catalogue_question)
+            route(catalogue_question, catalogue_city)
+            route(catalogue_city, catalogue_lead)
+            route(catalogue_lead, assign_team_step)
+
+            route(quote_tag, quote_product)
+            route(quote_product, quote_size)
+            route(quote_size, quote_qty)
+            route(quote_qty, quote_city)
+            route(quote_city, quote_timeline)
+            route(quote_timeline, quote_contact_update)
+            route(quote_contact_update, quote_lead)
+            route(quote_lead, quote_qualified)
+            route(quote_qualified, quote_form)
+            route(quote_form, assign_team_step)
+
+            route(dealer_tag, dealer_type)
+            route(dealer_type, dealer_city)
+            route(dealer_city, dealer_requirement)
+            route(dealer_requirement, dealer_form)
+            route(dealer_form, dealer_lead)
+            route(dealer_lead, assign_team_step)
+
+            route(payment_step, payment_tag)
+            route(payment_tag, assign_team_step)
+            route(order_ref, order_tag)
+            route(order_tag, assign_team_step)
+            route(invoice_tag, order_ref)
+
+            route(support_ref, support_details)
+            route(support_details, support_form)
+            route(support_form, support_tag)
+            route(support_tag, assign_team_step)
+            route(warranty_tag, support_ref)
+            route(product_issue_tag, support_ref)
+
+            route(forms_tag, forms_menu)
+            route(form_quote, assign_team_step)
+            route(form_support, assign_team_step)
+            route(form_lead, assign_team_step)
+            route(form_catalogue, assign_team_step)
+            route(form_feedback, end)
+
+            route(feedback_form, feedback_tag)
+            route(feedback_tag, end)
+            route(company_info, company_website)
+            route(company_website, end)
+            route(agent_tag, assign_team_step)
+            route(assign_team_step, assign_fallback)
+            route(assign_fallback, open_chat)
+            route(open_chat, agent_confirm)
+            route(agent_confirm, end)
+
+            main_menu.with_context(skip_canvas_sync=True).write({'fallback_step_id': free_text_router.id})
+            free_text_router.with_context(skip_canvas_sync=True).write({
+                'condition_true_step': quote_tag.id,
+                'condition_false_step': agent_tag.id,
+            })
+            add_branches(free_text_router, [
+                (10, 'Catalogue / Website', 'regex', 'catalog|catalogue|website|brochure|product', catalogue_tag),
+                (20, 'Quote / Price', 'regex', 'price|quote|quotation|rate|cost', quote_tag),
+                (30, 'Dealer / Project', 'regex', 'dealer|distributor|project|tender|bulk|contractor', dealer_tag),
+                (40, 'Order / Payment', 'regex', 'payment|pay|invoice|order|delivery|tracking', order_menu),
+                (50, 'Support / Warranty', 'regex', 'support|issue|warranty|complaint|problem|replacement', support_menu),
+                (60, 'Feedback', 'regex', 'feedback|review|rating|experience', feedback_prompt),
+            ])
+
+            add_buttons(main_menu, [
+                ('Catalogue / Website', 'fci_catalogue', 'Catalogue, shop, and website link', catalogue_tag),
+                ('Quote / Price', 'fci_quote', 'Collect product, size, quantity, city', quote_tag),
+                ('Dealer / Project', 'fci_dealer', 'Dealer, project, tender, bulk enquiry', dealer_tag),
+                ('Order / Payment', 'fci_order', 'Invoice, payment, order reference', order_menu),
+                ('Support / Warranty', 'fci_support', 'Support ticket, warranty, product issue', support_menu),
+                ('Talk to Agent', 'fci_agent', 'Assign a human team member', agent_tag),
+                ('Forms / Upload', 'fci_forms', 'Quote, support, catalogue, feedback forms', forms_tag),
+                ('Feedback', 'fci_feedback', 'Share customer experience', feedback_prompt),
+                ('Company Info', 'fci_company', 'About Fibera Composite India Pvt Ltd', company_info),
+            ])
+            add_buttons(order_menu, [
+                ('Pay Now', 'fci_pay_now', 'Send payment link if configured', payment_step),
+                ('Order Status', 'fci_order_status', 'Share order/delivery reference', order_ref),
+                ('Invoice Help', 'fci_invoice_help', 'Invoice, payment, accounts support', invoice_tag),
+            ])
+            add_buttons(support_menu, [
+                ('Product Issue', 'fci_product_issue', 'Quality, damage, fitment, technical concern', product_issue_tag),
+                ('Delivery Issue', 'fci_delivery_issue', 'Dispatch, delivery, shortage, delay', support_ref),
+                ('Warranty', 'fci_warranty', 'Warranty or replacement request', warranty_tag),
+                ('Payment / Invoice', 'fci_support_invoice', 'Accounts or invoice-related support', invoice_tag),
+                ('Talk to Agent', 'fci_support_agent', 'Human support handoff', agent_tag),
+            ])
+            add_buttons(forms_menu, [
+                ('Quote Form', 'fci_form_quote', 'Detailed quotation request', form_quote),
+                ('Support Form', 'fci_form_support', 'Issue details and uploads', form_support),
+                ('Lead Form', 'fci_form_lead', 'Dealer/project/customer enquiry', form_lead),
+                ('Catalogue Form', 'fci_form_catalogue', 'Specific catalogue request', form_catalogue),
+                ('Feedback Form', 'fci_form_feedback', 'Rating and comments', form_feedback),
+            ])
+            add_buttons(feedback_prompt, [
+                ('Good', 'fci_feedback_good', 'Positive feedback', feedback_form),
+                ('Average', 'fci_feedback_average', 'Neutral feedback', feedback_form),
+                ('Poor', 'fci_feedback_poor', 'Needs follow-up', feedback_form),
+            ])
+            created |= finish(flow)
 
         flow, is_new = create_flow(
             'FiberaFRP Full Business Assistant - Blueprint',
