@@ -752,7 +752,6 @@ class WhatsAppChat(models.Model):
             raise UserError(_("Select an approved template before sending."))
         if template.status != 'approved':
             raise UserError(_("Only approved WhatsApp templates can be sent."))
-        template._validate_meta_constraints()
         if template.header_type in ('image', 'video', 'document') and not (
             template.header_media_file or template.header_media_url
         ):
@@ -766,6 +765,7 @@ class WhatsAppChat(models.Model):
             })
             action['context'] = context
             return action
+        template._validate_meta_constraints()
 
         payload = template._prepare_send_payload(
             partner=self.partner_id,
