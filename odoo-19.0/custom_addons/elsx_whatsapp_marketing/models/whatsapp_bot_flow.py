@@ -2404,6 +2404,53 @@ class WhatsAppBotFlow(models.Model):
             })
             return flow, True
 
+        def create_repairable_blueprint(name, flow_type, keywords, description, priority=40):
+            vals = {
+                'name': name,
+                'account_id': account.id,
+                'description': description,
+                'flow_type': flow_type,
+                'trigger_type': 'keyword',
+                'keywords': keywords,
+                'priority': priority,
+                'active': False,
+                'retry_on_failure': True,
+                'max_retries': 2,
+            }
+            flow = self.with_context(active_test=False).search([
+                ('account_id', '=', account.id),
+                ('name', '=', name),
+            ], limit=1)
+            if flow and flow.active:
+                suffix = 2
+                while True:
+                    versioned_name = f'{name} v{suffix}'
+                    versioned = self.with_context(active_test=False).search([
+                        ('account_id', '=', account.id),
+                        ('name', '=', versioned_name),
+                    ], limit=1)
+                    if not versioned:
+                        vals['name'] = versioned_name
+                        flow = Flow.create(vals)
+                        return flow, True
+                    if not versioned.active:
+                        flow = versioned
+                        vals['name'] = versioned_name
+                        break
+                    suffix += 1
+            elif not flow:
+                flow = Flow.create(vals)
+                return flow, True
+
+            flow.with_context(skip_canvas_sync=True).write(vals)
+            if flow.step_ids:
+                flow.step_ids.with_context(
+                    skip_canvas_sync=True,
+                    skip_flow_step_validation=True,
+                ).unlink()
+            flow.with_context(skip_canvas_sync=True).write({'canvas_data': '{}'})
+            return flow, True
+
         def create_step(flow, number, name, action, **vals):
             vals.update({
                 'flow_id': flow.id,
@@ -2462,7 +2509,7 @@ class WhatsAppBotFlow(models.Model):
         )
         payment_enabled = account.payment_link_mode == 'manual_url' and bool(account.payment_manual_url)
 
-        flow, is_new = create_flow(
+        flow, is_new = create_repairable_blueprint(
             'Fibera Composite India Business Concierge - Blueprint',
             'custom',
             (
@@ -2884,7 +2931,228 @@ class WhatsAppBotFlow(models.Model):
             ])
             created |= finish(flow)
 
-        flow, is_new = create_flow(
+        flow, is_new = create_repairable_blueprint(
+            'FiberaFRP Smart Menu Assistant - Production Blueprint',
+            'support',
+            'hi, hello, start, menu, fibera, fiberafrp, catalogue, catalog, price, quote, support, agent, website',
+            (
+                'Inactive WhatsApp-style production menu for FiberaFRP. Presents Catalogue, Price / Quote, '
+                'Support / Agent, and Website with routed follow-up, lead creation, forms, and handoff.'
+            ),
+            priority=93,
+        )
+        if is_new:
+            menu = create_step(
+                flow, 1, 'FiberaFRP Smart Menu', 'send_list',
+                message_text=(
+                    'Hi {{name}}, welcome to FiberaFRP.\n\n'
+                    'Please choose what you need:'
+                ),
+                button_header_text='FiberaFRP',
+                button_footer_text='Catalogue, pricing, support, and website help.',
+                list_button_text='Choose',
+                list_section_title='FiberaFRP Help',
+            )
+
+            smart_catalogue_tag = create_step(flow, 100, 'Tag Smart Catalogue Request', 'assign_tag', assign_tag_id=tags['Catalogue Requested'].id)
+            smart_catalogue_link = create_step(
+                flow, 110, 'Smart Catalogue Link', 'send_cta_url',
+                message_text='Here is the FiberaFRP catalogue/product page. You can reply here for pricing or support.',
+                cta_button_text='Open Catalogue',
+                cta_button_url=shop_url,
+                button_footer_text='FRP manhole covers, drain covers, gratings, tank covers, and project products.',
+            )
+            if has_catalog_config:
+                smart_catalogue_meta = create_step(
+                    flow, 120, 'Smart Meta Catalogue', 'send_catalog',
+                    message_text='You can also browse available catalogue products here.',
+                    catalog_message_type='catalog_message',
+                    thumbnail_product_retailer_id=account.commerce_default_product_retailer_id,
+                    button_footer_text='Tap the catalogue card to view product details.',
+                )
+            else:
+                smart_catalogue_meta = False
+            smart_catalogue_form = create_step(
+                flow, 130, 'Smart Catalogue Form', 'send_form_link',
+                message_text='For a specific catalogue, brochure, or product range request, use this form: {{form_url}}',
+                form_id=forms.get('Catalogue Request').id if forms.get('Catalogue Request') else False,
+            )
+            smart_catalogue_next = create_step(
+                flow, 140, 'Smart Catalogue Next Step', 'send_buttons',
+                message_text='Catalogue details are shared. What should we help with next?',
+                button_header_text='Next Step',
+            )
+
+            smart_quote_tag = create_step(flow, 200, 'Tag Smart Quote Request', 'assign_tag', assign_tag_id=tags['Quote Requested'].id)
+            smart_quote_product = create_step(
+                flow, 210, 'Smart Ask Product', 'ask_question',
+                message_text='Which product do you need a quote for? Example: FRP manhole cover, drain cover, grating, tank cover.',
+                input_validation_type='text',
+                save_response=True,
+                response_variable='smart_quote_product',
+                max_attempts=2,
+            )
+            smart_quote_size = create_step(
+                flow, 220, 'Smart Ask Size / Load', 'ask_question',
+                message_text='Please share size and load rating if available. Example: 600x600 heavy duty, 10T, 25T.',
+                input_validation_type='text',
+                save_response=True,
+                response_variable='smart_quote_size_load',
+                max_attempts=2,
+            )
+            smart_quote_qty = create_step(
+                flow, 230, 'Smart Ask Quantity', 'ask_question',
+                message_text='How many pieces or approximate quantity do you require?',
+                input_validation_type='text',
+                save_response=True,
+                response_variable='smart_quote_quantity',
+                max_attempts=2,
+            )
+            smart_quote_city = create_step(
+                flow, 240, 'Smart Ask City', 'ask_question',
+                message_text='Which delivery city or project location should we quote for?',
+                input_validation_type='text',
+                save_response=True,
+                response_variable='smart_quote_city',
+                max_attempts=2,
+            )
+            smart_quote_lead = create_step(
+                flow, 250, 'Smart Create Quote Lead', 'create_lead',
+                message_text=(
+                    'FiberaFRP Smart Menu quote request.\n'
+                    'Product: {{smart_quote_product}}\n'
+                    'Size/load: {{smart_quote_size_load}}\n'
+                    'Quantity: {{smart_quote_quantity}}\n'
+                    'City/location: {{smart_quote_city}}\n'
+                    'Phone: {{phone}}'
+                ),
+            )
+            smart_quote_form = create_step(
+                flow, 260, 'Smart Quote Form', 'send_form_link',
+                message_text='Please complete this quote form for drawings, BOQ, GST/company details, or exact specs: {{form_url}}',
+                form_id=forms.get('Quote Request').id if forms.get('Quote Request') else False,
+            )
+            smart_quote_qualified = create_step(flow, 270, 'Tag Smart Quote Qualified', 'assign_tag', assign_tag_id=tags['Quote Qualified'].id)
+
+            smart_support_tag = create_step(flow, 300, 'Tag Smart Support Request', 'assign_tag', assign_tag_id=tags['Support Required'].id)
+            smart_support_topic = create_step(
+                flow, 310, 'Smart Ask Support Topic', 'ask_question',
+                message_text='Please describe what you need. Type agent if you want direct human support.',
+                input_validation_type='text',
+                save_response=True,
+                response_variable='smart_support_topic',
+                max_attempts=2,
+            )
+            smart_support_router = create_step(
+                flow, 320, 'Smart Support Router', 'condition',
+                condition_type='response_contains',
+                condition_source='variable',
+                condition_variable='smart_support_topic',
+                condition_operator='regex',
+                condition_value='agent|human|person|connect|call',
+            )
+            smart_support_ref = create_step(
+                flow, 330, 'Smart Ask Reference', 'ask_question',
+                message_text='Please share order number, invoice number, delivery reference, or project reference if available.',
+                input_validation_type='text',
+                save_response=True,
+                response_variable='smart_support_reference',
+                max_attempts=2,
+            )
+            smart_support_details = create_step(
+                flow, 340, 'Smart Ask Support Details', 'ask_question',
+                message_text='Please share details, photos/documents in the next form if needed, and what result you expect.',
+                input_validation_type='text',
+                save_response=True,
+                response_variable='smart_support_details',
+                max_attempts=2,
+            )
+            smart_support_form = create_step(
+                flow, 350, 'Smart Support Form', 'send_form_link',
+                message_text='Please upload photos, invoice, delivery proof, or documents in this support form: {{form_url}}',
+                form_id=forms.get('Support Ticket').id if forms.get('Support Ticket') else False,
+            )
+
+            smart_website_tag = create_step(flow, 400, 'Tag Smart Website Shared', 'assign_tag', assign_tag_id=tags['Website Shared'].id)
+            smart_website_link = create_step(
+                flow, 410, 'Smart Website Link', 'send_cta_url',
+                message_text='Open the FiberaFRP website/catalogue page below.',
+                cta_button_text='Open Website',
+                cta_button_url=shop_url,
+                button_footer_text='Reply here for price, catalogue, or support help.',
+            )
+            smart_website_next = create_step(
+                flow, 420, 'Smart Website Next Step', 'send_buttons',
+                message_text='Website link is shared. Do you need pricing or a human agent?',
+                button_header_text='Next Step',
+            )
+
+            smart_agent_tag = create_step(flow, 900, 'Tag Smart Agent Requested', 'assign_tag', assign_tag_id=tags['Agent Requested'].id)
+            smart_assign_team = create_step(flow, 910, 'Smart Assign Available Team', 'assign_team')
+            smart_assign_fallback = create_step(flow, 920, 'Smart Assign Fallback Agent', 'transfer', assign_user_id=assign_user.id)
+            smart_open_chat = create_step(flow, 930, 'Smart Keep Chat Open', 'chat_status', chat_status='open')
+            smart_agent_confirm = create_step(
+                flow, 940, 'Smart Agent Confirmation', 'send_text',
+                message_text='Thanks {{name}}. I have connected this chat to our team. A person will reply here shortly.',
+            )
+            smart_done = create_step(flow, 999, 'End', 'end')
+
+            route(smart_catalogue_tag, smart_catalogue_link)
+            route(smart_catalogue_link, smart_catalogue_meta or smart_catalogue_form)
+            if smart_catalogue_meta:
+                route(smart_catalogue_meta, smart_catalogue_form)
+            route(smart_catalogue_form, smart_catalogue_next)
+
+            route(smart_quote_tag, smart_quote_product)
+            route(smart_quote_product, smart_quote_size)
+            route(smart_quote_size, smart_quote_qty)
+            route(smart_quote_qty, smart_quote_city)
+            route(smart_quote_city, smart_quote_lead)
+            route(smart_quote_lead, smart_quote_form)
+            route(smart_quote_form, smart_quote_qualified)
+            route(smart_quote_qualified, smart_assign_team)
+
+            route(smart_support_tag, smart_support_topic)
+            route(smart_support_topic, smart_support_router)
+            smart_support_router.with_context(skip_canvas_sync=True).write({
+                'condition_true_step': smart_agent_tag.id,
+                'condition_false_step': smart_support_ref.id,
+            })
+            route(smart_support_ref, smart_support_details)
+            route(smart_support_details, smart_support_form)
+            route(smart_support_form, smart_assign_team)
+
+            route(smart_website_tag, smart_website_link)
+            route(smart_website_link, smart_website_next)
+
+            route(smart_agent_tag, smart_assign_team)
+            route(smart_assign_team, smart_assign_fallback)
+            route(smart_assign_fallback, smart_open_chat)
+            route(smart_open_chat, smart_agent_confirm)
+            route(smart_agent_confirm, smart_done)
+
+            menu.with_context(skip_canvas_sync=True).write({'fallback_step_id': smart_support_tag.id})
+            smart_catalogue_next.with_context(skip_canvas_sync=True).write({'fallback_step_id': smart_support_tag.id})
+            smart_website_next.with_context(skip_canvas_sync=True).write({'fallback_step_id': smart_support_tag.id})
+            add_buttons(menu, [
+                ('Catalogue', 'smart_catalogue', 'Send product catalogue', smart_catalogue_tag),
+                ('Price / Quote', 'smart_quote', 'Create quotation enquiry', smart_quote_tag),
+                ('Support / Agent', 'smart_support', 'Talk to support', smart_support_tag),
+                ('Website', 'smart_website', 'Open FiberaFRP website', smart_website_tag),
+            ])
+            add_buttons(smart_catalogue_next, [
+                ('Price / Quote', 'smart_cat_quote', 'Create quotation enquiry', smart_quote_tag),
+                ('Talk Agent', 'smart_cat_agent', 'Human support handoff', smart_agent_tag),
+                ('Done', 'smart_cat_done', 'Close this flow', smart_done),
+            ])
+            add_buttons(smart_website_next, [
+                ('Price / Quote', 'smart_web_quote', 'Create quotation enquiry', smart_quote_tag),
+                ('Talk Agent', 'smart_web_agent', 'Human support handoff', smart_agent_tag),
+                ('Done', 'smart_web_done', 'Close this flow', smart_done),
+            ])
+            created |= finish(flow)
+
+        flow, is_new = create_repairable_blueprint(
             'Fibera Composite Support Assistant - 4 Option Menu',
             'support',
             'support, assistant, assist, help, menu, hi, hello, agent, catalogue, catalog, website, quote, price',
@@ -2940,8 +3208,9 @@ class WhatsAppBotFlow(models.Model):
                 form_id=forms.get('Catalogue Request').id if forms.get('Catalogue Request') else False,
             )
             catalogue_done = create_step(
-                flow, 140, 'Catalogue Done', 'send_text',
-                message_text='Catalogue details have been shared. Choose Quote from the menu if you want pricing.',
+                flow, 140, 'Catalogue Next Step', 'send_buttons',
+                message_text='Catalogue details have been shared. What should we help with next?',
+                button_header_text='Next Step',
             )
 
             website_tag = create_step(flow, 200, 'Tag Website Shared', 'assign_tag', assign_tag_id=tags['Website Shared'].id)
@@ -2951,6 +3220,11 @@ class WhatsAppBotFlow(models.Model):
                 cta_button_text='Open Website',
                 cta_button_url=shop_url,
                 button_footer_text='You can reply here for sales or support help.',
+            )
+            website_followup = create_step(
+                flow, 220, 'Website Next Step', 'send_buttons',
+                message_text='Website link is shared. Do you need pricing or a human agent?',
+                button_header_text='Next Step',
             )
 
             quote_tag = create_step(flow, 300, 'Tag Quote Requested', 'assign_tag', assign_tag_id=tags['Quote Requested'].id)
@@ -3007,10 +3281,9 @@ class WhatsAppBotFlow(models.Model):
             if catalogue_meta:
                 route(catalogue_meta, catalogue_form)
             route(catalogue_form, catalogue_done)
-            route(catalogue_done, end)
 
             route(website_tag, website_step)
-            route(website_step, end)
+            route(website_step, website_followup)
 
             route(quote_tag, quote_product)
             route(quote_product, quote_qty)
@@ -3021,11 +3294,23 @@ class WhatsAppBotFlow(models.Model):
             route(quote_qualified, assign_team_step)
 
             menu.with_context(skip_canvas_sync=True).write({'fallback_step_id': agent_tag.id})
+            catalogue_done.with_context(skip_canvas_sync=True).write({'fallback_step_id': agent_tag.id})
+            website_followup.with_context(skip_canvas_sync=True).write({'fallback_step_id': agent_tag.id})
             add_buttons(menu, [
                 ('Agent Connect', 'fci_simple_agent', 'Talk to a human team member', agent_tag),
                 ('Catalogue', 'fci_simple_catalogue', 'Catalogue link and request form', catalogue_tag),
                 ('Website', 'fci_simple_website', 'Open website/catalogue page', website_tag),
                 ('Quote', 'fci_simple_quote', 'Collect quote details and create lead', quote_tag),
+            ])
+            add_buttons(catalogue_done, [
+                ('Price / Quote', 'fci_simple_cat_quote', 'Collect quote details and create lead', quote_tag),
+                ('Talk Agent', 'fci_simple_cat_agent', 'Assign a human team member', agent_tag),
+                ('Done', 'fci_simple_cat_done', 'Close this flow', end),
+            ])
+            add_buttons(website_followup, [
+                ('Price / Quote', 'fci_simple_web_quote', 'Collect quote details and create lead', quote_tag),
+                ('Talk Agent', 'fci_simple_web_agent', 'Assign a human team member', agent_tag),
+                ('Done', 'fci_simple_web_done', 'Close this flow', end),
             ])
             created |= finish(flow)
 
