@@ -88,6 +88,39 @@ docker compose run --rm -T --no-deps odoo \
     -u "${UPGRADE_MODULES}" \
     --stop-after-init
 
+echo "==> Re-merging safe WhatsApp default data as inactive reviewable blueprints"
+docker compose run --rm -T --no-deps odoo \
+  python3 /opt/odoo/odoo-bin shell \
+    -c "${CONFIG}" \
+    -d "${LIVE_DB_NAME}" <<'PY'
+params = env['ir.config_parameter'].sudo()
+sample_model = env['whatsapp.sample.template'].sudo()
+form_model = env['whatsapp.form'].sudo()
+
+sample_model._seed_sample_templates()
+form_model._seed_fiberafrp_production_forms()
+
+accounts = env['whatsapp.account'].sudo().search([('active', '=', True)])
+if not accounts:
+    print("No active WhatsApp account found; sample templates and forms were re-merged.")
+    print("After creating/recovering the account, click Initialize Defaults on the account form.")
+else:
+    if not params.get_param('whatsapp.default.account.id'):
+        params.set_param('whatsapp.default.account.id', str(accounts[0].id))
+    for account in accounts:
+        ctx = dict(
+            env.context,
+            whatsapp_seed_account_id=account.id,
+            restore_defaults_inactive=True,
+        )
+        env['whatsapp.sample.template'].with_context(ctx).sudo()._seed_sample_templates()
+        env['whatsapp.form'].with_context(ctx).sudo()._seed_fiberafrp_production_forms()
+        env['whatsapp.bot.flow'].with_context(ctx).sudo()._seed_fiberafrp_assistant_flow()
+        env['whatsapp.bot.flow'].with_context(ctx).sudo()._seed_fiberafrp_advanced_business_flows()
+    print("WhatsApp defaults re-merged for %s active account(s). Flow blueprints remain inactive unless already active." % len(accounts))
+env.cr.commit()
+PY
+
 echo "==> Starting Odoo and WhatsApp sidecar"
 docker compose up -d odoo sidecar
 

@@ -51,7 +51,9 @@ bash deploy/recover_live_modules.sh FiberaFRP_DB
 
 This restores the apps, menus, schema, and custom module logic. If the uninstall
 already deleted business records, restore those records from a pre-uninstall
-database/filestore backup.
+database/filestore backup. The script also re-merges WhatsApp sample templates,
+production forms, and FiberaFRP flow blueprints as inactive reviewable defaults;
+it does not push or recreate live Meta credentials from Git.
 
 ---
 
