@@ -72,6 +72,54 @@ http://SERVER_IP:8069/web/database/manager
 Use this when the Ubuntu deployment must behave exactly like the current
 working machine.
 
+### Preferred: Encrypted Portable Backup
+
+Use this path for live production data. It moves the database, filestore,
+WhatsApp records, invoices, and included local config through one encrypted file
+without committing private data to GitHub.
+
+On the current/live server:
+
+```bash
+cd ~/Desktop/FiberaFRP/FibraFRP-client-repo/odoo-19.0
+git pull origin main
+read -s -p "Backup passphrase: " BACKUP_PASSPHRASE
+echo
+export BACKUP_PASSPHRASE
+bash deploy/export_live_encrypted_backup.sh FiberaFRP_DB
+```
+
+Copy the generated `.enc` file from `secure_backups/` through private storage
+only. Do not commit it to GitHub.
+
+On the target Ubuntu Docker host:
+
+```bash
+cd ~/Desktop/FiberaFRP/FibraFRP-client-repo/odoo-19.0
+git pull origin main
+read -s -p "Backup passphrase: " BACKUP_PASSPHRASE
+echo
+export BACKUP_PASSPHRASE
+CONFIRM_RESTORE=YES bash deploy/restore_live_encrypted_backup.sh /path/to/backup.enc FiberaFRP_DB
+```
+
+By default, restore does not overwrite local `.env` or `odoo.docker.conf`.
+Restore those config files only when deliberately cloning the source server
+configuration:
+
+```bash
+RESTORE_CONFIG=YES CONFIRM_RESTORE=YES bash deploy/restore_live_encrypted_backup.sh /path/to/backup.enc FiberaFRP_DB
+```
+
+After restore, run the live database helper so webhook ownership and module
+state are refreshed:
+
+```bash
+bash deploy/configure_live_db.sh FiberaFRP_DB 1 elsx_verify_2024
+```
+
+### Advanced Manual Restore
+
 Required files:
 
 - PostgreSQL dump, for example `FiberaFRP_DB.pg_dump`.
