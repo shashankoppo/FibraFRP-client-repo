@@ -14,9 +14,9 @@
                 <field name="sent_count"/>
                 <field name="delivered_count"/>
                 <field name="read_count"/>
-                <field name="delivery_rate" widget="percentage"/>
-                <field name="read_rate" widget="percentage"/>
-                <field name="roi" widget="percentage"/>
+                <field name="delivery_rate" widget="percentage" optional="hide"/>
+                <field name="read_rate" widget="percentage" optional="show"/>
+                <field name="roi" widget="percentage" optional="hide"/>
                 <field name="state"/>
             </list>
         </field>
@@ -273,19 +273,19 @@
                         <page string="Messages" name="messages">
                             <field name="message_ids" readonly="1">
                                 <list>
-                                    <field name="create_date"/>
+                                    <field name="create_date" optional="show"/>
                                     <field name="partner_id"/>
                                     <field name="phone_number"/>
-                                    <field name="direction"/>
-                                    <field name="message_type"/>
+                                    <field name="direction" optional="hide"/>
+                                    <field name="message_type" optional="show"/>
                                     <field name="body"/>
                                     <field name="button_text" optional="hide"/>
                                     <field name="list_item_title" optional="hide"/>
                                     <field name="media_filename" optional="hide"/>
                                     <field name="status"/>
-                                    <field name="sent_date"/>
-                                    <field name="delivered_date"/>
-                                    <field name="read_date"/>
+                                    <field name="sent_date" optional="show"/>
+                                    <field name="delivered_date" optional="hide"/>
+                                    <field name="read_date" optional="hide"/>
                                     <field name="error_message" optional="hide"/>
                                 </list>
                             </field>

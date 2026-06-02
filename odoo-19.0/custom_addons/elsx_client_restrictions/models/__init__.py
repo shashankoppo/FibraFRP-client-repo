@@ -2,3 +2,4 @@
 from odoo import models
 from . import ir_module
 from . import ir_ui_menu
+from . import timezone_compat

@@ -692,6 +692,45 @@ class WhatsAppBotFlow(models.Model):
         self.write({'active': True})
         return True
 
+    def unlink(self):
+        if (
+            self.env.context.get('force_unlink_flow')
+            or self.env.context.get('hard_delete_flow')
+            or self.env.context.get('module_uninstall')
+            or self.env.context.get('uninstall_mode')
+        ):
+            return super().unlink()
+        self.write({'active': False})
+        _logger.info("Archived %s WhatsApp bot flow(s) instead of hard deleting.", len(self))
+        return True
+
+    @api.model
+    def action_restore_default_flow_blueprints(self):
+        account = self.env['whatsapp.account'].sudo()._get_default_account()
+        if not account:
+            raise UserError(_("Create or select a WhatsApp account before restoring default flows."))
+
+        Flow = self.with_context(
+            active_test=False,
+            whatsapp_seed_account_id=account.id,
+            restore_defaults_inactive=True,
+        ).sudo()
+        assistant = Flow._seed_fiberafrp_assistant_flow()
+        advanced = Flow._seed_fiberafrp_advanced_business_flows()
+        restored = advanced
+        if assistant:
+            restored |= assistant
+
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Default Flows Ready'),
+                'message': _('%s FiberaFRP default flow(s) are available as inactive drafts for review.') % len(restored),
+                'type': 'success',
+            },
+        }
+
     def action_open_visual_builder(self):
         self.ensure_one()
         return {
@@ -2116,7 +2155,7 @@ class WhatsAppBotFlow(models.Model):
             _logger.info("Skipping FiberaFRP assistant flow seed because no WhatsApp account exists.")
             return False
 
-        existing = self.search([
+        existing = self.with_context(active_test=False).search([
             ('account_id', '=', account.id),
             ('name', '=', 'FiberaFRP Sales & Support Assistant'),
         ], limit=1)
@@ -2150,7 +2189,7 @@ class WhatsAppBotFlow(models.Model):
             'trigger_type': 'keyword',
             'keywords': 'hi, hello, start, catalogue, catalog, price, quote, support, help',
             'priority': 80,
-            'active': True,
+            'active': False if self.env.context.get('restore_defaults_inactive') else True,
             'retry_on_failure': True,
             'max_retries': 2,
         })
@@ -2335,7 +2374,10 @@ class WhatsAppBotFlow(models.Model):
         created = self.browse()
 
         def create_flow(name, flow_type, keywords, description, priority=40):
-            existing = self.search([('account_id', '=', account.id), ('name', '=', name)], limit=1)
+            existing = self.with_context(active_test=False).search([
+                ('account_id', '=', account.id),
+                ('name', '=', name),
+            ], limit=1)
             if existing:
                 return existing, False
             flow = Flow.create({

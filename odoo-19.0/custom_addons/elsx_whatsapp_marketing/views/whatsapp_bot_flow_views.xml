@@ -440,6 +440,7 @@
                     <button name="action_generate_ai_flow_review" type="object" string="AI Review" class="btn-secondary" icon="fa-lightbulb-o"/>
                     <button name="action_generate_ai_flow_draft" type="object" string="Generate Draft Flow" class="btn-secondary" icon="fa-magic"/>
                     <button name="action_view_logs" type="object" string="View Logs" class="btn-secondary"/>
+                    <button name="action_restore_default_flow_blueprints" type="object" string="Restore Defaults" class="btn-secondary" icon="fa-refresh"/>
                     <button name="action_archive_record" type="object" string="Archive" class="btn-secondary" invisible="not active"/>
                     <button name="action_unarchive_record" type="object" string="Unarchive" class="btn-primary" invisible="active"/>
                 </header>

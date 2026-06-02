@@ -8,9 +8,32 @@ import json
 
 _logger = logging.getLogger(__name__)
 
+LEGACY_TIMEZONE_MAP = {
+    'Asia/Calcutta': 'Asia/Kolkata',
+}
+
+
+def _canonical_timezone(value):
+    return LEGACY_TIMEZONE_MAP.get(value, value or 'UTC')
+
+
+def _canonicalize_timezone_vals(vals):
+    if vals and vals.get('timezone_id') in LEGACY_TIMEZONE_MAP:
+        vals = dict(vals)
+        vals['timezone_id'] = _canonical_timezone(vals['timezone_id'])
+    return vals
+
 
 def _timezone_selection(self):
-    return [(tz, tz) for tz in pytz.all_timezones]
+    selection = []
+    seen = set()
+    for tz in pytz.all_timezones:
+        canonical = _canonical_timezone(tz)
+        if canonical in seen:
+            continue
+        seen.add(canonical)
+        selection.append((canonical, canonical))
+    return selection
 
 
 def _parse_cron_part(part, min_value, max_value, field_name, allow_sunday_7=False):
@@ -149,7 +172,7 @@ class WhatsAppScheduledMessage(models.Model):
         selection=_timezone_selection,
         string='Timezone',
         required=True,
-        default=lambda self: self.env.user.tz or 'UTC',
+        default=lambda self: _canonical_timezone(self.env.user.tz),
     )
     
     # Recurring options
@@ -191,9 +214,18 @@ class WhatsAppScheduledMessage(models.Model):
     @api.depends('scheduled_date', 'timezone_id')
     def _compute_name(self):
         for record in self:
-            tz = pytz.timezone(record.timezone_id or 'UTC')
+            tz = pytz.timezone(_canonical_timezone(record.timezone_id))
             date_str = record.scheduled_date.strftime('%Y-%m-%d %H:%M') if record.scheduled_date else ''
             record.name = f"Scheduled: {date_str} ({tz.zone})" if date_str else "Scheduled Message"
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        vals_list = [_canonicalize_timezone_vals(vals) for vals in vals_list]
+        return super().create(vals_list)
+
+    def write(self, vals):
+        vals = _canonicalize_timezone_vals(vals)
+        return super().write(vals)
     
     @api.depends('scheduled_date', 'recurring_type', 'recurrence_end_date')
     def _compute_next_execution(self):
@@ -415,7 +447,7 @@ class WhatsAppScheduledCampaign(models.Model):
     campaign_id = fields.Many2one('whatsapp.campaign', required=True, ondelete='cascade')
     scheduled_date = fields.Datetime('Send Date/Time', required=True)
     timezone_id = fields.Selection(selection=_timezone_selection, required=True,
-                                   default=lambda self: self.env.user.tz or 'UTC')
+                                   default=lambda self: _canonical_timezone(self.env.user.tz))
     
     # A/B Testing
     variant_a_template = fields.Many2one('whatsapp.template', string='Variant A')
@@ -455,6 +487,15 @@ class WhatsAppScheduledCampaign(models.Model):
     last_execution_date = fields.Datetime('Last Execution', readonly=True)
     next_execution_date = fields.Datetime('Next Execution', compute='_compute_next_execution', store=True)
     execution_count = fields.Integer('Times Executed', readonly=True, default=0)
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        vals_list = [_canonicalize_timezone_vals(vals) for vals in vals_list]
+        return super().create(vals_list)
+
+    def write(self, vals):
+        vals = _canonicalize_timezone_vals(vals)
+        return super().write(vals)
 
     @api.depends('scheduled_date', 'recurring_type', 'recurrence_end_date')
     def _compute_next_execution(self):
@@ -509,14 +550,33 @@ class WhatsAppScheduledCampaign(models.Model):
     
     def action_send(self):
         """Execute the campaign"""
-        # Force reload recipients to capture any dynamic updates
-        self.campaign_id.action_load_recipients()
-        
-        # Reset campaign state to draft temporarily to bypass state checks
-        if self.campaign_id.state in ['running', 'completed', 'scheduled']:
-            self.campaign_id.state = 'draft'
-            
-        self.campaign_id.action_send_campaign()
+        for record in self:
+            campaign = record.campaign_id
+            if not campaign:
+                continue
+
+            pending_messages = campaign.message_ids.filtered(
+                lambda msg: msg.status in ('draft', 'queued')
+                or (msg.status == 'failed' and msg.next_retry_at)
+            )
+            if pending_messages:
+                if campaign.state == 'scheduled':
+                    campaign.state = 'running'
+                campaign.action_process_queue()
+                continue
+
+            if campaign.state == 'completed':
+                _logger.info(
+                    "Scheduled campaign %s skipped because campaign %s is already completed.",
+                    record.id,
+                    campaign.id,
+                )
+                continue
+
+            # Force reload recipients to capture any dynamic updates without
+            # rewinding running/completed campaigns back to draft.
+            campaign.action_load_recipients()
+            campaign.action_send_campaign()
 
     @api.model
     def _cron_process_scheduled_campaigns(self):
@@ -577,7 +637,7 @@ class WhatsAppCampaignScheduleWizard(models.TransientModel):
     
     scheduled_date = fields.Datetime('Send Date')
     timezone_id = fields.Selection(selection=_timezone_selection, required=True,
-                                   default=lambda self: self.env.user.tz or 'UTC')
+                                   default=lambda self: _canonical_timezone(self.env.user.tz))
     
     # Time zone considerations
     respect_contact_timezone = fields.Boolean('Respect Contact Timezone', default=True,

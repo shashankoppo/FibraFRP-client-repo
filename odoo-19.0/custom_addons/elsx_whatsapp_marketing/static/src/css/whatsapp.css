@@ -1961,6 +1961,31 @@ textarea.wa-premium-input:focus {
     }
 }
 
+@media (max-width: 1200px) {
+    .o_whatsapp_campaign_form .o_field_x2many,
+    .o_whatsapp_campaign_form .o_list_renderer,
+    .o_whatsapp_campaign_form .o_list_view {
+        max-width: 100% !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .o_whatsapp_campaign_form .o_field_x2many .o_list_table,
+    .o_whatsapp_campaign_form .o_notebook .o_list_table {
+        min-width: 1040px !important;
+        table-layout: auto !important;
+    }
+
+    .o_whatsapp_campaign_form .o_notebook .o_list_table td[name="body"],
+    .o_whatsapp_campaign_form .o_notebook .o_list_table .o_data_cell[name="body"] {
+        min-width: 320px !important;
+        max-width: 520px !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        line-height: 1.35 !important;
+    }
+}
+
 @media (max-width: 576px) {
     .wa-kpi-grid {
         grid-template-columns: 1fr;

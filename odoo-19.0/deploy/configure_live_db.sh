@@ -133,6 +133,44 @@ BEGIN
 END $$;
 SQL
 
+echo "==> Normalizing PostgreSQL-safe timezone values"
+docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -v ON_ERROR_STOP=1 <<'SQL'
+DO $$
+DECLARE
+  updated_count integer := 0;
+BEGIN
+  IF to_regclass('public.res_partner') IS NOT NULL THEN
+    UPDATE res_partner SET tz = 'Asia/Kolkata' WHERE tz = 'Asia/Calcutta';
+    GET DIAGNOSTICS updated_count = ROW_COUNT;
+    RAISE NOTICE 'Timezone rescue updated % res_partner row(s).', updated_count;
+  END IF;
+
+  IF to_regclass('public.resource_calendar') IS NOT NULL THEN
+    UPDATE resource_calendar SET tz = 'Asia/Kolkata' WHERE tz = 'Asia/Calcutta';
+    GET DIAGNOSTICS updated_count = ROW_COUNT;
+    RAISE NOTICE 'Timezone rescue updated % resource_calendar row(s).', updated_count;
+  END IF;
+
+  IF to_regclass('public.resource_resource') IS NOT NULL THEN
+    UPDATE resource_resource SET tz = 'Asia/Kolkata' WHERE tz = 'Asia/Calcutta';
+    GET DIAGNOSTICS updated_count = ROW_COUNT;
+    RAISE NOTICE 'Timezone rescue updated % resource_resource row(s).', updated_count;
+  END IF;
+
+  IF to_regclass('public.whatsapp_scheduled_message') IS NOT NULL THEN
+    UPDATE whatsapp_scheduled_message SET timezone_id = 'Asia/Kolkata' WHERE timezone_id = 'Asia/Calcutta';
+    GET DIAGNOSTICS updated_count = ROW_COUNT;
+    RAISE NOTICE 'Timezone rescue updated % whatsapp_scheduled_message row(s).', updated_count;
+  END IF;
+
+  IF to_regclass('public.whatsapp_scheduled_campaign') IS NOT NULL THEN
+    UPDATE whatsapp_scheduled_campaign SET timezone_id = 'Asia/Kolkata' WHERE timezone_id = 'Asia/Calcutta';
+    GET DIAGNOSTICS updated_count = ROW_COUNT;
+    RAISE NOTICE 'Timezone rescue updated % whatsapp_scheduled_campaign row(s).', updated_count;
+  END IF;
+END $$;
+SQL
+
 echo "==> Installing/upgrading live database modules"
 ODOO_MODULE_ARGS=()
 if [ -n "${INSTALL_MODULES}" ]; then

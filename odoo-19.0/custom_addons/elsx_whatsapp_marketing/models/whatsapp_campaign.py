@@ -814,6 +814,29 @@ class WhatsAppCampaign(models.Model):
         
         if self.campaign_type == 'broadcast':
             messages_to_create = []
+            failed_messages_to_create = []
+            skipped_without_phone = 0
+            Message = self.env['whatsapp.message']
+
+            def failed_message_vals(partner, phone_number, version, template, body, reason):
+                phone_hint = phone_number or getattr(partner, 'mobile', False) or partner.phone or f'partner:{partner.id}'
+                return {
+                    'campaign_id': self.id,
+                    'account_id': self.account_id.id,
+                    'phone_number': phone_hint,
+                    'partner_id': partner.id,
+                    'ab_test_version': version if self.is_ab_test else False,
+                    'message_type': 'template' if template else 'text',
+                    'template_id': template.id if template else False,
+                    'template_name': template.display_name if template else False,
+                    'template_language': template.exact_language_code if template else False,
+                    'body': body or '',
+                    'status': 'failed',
+                    'direction': 'outbound',
+                    'flow_id': self.flow_id.id if self.flow_id else False,
+                    'error_message': str(reason)[:1000],
+                }
+
             # Safe Sending: Queue messages in draft state, then send or schedule
             # A/B Test Split Logic
             partner_list = list(self.partner_ids)
@@ -829,7 +852,7 @@ class WhatsAppCampaign(models.Model):
 
             for i, partner in enumerate(partner_list):
                 version = 'a' if partner in part_a else 'b'
-                
+
                 # Determine which template/body to use. For A/B tests, Version B must
                 # use its own configured content instead of silently falling back to A.
                 if version == 'b':
@@ -838,84 +861,115 @@ class WhatsAppCampaign(models.Model):
                 else:
                     current_template = self.template_id
                     current_body = self.message_body
-                
+
                 phone = partner.phone
                 if 'mobile' in self.env['res.partner']._fields and partner.mobile:
                     phone = partner.mobile
-                
-                if not phone: continue
-                phone = self.env['whatsapp.message']._normalize_phone(phone, account=self.account_id)
-                
-                message_body = current_template.body if current_template else current_body
-                raw_data = False
-                message_media_vals = {}
 
-                if current_template:
-                    message_body = self._render_body_for_partner(message_body, partner, current_template)
-                    media_kwargs = self._campaign_header_media_kwargs(version)
-                    try:
-                        template_payload = self._template_payload_for_partner(current_template, partner, version=version)
-                    except (UserError, ValidationError) as e:
-                        raise UserError(_(
-                            "Campaign cannot be queued for recipient %(recipient)s using template %(template)s.\n\n"
-                            "Reason: %(reason)s"
-                        ) % {
-                            'recipient': partner.display_name or partner.name or partner.id,
-                            'template': current_template.display_name or current_template.name,
-                            'reason': str(e),
-                        })
-                    raw_data = json.dumps(template_payload)
-                    if current_template.header_type in ('image', 'video', 'document'):
-                        media_file = media_kwargs.get('header_media_file')
-                        media_url = media_kwargs.get('header_media_url')
-                        media_filename = (
-                            media_kwargs.get('header_media_filename')
-                            or current_template.header_media_filename
-                            or current_template.name
-                        )
-                        if media_file:
-                            message_media_vals.update({
-                                'media_file': media_file,
-                                'media_filename': media_filename,
-                            })
-                        elif media_url:
-                            message_media_vals.update({
-                                'media_url': media_url,
-                                'media_filename': media_filename,
-                            })
+                if not phone:
+                    skipped_without_phone += 1
+                    continue
+
+                try:
+                    phone = Message._normalize_phone(phone, account=self.account_id)
+                    if not phone:
+                        failed_messages_to_create.append(failed_message_vals(
+                            partner,
+                            getattr(partner, 'mobile', False) or partner.phone,
+                            version,
+                            current_template,
+                            current_body,
+                            _("Phone number could not be normalized."),
+                        ))
+                        continue
+                    message_body = current_template.body if current_template else current_body
+                    raw_data = False
+                    message_media_vals = {}
+
+                    if current_template:
+                        message_body = self._render_body_for_partner(message_body, partner, current_template)
+                        media_kwargs = self._campaign_header_media_kwargs(version)
+                        try:
+                            template_payload = self._template_payload_for_partner(current_template, partner, version=version)
+                        except (UserError, ValidationError) as e:
+                            failed_messages_to_create.append(failed_message_vals(
+                                partner, phone, version, current_template, message_body, e,
+                            ))
+                            continue
+                        raw_data = json.dumps(template_payload)
+                        if current_template.header_type in ('image', 'video', 'document'):
+                            media_file = media_kwargs.get('header_media_file')
+                            media_url = media_kwargs.get('header_media_url')
+                            media_filename = (
+                                media_kwargs.get('header_media_filename')
+                                or current_template.header_media_filename
+                                or current_template.name
+                            )
+                            if media_file:
+                                message_media_vals.update({
+                                    'media_file': media_file,
+                                    'media_filename': media_filename,
+                                })
+                            elif media_url:
+                                message_media_vals.update({
+                                    'media_url': media_url,
+                                    'media_filename': media_filename,
+                                })
+                    else:
+                        message_body = self._render_body_for_partner(message_body, partner)
+
+                    message_vals = {
+                        'campaign_id': self.id,
+                        'account_id': self.account_id.id,
+                        'phone_number': phone,
+                        'partner_id': partner.id,
+                        'ab_test_version': version if self.is_ab_test else False,
+                        'message_type': 'template' if current_template else 'text',
+                        'template_id': current_template.id if current_template else False,
+                        'template_name': current_template._get_send_template_name() if current_template else False,
+                        'template_language': current_template._get_send_language_code() if current_template else False,
+                        'body': message_body,
+                        'raw_data': raw_data,
+                        'status': 'queued',
+                        'next_retry_at': self.schedule_date if scheduled_for_later else fields.Datetime.now(),
+                        'direction': 'outbound',
+                        'flow_id': self.flow_id.id if self.flow_id else False,
+                    }
+                    existing_chat = self.env['whatsapp.chat'].sudo().search([
+                        ('account_id', '=', self.account_id.id),
+                        ('phone_number', '=', phone),
+                    ], limit=1)
+                    if existing_chat:
+                        message_vals['chat_id_ref'] = existing_chat.id
+                    message_vals.update(message_media_vals)
+                    messages_to_create.append(message_vals)
+                except Exception as e:
+                    _logger.exception(
+                        "Campaign recipient preparation failed. campaign_id=%s partner_id=%s",
+                        self.id,
+                        partner.id,
+                    )
+                    failed_messages_to_create.append(failed_message_vals(
+                        partner, phone, version, current_template, current_body, e,
+                    ))
+
+            if messages_to_create or failed_messages_to_create:
+                Message.create(messages_to_create + failed_messages_to_create)
+                if messages_to_create:
+                    self.state = 'scheduled' if scheduled_for_later else 'running'
+                    _logger.info(
+                        "Campaign %s queued %s messages and recorded %s preparation failure(s).",
+                        self.name,
+                        len(messages_to_create),
+                        len(failed_messages_to_create),
+                    )
                 else:
-                    message_body = self._render_body_for_partner(message_body, partner)
-
-                message_vals = {
-                    'campaign_id': self.id,
-                    'account_id': self.account_id.id,
-                    'phone_number': phone,
-                    'partner_id': partner.id,
-                    'ab_test_version': version if self.is_ab_test else False,
-                    'message_type': 'template' if current_template else 'text',
-                    'template_id': current_template.id if current_template else False,
-                    'template_name': current_template._get_send_template_name() if current_template else False,
-                    'template_language': current_template._get_send_language_code() if current_template else False,
-                    'body': message_body,
-                    'raw_data': raw_data,
-                    'status': 'queued',
-                    'next_retry_at': self.schedule_date if scheduled_for_later else fields.Datetime.now(),
-                    'direction': 'outbound',
-                    'flow_id': self.flow_id.id if self.flow_id else False,
-                }
-                existing_chat = self.env['whatsapp.chat'].sudo().search([
-                    ('account_id', '=', self.account_id.id),
-                    ('phone_number', '=', phone),
-                ], limit=1)
-                if existing_chat:
-                    message_vals['chat_id_ref'] = existing_chat.id
-                message_vals.update(message_media_vals)
-                messages_to_create.append(message_vals)
-            
-            if messages_to_create:
-                self.env['whatsapp.message'].create(messages_to_create)
-                self.state = 'scheduled' if scheduled_for_later else 'running'
-                _logger.info(f"Campaign {self.name} queued {len(messages_to_create)} messages for background processing.")
+                    self.state = 'completed'
+                    _logger.warning(
+                        "Campaign %s had no queueable recipients and recorded %s preparation failure(s).",
+                        self.name,
+                        len(failed_messages_to_create),
+                    )
             else:
                 raise UserError('No valid recipients with phone numbers were found.')
                 
@@ -951,17 +1005,26 @@ class WhatsAppCampaign(models.Model):
         except Exception as e:
             _logger.warning(f"Blockchain logging failed for campaign {self.name}: {e}")
             
+        queued_count = len(messages_to_create) if self.campaign_type == 'broadcast' else len(self.partner_ids)
+        failed_count = len(failed_messages_to_create) if self.campaign_type == 'broadcast' else 0
+        skipped_count = skipped_without_phone if self.campaign_type == 'broadcast' else 0
+        launch_message = (
+            f'Queued {queued_count} message(s).'
+            + (f' Failed {failed_count} recipient(s) with readable errors.' if failed_count else '')
+            + (f' Skipped {skipped_count} recipient(s) without phone numbers.' if skipped_count else '')
+        )
+
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
                 'title': 'Campaign Scheduled' if target_state == 'scheduled' else 'Campaign Queued',
                 'message': (
-                    f'Campaign scheduled for {self.schedule_date}.'
+                    f'Campaign scheduled for {self.schedule_date}. {launch_message}'
                     if target_state == 'scheduled'
-                    else f'Campaign queued {len(self.partner_ids)} messages for Safe Sending.'
+                    else launch_message
                 ),
-                'type': 'success',
+                'type': 'warning' if failed_count or skipped_count else 'success',
             }
         }
 
