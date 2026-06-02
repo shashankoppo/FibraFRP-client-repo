@@ -53,7 +53,7 @@
                     </div>
                     <div class="alert alert-info" role="alert">
                         <i class="fa fa-shopping-bag me-1"/>
-                        This page configures commerce defaults for an existing WhatsApp account. To add/connect another WhatsApp API number, use Configuration > WhatsApp Accounts > New.
+                        This page configures commerce defaults for an existing WhatsApp account. If this screen is empty, first use Configuration > Add WhatsApp Account.
                         Fill these values before using Catalog/Product, Shop URL, Form Link, or Payment Link actions in Inbox, Campaigns, and Flows.
                     </div>
                     <group>
@@ -330,10 +330,30 @@
         <field name="view_mode">list,form</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
-                Create your first WhatsApp Business Account
+                Add your WhatsApp Business API account
             </p>
             <p>
-                Connect your WhatsApp Business API account to start sending messages and campaigns.
+                Click New and enter the phone number, Phone Number ID, WABA / Business Account ID, access token, webhook verify token, and app secret.
+            </p>
+            <p>
+                After saving, use Test Connection, Sync Meta Health, Sync Templates, and Initialize Defaults.
+            </p>
+        </field>
+    </record>
+
+    <record id="action_whatsapp_account_new" model="ir.actions.act_window">
+        <field name="name">Add WhatsApp Account</field>
+        <field name="res_model">whatsapp.account</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_whatsapp_account_form"/>
+        <field name="target">current</field>
+        <field name="context">{'form_view_initial_mode': 'edit'}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Add your WhatsApp Business API account
+            </p>
+            <p>
+                Save the account first, then run Test Connection and Initialize Defaults from the account header.
             </p>
         </field>
     </record>

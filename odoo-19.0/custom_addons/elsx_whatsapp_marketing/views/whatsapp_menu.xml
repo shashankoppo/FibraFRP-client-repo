@@ -320,13 +320,20 @@
               sequence="10"
               action="action_whatsapp_account"/>
 
+    <menuitem id="menu_whatsapp_account_new"
+              name="Add WhatsApp Account"
+              parent="menu_whatsapp_config"
+              sequence="11"
+              action="action_whatsapp_account_new"/>
+
     <record id="action_whatsapp_commerce_setup" model="ir.actions.act_window">
         <field name="name">Commerce / Shop Setup</field>
         <field name="res_model">whatsapp.account</field>
         <field name="view_mode">list,form</field>
         <field name="help" type="html">
-            <p class="o_view_nocontent_smiling_face">Configure WhatsApp commerce defaults</p>
-            <p>Open an account and set Meta Catalog ID, Product Retailer IDs, Shop URL, default form, and payment-link mode.</p>
+            <p class="o_view_nocontent_smiling_face">No WhatsApp account found</p>
+            <p>First open Configuration &gt; Add WhatsApp Account and save the Meta API details.</p>
+            <p>After saving, return here to set Catalog ID, Product Retailer IDs, Shop URL, default form, and payment-link mode.</p>
         </field>
     </record>
 
