@@ -115,6 +115,44 @@ class WhatsAppSendWizard(models.TransientModel):
         }.get(self.template_id.header_type if self.template_id else 'document', 'bin')
         return f"{filename}.{extension}"
 
+    def _previous_template_header_media_kwargs(self):
+        """Reuse the latest media sent with this template when the template lost its default file.
+
+        This keeps restored/reinstalled databases usable without silently changing template
+        records. If the old Meta media id has expired, the normal send path will return a
+        readable Meta failure instead of blocking this wizard before send.
+        """
+        self.ensure_one()
+        if not self.template_id:
+            return {}
+        previous_message = self.env['whatsapp.message'].sudo().search([
+            ('account_id', '=', self.account_id.id),
+            ('template_id', '=', self.template_id.id),
+            ('message_type', '=', 'template'),
+            ('direction', '=', 'outbound'),
+            '|',
+            ('media_file', '!=', False),
+            ('media_url', '!=', False),
+        ], order='id desc', limit=1)
+        if not previous_message:
+            return {}
+        filename = (
+            previous_message.media_filename
+            or self.template_id.header_media_filename
+            or self._template_header_media_filename()
+        )
+        if previous_message.media_file:
+            return {
+                'header_media_file': previous_message.media_file,
+                'header_media_filename': filename,
+            }
+        if previous_message.media_url:
+            return {
+                'header_media_url': previous_message.media_url,
+                'header_media_filename': filename,
+            }
+        return {}
+
     def _prepare_template_header_media_kwargs(self):
         self.ensure_one()
         if not self.template_id or self.template_id.header_type not in ('image', 'video', 'document'):
@@ -132,6 +170,9 @@ class WhatsAppSendWizard(models.TransientModel):
             }
         if self.template_id.header_media_url or self.template_id.header_media_file:
             return {}
+        previous_media = self._previous_template_header_media_kwargs()
+        if previous_media:
+            return previous_media
         raise UserError(_(
             "%(template)s needs a %(type)s header file before sending. "
             "Upload a file in this wizard or set a default Header Media File on the template."
@@ -205,6 +246,8 @@ class WhatsAppSendWizard(models.TransientModel):
             }
             if template_kwargs.get('header_media_url'):
                 vals['media_url'] = template_kwargs['header_media_url']
+            if template_kwargs.get('header_media_file'):
+                vals['media_file'] = template_kwargs['header_media_file']
             if template_kwargs.get('header_media_filename'):
                 vals['media_filename'] = template_kwargs['header_media_filename']
             message = self.env['whatsapp.message'].create(vals)
