@@ -578,7 +578,8 @@ class WhatsAppCampaign(models.Model):
 
     def _check_message_configuration(self):
         self.ensure_one()
-        self._check_variant_message("Version A", self.template_id, self.message_body, version='a')
+        primary_label = "Version A" if self.is_ab_test else "Campaign message"
+        self._check_variant_message(primary_label, self.template_id, self.message_body, version='a')
         if self.is_ab_test:
             self._check_variant_message("Version B", self.template_id_b, self.message_body_b, version='b')
         self._check_reply_rule_configuration()
