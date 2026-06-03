@@ -825,7 +825,7 @@ class WhatsAppCampaign(models.Model):
                     'message_type': 'template' if template else 'text',
                     'template_id': template.id if template else False,
                     'template_name': template.display_name if template else False,
-                    'template_language': template.exact_language_code if template else False,
+                    'template_language': template._get_send_language_code() if template else False,
                     'body': body or '',
                     'status': 'failed',
                     'direction': 'outbound',
