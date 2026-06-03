@@ -557,17 +557,6 @@ class WhatsAppCampaign(models.Model):
             raise ValidationError(f"{label} template must belong to the selected WhatsApp account.")
         if template.status != 'approved':
             raise ValidationError(f"{label} template must be approved before it can be used in a campaign.")
-        if not self._template_media_ready(template, version):
-            tab_hint = (
-                "A/B Testing tab under %s > Header Media Override" % label
-                if self.is_ab_test
-                else "Message tab > Template Header Media Override"
-            )
-            raise ValidationError(
-                f"{label} template has a {template.header_type} header. "
-                "Set a default Header Media File/URL on the template, or upload this campaign's header media in "
-                f"{tab_hint}."
-            )
 
     def _check_variant_message(self, label, template, body, version='a'):
         if template:
