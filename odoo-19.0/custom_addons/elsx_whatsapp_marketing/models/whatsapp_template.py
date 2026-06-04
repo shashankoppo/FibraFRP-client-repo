@@ -442,12 +442,18 @@ class WhatsAppTemplate(models.Model):
         if not isinstance(components, list):
             return {}
         for component in components:
-            if not isinstance(component, dict) or component.get('type') != 'header':
+            component_type = str(component.get('type') or '').lower() if isinstance(component, dict) else ''
+            if not isinstance(component, dict) or component_type != 'header':
                 continue
             for param in component.get('parameters') or []:
-                if not isinstance(param, dict) or param.get('type') != self.header_type:
+                param_type = str(param.get('type') or '').lower() if isinstance(param, dict) else ''
+                if not isinstance(param, dict) or param_type != self.header_type:
                     continue
-                media_object = param.get(self.header_type) or {}
+                media_object = (
+                    param.get(self.header_type)
+                    or param.get(self.header_type.upper())
+                    or {}
+                )
                 if not isinstance(media_object, dict):
                     continue
                 value = media_object.get('id') or media_object.get('link')

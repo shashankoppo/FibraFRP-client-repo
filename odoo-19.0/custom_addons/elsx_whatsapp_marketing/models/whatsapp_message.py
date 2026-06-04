@@ -1051,7 +1051,8 @@ class WhatsAppMessage(models.Model):
                 has_header_component = bool(
                     payload
                     and any(
-                        isinstance(component, dict) and component.get('type') == 'header'
+                        isinstance(component, dict)
+                        and str(component.get('type') or '').lower() == 'header'
                         for component in (payload.get('components') or [])
                     )
                 )
