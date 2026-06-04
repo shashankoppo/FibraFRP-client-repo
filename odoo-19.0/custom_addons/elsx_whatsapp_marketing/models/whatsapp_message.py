@@ -1044,7 +1044,27 @@ class WhatsAppMessage(models.Model):
                 send_kwargs['flow_id'] = record.flow_id.id
 
             if record.message_type == 'template':
-                if payload and payload.get('name') and payload.get('language'):
+                needs_media_header = (
+                    record.template_id
+                    and record.template_id.header_type in ('image', 'video', 'document')
+                )
+                has_header_component = bool(
+                    payload
+                    and any(
+                        isinstance(component, dict) and component.get('type') == 'header'
+                        for component in (payload.get('components') or [])
+                    )
+                )
+                if needs_media_header and not has_header_component:
+                    send_kwargs['template_record'] = record.template_id
+                    if record.media_file:
+                        send_kwargs['header_media_file'] = record.media_file
+                        send_kwargs['header_media_filename'] = record.media_filename
+                    elif record.media_url:
+                        send_kwargs['header_media_url'] = record.media_url
+                        if record.media_filename:
+                            send_kwargs['header_media_filename'] = record.media_filename
+                elif payload and payload.get('name') and payload.get('language'):
                     send_kwargs['template'] = payload
                 elif record.template_id:
                     send_kwargs['template_record'] = record.template_id

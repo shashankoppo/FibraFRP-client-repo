@@ -538,17 +538,31 @@ class WhatsAppCampaign(models.Model):
             'header_media_url': self.template_header_media_url or False,
         }
 
+    def _effective_header_media_kwargs(self, template, version='a'):
+        self.ensure_one()
+        if not template or template.header_type not in ('image', 'video', 'document'):
+            return {}
+        media_kwargs = self._campaign_header_media_kwargs(version)
+        if media_kwargs.get('header_media_file') or media_kwargs.get('header_media_url'):
+            return media_kwargs
+        if template.header_media_url and template._is_send_media_reference(template.header_media_url):
+            return {
+                'header_media_url': template.header_media_url,
+                'header_media_filename': template.header_media_filename or template._header_media_upload_filename(template.header_type),
+            }
+        if template.header_media_file:
+            return {
+                'header_media_file': template.header_media_file,
+                'header_media_filename': template.header_media_filename or template._header_media_upload_filename(template.header_type),
+            }
+        return template._latest_send_header_media_kwargs(account=self.account_id)
+
     def _template_media_ready(self, template, version='a'):
         self.ensure_one()
         if not template or template.header_type not in ('image', 'video', 'document'):
             return True
-        media_kwargs = self._campaign_header_media_kwargs(version)
-        return bool(
-            template.header_media_url
-            or template.header_media_file
-            or media_kwargs.get('header_media_url')
-            or media_kwargs.get('header_media_file')
-        )
+        media_kwargs = self._effective_header_media_kwargs(template, version)
+        return bool(media_kwargs.get('header_media_url') or media_kwargs.get('header_media_file'))
 
     def _check_template_ready_for_campaign(self, template, label, version='a'):
         if not template:
@@ -605,11 +619,10 @@ class WhatsAppCampaign(models.Model):
         return body
 
     def _template_payload_for_partner(self, template, partner, version='a'):
-        media_kwargs = self._campaign_header_media_kwargs(version)
+        media_kwargs = self._effective_header_media_kwargs(template, version)
         return template._prepare_send_payload(
             partner=partner,
             account=self.account_id,
-            allow_missing_header_media=True,
             **media_kwargs,
         )
 
@@ -885,7 +898,7 @@ class WhatsAppCampaign(models.Model):
 
                     if current_template:
                         message_body = self._render_body_for_partner(message_body, partner, current_template)
-                        media_kwargs = self._campaign_header_media_kwargs(version)
+                        media_kwargs = self._effective_header_media_kwargs(current_template, version)
                         try:
                             template_payload = self._template_payload_for_partner(current_template, partner, version=version)
                         except (UserError, ValidationError) as e:

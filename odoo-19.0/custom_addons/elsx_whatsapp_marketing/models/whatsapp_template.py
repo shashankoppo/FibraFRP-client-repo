@@ -381,11 +381,72 @@ class WhatsAppTemplate(models.Model):
             if media_type == 'document' and media_filename:
                 media_object["filename"] = str(media_filename)
             return {"type": media_type, media_type: media_object}
-        # If it's a non-digit handle string (e.g. resumable upload handle), return it as 'handle'
-        media_object = {"handle": media_value}
+        # Message sends accept media id/link references. Template approval
+        # header handles are not valid here and are rejected before this point.
+        media_object = {"id": media_value}
         if media_type == 'document' and media_filename:
             media_object["filename"] = str(media_filename)
         return {"type": media_type, media_type: media_object}
+
+    def _is_send_media_reference(self, value):
+        value = str(value or '').strip()
+        if not value:
+            return False
+        if value.startswith(('http://', 'https://')):
+            return True
+        return not self._is_template_header_handle(value)
+
+    def _latest_send_header_media_kwargs(self, account=False):
+        """Find the latest usable media sent with this template/account.
+
+        This is intentionally a fallback for restored/reinstalled databases where
+        the template record survived but its binary header file did not. It never
+        changes the template record and never treats Meta template approval
+        header handles as sendable media.
+        """
+        self.ensure_one()
+        if self.header_type not in ('image', 'video', 'document'):
+            return {}
+        domain = [
+            ('template_id', '=', self.id),
+            ('message_type', '=', 'template'),
+            ('direction', '=', 'outbound'),
+            ('status', '!=', 'failed'),
+            '|',
+            ('media_file', '!=', False),
+            ('media_url', '!=', False),
+        ]
+        if account:
+            domain.append(('account_id', '=', account.id))
+        previous_message = self.env['whatsapp.message'].sudo().search(domain, order='id desc', limit=1)
+        if not previous_message:
+            return {}
+        filename = (
+            previous_message.media_filename
+            or self.header_media_filename
+            or self._header_media_upload_filename(self.header_type)
+        )
+        if previous_message.media_file:
+            return {
+                'header_media_file': previous_message.media_file,
+                'header_media_filename': filename,
+            }
+        if previous_message.media_url and self._is_send_media_reference(previous_message.media_url):
+            return {
+                'header_media_url': previous_message.media_url,
+                'header_media_filename': filename,
+            }
+        return {}
+
+    def _has_send_ready_header_media(self, account=False, include_previous=True):
+        self.ensure_one()
+        if self.header_type not in ('image', 'video', 'document'):
+            return True
+        if self.header_media_file:
+            return True
+        if self.header_media_url and self._is_send_media_reference(self.header_media_url):
+            return True
+        return bool(include_previous and self._latest_send_header_media_kwargs(account=account))
 
     def _header_media_upload_filename(self, media_type, filename=None):
         self.ensure_one()
@@ -409,6 +470,11 @@ class WhatsAppTemplate(models.Model):
     ):
         self.ensure_one()
         if media_url:
+            if self._is_template_header_handle(media_url):
+                raise UserError(
+                    f"{media_type.title()} header templates cannot use a Meta template approval header handle "
+                    "as message media. Upload the file, use a public HTTPS URL, or use a WhatsApp media ID."
+                )
             return str(media_url).strip()
 
         upload_account = account or self.account_id
@@ -418,7 +484,7 @@ class WhatsAppTemplate(models.Model):
             filename = self._header_media_upload_filename(media_type, media_filename)
             return upload_account._upload_media_to_meta(media_file, filename, media_type)
 
-        if self.header_media_url:
+        if self.header_media_url and self._is_send_media_reference(self.header_media_url):
             return self.header_media_url
 
         if self.header_media_file:
@@ -428,6 +494,21 @@ class WhatsAppTemplate(models.Model):
             media_id = upload_account._upload_media_to_meta(self.header_media_file, filename, media_type)
             self.sudo().write({'header_media_url': media_id})
             return media_id
+
+        previous_media = self._latest_send_header_media_kwargs(account=upload_account)
+        if previous_media.get('header_media_url'):
+            return previous_media['header_media_url']
+        if previous_media.get('header_media_file'):
+            if not upload_account:
+                raise UserError(f"{media_type.title()} header templates require a WhatsApp account to upload media.")
+            filename = self._header_media_upload_filename(media_type, previous_media.get('header_media_filename'))
+            return upload_account._upload_media_to_meta(previous_media['header_media_file'], filename, media_type)
+
+        if self.header_media_url and self._is_template_header_handle(self.header_media_url):
+            raise UserError(
+                f"{self.display_name}: the saved header value is a Meta template approval handle, not send media. "
+                "Upload the document/image/video again, set a public HTTPS URL, or use a WhatsApp media ID."
+            )
 
         raise UserError(
             f"{self.display_name}: {media_type.title()} header templates require a media handle, "
@@ -543,6 +624,11 @@ class WhatsAppTemplate(models.Model):
 
             else:
                 if self.header_type in ['image', 'video', 'document']:
+                    if not (header_media_file or header_media_url or self.header_media_file or self.header_media_url):
+                        previous_media = self._latest_send_header_media_kwargs(account=account)
+                        header_media_file = previous_media.get('header_media_file') or header_media_file
+                        header_media_filename = previous_media.get('header_media_filename') or header_media_filename
+                        header_media_url = previous_media.get('header_media_url') or header_media_url
                     try:
                         header_media_value = self._resolve_header_media_value(
                             self.header_type,
@@ -699,10 +785,17 @@ class WhatsAppTemplate(models.Model):
         )
         has_media_reference = bool(
             header_media_file
-            or header_media_url
-            or (message and (message.media_file or message.media_url))
+            or (header_media_url and self._is_send_media_reference(header_media_url))
+            or (
+                message
+                and (
+                    message.media_file
+                    or (message.media_url and self._is_send_media_reference(message.media_url))
+                )
+            )
             or self.header_media_file
-            or self.header_media_url
+            or (self.header_media_url and self._is_send_media_reference(self.header_media_url))
+            or self._latest_send_header_media_kwargs(account=self.account_id)
         )
         if header_type == 'text' and self.header_text:
             return (
@@ -963,12 +1056,13 @@ class WhatsAppTemplate(models.Model):
             lines.append(text)
         if self.header_type in ('image', 'video', 'document') and not (
             header_media_file
-            or header_media_url
+            or (header_media_url and self._is_send_media_reference(header_media_url))
             or self.header_media_file
-            or self.header_media_url
+            or (self.header_media_url and self._is_send_media_reference(self.header_media_url))
+            or self._latest_send_header_media_kwargs(account=self.account_id)
         ):
             lines.append(
-                "Warning: %s header needs a media file, Meta media handle, or public HTTPS URL before sending."
+                "Warning: %s header needs a media file, WhatsApp media ID, or public HTTPS URL before sending."
                 % self.header_type.title()
             )
         return "\n".join(line for line in lines if line)

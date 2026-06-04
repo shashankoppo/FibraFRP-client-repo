@@ -752,8 +752,9 @@ class WhatsAppChat(models.Model):
             raise UserError(_("Select an approved template before sending."))
         if template.status != 'approved':
             raise UserError(_("Only approved WhatsApp templates can be sent."))
-        if template.header_type in ('image', 'video', 'document') and not (
-            template.header_media_file or template.header_media_url
+        if (
+            template.header_type in ('image', 'video', 'document')
+            and not template._has_send_ready_header_media(account=self.account_id)
         ):
             action = self.action_open_send_wizard()
             action['name'] = _('Attach Header Media')
