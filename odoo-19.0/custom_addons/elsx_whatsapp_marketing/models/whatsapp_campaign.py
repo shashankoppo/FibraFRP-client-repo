@@ -1010,18 +1010,33 @@ class WhatsAppCampaign(models.Model):
             + (f' Failed {failed_count} recipient(s) with readable errors.' if failed_count else '')
             + (f' Skipped {skipped_count} recipient(s) without phone numbers.' if skipped_count else '')
         )
+        auto_dispatch_failed = False
+        if self.campaign_type == 'broadcast' and messages_to_create and not scheduled_for_later:
+            try:
+                process_action = self.action_process_queue()
+                process_params = process_action.get('params', {}) if isinstance(process_action, dict) else {}
+                process_message = process_params.get('message')
+                if process_message:
+                    launch_message += ' ' + process_message
+            except Exception as e:
+                auto_dispatch_failed = True
+                _logger.exception("Campaign %s queued but automatic queue dispatch did not start.", self.id)
+                launch_message += _(
+                    " Queue was created, but automatic dispatch could not start: %s. "
+                    "Use Process Queue or check Odoo logs."
+                ) % (str(e) or e.__class__.__name__)
 
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
-                'title': 'Campaign Scheduled' if target_state == 'scheduled' else 'Campaign Queued',
+                'title': 'Campaign Scheduled' if target_state == 'scheduled' else 'Campaign Started',
                 'message': (
                     f'Campaign scheduled for {self.schedule_date}. {launch_message}'
                     if target_state == 'scheduled'
                     else launch_message
                 ),
-                'type': 'warning' if failed_count or skipped_count else 'success',
+                'type': 'warning' if failed_count or skipped_count or auto_dispatch_failed else 'success',
             }
         }
 

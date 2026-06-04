@@ -220,6 +220,33 @@ else:
     env.cr.commit()
 PY
 
+echo "==> Ensuring WhatsApp queue cron is active"
+docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -v ON_ERROR_STOP=1 <<'SQL'
+DO $$
+DECLARE
+  updated_count integer := 0;
+BEGIN
+  IF to_regclass('public.ir_cron') IS NULL
+     OR to_regclass('public.ir_model_data') IS NULL THEN
+    RAISE NOTICE 'Cron tables are not present; skipping WhatsApp queue cron repair.';
+    RETURN;
+  END IF;
+
+  UPDATE ir_cron AS c
+     SET active = true,
+         interval_number = 1,
+         interval_type = 'minutes',
+         nextcall = (now() AT TIME ZONE 'UTC')
+    FROM ir_model_data AS d
+   WHERE d.model = 'ir.cron'
+     AND d.res_id = c.id
+     AND d.module = 'elsx_whatsapp_marketing'
+     AND d.name = 'ir_cron_process_whatsapp_queue';
+  GET DIAGNOSTICS updated_count = ROW_COUNT;
+  RAISE NOTICE 'WhatsApp queue cron repair updated % row(s).', updated_count;
+END $$;
+SQL
+
 echo "==> Marking ${LIVE_DB_NAME} as the primary WhatsApp webhook database"
 mapfile -t DATABASES < <(
   docker compose exec -T db psql -U "${DB_USER}" -d postgres -Atc \
