@@ -63,6 +63,11 @@
                                         <field name="header_media_file" filename="header_media_filename" invisible="header_type not in ['image', 'video', 'document']"/>
                                         <field name="header_media_filename" invisible="1"/>
                                         <field name="header_media_url" invisible="header_type not in ['image', 'video', 'document']" readonly="1" force_save="1"/>
+                                        <button name="action_upload_default_header_media" string="Upload Default Header" type="object" class="btn-primary" invisible="status != 'approved' or header_type not in ['image', 'video', 'document']"/>
+                                        <button name="action_use_last_successful_header_media" string="Use Last Successful Header" type="object" class="btn-secondary" invisible="status != 'approved' or header_type not in ['image', 'video', 'document']"/>
+                                        <div class="alert alert-info" role="alert" colspan="2" invisible="header_type not in ['image', 'video', 'document']">
+                                            Approved media-header templates still need a sendable image/video/document media ID or URL at send time. Upload the original approved header file here once, or recover it from a previous successful send.
+                                        </div>
                                     </group>
                                     <group string="Body">
                                         <field name="body" widget="text"/>

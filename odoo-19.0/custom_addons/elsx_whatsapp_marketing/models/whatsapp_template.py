@@ -1426,6 +1426,83 @@ class WhatsAppTemplate(models.Model):
             },
         }
 
+    def action_upload_default_header_media(self):
+        """Upload the template header file as reusable send media.
+
+        Meta approval header handles are only samples for approval. This action
+        stores a normal WhatsApp media ID so approved templates behave like
+        AiSensy-style default media sends.
+        """
+        self.ensure_one()
+        if self.header_type not in ('image', 'video', 'document'):
+            raise UserError("Only image, video, and document header templates need default send media.")
+        if self.status != 'approved':
+            raise UserError("Upload Default Header is only for already-approved media-header templates.")
+        if not self.account_id:
+            raise UserError("Select a WhatsApp Account before uploading default header media.")
+        if not self.header_media_file:
+            raise UserError("Upload the original header file on this template first.")
+        filename = self._header_media_upload_filename(self.header_type)
+        media_id = self.account_id._upload_media_to_meta(self.header_media_file, filename, self.header_type)
+        self.write({
+            'header_media_url': media_id,
+            'header_media_filename': filename,
+        })
+        self._log_meta_audit(
+            'default_send_header_uploaded',
+            status=self.status,
+            reason='Stored reusable WhatsApp media ID for approved template sends.',
+            raw_data={'media_id': media_id, 'filename': filename, 'header_type': self.header_type},
+        )
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': 'Default header ready',
+                'message': 'This template will now use the uploaded header media automatically when sending.',
+                'type': 'success',
+                'sticky': False,
+            },
+        }
+
+    def action_use_last_successful_header_media(self):
+        """Recover reusable media from the latest successful send of this template."""
+        self.ensure_one()
+        if self.header_type not in ('image', 'video', 'document'):
+            raise UserError("Only image, video, and document header templates use header media.")
+        if self.status != 'approved':
+            raise UserError("Use Last Successful Header is only for already-approved media-header templates.")
+        media_kwargs = self._latest_send_header_media_kwargs(account=self.account_id)
+        if not media_kwargs:
+            raise UserError(
+                "No previous successful send with usable header media was found for this template/account. "
+                "Upload the original header file on the template, then click Upload Default Header."
+            )
+        vals = {
+            'header_media_filename': media_kwargs.get('header_media_filename') or self.header_media_filename,
+        }
+        if media_kwargs.get('header_media_file'):
+            vals['header_media_file'] = media_kwargs['header_media_file']
+        if media_kwargs.get('header_media_url'):
+            vals['header_media_url'] = media_kwargs['header_media_url']
+        self.write(vals)
+        self._log_meta_audit(
+            'default_send_header_recovered',
+            status=self.status,
+            reason='Recovered reusable header media from a previous successful template send.',
+            raw_data={key: bool(value) if key == 'header_media_file' else value for key, value in media_kwargs.items()},
+        )
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': 'Header recovered',
+                'message': 'This template can now reuse the recovered approved header media automatically.',
+                'type': 'success',
+                'sticky': False,
+            },
+        }
+
     def action_generate_ai_draft(self):
         """Draft template body text without submitting anything to Meta."""
         self.ensure_one()

@@ -606,6 +606,20 @@ class WhatsAppAccount(models.Model):
                             vals['header_type'] = (component.get('format') or 'none').lower()
                             if vals['header_type'] == 'text':
                                 vals['header_text'] = component.get('text')
+                            elif vals['header_type'] in ('image', 'video', 'document'):
+                                example = component.get('example') or {}
+                                header_handles = example.get('header_handle') or []
+                                if isinstance(header_handles, str):
+                                    header_handles = [header_handles]
+                                header_example = header_handles[0] if header_handles else False
+                                if header_example and str(header_example).startswith(('http://', 'https://')):
+                                    vals['header_media_url'] = header_example
+                                    if vals['header_type'] == 'document':
+                                        current_filename = template.header_media_filename if template else False
+                                        vals['header_media_filename'] = (
+                                            current_filename
+                                            or f"{template_name}_header.pdf"
+                                        )
                         elif component.get('type') == 'FOOTER':
                             vals['footer'] = component.get('text')
                         elif component.get('type') == 'BUTTONS':
