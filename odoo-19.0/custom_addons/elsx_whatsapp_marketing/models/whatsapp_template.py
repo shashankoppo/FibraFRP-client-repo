@@ -283,12 +283,20 @@ class WhatsAppTemplate(models.Model):
                         raise UserError("Carousel button text can be at most 25 characters.")
                     if card.button_type_1 == 'url' and card.button_url_1 and not card.button_url_1.startswith(('http://', 'https://')):
                         raise UserError("Carousel URL buttons must start with http:// or https://.")
-            if rec.header_type in ('image', 'video', 'document') and not (
-                rec.header_media_url or rec.header_media_file
-            ):
-                raise UserError(
-                    f"{rec.header_type.title()} header templates require a default media file or uploaded Meta media handle."
-                )
+            if rec.header_type in ('image', 'video', 'document'):
+                has_any_header_media = bool(rec.header_media_url or rec.header_media_file)
+                if rec.status == 'approved':
+                    if not rec._has_send_ready_header_media(account=rec.account_id):
+                        raise UserError(
+                            f"{rec.display_name}: {rec.header_type.title()} header templates need a default send "
+                            "media file, WhatsApp media ID, public HTTPS URL, or a previous successful send with "
+                            "this same approved template before sending."
+                        )
+                elif not has_any_header_media:
+                    raise UserError(
+                        f"{rec.header_type.title()} header templates require a header media file or uploaded "
+                        "Meta template header handle before Submit to Meta."
+                    )
             if rec.has_buttons and not rec.button_type:
                 raise UserError("Please select a button type or disable buttons.")
             if rec.has_buttons and rec.button_type == 'quick_reply':
@@ -396,6 +404,62 @@ class WhatsAppTemplate(models.Model):
             return True
         return not self._is_template_header_handle(value)
 
+    def _normalized_template_name(self, value):
+        value = (value or '').strip().lower()
+        value = re.sub(r'[^a-z0-9_]', '_', value)
+        value = re.sub(r'_+', '_', value)
+        return value.strip('_')
+
+    def _send_template_name_candidates(self):
+        self.ensure_one()
+        values = {
+            self._get_send_template_name(),
+            self.name or '',
+            self.meta_template_name or '',
+        }
+        return {self._normalized_template_name(value) for value in values if value}
+
+    def _template_payload_name(self, payload):
+        if not isinstance(payload, dict):
+            return ''
+        template_payload = payload.get('template') if isinstance(payload.get('template'), dict) else payload
+        if not isinstance(template_payload, dict):
+            return ''
+        return self._normalized_template_name(template_payload.get('name'))
+
+    def _template_payload_matches(self, payload):
+        return self._template_payload_name(payload) in self._send_template_name_candidates()
+
+    def _header_media_kwargs_from_payload(self, payload):
+        """Extract a sendable header media reference from a Meta template payload."""
+        self.ensure_one()
+        if self.header_type not in ('image', 'video', 'document') or not isinstance(payload, dict):
+            return {}
+        template_payload = payload.get('template') if isinstance(payload.get('template'), dict) else payload
+        if not isinstance(template_payload, dict):
+            return {}
+        components = template_payload.get('components') or []
+        if not isinstance(components, list):
+            return {}
+        for component in components:
+            if not isinstance(component, dict) or component.get('type') != 'header':
+                continue
+            for param in component.get('parameters') or []:
+                if not isinstance(param, dict) or param.get('type') != self.header_type:
+                    continue
+                media_object = param.get(self.header_type) or {}
+                if not isinstance(media_object, dict):
+                    continue
+                value = media_object.get('id') or media_object.get('link')
+                if not self._is_send_media_reference(value):
+                    continue
+                filename = media_object.get('filename') or self.header_media_filename or self._header_media_upload_filename(self.header_type)
+                return {
+                    'header_media_url': str(value),
+                    'header_media_filename': filename,
+                }
+        return {}
+
     def _latest_send_header_media_kwargs(self, account=False):
         """Find the latest usable media sent with this template/account.
 
@@ -408,34 +472,53 @@ class WhatsAppTemplate(models.Model):
         if self.header_type not in ('image', 'video', 'document'):
             return {}
         domain = [
-            ('template_id', '=', self.id),
             ('message_type', '=', 'template'),
             ('direction', '=', 'outbound'),
-            ('status', '!=', 'failed'),
-            '|',
-            ('media_file', '!=', False),
-            ('media_url', '!=', False),
+            ('status', 'in', ['sent', 'delivered', 'read']),
         ]
         if account:
             domain.append(('account_id', '=', account.id))
-        previous_message = self.env['whatsapp.message'].sudo().search(domain, order='id desc', limit=1)
-        if not previous_message:
-            return {}
-        filename = (
-            previous_message.media_filename
-            or self.header_media_filename
-            or self._header_media_upload_filename(self.header_type)
-        )
-        if previous_message.media_file:
-            return {
-                'header_media_file': previous_message.media_file,
-                'header_media_filename': filename,
-            }
-        if previous_message.media_url and self._is_send_media_reference(previous_message.media_url):
-            return {
-                'header_media_url': previous_message.media_url,
-                'header_media_filename': filename,
-            }
+        candidates = self._send_template_name_candidates()
+        previous_messages = self.env['whatsapp.message'].sudo().search(domain, order='id desc', limit=200)
+        for previous_message in previous_messages:
+            message_template_name = self._normalized_template_name(previous_message.template_name)
+            same_template = (
+                previous_message.template_id == self
+                or (message_template_name and message_template_name in candidates)
+            )
+            parsed_payload = False
+            if not same_template and previous_message.raw_data:
+                try:
+                    parsed_payload = json.loads(previous_message.raw_data)
+                    same_template = self._template_payload_matches(parsed_payload)
+                except Exception:
+                    parsed_payload = False
+            if not same_template:
+                continue
+
+            filename = (
+                previous_message.media_filename
+                or self.header_media_filename
+                or self._header_media_upload_filename(self.header_type)
+            )
+            if previous_message.media_file:
+                return {
+                    'header_media_file': previous_message.media_file,
+                    'header_media_filename': filename,
+                }
+            if previous_message.media_url and self._is_send_media_reference(previous_message.media_url):
+                return {
+                    'header_media_url': previous_message.media_url,
+                    'header_media_filename': filename,
+                }
+            if not parsed_payload and previous_message.raw_data:
+                try:
+                    parsed_payload = json.loads(previous_message.raw_data)
+                except Exception:
+                    parsed_payload = False
+            media_kwargs = self._header_media_kwargs_from_payload(parsed_payload) if parsed_payload else {}
+            if media_kwargs:
+                return media_kwargs
         return {}
 
     def _has_send_ready_header_media(self, account=False, include_previous=True):

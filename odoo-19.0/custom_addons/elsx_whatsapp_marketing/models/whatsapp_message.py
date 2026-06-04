@@ -1066,6 +1066,8 @@ class WhatsAppMessage(models.Model):
                             send_kwargs['header_media_filename'] = record.media_filename
                 elif payload and payload.get('name') and payload.get('language'):
                     send_kwargs['template'] = payload
+                    if record.template_id:
+                        send_kwargs['template_record'] = record.template_id
                 elif record.template_id:
                     send_kwargs['template_record'] = record.template_id
                     if record.media_file:

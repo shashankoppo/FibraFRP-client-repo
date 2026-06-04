@@ -648,13 +648,18 @@ class WhatsAppChat(models.Model):
                     lines.append(_("Header: %s") % (header or _('Text header')))
                 else:
                     filename = template.header_media_filename or template.name or _('media file')
-                    ready = bool(template.header_media_file or template.header_media_url)
+                    ready = template._has_send_ready_header_media(account=chat.account_id)
                     lines.append(_("Header: %(type)s - %(file)s") % {
                         'type': header_type.title(),
                         'file': filename,
                     })
-                    if not ready:
-                        lines.append(_("Warning: this %s header still needs a file, media handle, or public HTTPS URL before sending.") % header_type)
+                    if ready:
+                        lines.append(_("Header media is ready for sending."))
+                    else:
+                        lines.append(_(
+                            "Warning: this %s header still needs a default send media file, WhatsApp media ID, "
+                            "public HTTPS URL, or a previous successful send with this approved template."
+                        ) % header_type)
 
             if template.is_carousel:
                 lines.append(_("Carousel: %s card(s)") % len(template.card_ids))

@@ -807,6 +807,7 @@ class WhatsAppAccount(models.Model):
             'recipient_type': 'individual',
             'to': to_number,
         }
+        template_header_media_vals = {}
         
         if message_type == 'text':
             body = kwargs.get('body', '') or ''
@@ -843,6 +844,9 @@ class WhatsAppAccount(models.Model):
                 if 'components' in template_payload and not template_payload['components']:
                     del template_payload['components']
                 payload['template'] = template_payload
+                template_record = kwargs.get('template_record')
+                if template_record and hasattr(template_record, '_header_media_kwargs_from_payload'):
+                    template_header_media_vals = template_record._header_media_kwargs_from_payload(template_payload)
             else:
                 raise UserError(_("Template messages require a template payload, template record, or template name."))
 
@@ -951,10 +955,15 @@ class WhatsAppAccount(models.Model):
                     if kwargs.get('media_file'):
                         queued_vals['media_file'] = kwargs['media_file']
                 elif message_type == 'template':
-                    if kwargs.get('header_media_url'):
-                        queued_vals['media_url'] = kwargs['header_media_url']
-                    if kwargs.get('header_media_filename'):
-                        queued_vals['media_filename'] = kwargs['header_media_filename']
+                    header_media_url = kwargs.get('header_media_url') or template_header_media_vals.get('header_media_url')
+                    header_media_filename = (
+                        kwargs.get('header_media_filename')
+                        or template_header_media_vals.get('header_media_filename')
+                    )
+                    if header_media_url:
+                        queued_vals['media_url'] = header_media_url
+                    if header_media_filename:
+                        queued_vals['media_filename'] = header_media_filename
                     if kwargs.get('header_media_file'):
                         queued_vals['media_file'] = kwargs['header_media_file']
                 return self.env['whatsapp.message'].create(queued_vals)
@@ -1060,10 +1069,15 @@ class WhatsAppAccount(models.Model):
                 if kwargs.get('media_file'):
                     vals['media_file'] = kwargs['media_file']
             elif message_type == 'template':
-                if kwargs.get('header_media_url'):
-                    vals['media_url'] = kwargs['header_media_url']
-                if kwargs.get('header_media_filename'):
-                    vals['media_filename'] = kwargs['header_media_filename']
+                header_media_url = kwargs.get('header_media_url') or template_header_media_vals.get('header_media_url')
+                header_media_filename = (
+                    kwargs.get('header_media_filename')
+                    or template_header_media_vals.get('header_media_filename')
+                )
+                if header_media_url:
+                    vals['media_url'] = header_media_url
+                if header_media_filename:
+                    vals['media_filename'] = header_media_filename
                 if kwargs.get('header_media_file'):
                     vals['media_file'] = kwargs['header_media_file']
 
