@@ -829,6 +829,7 @@ class WhatsAppAccount(models.Model):
                     header_media_filename=kwargs.get('header_media_filename'),
                     header_media_url=kwargs.get('header_media_url'),
                     account=self,
+                    allow_missing_header_media=bool(kwargs.get('allow_missing_header_media')),
                 )
             if not template_payload and kwargs.get('template_name'):
                 template_payload = {

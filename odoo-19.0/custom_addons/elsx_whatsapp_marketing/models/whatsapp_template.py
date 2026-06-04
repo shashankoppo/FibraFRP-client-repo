@@ -512,6 +512,7 @@ class WhatsAppTemplate(models.Model):
         header_media_filename=False,
         header_media_url=False,
         account=False,
+        allow_missing_header_media=False,
     ):
         self.ensure_one()
         _logger.info(f"Preparing send payload for template {self.name} (ID: {self.id})")
@@ -542,22 +543,28 @@ class WhatsAppTemplate(models.Model):
 
             else:
                 if self.header_type in ['image', 'video', 'document']:
-                    header_media_value = self._resolve_header_media_value(
-                        self.header_type,
-                        media_file=header_media_file,
-                        media_filename=header_media_filename,
-                        media_url=header_media_url,
-                        account=account,
-                    )
-                    header_filename = header_media_filename or self.header_media_filename
-                    if self.header_type == 'document':
-                        header_filename = self._header_media_upload_filename(self.header_type, header_filename)
-                    header_param = self._media_parameter(
-                        self.header_type,
-                        header_media_value,
-                        media_filename=header_filename,
-                    )
-                    components.append({"type": "header", "parameters": [header_param]})
+                    try:
+                        header_media_value = self._resolve_header_media_value(
+                            self.header_type,
+                            media_file=header_media_file,
+                            media_filename=header_media_filename,
+                            media_url=header_media_url,
+                            account=account,
+                        )
+                    except UserError:
+                        if not allow_missing_header_media:
+                            raise
+                        header_media_value = False
+                    if header_media_value:
+                        header_filename = header_media_filename or self.header_media_filename
+                        if self.header_type == 'document':
+                            header_filename = self._header_media_upload_filename(self.header_type, header_filename)
+                        header_param = self._media_parameter(
+                            self.header_type,
+                            header_media_value,
+                            media_filename=header_filename,
+                        )
+                        components.append({"type": "header", "parameters": [header_param]})
 
                 elif self.header_type == 'text' and '{{' in (self.header_text or ''):
                     header_variables = self._variables_for_names(self._variable_names_for_text(self.header_text))

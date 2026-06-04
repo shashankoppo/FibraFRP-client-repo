@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import json
+
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
 
@@ -173,13 +175,7 @@ class WhatsAppSendWizard(models.TransientModel):
         previous_media = self._previous_template_header_media_kwargs()
         if previous_media:
             return previous_media
-        raise UserError(_(
-            "%(template)s needs a %(type)s header file before sending. "
-            "Upload a file in this wizard or set a default Header Media File on the template."
-        ) % {
-            'template': self.template_id.display_name,
-            'type': self.template_id.header_type,
-        })
+        return {'allow_missing_header_media': True}
 
     def _send_to_recipient(self, phone, partner=False, template_header_media_kwargs=None):
         partner_id = partner.id if partner else False
@@ -250,6 +246,12 @@ class WhatsAppSendWizard(models.TransientModel):
                 vals['media_file'] = template_kwargs['header_media_file']
             if template_kwargs.get('header_media_filename'):
                 vals['media_filename'] = template_kwargs['header_media_filename']
+            if template_kwargs.get('allow_missing_header_media'):
+                vals['raw_data'] = json.dumps(self.template_id._prepare_send_payload(
+                    partner=partner,
+                    account=account,
+                    allow_missing_header_media=True,
+                ))
             message = self.env['whatsapp.message'].create(vals)
             message.action_send()
             return

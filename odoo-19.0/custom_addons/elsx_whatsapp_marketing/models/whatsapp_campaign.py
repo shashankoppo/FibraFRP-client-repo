@@ -609,6 +609,7 @@ class WhatsAppCampaign(models.Model):
         return template._prepare_send_payload(
             partner=partner,
             account=self.account_id,
+            allow_missing_header_media=True,
             **media_kwargs,
         )
 
