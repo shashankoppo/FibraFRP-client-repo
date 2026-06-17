@@ -55,4 +55,3 @@ package.json
 # encrypted local backups
 secure_backups/
 .env
-
