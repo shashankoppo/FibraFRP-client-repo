@@ -6,10 +6,14 @@ LEGACY_TIMEZONE_MAP = {
 }
 
 
+def canonical_timezone(value):
+    return LEGACY_TIMEZONE_MAP.get(value, value)
+
+
 def _canonicalize_tz_vals(vals):
     if vals and vals.get('tz') in LEGACY_TIMEZONE_MAP:
         vals = dict(vals)
-        vals['tz'] = LEGACY_TIMEZONE_MAP[vals['tz']]
+        vals['tz'] = canonical_timezone(vals['tz'])
     return vals
 
 

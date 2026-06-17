@@ -3,6 +3,7 @@ from odoo import http
 from odoo.http import request
 import logging
 import re
+from urllib.parse import urlencode
 from werkzeug.exceptions import Forbidden, NotFound
 from odoo.addons.web.controllers.database import Database as WebDatabaseController
 
@@ -151,5 +152,15 @@ class SystemAccessShortcutController(http.Controller):
         action = request.env.ref("base.open_module_tree", raise_if_not_found=False)
         if not action:
             raise NotFound()
+        menu = request.env.ref("base.menu_apps", raise_if_not_found=False)
+        query = {
+            "search_default_app": 1,
+            "cids": request.env.company.id,
+        }
+        if menu:
+            query.update({
+                "menu_id": menu.id,
+                "active_id": menu.id,
+            })
         _logger.info("Apps secret URL used by administrator: %s", request.env.user.login)
-        return request.redirect("/odoo/action-%s" % action.id)
+        return request.redirect("/odoo/action-%s?%s" % (action.id, urlencode(query)))

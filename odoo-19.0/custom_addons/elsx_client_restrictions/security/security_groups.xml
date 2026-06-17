@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Compatibility group kept so older XML ids keep upgrading cleanly. -->
+    <!-- Compatibility XML id kept so older databases keep upgrading cleanly. -->
     <record id="group_secret_apps_access" model="res.groups">
-        <field name="name">Legacy Apps Shortcut Compatibility</field>
-        <field name="comment">Compatibility record only. Standard Odoo groups control Apps access.</field>
+        <field name="name">ELSx Controlled Apps Manager</field>
+        <field name="implied_ids" eval="[(4, ref('base.group_system'))]"/>
+        <field name="comment">Can use the controlled Apps management shortcut. Keep assigned only to trusted technical administrators.</field>
     </record>
 </odoo>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="group_ai_website_builder_manager" model="res.groups">
+        <field name="name">ELSx AI Studio Manager</field>
+        <field name="sequence">30</field>
+        <field name="privilege_id" ref="website.res_groups_privilege_website"/>
+        <field name="implied_ids" eval="[(4, ref('website.group_website_designer'))]"/>
+        <field name="implied_by_ids" eval="[(4, ref('base.group_system'))]"/>
+    </record>
+</odoo>

@@ -265,54 +265,149 @@ Manual acceptance checks:
 - Template and campaign screens open.
 - Tally sync/export path works.
 
-## 9. Updating Custom Modules Across All Databases
+## 9. Production-Safe Update Path
+
+Use this path for the live `FiberaFRP_DB` when client data is already present.
+It creates an encrypted backup first, builds the Odoo image, upgrades only the
+safety modules requested by the script, restarts Odoo/WhatsApp sidecar, and
+prints health checks. It never runs `docker compose down -v` and never uninstalls
+modules.
+
+```bash
+cd ~/Desktop/FiberaFRP/FibraFRP-client-repo/odoo-19.0
+git pull origin main
+read -s -p "Backup passphrase: " BACKUP_PASSPHRASE
+echo
+export BACKUP_PASSPHRASE
+bash deploy/safe_production_update.sh FiberaFRP_DB
+docker compose ps
+docker logs --tail 250 odoo_app
+```
+
+To include a specific outside/custom module install in the same controlled run,
+copy the addon into `custom_addons`, confirm it is compatible with Odoo 19, then
+pass it through `EXTRA_INSTALL_MODULES`. Add it to `EXTRA_UPGRADE_MODULES` too
+when the module already exists in the database and needs XML/schema refresh:
+
+```bash
+EXTRA_INSTALL_MODULES=my_new_module EXTRA_UPGRADE_MODULES=my_new_module bash deploy/safe_production_update.sh FiberaFRP_DB
+```
+
+To upgrade an already installed module without installing anything new:
+
+```bash
+EXTRA_UPGRADE_MODULES=elsx_whatsapp_marketing bash deploy/safe_production_update.sh FiberaFRP_DB
+```
+
+If an outside module still cannot install, check its manifest dependencies,
+Python package requirements, Odoo version compatibility, XML view inheritance,
+and whether its technical name is present in the configured addon path. The
+ELSx module guard blocks protected uninstalls only; normal installs are still
+handled by Odoo.
+
+Face attendance is installed as a separate addon but remains disabled until an
+administrator enables it in Settings. Normal Attendances keep working as before.
+The local recognition sidecar is also disabled by default through a Docker
+profile. Start it only after testing on a staging copy:
+
+```bash
+docker compose --profile face up -d face_sidecar
+```
+
+The SaaS admin console is installed as `elsx_saas` by the same safe update. It
+appears only for system administrators under **ELSx SaaS Admin > Tenants**. It
+records tenant lifecycle, enabled apps, limits, safety checklist, and deployment
+plan. It does not create/drop databases from the browser.
+
+Production smoke checks after this update:
+
+- Login works.
+- WhatsApp Inbox opens and receives a test inbound message.
+- CRM leads and WhatsApp links open.
+- Invoices/accounting open.
+- Campaign/template previews open.
+- Existing Attendances open and normal check-in works.
+- Attendance kiosk links use the current tenant/domain, for example
+  `localhost` locally and `fibera.elsxglobal.com` in production, with the
+  correct `db=` query for multi-database SaaS routing.
+- Face Attendance settings are visible but disabled.
+- ELSx SaaS Admin opens for system administrators.
+- Protected module uninstall is blocked with a clear warning.
+
+## 10. Updating Custom Modules Across All Databases
 
 Odoo stores module XML views, menus, actions, and fields inside each database.
 After pulling code, every database that uses WhatsApp Marketing must receive a
 module upgrade. Updating only one database leaves other databases with old stored
 views and can keep errors such as missing campaign fields alive.
 
-For normal WhatsApp Marketing deployments, run:
+For one production database, use the backup-first updater and pass the database
+name explicitly:
 
 ```bash
 git pull origin main
-docker compose down
-docker compose build odoo
-bash deploy/upgrade_module_all_dbs.sh elsx_whatsapp_marketing
+read -s -p "Backup passphrase: " BACKUP_PASSPHRASE && echo
+export BACKUP_PASSPHRASE
+bash deploy/safe_production_update.sh FiberaFRP_DB
 ```
 
-For the current production database, prefer the live helper after build:
+For all application databases on the server, use the all-DB updater. It requires
+an explicit confirmation flag so it cannot run tenant-wide by accident:
 
 ```bash
 git pull origin main
-docker compose build odoo
-bash deploy/configure_live_db.sh FiberaFRP_DB 1 elsx_verify_2024
+read -s -p "Backup passphrase: " BACKUP_PASSPHRASE && echo
+export BACKUP_PASSPHRASE
+CONFIRM_ALL_DBS=YES bash deploy/safe_update_all_dbs.sh
 ```
 
-The script:
+Both safe scripts:
 
 - Starts PostgreSQL.
-- Stops Odoo and the sidecar while upgrades run.
-- Lists all non-template application databases.
-- Runs `-u elsx_whatsapp_marketing` once per database.
+- Creates encrypted backups before module changes.
+- Builds the Odoo image.
+- Stops Odoo and the WhatsApp sidecar only while upgrades run.
+- Installs/upgrades the configured custom modules.
 - Starts Odoo and the sidecar again.
+- Never runs `docker compose down -v`.
+- Never deletes databases, filestores, records, credentials, invoices, WhatsApp
+  messages, or customer data.
 
-To exclude additional databases, pass a comma-separated list:
+To upgrade only one module across all databases, override the module list:
 
 ```bash
-DB_NAME_EXCLUDES=postgres,test_old bash deploy/upgrade_module_all_dbs.sh elsx_whatsapp_marketing
+INSTALL_MODULES=elsx_whatsapp_marketing \
+UPGRADE_MODULES=elsx_whatsapp_marketing \
+CONFIRM_ALL_DBS=YES \
+bash deploy/safe_update_all_dbs.sh
 ```
 
-After the upgrade, verify:
+To exclude additional databases from an all-DB update, pass a comma-separated
+list:
 
 ```bash
+DB_NAME_EXCLUDES=postgres,test_old \
+CONFIRM_ALL_DBS=YES \
+bash deploy/safe_update_all_dbs.sh
+```
+
+After any upgrade, verify:
+
+```bash
+docker compose ps
 docker logs --tail 200 odoo_app
 ```
 
-Then open WhatsApp Marketing and check Campaigns, Templates, Flow Builder,
-Team Inbox, and Dashboard in every active client database.
+Then open the active client databases and check Login, WhatsApp Inbox,
+Campaigns, Templates, Flow Builder, Dashboard, CRM, Invoicing, Attendance, and
+Face Attendance. Start the face sidecar only for databases where Face Attendance
+is approved:
 
-## 10. What Is Not in Git
+```bash
+docker compose --profile face up -d face_sidecar
+```
+
+## 11. What Is Not in Git
 
 The Git repository contains application code and deployment files. It does not
 contain:

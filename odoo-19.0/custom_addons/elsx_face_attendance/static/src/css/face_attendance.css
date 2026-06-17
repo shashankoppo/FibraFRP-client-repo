@@ -1,0 +1,751 @@
+html,
+body {
+    min-height: 100%;
+    margin: 0;
+    background: #eef3f6;
+}
+
+.elsx_face_attendance_page {
+    min-height: 100vh;
+    background: #eef3f6;
+    padding: 24px;
+    color: #1f2933;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    box-sizing: border-box;
+}
+
+.elsx_face_attendance_page *,
+.elsx_face_attendance_page *::before,
+.elsx_face_attendance_page *::after {
+    box-sizing: inherit;
+}
+
+.elsx_face_attendance_page .d-none {
+    display: none !important;
+}
+
+.elsx_face_panel {
+    max-width: 1180px;
+    margin: 0 auto;
+    background: #fff;
+    border: 1px solid #dfe5ea;
+    border-radius: 8px;
+    padding: 24px;
+    box-shadow: 0 16px 40px rgba(21, 32, 43, 0.08);
+}
+
+.elsx_face_header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.elsx_face_eyebrow {
+    margin: 0 0 6px;
+    color: #0f766e;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.elsx_face_header h1 {
+    margin: 0;
+    font-size: 32px;
+    line-height: 1.15;
+}
+
+.elsx_face_subtitle {
+    margin: 8px 0 0;
+    color: #52616b;
+}
+
+.elsx_face_assurance {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 8px 0 16px;
+}
+
+.elsx_face_assurance span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: #e7f6ee;
+    color: #0b6b3a;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.elsx_face_status,
+.elsx_face_result {
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin: 14px 0;
+    background: #eef2f6;
+    color: #20303d;
+}
+
+.elsx_face_status.ok,
+.elsx_face_result.ok {
+    background: #e7f6ee;
+    color: #0b6b3a;
+}
+
+.elsx_face_status.warn,
+.elsx_face_result.warn {
+    background: #fff7df;
+    color: #7c5100;
+}
+
+.elsx_face_result.error {
+    background: #fdeaea;
+    color: #a11919;
+}
+
+.elsx_face_gate_grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin: 14px 0;
+}
+
+.elsx_face_gate {
+    min-height: 76px;
+    border: 1px solid #d9e2ec;
+    border-left-width: 4px;
+    border-radius: 8px;
+    background: #fbfcfd;
+    padding: 12px;
+}
+
+.elsx_face_gate strong,
+.elsx_face_gate span {
+    display: block;
+}
+
+.elsx_face_gate strong {
+    color: #102a43;
+    font-size: 11px;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.elsx_face_gate span {
+    margin-top: 8px;
+    color: #334e68;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+.elsx_face_gate.ok {
+    border-left-color: #0f766e;
+    background: #f3fbf7;
+}
+
+.elsx_face_gate.warn {
+    border-left-color: #d49100;
+    background: #fffaf0;
+}
+
+.elsx_face_gate.error {
+    border-left-color: #b42318;
+    background: #fff5f5;
+}
+
+.elsx_face_gate.active {
+    border-left-color: #315e8f;
+    background: #f0f6fc;
+}
+
+.elsx_face_command_grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin: 14px 0;
+}
+
+.elsx_face_command_grid > div,
+.elsx_face_evidence {
+    border: 1px solid #d9e2ec;
+    border-radius: 8px;
+    background: #fbfcfd;
+    padding: 12px;
+}
+
+.elsx_face_command_grid strong,
+.elsx_face_command_grid span {
+    display: block;
+}
+
+.elsx_face_command_grid strong {
+    color: #102a43;
+    font-size: 12px;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.elsx_face_command_grid span {
+    margin-top: 5px;
+    color: #334e68;
+    font-size: 13px;
+    line-height: 1.35;
+}
+
+.elsx_face_mode_panel {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin: 14px 0;
+}
+
+.elsx_face_mode_button {
+    min-height: 86px;
+    border: 1px solid #d9e2ec;
+    border-radius: 8px;
+    background: #fbfcfd;
+    color: #20303d;
+    cursor: pointer;
+    padding: 12px;
+    text-align: left;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.elsx_face_mode_button:hover {
+    border-color: #0f766e;
+    background: #f3fbf7;
+}
+
+.elsx_face_mode_button.active {
+    border-color: #0f766e;
+    background: #e7f6ee;
+    box-shadow: inset 3px 0 0 #0f766e;
+}
+
+.elsx_face_mode_button strong,
+.elsx_face_mode_button span {
+    display: block;
+}
+
+.elsx_face_mode_button strong {
+    font-size: 13px;
+    color: #102a43;
+}
+
+.elsx_face_mode_button span {
+    margin-top: 6px;
+    font-size: 12px;
+    line-height: 1.35;
+    color: #52616b;
+}
+
+.elsx_face_mode_summary {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(220px, 0.8fr);
+    gap: 12px;
+    align-items: stretch;
+    margin: 14px 0;
+    border: 1px solid #cbd7e2;
+    border-left: 4px solid #315e8f;
+    border-radius: 8px;
+    background: #f7fafc;
+    padding: 14px;
+}
+
+.elsx_face_mode_summary strong,
+.elsx_face_mode_summary span {
+    display: block;
+}
+
+.elsx_face_mode_summary strong {
+    color: #102a43;
+    font-size: 16px;
+}
+
+.elsx_face_mode_summary span {
+    margin-top: 5px;
+    color: #334e68;
+    line-height: 1.45;
+}
+
+.elsx_face_mode_summary > span {
+    align-self: stretch;
+    margin-top: 0;
+    border-radius: 6px;
+    background: #e8f1fa;
+    padding: 10px 12px;
+    color: #1b4e7a;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.elsx_face_scan_panel {
+    display: grid;
+    grid-template-columns: 1.3fr 0.7fr 0.9fr 1.3fr;
+    gap: 10px;
+    margin: 14px 0;
+    padding: 10px;
+    border: 1px solid #d9e2ec;
+    border-radius: 8px;
+    background: #fbfcfd;
+}
+
+.elsx_face_scan_panel.ok {
+    border-color: #92d7af;
+    background: #f3fbf7;
+}
+
+.elsx_face_scan_panel.warn {
+    border-color: #efd483;
+    background: #fffaf0;
+}
+
+.elsx_face_scan_panel.error {
+    border-color: #f4aaaa;
+    background: #fff5f5;
+}
+
+.elsx_face_scan_panel > div {
+    min-width: 0;
+}
+
+.elsx_face_scan_panel strong,
+.elsx_face_scan_panel span {
+    display: block;
+}
+
+.elsx_face_scan_panel strong {
+    color: #102a43;
+    font-size: 11px;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.elsx_face_scan_panel span {
+    margin-top: 5px;
+    color: #334e68;
+    font-size: 13px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.elsx_face_metric_grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin: 14px 0;
+}
+
+.elsx_face_metric {
+    min-height: 72px;
+    border: 1px solid #d9e2ec;
+    border-radius: 8px;
+    background: #fbfcfd;
+    padding: 12px;
+}
+
+.elsx_face_metric strong,
+.elsx_face_metric span {
+    display: block;
+}
+
+.elsx_face_metric strong {
+    color: #102a43;
+    font-size: 11px;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.elsx_face_metric span {
+    margin-top: 8px;
+    color: #334e68;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.3;
+}
+
+.elsx_face_camera {
+    overflow: hidden;
+    background: #111820;
+    border-radius: 8px;
+    aspect-ratio: 16 / 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    border: 1px solid #20303d;
+}
+
+.elsx_face_camera video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.elsx_face_frame {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.elsx_face_frame span {
+    display: block;
+    width: min(52%, 300px);
+    aspect-ratio: 3 / 4;
+    border: 3px solid rgba(255, 255, 255, 0.78);
+    border-radius: 50%;
+    box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.18);
+}
+
+.elsx_face_live_hint {
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    bottom: 14px;
+    z-index: 3;
+    min-height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: rgba(15, 23, 32, 0.78);
+    color: #fff;
+    font-weight: 700;
+    text-align: center;
+}
+
+.elsx_face_live_hint.ok {
+    background: rgba(11, 107, 58, 0.88);
+}
+
+.elsx_face_live_hint.warn {
+    background: rgba(124, 81, 0, 0.88);
+}
+
+.elsx_face_live_hint.error {
+    background: rgba(161, 25, 25, 0.9);
+}
+
+.elsx_face_challenge {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    right: 14px;
+    z-index: 3;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.26);
+    border-radius: 8px;
+    background: rgba(15, 23, 32, 0.72);
+    color: #fff;
+    font-weight: 700;
+    text-align: center;
+}
+
+.elsx_face_challenge.ok {
+    background: rgba(11, 107, 58, 0.88);
+}
+
+.elsx_face_challenge.warn {
+    background: rgba(124, 81, 0, 0.88);
+}
+
+.elsx_face_challenge.error {
+    background: rgba(161, 25, 25, 0.9);
+}
+
+.elsx_face_evidence {
+    display: none;
+    margin-top: 14px;
+    color: #334e68;
+    font-size: 13px;
+    line-height: 1.5;
+    white-space: pre-line;
+}
+
+.elsx_face_evidence.show {
+    display: block;
+}
+
+.elsx_face_quality_grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.elsx_face_quality_grid > div {
+    border: 1px solid #dfe5ea;
+    border-radius: 8px;
+    padding: 12px;
+    background: #fbfcfd;
+}
+
+.elsx_face_quality_grid strong,
+.elsx_face_quality_grid span {
+    display: block;
+}
+
+.elsx_face_quality_grid strong {
+    color: #20303d;
+    font-size: 13px;
+}
+
+.elsx_face_quality_grid span {
+    margin-top: 4px;
+    color: #52616b;
+    font-size: 12px;
+}
+
+.elsx_face_timeline {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.elsx_face_step {
+    position: relative;
+    min-height: 74px;
+    border: 1px solid #dfe5ea;
+    border-radius: 8px;
+    background: #fbfcfd;
+    padding: 12px 12px 12px 38px;
+}
+
+.elsx_face_step::before {
+    content: "";
+    position: absolute;
+    left: 14px;
+    top: 17px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #9aa6b2;
+    box-shadow: 0 0 0 4px rgba(154, 166, 178, 0.18);
+}
+
+.elsx_face_step.ok::before {
+    background: #0f766e;
+    box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.18);
+}
+
+.elsx_face_step.warn::before,
+.elsx_face_step.active::before {
+    background: #d49100;
+    box-shadow: 0 0 0 4px rgba(212, 145, 0, 0.18);
+}
+
+.elsx_face_step.error::before {
+    background: #b42318;
+    box-shadow: 0 0 0 4px rgba(180, 35, 24, 0.18);
+}
+
+.elsx_face_step strong,
+.elsx_face_step span {
+    display: block;
+}
+
+.elsx_face_step strong {
+    color: #102a43;
+    font-size: 12px;
+    text-transform: uppercase;
+}
+
+.elsx_face_step span {
+    margin-top: 6px;
+    color: #52616b;
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+.elsx_face_actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+}
+
+.elsx_face_attendance_page .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 42px;
+    padding: 9px 16px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: #eef2f6;
+    color: #1f2933;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.2;
+    text-decoration: none;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.elsx_face_attendance_page .btn:hover {
+    background: #dfe8ef;
+    color: #10212f;
+    text-decoration: none;
+}
+
+.elsx_face_attendance_page .btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.elsx_face_attendance_page .btn-primary {
+    background: #0f766e;
+    color: #fff;
+}
+
+.elsx_face_attendance_page .btn-primary:hover {
+    background: #0b625c;
+    color: #fff;
+}
+
+.elsx_face_attendance_page .btn-outline-primary {
+    border-color: #0f766e;
+    background: #fff;
+    color: #0f766e;
+}
+
+.elsx_face_attendance_page .btn-outline-primary:hover {
+    background: #e7f6ee;
+    color: #0b625c;
+}
+
+.elsx_face_kiosk_link {
+    color: #1f2933;
+    text-decoration: none;
+}
+
+.elsx_face_kiosk_link:hover {
+    color: #0f766e;
+    text-decoration: none;
+}
+
+.elsx_face_kiosk_icon {
+    width: 350px;
+    height: 210px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    border: 8px solid #7a4d72;
+    border-radius: 12px;
+    background: #99778f;
+    color: #fff;
+    font-size: 56px;
+}
+
+.elsx_face_kiosk_icon span {
+    font-size: 30px;
+    font-weight: 700;
+}
+
+.elsx_face_kiosk_icon_small {
+    width: 40%;
+    height: 90px;
+    min-width: 120px;
+    font-size: 34px;
+    border-width: 4px;
+}
+
+@media (max-width: 991px) {
+    .elsx_face_panel {
+        max-width: 100%;
+    }
+
+    .elsx_face_gate_grid,
+    .elsx_face_metric_grid,
+    .elsx_face_timeline {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .elsx_face_mode_panel {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .elsx_face_mode_summary {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .elsx_face_attendance_page {
+        padding: 12px;
+    }
+
+    .elsx_face_panel {
+        padding: 16px;
+    }
+
+    .elsx_face_header {
+        flex-direction: column;
+    }
+
+    .elsx_face_header h1 {
+        font-size: 24px;
+    }
+
+    .elsx_face_actions .btn {
+        width: 100%;
+    }
+
+    .elsx_face_quality_grid {
+        grid-template-columns: 1fr;
+    }
+
+    .elsx_face_command_grid {
+        grid-template-columns: 1fr;
+    }
+
+    .elsx_face_mode_panel,
+    .elsx_face_scan_panel {
+        grid-template-columns: 1fr;
+    }
+
+    .elsx_face_gate_grid,
+    .elsx_face_metric_grid,
+    .elsx_face_timeline {
+        grid-template-columns: 1fr;
+    }
+
+    .elsx_face_kiosk_icon_small {
+        min-width: 100px;
+        height: 76px;
+    }
+}
+
+@media (max-width: 480px) {
+    .elsx_face_panel {
+        padding: 12px;
+    }
+
+    .elsx_face_header h1 {
+        font-size: 22px;
+    }
+
+    .elsx_face_camera {
+        aspect-ratio: 4 / 5;
+    }
+
+    .elsx_face_frame span {
+        width: min(68%, 260px);
+    }
+}

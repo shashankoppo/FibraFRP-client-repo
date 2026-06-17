@@ -1,0 +1,457 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_elsx_website_ai_draft_list" model="ir.ui.view">
+        <field name="name">elsx.website.ai.draft.list</field>
+        <field name="model">elsx.website.ai.draft</field>
+        <field name="arch" type="xml">
+            <list string="AI Website Drafts" default_order="create_date desc">
+                <field name="name"/>
+                <field name="mode"/>
+                <field name="page_blueprint" optional="show"/>
+                <field name="edit_scope" optional="show"/>
+                <field name="design_style" optional="hide"/>
+                <field name="website_id" groups="website.group_multi_website"/>
+                <field name="source_page_id"/>
+                <field name="target_page_id"/>
+                <field name="quality_score" optional="show"/>
+                <field name="provider_id" optional="hide"/>
+                <field name="state" widget="badge"/>
+                <field name="create_uid" widget="many2one_avatar" optional="hide"/>
+                <field name="create_date" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_elsx_website_ai_draft_search" model="ir.ui.view">
+        <field name="name">elsx.website.ai.draft.search</field>
+        <field name="model">elsx.website.ai.draft</field>
+        <field name="arch" type="xml">
+            <search string="AI Website Drafts">
+                <field name="name"/>
+                <field name="instruction"/>
+                <field name="source_page_id"/>
+                <field name="target_page_id"/>
+                <filter name="generated" string="Generated" domain="[('state', '=', 'generated')]"/>
+                <filter name="page_created" string="Unpublished Page Created" domain="[('state', '=', 'page_created')]"/>
+                <filter name="published" string="Published" domain="[('state', '=', 'published')]"/>
+                <filter name="failed" string="Failed" domain="[('state', '=', 'failed')]"/>
+                <filter name="new_page" string="New Page" domain="[('mode', '=', 'new_page')]"/>
+                <filter name="improve_page" string="Improve Page" domain="[('mode', '=', 'improve_page')]"/>
+                <filter name="crm_whatsapp" string="CRM / WhatsApp" domain="[('mode', '=', 'crm_whatsapp')]"/>
+                <filter name="product_blueprint" string="Product Blueprint" domain="[('page_blueprint', '=', 'product')]"/>
+                <filter name="low_quality" string="Needs Polish" domain="[('quality_score', '&lt;', 70), ('state', 'in', ('generated', 'page_created'))]"/>
+                <filter name="has_source" string="Has Source Page" domain="[('source_page_id', '!=', False)]"/>
+                <filter name="has_generated_page" string="Has Generated Page" domain="[('target_page_id', '!=', False)]"/>
+                <group>
+                    <filter name="group_state" string="State" context="{'group_by': 'state'}"/>
+                    <filter name="group_mode" string="Mode" context="{'group_by': 'mode'}"/>
+                    <filter name="group_blueprint" string="Blueprint" context="{'group_by': 'page_blueprint'}"/>
+                    <filter name="group_scope" string="Scope" context="{'group_by': 'edit_scope'}"/>
+                    <filter name="group_website" string="Website" context="{'group_by': 'website_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_elsx_website_ai_draft_form" model="ir.ui.view">
+        <field name="name">elsx.website.ai.draft.form</field>
+        <field name="model">elsx.website.ai.draft</field>
+        <field name="arch" type="xml">
+            <form string="ELSx AI Studio" class="o_elsx_ai_website_builder_form">
+                <header>
+                    <button name="action_generate_draft" type="object" string="Generate Studio Draft" class="btn-primary"
+                            invisible="state == 'published'"/>
+                    <button name="action_preset_product_page" type="object" string="Product Studio" class="btn-secondary"
+                            invisible="state == 'published'"/>
+                    <button name="action_preset_landing_page" type="object" string="Landing Studio" class="btn-secondary"
+                            invisible="state == 'published'"/>
+                    <button name="action_preset_redesign" type="object" string="Redesign Studio" class="btn-secondary"
+                            invisible="state == 'published'"/>
+                    <button name="action_preset_mobile" type="object" string="Mobile Studio" class="btn-secondary"
+                            invisible="state == 'published'"/>
+                    <button name="action_preset_crm_whatsapp" type="object" string="CRM / WhatsApp Studio" class="btn-secondary"
+                            invisible="state == 'published'"/>
+                    <button name="action_clone_source_page" type="object" string="Clone Source Page" class="btn-secondary"
+                            invisible="not source_page_id or target_page_id"/>
+                    <button name="action_create_unpublished_page" type="object" string="Create Unpublished Page" class="btn-primary"
+                            invisible="state != 'generated' or target_page_id"/>
+                    <button name="action_update_unpublished_page" type="object" string="Update Unpublished Page" class="btn-primary"
+                            confirm="Replace the generated unpublished page copy with the latest AI draft? The live page is not touched."
+                            invisible="not target_page_id or state not in ('generated', 'page_created')"/>
+                    <button name="action_open_preview" type="object" string="Open Preview" class="btn-secondary"
+                            invisible="not target_page_id"/>
+                    <button name="action_open_editor" type="object" string="Open Editor" class="btn-secondary"
+                            invisible="not target_page_id"/>
+                    <button name="action_publish_page" type="object" string="Publish Page" class="btn-primary"
+                            confirm="Publish this AI-generated copy? Existing live pages are not changed, but this generated page will become public."
+                            invisible="state != 'page_created'"/>
+                    <button name="action_unpublish_page" type="object" string="Unpublish Page"
+                            confirm="Unpublish this AI-generated page?"
+                            invisible="state != 'published'"/>
+                    <button name="action_reset_to_draft" type="object" string="Reset to Draft"
+                            invisible="state not in ('generated', 'page_created', 'failed', 'cancelled')"/>
+                    <button name="action_cancel" type="object" string="Cancel"
+                            invisible="state in ('cancelled', 'page_created', 'published')"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,generated,page_created,published"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="Landing page, product section, SEO polish..."/></h1>
+                    </div>
+
+                    <div class="alert alert-info o_elsx_ai_safety_note" role="alert">
+                        ELSx AI Studio works like a safe website builder: command it, generate a draft, create or update an unpublished copy, edit in the standard Odoo Website editor, then publish manually only after review.
+                    </div>
+
+                    <div class="o_elsx_ai_studio_landing">
+                        <div>
+                            <p class="o_elsx_ai_eyebrow">Draft-first Odoo CE website studio</p>
+                            <h2>Build, redesign, polish, and prepare pages without touching the live website.</h2>
+                            <p>Use the presets, describe the business outcome, let AI create a reviewed draft, and finish in Odoo's visual editor.</p>
+                        </div>
+                        <div class="o_elsx_ai_studio_steps">
+                            <span>1. Command</span>
+                            <span>2. Generate</span>
+                            <span>3. Review</span>
+                            <span>4. Edit &amp; Publish</span>
+                        </div>
+                    </div>
+
+                    <group>
+                        <group string="Studio Command">
+                            <field name="mode" readonly="state not in ('draft', 'failed', 'cancelled')"/>
+                            <field name="edit_scope" readonly="state == 'published'"/>
+                            <field name="apply_strategy" readonly="state == 'published'"/>
+                            <field name="section_position" readonly="state == 'published'"/>
+                            <field name="design_style" readonly="state == 'published'"/>
+                            <field name="page_blueprint" readonly="state == 'published'"/>
+                            <field name="device_focus" readonly="state == 'published'"/>
+                            <field name="content_depth" readonly="state == 'published'"/>
+                            <field name="brand_tone" readonly="state not in ('draft', 'failed', 'cancelled')"/>
+                            <field name="conversion_action" readonly="state == 'published'"/>
+                            <field name="target_audience" placeholder="Dealers, procurement teams, local buyers..." readonly="state not in ('draft', 'failed', 'cancelled')"/>
+                            <field name="page_goal" placeholder="Collect quote requests, build trust, improve mobile landing..." readonly="state not in ('draft', 'failed', 'cancelled')"/>
+                            <field name="instruction" placeholder="Example: Create a dealer enquiry landing page for FRP manhole covers with a clear CTA."
+                                   readonly="state == 'published'"/>
+                            <field name="revision_notes" placeholder="Example: Make the hero more premium, add stronger WhatsApp CTA, simplify mobile layout."
+                                   readonly="state == 'published'"/>
+                        </group>
+                        <group string="Target Page &amp; Assets">
+                            <field name="website_id" readonly="state not in ('draft', 'failed', 'cancelled')" groups="website.group_multi_website"/>
+                            <field name="source_page_id" readonly="state not in ('draft', 'failed', 'cancelled')"/>
+                            <field name="requested_url" placeholder="/frp-manhole-covers" readonly="state == 'published'"/>
+                            <field name="business_context" placeholder="Products, regions served, compliance notes, brand facts, offers, phone/email, website style..."
+                                   readonly="state == 'published'"/>
+                            <field name="asset_strategy" readonly="state == 'published'"/>
+                            <field name="asset_guidance" placeholder="Preferred images, catalogue/product URLs, trust marks, proof points, sections to avoid..."
+                                   readonly="state == 'published'"/>
+                        </group>
+                    </group>
+
+                    <group>
+                        <group string="Studio Brief">
+                            <field name="studio_brief" nolabel="1"/>
+                        </group>
+                        <group string="Output">
+                            <field name="provider_id"/>
+                            <field name="ai_job_id"/>
+                            <field name="target_page_id"/>
+                            <field name="preview_url"/>
+                            <field name="quality_score"/>
+                            <field name="asset_intents"/>
+                            <field name="asset_candidates"/>
+                            <field name="seo_title"/>
+                            <field name="seo_description"/>
+                            <field name="seo_keywords"/>
+                            <field name="published_by_id"/>
+                            <field name="published_date"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Preview">
+                            <div class="o_elsx_ai_preview_card">
+                                <field name="draft_preview_html" widget="html" nolabel="1" readonly="1"/>
+                            </div>
+                        </page>
+                        <page string="Summary &amp; Warnings">
+                            <group>
+                                <field name="ai_summary" nolabel="1" placeholder="AI summary appears after generation."/>
+                                <field name="warnings" nolabel="1" placeholder="Safety and content warnings appear here."/>
+                            </group>
+                        </page>
+                        <page string="Plan &amp; Quality">
+                            <group>
+                                <field name="section_plan" nolabel="1" placeholder="Generated section plan appears after generation."/>
+                                <field name="quality_checklist" nolabel="1" placeholder="Quality checklist appears after generation."/>
+                            </group>
+                        </page>
+                        <page string="Images &amp; Assets">
+                            <group>
+                                <field name="asset_strategy"/>
+                                <field name="asset_intents" nolabel="1" placeholder="Image intents appear after generation."/>
+                                <field name="asset_candidates" nolabel="1" placeholder="Odoo media/product/brand image candidates appear after generation."/>
+                            </group>
+                        </page>
+                        <page string="Draft HTML">
+                            <field name="draft_html" nolabel="1" readonly="1"/>
+                        </page>
+                        <page string="Draft CSS">
+                            <field name="draft_css" nolabel="1" readonly="1"/>
+                        </page>
+                        <page string="Before / After Diff">
+                            <field name="diff_text" nolabel="1" readonly="1"/>
+                        </page>
+                        <page string="Snapshots">
+                            <field name="version_ids" nolabel="1">
+                                <list>
+                                    <field name="applied_date"/>
+                                    <field name="page_id"/>
+                                    <field name="view_id"/>
+                                    <field name="applied_by_id" widget="many2one_avatar"/>
+                                    <field name="note"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Raw AI Output" groups="base.group_no_one">
+                            <field name="raw_ai_output" nolabel="1" readonly="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_elsx_website_ai_version_form" model="ir.ui.view">
+        <field name="name">elsx.website.ai.version.form</field>
+        <field name="model">elsx.website.ai.version</field>
+        <field name="arch" type="xml">
+            <form string="AI Website Snapshot">
+                <sheet>
+                    <group>
+                        <field name="draft_id"/>
+                        <field name="page_id"/>
+                        <field name="view_id"/>
+                        <field name="applied_by_id"/>
+                        <field name="applied_date"/>
+                        <field name="note"/>
+                    </group>
+                    <notebook>
+                        <page string="Original XML">
+                            <field name="original_arch" nolabel="1"/>
+                        </page>
+                        <page string="AI Draft XML">
+                            <field name="new_arch" nolabel="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_elsx_ce_ai_command_list" model="ir.ui.view">
+        <field name="name">elsx.ce.ai.command.list</field>
+        <field name="model">elsx.ce.ai.command</field>
+        <field name="arch" type="xml">
+            <list string="ELSx CE AI Commands" default_order="create_date desc">
+                <field name="name"/>
+                <field name="command_type"/>
+                <field name="execution_mode"/>
+                <field name="risk_level" widget="badge"/>
+                <field name="quality_score"/>
+                <field name="provider_id" optional="hide"/>
+                <field name="website_draft_id" optional="show"/>
+                <field name="state" widget="badge"/>
+                <field name="create_uid" widget="many2one_avatar" optional="hide"/>
+                <field name="create_date" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_elsx_ce_ai_command_search" model="ir.ui.view">
+        <field name="name">elsx.ce.ai.command.search</field>
+        <field name="model">elsx.ce.ai.command</field>
+        <field name="arch" type="xml">
+            <search string="ELSx CE AI Commands">
+                <field name="name"/>
+                <field name="instruction"/>
+                <field name="result_markdown"/>
+                <filter name="generated" string="Generated" domain="[('state', '=', 'generated')]"/>
+                <filter name="handed_off" string="Handed Off" domain="[('state', '=', 'handed_off')]"/>
+                <filter name="failed" string="Failed" domain="[('state', '=', 'failed')]"/>
+                <filter name="website_work" string="Website Work" domain="[('command_type', 'in', ('website_page', 'website_redesign', 'website_section', 'seo', 'ux_review'))]"/>
+                <filter name="sensitive" string="Sensitive Review" domain="[('risk_level', '=', 'sensitive')]"/>
+                <filter name="low_quality" string="Needs Polish" domain="[('quality_score', '&lt;', 70), ('state', 'in', ('generated', 'handed_off'))]"/>
+                <group>
+                    <filter name="group_state" string="State" context="{'group_by': 'state'}"/>
+                    <filter name="group_type" string="Type" context="{'group_by': 'command_type'}"/>
+                    <filter name="group_risk" string="Risk" context="{'group_by': 'risk_level'}"/>
+                    <filter name="group_mode" string="Mode" context="{'group_by': 'execution_mode'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_elsx_ce_ai_command_form" model="ir.ui.view">
+        <field name="name">elsx.ce.ai.command.form</field>
+        <field name="model">elsx.ce.ai.command</field>
+        <field name="arch" type="xml">
+            <form string="ELSx CE AI Command Center" class="o_elsx_ai_website_builder_form">
+                <header>
+                    <button name="action_run_command" type="object" string="Run AI Command" class="btn-primary"
+                            invisible="state in ('running', 'cancelled')"/>
+                    <button name="action_create_website_builder_draft" type="object" string="Create Website Builder Draft" class="btn-primary"
+                            invisible="state not in ('generated', 'handed_off') or command_type not in ('website_page', 'website_redesign', 'website_section', 'seo', 'ux_review')"/>
+                    <button name="action_open_website_draft" type="object" string="Open Website Draft" class="btn-secondary"
+                            invisible="not website_draft_id"/>
+                    <button name="action_reset_to_draft" type="object" string="Reset to Draft"
+                            invisible="state in ('draft', 'running')"/>
+                    <button name="action_cancel" type="object" string="Cancel"
+                            invisible="state in ('cancelled', 'handed_off')"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,running,generated,handed_off"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="Website, CRM, WhatsApp, campaign, module, UX command..."/></h1>
+                    </div>
+
+                    <div class="alert alert-warning" role="alert">
+                        ELSx CE AI Command Center is draft-first. It generates plans, copy, specs, and website handoffs only. It does not edit live data, publish pages, run SQL, or bypass Odoo licensing.
+                    </div>
+
+                    <group>
+                        <group string="Command">
+                            <field name="command_type" readonly="state not in ('draft', 'failed', 'cancelled')"/>
+                            <field name="execution_mode" readonly="state not in ('draft', 'failed', 'cancelled')"/>
+                            <field name="instruction" placeholder="Example: Build a complete website redesign plan for FiberaFRP with catalogue, quote, WhatsApp and SEO sections."
+                                   readonly="state in ('running', 'handed_off')"/>
+                            <field name="business_context" placeholder="Brand facts, products, region, constraints, users, desired outcome..."
+                                   readonly="state in ('running', 'handed_off')"/>
+                            <field name="constraints" readonly="state in ('running', 'handed_off')"/>
+                        </group>
+                        <group string="Context">
+                            <field name="website_id" groups="website.group_multi_website"/>
+                            <field name="source_page_id"/>
+                            <field name="target_model" placeholder="website.page, crm.lead, whatsapp.campaign..."/>
+                            <field name="target_record_id"/>
+                            <field name="provider_id"/>
+                            <field name="ai_job_id"/>
+                            <field name="website_draft_id"/>
+                            <field name="risk_level" widget="badge"/>
+                            <field name="quality_score"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="AI Result">
+                            <field name="result_preview_html" widget="html" nolabel="1" readonly="1"/>
+                        </page>
+                        <page string="Draft Artifact">
+                            <field name="result_markdown" nolabel="1" readonly="1"/>
+                        </page>
+                        <page string="Recommended Actions">
+                            <field name="recommended_actions" nolabel="1" readonly="1"/>
+                        </page>
+                        <page string="Safety">
+                            <field name="safety_notes" nolabel="1" readonly="1"/>
+                        </page>
+                        <page string="Raw JSON" groups="base.group_no_one">
+                            <field name="result_json" nolabel="1" readonly="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_elsx_ce_ai_command" model="ir.actions.act_window">
+        <field name="name">ELSx CE AI Command Center</field>
+        <field name="res_model">elsx.ce.ai.command</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'default_execution_mode': 'draft'}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Run safe AI commands for Odoo CE</p>
+            <p>Generate website, CRM, WhatsApp, campaign, SEO, UX, workflow, and module planning artifacts without touching production records.</p>
+        </field>
+    </record>
+
+    <record id="action_elsx_website_ai_draft" model="ir.actions.act_window">
+        <field name="name">ELSx AI Studio</field>
+        <field name="res_model">elsx.website.ai.draft</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'default_mode': 'new_page'}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create safe AI website drafts</p>
+            <p>Generate unpublished pages, copy improvements, SEO polish, and mobile-friendly sections using your configured ELSx AI provider.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_elsx_ce_ai_command"
+              name="CE AI Command Center"
+              parent="website.menu_content"
+              action="action_elsx_ce_ai_command"
+              sequence="17"
+              groups="elsx_ai_website_builder.group_ai_website_builder_manager"/>
+
+    <menuitem id="menu_elsx_website_ai_builder"
+              name="ELSx AI Studio"
+              parent="website.menu_content"
+              action="action_elsx_website_ai_draft"
+              sequence="18"
+              groups="elsx_ai_website_builder.group_ai_website_builder_manager"/>
+
+    <record id="website_pages_form_ai_builder_inherit" model="ir.ui.view">
+        <field name="name">website.page.form.ai.builder</field>
+        <field name="model">website.page</field>
+        <field name="inherit_id" ref="website.website_pages_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form/sheet" position="before">
+                <header>
+                    <button name="action_open_ai_builder"
+                            type="object"
+                            string="AI Improve Page"
+                            class="btn-primary"
+                            groups="elsx_ai_website_builder.group_ai_website_builder_manager"/>
+                </header>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="website_pages_list_ai_builder_inherit" model="ir.ui.view">
+        <field name="name">website.page.list.ai.builder</field>
+        <field name="model">website.page</field>
+        <field name="inherit_id" ref="website.website_pages_tree_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//list/field[@name='website_url']" position="after">
+                <button name="action_open_ai_builder"
+                        type="object"
+                        icon="fa-magic"
+                        title="AI Improve Page"
+                        groups="elsx_ai_website_builder.group_ai_website_builder_manager"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="website_pages_kanban_ai_builder_inherit" model="ir.ui.view">
+        <field name="name">website.page.kanban.ai.builder</field>
+        <field name="model">website.page</field>
+        <field name="inherit_id" ref="website.website_pages_kanban_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//templates/t[@t-name='card']/div[last()]" position="after">
+                <div class="d-flex border-top mt-2 pt-2"
+                     groups="elsx_ai_website_builder.group_ai_website_builder_manager">
+                    <button class="btn-link p-0"
+                            name="action_open_ai_builder"
+                            title="AI Improve Page"
+                            type="object"
+                            icon="fa-magic"/>
+                    <span class="ms-2">AI Improve</span>
+                </div>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

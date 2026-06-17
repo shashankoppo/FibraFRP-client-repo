@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="elsx_face_attendance.PublicKioskFaceOption"
+       t-inherit="hr_attendance.PublicKiosksSettingScreen"
+       t-inherit-mode="extension">
+        <xpath expr="//div[hasclass('o_hr_kiosk_mode_main')]" position="inside">
+            <div class="d-flex flex-column align-items-center text-center gap-2"
+                 t-att-style="!env.isSmall ? 'max-width: min-content;' : ''">
+                <a href="#"
+                   t-att-data-token="this.props.token"
+                   class="elsx_face_kiosk_link btn btn-light"
+                   t-att-class="{
+                       'd-flex flex-row rounded-2 ps-2 align-items-center gap-2' : env.isSmall,
+                       'btn-lg rounded-3': !env.isSmall
+                   }">
+                    <t t-if="env.isSmall">
+                        <span class="elsx_face_kiosk_icon elsx_face_kiosk_icon_small">
+                            <i class="fa fa-camera"/>
+                        </span>
+                        <h6 class="m-0">Face ID</h6>
+                    </t>
+                    <t t-else="">
+                        <span class="elsx_face_kiosk_icon">
+                            <i class="fa fa-camera"/>
+                            <span>Face ID</span>
+                        </span>
+                    </t>
+                </a>
+                <t t-if="!env.isSmall">
+                    <h5 class="m-0 w-75">Face ID on Tablet</h5>
+                    <em>camera verification</em>
+                </t>
+            </div>
+        </xpath>
+    </t>
+</templates>

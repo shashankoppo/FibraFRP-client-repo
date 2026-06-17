@@ -1,0 +1,4 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_elsx_website_ai_draft_manager,elsx.website.ai.draft.manager,model_elsx_website_ai_draft,elsx_ai_website_builder.group_ai_website_builder_manager,1,1,1,1
+access_elsx_website_ai_version_manager,elsx.website.ai.version.manager,model_elsx_website_ai_version,elsx_ai_website_builder.group_ai_website_builder_manager,1,1,1,0
+access_elsx_ce_ai_command_manager,elsx.ce.ai.command.manager,model_elsx_ce_ai_command,elsx_ai_website_builder.group_ai_website_builder_manager,1,1,1,1

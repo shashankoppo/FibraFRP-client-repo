@@ -1,14 +1,49 @@
+# Version control
 .git
 .github
+
+# Archives and large binaries
 *.zip
+*.enc
+
+# Logs
 *.log
+latest_upgrade.log
+odoo_server.log
+upgrade_log.txt
+upgrade_output.txt
+verify_output.txt
+
+# Python artifacts
 venv19/
 __pycache__/
 *.pyc
 *.pyo
+*.egg-info
+
+# Windows scripts
 *.bat
-*.bat
+
+# Build / packaging
 debian/
 doc/
 setup/
-upgrade_client_restrictions.bat
+
+# Deployment scripts (not needed inside the container)
+deploy/
+secure_backups/
+
+# Scratch / AI / dev tooling
+brain/
+scratch/
+.vscode/
+
+# Sidecars (built separately)
+face_sidecar/
+
+# Documentation (not needed at runtime)
+*.md
+!requirements.txt
+
+# Environment file (secrets)
+.env

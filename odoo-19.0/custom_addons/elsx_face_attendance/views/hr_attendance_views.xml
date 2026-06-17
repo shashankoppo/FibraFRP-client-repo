@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_attendance_tree_face_inherit" model="ir.ui.view">
+        <field name="name">hr.attendance.list.elsx.face</field>
+        <field name="model">hr.attendance</field>
+        <field name="inherit_id" ref="hr_attendance.view_attendance_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='out_mode']" position="after">
+                <field name="elsx_face_verified" string="Face" optional="show"/>
+                <field name="elsx_face_confidence" string="Face Confidence" optional="hidden"/>
+                <field name="elsx_face_policy_mode" string="Face Policy" optional="hidden"/>
+                <field name="elsx_face_risk_level" string="Face Risk" optional="hidden"/>
+                <field name="elsx_face_review_required" string="Face Review" optional="hidden"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="hr_attendance_view_form_face_inherit" model="ir.ui.view">
+        <field name="name">hr.attendance.form.elsx.face</field>
+        <field name="model">hr.attendance</field>
+        <field name="inherit_id" ref="hr_attendance.hr_attendance_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group[@name='check_in_group']" position="after">
+                <separator string="Face Verification"/>
+                <group colspan="2" name="elsx_face_group">
+                    <group>
+                        <field name="elsx_face_verified"/>
+                        <field name="elsx_face_confidence"/>
+                        <field name="elsx_face_policy_mode"/>
+                        <field name="elsx_face_decision"/>
+                        <field name="elsx_face_risk_level"/>
+                        <field name="elsx_face_risk_score"/>
+                    </group>
+                    <group>
+                        <field name="elsx_face_liveness_status"/>
+                        <field name="elsx_face_review_required"/>
+                        <field name="elsx_face_failure_reason"/>
+                        <field name="elsx_face_verification_id"/>
+                    </group>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="hr_attendance_view_filter_face_inherit" model="ir.ui.view">
+        <field name="name">hr.attendance.search.elsx.face</field>
+        <field name="model">hr.attendance</field>
+        <field name="inherit_id" ref="hr_attendance.hr_attendance_view_filter"/>
+        <field name="arch" type="xml">
+            <xpath expr="//filter[@name='auto_check']" position="after">
+                <filter string="Face Verified" name="elsx_face_verified" domain="[('elsx_face_verified', '=', True)]"/>
+                <filter string="Face Not Verified" name="elsx_face_not_verified" domain="[('elsx_face_verified', '=', False), ('elsx_face_verification_id', '!=', False)]"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

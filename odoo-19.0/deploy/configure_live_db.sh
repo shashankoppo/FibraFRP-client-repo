@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-LIVE_DB_NAME="${1:-${LIVE_DB_NAME:-FiberaFRP_DB}}"
+LIVE_DB_NAME="${1:-${LIVE_DB_NAME:-}}"
 LIVE_ACCOUNT_ID="${2:-${WHATSAPP_ACCOUNT_ID:-}}"
 LIVE_VERIFY_TOKEN="${3:-${WHATSAPP_VERIFY_TOKEN:-}}"
 LIVE_APP_SECRET="${4:-${WHATSAPP_APP_SECRET:-}}"
@@ -14,6 +14,12 @@ sql_quote() {
   local value="${1//\'/\'\'}"
   printf "'%s'" "${value}"
 }
+
+if [ -z "${LIVE_DB_NAME}" ]; then
+  echo "ERROR: database name is required. This script will not guess a production database." >&2
+  echo "Usage: bash deploy/configure_live_db.sh <database_name> [whatsapp_account_id] [verify_token] [app_secret]" >&2
+  exit 2
+fi
 
 LIVE_DB_SQL="$(sql_quote "${LIVE_DB_NAME}")"
 

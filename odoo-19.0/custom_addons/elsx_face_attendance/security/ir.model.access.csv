@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_elsx_face_profile_user,elsx.face.profile.user,model_elsx_face_profile,base.group_user,1,0,0,0
+access_elsx_face_profile_manager,elsx.face.profile.manager,model_elsx_face_profile,hr_attendance.group_hr_attendance_manager,1,1,1,1
+access_elsx_face_verification_log_user,elsx.face.verification.log.user,model_elsx_face_verification_log,base.group_user,1,0,0,0
+access_elsx_face_verification_log_manager,elsx.face.verification.log.manager,model_elsx_face_verification_log,hr_attendance.group_hr_attendance_manager,1,1,1,0

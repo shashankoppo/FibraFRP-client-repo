@@ -28,6 +28,11 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 node_modules/
+venv/
+.venv/
+env/
+.env/
+odoo-19.0/venv19/
 
 # Local editor/OS noise
 .DS_Store

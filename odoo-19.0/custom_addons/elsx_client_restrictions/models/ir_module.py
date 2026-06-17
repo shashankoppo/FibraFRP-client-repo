@@ -1,12 +1,61 @@
 # -*- coding: utf-8 -*-
-from odoo import models
+from odoo import _, models
+from odoo.exceptions import UserError
 import logging
 
 _logger = logging.getLogger(__name__)
 
 
+PROTECTED_MODULES = {
+    'base',
+    'web',
+    'mail',
+    'contacts',
+    'crm',
+    'sale',
+    'account',
+    'hr',
+    'hr_attendance',
+    'elsx_whatsapp_marketing',
+    'elsx_attendance_tracking',
+    'elsx_face_attendance',
+    'elsx_client_restrictions',
+    'elsx_tally_integration',
+    'elsx_saas',
+    'elsx_security',
+}
+
+
 class IrModuleModule(models.Model):
     _inherit = 'ir.module.module'
+
+    def _elsx_protected_module_names(self):
+        params = self.env['ir.config_parameter'].sudo()
+        configured = params.get_param('elsx.module_guard.protected_modules', default='')
+        names = set(PROTECTED_MODULES)
+        if configured:
+            names |= {name.strip() for name in configured.replace('\n', ',').split(',') if name.strip()}
+        return names
+
+    def _elsx_protected_uninstall_candidates(self):
+        candidates = self
+        try:
+            candidates |= self.downstream_dependencies()
+        except Exception:
+            _logger.exception('Could not compute downstream module dependencies for ELSx module guard.')
+        return candidates.filtered(lambda module: module.name in self._elsx_protected_module_names())
+
+    def _elsx_check_protected_uninstall(self):
+        if self.env.context.get('elsx_allow_protected_module_uninstall'):
+            return
+        protected = self._elsx_protected_uninstall_candidates()
+        if protected:
+            names = ', '.join(sorted(protected.mapped('name')))
+            raise UserError(_(
+                "Production safety blocked this uninstall.\n\n"
+                "The operation would remove protected modules: %s\n\n"
+                "Create a verified encrypted backup and use a technical recovery plan before removing protected modules."
+            ) % names)
 
     def _elsx_rescue_brand_promotion_view(self):
         """Repair the old branding override before installing modules.
@@ -93,6 +142,18 @@ class IrModuleModule(models.Model):
         """
         self._elsx_rescue_brand_promotion_view()
         return super(IrModuleModule, self).button_immediate_upgrade()
+
+    def button_uninstall(self):
+        self._elsx_check_protected_uninstall()
+        return super(IrModuleModule, self).button_uninstall()
+
+    def button_immediate_uninstall(self):
+        self._elsx_check_protected_uninstall()
+        return super(IrModuleModule, self).button_immediate_uninstall()
+
+    def module_uninstall(self):
+        self._elsx_check_protected_uninstall()
+        return super(IrModuleModule, self).module_uninstall()
 
     def update_list(self):
         """

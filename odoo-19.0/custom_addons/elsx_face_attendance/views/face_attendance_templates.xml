@@ -1,0 +1,356 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="face_attendance_page" name="ELSx Face Attendance">
+        <html lang="en">
+            <head>
+                <meta charset="utf-8"/>
+                <meta name="viewport" content="width=device-width, initial-scale=1"/>
+                <title>Face Attendance | ELSxGlobal</title>
+                <link rel="stylesheet" type="text/css" href="/elsx_face_attendance/static/src/css/face_attendance.css"/>
+                <script type="text/javascript" defer="defer" src="/elsx_face_attendance/static/src/js/face_attendance_portal.js"></script>
+            </head>
+            <body>
+            <div class="elsx_face_attendance_page" t-att-data-employee-id="employee.id if employee else ''">
+                <section class="elsx_face_panel">
+                    <div class="elsx_face_header">
+                        <div>
+                            <p class="elsx_face_eyebrow">ELSxGlobal Attendances</p>
+                            <h1>Face Attendance</h1>
+                            <p class="elsx_face_subtitle">
+                                <t t-if="employee">Signed in as <strong><t t-esc="employee.name"/></strong></t>
+                                <t t-else="">No employee is linked to this user.</t>
+                            </p>
+                        </div>
+                        <a href="/odoo" class="btn btn-secondary">Back to ELSxGlobal</a>
+                    </div>
+                    <div class="elsx_face_assurance">
+                        <span>Local recognition engine</span>
+                        <span>Encrypted face templates</span>
+                        <span>No raw image storage by default</span>
+                    </div>
+                    <div class="elsx_face_status" id="elsx_face_status">Checking settings...</div>
+                    <div class="elsx_face_gate_grid" aria-label="Verification readiness">
+                        <div class="elsx_face_gate warn" id="elsx_face_gate_system">
+                            <strong>System</strong>
+                            <span>Checking</span>
+                        </div>
+                        <div class="elsx_face_gate warn" id="elsx_face_gate_camera">
+                            <strong>Camera</strong>
+                            <span>Not started</span>
+                        </div>
+                        <div class="elsx_face_gate warn" id="elsx_face_gate_identity">
+                            <strong>Identity</strong>
+                            <span>Pending</span>
+                        </div>
+                        <div class="elsx_face_gate warn" id="elsx_face_gate_policy">
+                            <strong>Policy</strong>
+                            <span>Loading</span>
+                        </div>
+                    </div>
+                    <div class="elsx_face_command_grid">
+                        <div>
+                            <strong>Policy</strong>
+                            <span id="elsx_face_policy">Loading policy...</span>
+                        </div>
+                        <div>
+                            <strong>Device Evidence</strong>
+                            <span id="elsx_face_device">Waiting for browser evidence</span>
+                        </div>
+                        <div>
+                            <strong>Risk Decision</strong>
+                            <span id="elsx_face_risk">No verification yet</span>
+                        </div>
+                    </div>
+                    <div class="elsx_face_mode_panel" aria-label="Face attendance operating mode">
+                        <button type="button" class="elsx_face_mode_button active" data-face-mode="manual">
+                            <strong>Manual Verify</strong>
+                            <span>Operator starts check-in/out.</span>
+                        </button>
+                        <button type="button" class="elsx_face_mode_button" data-face-mode="person_auto">
+                            <strong>Auto Person Scan</strong>
+                            <span>Find one stable person and prepare verification.</span>
+                        </button>
+                        <button type="button" class="elsx_face_mode_button" data-face-mode="room_monitor">
+                            <strong>Room Monitor</strong>
+                            <span>Scan room occupancy without attendance action.</span>
+                        </button>
+                        <button type="button" class="elsx_face_mode_button" data-face-mode="auto_verify">
+                            <strong>Auto Verify</strong>
+                            <span>Run verification after stable single-person scan.</span>
+                        </button>
+                    </div>
+                    <div class="elsx_face_mode_summary">
+                        <div>
+                            <strong id="elsx_face_mode_title">Manual Verification</strong>
+                            <span id="elsx_face_mode_body">Camera and challenge are controlled by the operator.</span>
+                        </div>
+                        <span id="elsx_face_mode_guard">No automatic attendance update will run in manual mode.</span>
+                    </div>
+                    <div class="elsx_face_scan_panel" id="elsx_face_scan_panel">
+                        <div>
+                            <strong>Live Scan</strong>
+                            <span id="elsx_face_scan_state">Manual mode standby</span>
+                        </div>
+                        <div>
+                            <strong>Faces</strong>
+                            <span id="elsx_face_scan_count">-</span>
+                        </div>
+                        <div>
+                            <strong>Quality</strong>
+                            <span id="elsx_face_scan_quality">-</span>
+                        </div>
+                        <div>
+                            <strong>Action</strong>
+                            <span id="elsx_face_scan_action">Start camera to scan</span>
+                        </div>
+                    </div>
+                    <div class="elsx_face_metric_grid" aria-label="Verification metrics">
+                        <div class="elsx_face_metric">
+                            <strong>Stability</strong>
+                            <span id="elsx_face_metric_stability">0/3 stable scans</span>
+                        </div>
+                        <div class="elsx_face_metric">
+                            <strong>Confidence</strong>
+                            <span id="elsx_face_metric_confidence">No decision</span>
+                        </div>
+                        <div class="elsx_face_metric">
+                            <strong>Liveness</strong>
+                            <span id="elsx_face_metric_liveness">Challenge standby</span>
+                        </div>
+                        <div class="elsx_face_metric">
+                            <strong>Cooldown</strong>
+                            <span id="elsx_face_metric_cooldown">Ready</span>
+                        </div>
+                    </div>
+                    <div class="elsx_face_camera">
+                        <div class="elsx_face_frame">
+                            <span></span>
+                        </div>
+                        <video id="elsx_face_video" autoplay="autoplay" playsinline="playsinline"></video>
+                        <canvas id="elsx_face_canvas" class="d-none"></canvas>
+                        <div class="elsx_face_live_hint" id="elsx_face_live_hint">Start camera and center your face</div>
+                        <div class="elsx_face_challenge" id="elsx_face_challenge">Challenge standby</div>
+                    </div>
+                    <div class="elsx_face_quality_grid">
+                        <div>
+                            <strong>1. Start Camera</strong>
+                            <span>Allow camera permission.</span>
+                        </div>
+                        <div>
+                            <strong>2. Challenge Capture</strong>
+                            <span>Hold, turn, and re-center when asked.</span>
+                        </div>
+                        <div>
+                            <strong>3. Risk Decision</strong>
+                            <span>Face, liveness, device, GPS/IP, and quality are scored.</span>
+                        </div>
+                    </div>
+                    <div class="elsx_face_timeline" aria-label="Operational timeline">
+                        <div class="elsx_face_step warn" id="elsx_face_step_camera">
+                            <strong>Camera</strong>
+                            <span>Waiting for permission</span>
+                        </div>
+                        <div class="elsx_face_step warn" id="elsx_face_step_scan">
+                            <strong>Scan</strong>
+                            <span>Manual standby</span>
+                        </div>
+                        <div class="elsx_face_step warn" id="elsx_face_step_challenge">
+                            <strong>Challenge</strong>
+                            <span>Not started</span>
+                        </div>
+                        <div class="elsx_face_step warn" id="elsx_face_step_decision">
+                            <strong>Decision</strong>
+                            <span>No attendance action</span>
+                        </div>
+                    </div>
+                    <div class="elsx_face_actions">
+                        <button id="elsx_face_start" class="btn btn-secondary" type="button">Start Camera</button>
+                        <button id="elsx_face_check" class="btn btn-primary" type="button" disabled="disabled">Check In / Out</button>
+                        <t t-if="can_manage">
+                            <button id="elsx_face_enroll" class="btn btn-outline-primary" type="button" disabled="disabled">Enroll This Employee</button>
+                        </t>
+                    </div>
+                    <div class="elsx_face_result" id="elsx_face_result"></div>
+                    <div class="elsx_face_evidence" id="elsx_face_evidence"></div>
+                </section>
+            </div>
+            </body>
+        </html>
+    </template>
+
+    <template id="face_attendance_kiosk_page" name="ELSx Face Attendance Kiosk">
+        <html lang="en">
+            <head>
+                <meta charset="utf-8"/>
+                <meta name="viewport" content="width=device-width, initial-scale=1"/>
+                <title>Face ID Attendance | ELSxGlobal</title>
+                <link rel="stylesheet" type="text/css" href="/elsx_face_attendance/static/src/css/face_attendance.css"/>
+                <script type="text/javascript" defer="defer" src="/elsx_face_attendance/static/src/js/face_attendance_portal.js"></script>
+            </head>
+            <body>
+            <div class="elsx_face_attendance_page elsx_face_kiosk_page"
+                 t-att-data-token="token"
+                 t-att-data-company-id="company.id">
+                <section class="elsx_face_panel">
+                    <div class="elsx_face_header">
+                        <div>
+                            <p class="elsx_face_eyebrow">ELSxGlobal Attendances</p>
+                            <h1>Face ID Attendance</h1>
+                            <p class="elsx_face_subtitle">
+                                <strong><t t-esc="company.name"/></strong>
+                            </p>
+                        </div>
+                        <a t-att-href="back_url" class="btn btn-secondary">Back to Kiosk</a>
+                    </div>
+                    <div class="elsx_face_assurance">
+                        <span>Face ID kiosk</span>
+                        <span>Encrypted verification logs</span>
+                        <span>GPS/IP only when policy requires</span>
+                    </div>
+                    <div class="elsx_face_status" id="elsx_face_status">Checking settings...</div>
+                    <div class="elsx_face_gate_grid" aria-label="Verification readiness">
+                        <div class="elsx_face_gate warn" id="elsx_face_gate_system">
+                            <strong>System</strong>
+                            <span>Checking</span>
+                        </div>
+                        <div class="elsx_face_gate warn" id="elsx_face_gate_camera">
+                            <strong>Camera</strong>
+                            <span>Not started</span>
+                        </div>
+                        <div class="elsx_face_gate warn" id="elsx_face_gate_identity">
+                            <strong>Identity</strong>
+                            <span>Pending</span>
+                        </div>
+                        <div class="elsx_face_gate warn" id="elsx_face_gate_policy">
+                            <strong>Policy</strong>
+                            <span>Loading</span>
+                        </div>
+                    </div>
+                    <div class="elsx_face_command_grid">
+                        <div>
+                            <strong>Policy</strong>
+                            <span id="elsx_face_policy">Loading policy...</span>
+                        </div>
+                        <div>
+                            <strong>Device Evidence</strong>
+                            <span id="elsx_face_device">Waiting for browser evidence</span>
+                        </div>
+                        <div>
+                            <strong>Risk Decision</strong>
+                            <span id="elsx_face_risk">No verification yet</span>
+                        </div>
+                    </div>
+                    <div class="elsx_face_mode_panel" aria-label="Face attendance operating mode">
+                        <button type="button" class="elsx_face_mode_button active" data-face-mode="manual">
+                            <strong>Manual Verify</strong>
+                            <span>Operator starts check-in/out.</span>
+                        </button>
+                        <button type="button" class="elsx_face_mode_button" data-face-mode="person_auto">
+                            <strong>Auto Person Scan</strong>
+                            <span>Find one stable person and prepare verification.</span>
+                        </button>
+                        <button type="button" class="elsx_face_mode_button" data-face-mode="room_monitor">
+                            <strong>Room Monitor</strong>
+                            <span>Scan room occupancy without attendance action.</span>
+                        </button>
+                        <button type="button" class="elsx_face_mode_button" data-face-mode="auto_verify">
+                            <strong>Auto Verify</strong>
+                            <span>Run verification after stable single-person scan.</span>
+                        </button>
+                    </div>
+                    <div class="elsx_face_mode_summary">
+                        <div>
+                            <strong id="elsx_face_mode_title">Manual Verification</strong>
+                            <span id="elsx_face_mode_body">Camera and challenge are controlled by the operator.</span>
+                        </div>
+                        <span id="elsx_face_mode_guard">No automatic attendance update will run in manual mode.</span>
+                    </div>
+                    <div class="elsx_face_scan_panel" id="elsx_face_scan_panel">
+                        <div>
+                            <strong>Live Scan</strong>
+                            <span id="elsx_face_scan_state">Manual mode standby</span>
+                        </div>
+                        <div>
+                            <strong>Faces</strong>
+                            <span id="elsx_face_scan_count">-</span>
+                        </div>
+                        <div>
+                            <strong>Quality</strong>
+                            <span id="elsx_face_scan_quality">-</span>
+                        </div>
+                        <div>
+                            <strong>Action</strong>
+                            <span id="elsx_face_scan_action">Start camera to scan</span>
+                        </div>
+                    </div>
+                    <div class="elsx_face_metric_grid" aria-label="Verification metrics">
+                        <div class="elsx_face_metric">
+                            <strong>Stability</strong>
+                            <span id="elsx_face_metric_stability">0/3 stable scans</span>
+                        </div>
+                        <div class="elsx_face_metric">
+                            <strong>Confidence</strong>
+                            <span id="elsx_face_metric_confidence">No decision</span>
+                        </div>
+                        <div class="elsx_face_metric">
+                            <strong>Liveness</strong>
+                            <span id="elsx_face_metric_liveness">Challenge standby</span>
+                        </div>
+                        <div class="elsx_face_metric">
+                            <strong>Cooldown</strong>
+                            <span id="elsx_face_metric_cooldown">Ready</span>
+                        </div>
+                    </div>
+                    <div class="elsx_face_camera">
+                        <div class="elsx_face_frame">
+                            <span></span>
+                        </div>
+                        <video id="elsx_face_video" autoplay="autoplay" playsinline="playsinline"></video>
+                        <canvas id="elsx_face_canvas" class="d-none"></canvas>
+                        <div class="elsx_face_live_hint" id="elsx_face_live_hint">Start camera and center your face</div>
+                        <div class="elsx_face_challenge" id="elsx_face_challenge">Challenge standby</div>
+                    </div>
+                    <div class="elsx_face_quality_grid">
+                        <div>
+                            <strong>1. Start Camera</strong>
+                            <span>Allow camera permission.</span>
+                        </div>
+                        <div>
+                            <strong>2. Challenge Capture</strong>
+                            <span>Move only when prompted.</span>
+                        </div>
+                        <div>
+                            <strong>3. Risk Decision</strong>
+                            <span>Face, liveness, device, GPS/IP, and quality are scored.</span>
+                        </div>
+                    </div>
+                    <div class="elsx_face_timeline" aria-label="Operational timeline">
+                        <div class="elsx_face_step warn" id="elsx_face_step_camera">
+                            <strong>Camera</strong>
+                            <span>Waiting for permission</span>
+                        </div>
+                        <div class="elsx_face_step warn" id="elsx_face_step_scan">
+                            <strong>Scan</strong>
+                            <span>Manual standby</span>
+                        </div>
+                        <div class="elsx_face_step warn" id="elsx_face_step_challenge">
+                            <strong>Challenge</strong>
+                            <span>Not started</span>
+                        </div>
+                        <div class="elsx_face_step warn" id="elsx_face_step_decision">
+                            <strong>Decision</strong>
+                            <span>No attendance action</span>
+                        </div>
+                    </div>
+                    <div class="elsx_face_actions">
+                        <button id="elsx_face_start" class="btn btn-secondary" type="button">Start Camera</button>
+                        <button id="elsx_face_check" class="btn btn-primary" type="button" disabled="disabled">Check In / Out With Face ID</button>
+                    </div>
+                    <div class="elsx_face_result" id="elsx_face_result"></div>
+                    <div class="elsx_face_evidence" id="elsx_face_evidence"></div>
+                </section>
+            </div>
+            </body>
+        </html>
+    </template>
+</odoo>

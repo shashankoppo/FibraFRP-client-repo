@@ -13,6 +13,16 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
     networks:
       - odoo-network
 
@@ -44,6 +54,16 @@ services:
       timeout: 10s
       retries: 15
       start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 3G
+          cpus: "2.0"
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     networks:
       - odoo-network
 
@@ -73,6 +93,108 @@ services:
       timeout: 10s
       retries: 10
       start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - odoo-network
+
+  face_sidecar:
+    build: ./face_sidecar
+    image: elsx-face-sidecar:1.0
+    container_name: face_sidecar
+    restart: unless-stopped
+    init: true
+    profiles:
+      - face
+    environment:
+      - PORT=8071
+    ports:
+      - "8071:8071"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8071/health', timeout=5)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - odoo-network
+
+  # ── Automated daily backup ──────────────────────────────────────
+  # Runs pg_dump daily at 02:00 UTC, keeps the last 7 days.
+  # Does NOT use encryption (no BACKUP_PASSPHRASE in container);
+  # for encrypted portable bundles use deploy/export_live_encrypted_backup.sh manually.
+  db-backup:
+    image: postgres:15
+    container_name: odoo_db_backup
+    restart: unless-stopped
+    profiles:
+      - backup
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-odoo}
+      - PGPASSWORD=${POSTGRES_PASSWORD:-odoo}
+    volumes:
+      - odoo-db-backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        echo "[backup] Automated daily backup service started"
+        while true; do
+          # Calculate seconds until next 02:00 UTC
+          now=$$(date +%s)
+          target=$$(date -d "tomorrow 02:00 UTC" +%s 2>/dev/null || date -d "02:00 UTC + 1 day" +%s)
+          sleep_secs=$$(( target - now ))
+          [ $$sleep_secs -le 0 ] && sleep_secs=86400
+          echo "[backup] Next backup in $$sleep_secs seconds (at 02:00 UTC)"
+          sleep $$sleep_secs
+
+          echo "[backup] Starting backup at $$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          for db in $$(psql -h db -U $${POSTGRES_USER:-odoo} -d postgres -Atc \
+            "SELECT datname FROM pg_database WHERE datistemplate = false AND datallowconn = true AND datname NOT IN ('postgres') ORDER BY datname;"); do
+            STAMP=$$(date -u +%Y%m%d_%H%M%S)
+            DUMP_FILE="/backups/$${db}_$${STAMP}.pg_dump"
+            echo "[backup] Dumping $${db} → $${DUMP_FILE}"
+            pg_dump -h db -U $${POSTGRES_USER:-odoo} -d "$${db}" --format=custom -f "$${DUMP_FILE}" && \
+              echo "[backup] $${db} OK" || \
+              echo "[backup] $${db} FAILED"
+          done
+
+          # Prune backups older than 7 days
+          find /backups -name '*.pg_dump' -mtime +7 -delete
+          echo "[backup] Pruned backups older than 7 days. Current backups:"
+          ls -lh /backups/*.pg_dump 2>/dev/null || echo "[backup] (none)"
+        done
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
     networks:
       - odoo-network
 
@@ -83,3 +205,4 @@ networks:
 volumes:
   odoo-db-data:
   odoo-web-data:
+  odoo-db-backups:

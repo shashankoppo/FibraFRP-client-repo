@@ -4,14 +4,54 @@
         <field name="name">elsx.saas.tenant.list</field>
         <field name="model">elsx.saas.tenant</field>
         <field name="arch" type="xml">
-            <list decoration-info="state == 'provisioning'" decoration-success="state == 'active'" decoration-muted="state == 'suspended'">
+            <list string="SaaS Tenants"
+                  class="o_elsx_saas_list"
+                  decoration-info="state in ('requested', 'provisioning')"
+                  decoration-success="state == 'active'"
+                  decoration-warning="state == 'suspended'"
+                  decoration-muted="state == 'archived'">
                 <field name="name"/>
+                <field name="legal_name" optional="show"/>
                 <field name="db_name"/>
+                <field name="custom_domain" optional="show"/>
                 <field name="admin_email"/>
                 <field name="plan"/>
+                <field name="monthly_recurring_revenue" optional="show"/>
+                <field name="payment_status" optional="show"/>
                 <field name="state"/>
-                <button name="action_provision" string="Provision" type="object" icon="fa-rocket" invisible="state != 'draft'" class="oe_highlight"/>
+                <field name="health_status"/>
+                <field name="backup_verified" optional="show"/>
+                <field name="client_database_created" optional="show"/>
+                <field name="modules_upgraded" optional="show"/>
+                <button name="action_request_provisioning"
+                        string="Request"
+                        type="object"
+                        icon="fa-clipboard-check"
+                        invisible="state != 'draft'"
+                        class="oe_highlight"/>
             </list>
+        </field>
+    </record>
+
+    <record id="view_elsx_saas_tenant_search" model="ir.ui.view">
+        <field name="name">elsx.saas.tenant.search</field>
+        <field name="model">elsx.saas.tenant</field>
+        <field name="arch" type="xml">
+            <search string="SaaS Tenants">
+                <field name="name"/>
+                <field name="legal_name"/>
+                <field name="db_name"/>
+                <field name="admin_email"/>
+                <field name="custom_domain"/>
+                <filter string="Production" name="production" domain="[('production_db', '=', True)]"/>
+                <filter string="Active" name="active_tenants" domain="[('state', '=', 'active')]"/>
+                <filter string="Needs Provisioning" name="needs_provisioning" domain="[('state', 'in', ('draft', 'requested', 'provisioning'))]"/>
+                <filter string="Suspended" name="suspended" domain="[('state', '=', 'suspended')]"/>
+                <separator/>
+                <filter string="Group by Plan" name="group_plan" context="{'group_by': 'plan'}"/>
+                <filter string="Group by State" name="group_state" context="{'group_by': 'state'}"/>
+                <filter string="Group by Health" name="group_health" context="{'group_by': 'health_status'}"/>
+            </search>
         </field>
     </record>
 
@@ -19,26 +59,162 @@
         <field name="name">elsx.saas.tenant.form</field>
         <field name="model">elsx.saas.tenant</field>
         <field name="arch" type="xml">
-            <form>
+            <form string="SaaS Tenant" class="o_elsx_saas_form">
                 <header>
-                    <button name="action_provision" string="Provision Database" type="object" invisible="state != 'draft'" class="oe_highlight"/>
-                    <field name="state" widget="statusbar" statusbar_visible="draft,provisioning,active"/>
+                    <button name="action_request_provisioning"
+                            string="Request Provisioning"
+                            type="object"
+                            invisible="state != 'draft'"
+                            class="oe_highlight"/>
+                    <button name="action_mark_provisioning"
+                            string="Mark Provisioning"
+                            type="object"
+                            invisible="state not in ('requested', 'draft')"/>
+                    <button name="action_mark_active"
+                            string="Mark Active"
+                            type="object"
+                            invisible="state not in ('requested', 'provisioning', 'suspended')"
+                            class="oe_highlight"/>
+                    <button name="action_suspend"
+                            string="Suspend Registry"
+                            type="object"
+                            invisible="state != 'active'"/>
+                    <button name="action_reset_to_draft"
+                            string="Reset Draft"
+                            type="object"
+                            invisible="state not in ('requested', 'provisioning')"/>
+                    <button name="action_archive"
+                            string="Archive Registry"
+                            type="object"
+                            invisible="state == 'archived'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,requested,provisioning,active,suspended"/>
                 </header>
                 <sheet>
+                    <div class="alert alert-info o_elsx_saas_notice" role="alert">
+                        <strong>Production-safe registry.</strong>
+                        This console records tenant state, module requests, revenue, and deployment plans.
+                        It does not create, delete, or modify live client databases from the browser.
+                    </div>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_open_database_manager"
+                                type="object"
+                                class="oe_stat_button"
+                                icon="fa-database">
+                            <span>DB Manager</span>
+                        </button>
+                        <button name="action_open_tenant_url"
+                                type="object"
+                                class="oe_stat_button"
+                                icon="fa-external-link"
+                                invisible="not base_url">
+                            <span>Open Tenant</span>
+                        </button>
+                        <button name="action_open_module_requests"
+                                type="object"
+                                class="oe_stat_button"
+                                icon="fa-puzzle-piece">
+                            <field name="module_request_count" widget="statinfo" string="Module Requests"/>
+                        </button>
+                    </div>
                     <div class="oe_title">
+                        <label for="name"/>
                         <h1>
-                            <field name="name" placeholder="Subdomain (e.g. luxury-corp)"/>
+                            <field name="name" placeholder="tenant-subdomain"/>
                         </h1>
                     </div>
                     <group>
-                        <group string="Database Info">
+                        <group string="Tenant">
+                            <field name="legal_name"/>
                             <field name="db_name"/>
                             <field name="plan"/>
+                            <field name="production_db"/>
                         </group>
-                        <group string="Admin Info">
+                        <group string="Admin">
+                            <field name="admin_name"/>
                             <field name="admin_email"/>
+                            <field name="custom_domain"/>
+                            <field name="base_url" placeholder="https://tenant.example.com/odoo"/>
                         </group>
                     </group>
+
+                    <notebook>
+                        <page string="Safety Checklist">
+                            <group>
+                                <group string="Preflight">
+                                    <field name="backup_verified"/>
+                                    <field name="allow_provisioning"/>
+                                    <field name="client_database_created"/>
+                                    <field name="filestore_present"/>
+                                </group>
+                                <group string="Go Live">
+                                    <field name="modules_upgraded"/>
+                                    <field name="webhook_checked"/>
+                                    <field name="health_status"/>
+                                    <field name="last_health_check" readonly="1"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Enabled Apps">
+                            <group>
+                                <group string="Business Suite">
+                                    <field name="enable_crm"/>
+                                    <field name="enable_accounting"/>
+                                    <field name="enable_whatsapp"/>
+                                </group>
+                                <group string="Operations">
+                                    <field name="enable_attendance"/>
+                                    <field name="enable_face_attendance"/>
+                                    <field name="enable_tally"/>
+                                </group>
+                            </group>
+                            <group string="Protected Modules">
+                                <field name="protected_summary" readonly="1" nolabel="1"/>
+                            </group>
+                        </page>
+                        <page string="Limits">
+                            <group>
+                                <field name="max_users"/>
+                                <field name="storage_quota_gb"/>
+                            </group>
+                        </page>
+                        <page string="Revenue">
+                            <group>
+                                <group string="Subscription">
+                                    <field name="currency_id"/>
+                                    <field name="billing_cycle"/>
+                                    <field name="monthly_recurring_revenue"/>
+                                    <field name="annual_recurring_revenue" readonly="1"/>
+                                    <field name="setup_fee"/>
+                                </group>
+                                <group string="Contract">
+                                    <field name="payment_status"/>
+                                    <field name="contract_start"/>
+                                    <field name="contract_end"/>
+                                    <field name="next_billing_date"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Module Requests">
+                            <field name="module_request_ids" context="{'default_tenant_id': id}">
+                                <list editable="bottom" class="o_elsx_saas_inline_list">
+                                    <field name="name"/>
+                                    <field name="module_name"/>
+                                    <field name="source_type"/>
+                                    <field name="risk_level"/>
+                                    <field name="state"/>
+                                    <field name="staging_tested"/>
+                                    <field name="production_approved"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Deployment Plan">
+                            <button name="action_copy_plan_notice" type="object" string="How To Use This Plan" class="btn-secondary"/>
+                            <field name="deployment_plan" readonly="1" nolabel="1"/>
+                        </page>
+                        <page string="Notes">
+                            <field name="notes" nolabel="1"/>
+                        </page>
+                    </notebook>
                 </sheet>
             </form>
         </field>
@@ -48,13 +224,171 @@
         <field name="name">SaaS Tenants</field>
         <field name="res_model">elsx.saas.tenant</field>
         <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_elsx_saas_tenant_search"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
-                Create your first ELSX SaaS Tenant!
+                Create a SaaS tenant registry record.
+            </p>
+            <p>
+                This admin console does not create or drop databases directly. Use the generated deployment plan after backup.
             </p>
         </field>
     </record>
 
-    <menuitem id="menu_elsx_saas_root" name="ELSX SaaS" web_icon="elsx_saas,static/description/icon.png"/>
-    <menuitem id="menu_elsx_saas_tenant" name="Tenants" parent="menu_elsx_saas_root" action="action_elsx_saas_tenant"/>
+    <record id="view_elsx_saas_module_request_list" model="ir.ui.view">
+        <field name="name">elsx.saas.module.request.list</field>
+        <field name="model">elsx.saas.module.request</field>
+        <field name="arch" type="xml">
+            <list string="Module Requests"
+                  class="o_elsx_saas_list"
+                  decoration-success="state in ('approved', 'staged', 'installed')"
+                  decoration-warning="risk_level in ('medium', 'high') and state not in ('installed', 'rejected', 'cancelled')"
+                  decoration-danger="risk_level == 'blocked' or state == 'rejected'"
+                  decoration-muted="state == 'cancelled'">
+                <field name="name"/>
+                <field name="tenant_id"/>
+                <field name="module_name"/>
+                <field name="source_type"/>
+                <field name="vendor" optional="show"/>
+                <field name="risk_level"/>
+                <field name="state"/>
+                <field name="monthly_cost" optional="show"/>
+                <field name="backup_verified" optional="show"/>
+                <field name="manifest_reviewed" optional="show"/>
+                <field name="dependency_reviewed" optional="show"/>
+                <field name="staging_tested" optional="show"/>
+                <field name="production_approved" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_elsx_saas_module_request_search" model="ir.ui.view">
+        <field name="name">elsx.saas.module.request.search</field>
+        <field name="model">elsx.saas.module.request</field>
+        <field name="arch" type="xml">
+            <search string="Module Requests">
+                <field name="name"/>
+                <field name="tenant_id"/>
+                <field name="module_name"/>
+                <field name="vendor"/>
+                <filter string="Needs Review" name="needs_review" domain="[('state', 'in', ('draft', 'review'))]"/>
+                <filter string="Approved/Staged" name="approved" domain="[('state', 'in', ('approved', 'staged'))]"/>
+                <filter string="High Risk" name="high_risk" domain="[('risk_level', 'in', ('high', 'blocked'))]"/>
+                <filter string="Installed" name="installed" domain="[('state', '=', 'installed')]"/>
+                <separator/>
+                <filter string="Group by Tenant" name="group_tenant" context="{'group_by': 'tenant_id'}"/>
+                <filter string="Group by State" name="group_state" context="{'group_by': 'state'}"/>
+                <filter string="Group by Risk" name="group_risk" context="{'group_by': 'risk_level'}"/>
+                <filter string="Group by Source" name="group_source" context="{'group_by': 'source_type'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_elsx_saas_module_request_form" model="ir.ui.view">
+        <field name="name">elsx.saas.module.request.form</field>
+        <field name="model">elsx.saas.module.request</field>
+        <field name="arch" type="xml">
+            <form string="Module Request" class="o_elsx_saas_form">
+                <header>
+                    <button name="action_submit_review" string="Submit Review" type="object" invisible="state != 'draft'" class="oe_highlight"/>
+                    <button name="action_approve" string="Approve" type="object" invisible="state != 'review'" class="oe_highlight"/>
+                    <button name="action_mark_staged" string="Mark Staged" type="object" invisible="state != 'approved'"/>
+                    <button name="action_mark_installed" string="Mark Installed" type="object" invisible="state not in ('approved', 'staged')"/>
+                    <button name="action_reject" string="Reject" type="object" invisible="state in ('installed', 'rejected', 'cancelled')"/>
+                    <button name="action_reset_draft" string="Reset Draft" type="object" invisible="state not in ('review', 'rejected', 'cancelled')"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,review,approved,staged,installed"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-warning o_elsx_saas_notice" role="alert">
+                        <strong>Review before deploy.</strong>
+                        Third-party/custom modules must pass backup, manifest, dependency, staging, and production approval checks before use on client data.
+                    </div>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="Website module request"/></h1>
+                    </div>
+                    <group>
+                        <group string="Module">
+                            <field name="tenant_id"/>
+                            <field name="module_name"/>
+                            <field name="source_type"/>
+                            <field name="vendor"/>
+                            <field name="license_reference"/>
+                            <field name="risk_level"/>
+                        </group>
+                        <group string="Commercial">
+                            <field name="currency_id"/>
+                            <field name="one_time_cost"/>
+                            <field name="monthly_cost"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Safety Review">
+                            <group>
+                                <group string="Runtime Needs">
+                                    <field name="requires_python_package"/>
+                                    <field name="requires_node_package"/>
+                                    <field name="requires_external_service"/>
+                                </group>
+                                <group string="Business Areas">
+                                    <field name="touches_crm"/>
+                                    <field name="touches_whatsapp"/>
+                                    <field name="touches_accounting"/>
+                                    <field name="touches_attendance"/>
+                                </group>
+                            </group>
+                            <group string="Required Checks">
+                                <field name="backup_verified"/>
+                                <field name="manifest_reviewed"/>
+                                <field name="dependency_reviewed"/>
+                                <field name="staging_tested"/>
+                                <field name="production_approved"/>
+                            </group>
+                            <group string="Impact Summary">
+                                <field name="impact_summary" readonly="1" nolabel="1"/>
+                            </group>
+                        </page>
+                        <page string="Deployment Plan">
+                            <field name="deployment_plan" readonly="1" nolabel="1"/>
+                        </page>
+                        <page string="Notes">
+                            <field name="notes" nolabel="1"/>
+                            <field name="rejection_reason" nolabel="1" placeholder="Reason if rejected or blocked"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_elsx_saas_module_request" model="ir.actions.act_window">
+        <field name="name">Module Requests</field>
+        <field name="res_model">elsx.saas.module.request</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_elsx_saas_module_request_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Track third-party or custom module requests safely.
+            </p>
+            <p>
+                This workflow records approval and deployment commands. It does not install modules from the browser.
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_elsx_saas_root"
+              name="ELSx SaaS Admin"
+              web_icon="elsx_saas,static/description/icon.png"
+              groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
+    <menuitem id="menu_elsx_saas_tenant"
+              name="Tenants"
+              parent="menu_elsx_saas_root"
+              action="action_elsx_saas_tenant"
+              groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
+    <menuitem id="menu_elsx_saas_module_request"
+              name="Module Requests"
+              parent="menu_elsx_saas_root"
+              action="action_elsx_saas_module_request"
+              sequence="20"
+              groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
 </odoo>

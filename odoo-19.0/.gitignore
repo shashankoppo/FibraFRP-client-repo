@@ -51,3 +51,8 @@ package.json
 /man/
 /share/
 /src/
+
+# encrypted local backups
+secure_backups/
+.env
+

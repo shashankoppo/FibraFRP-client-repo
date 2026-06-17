@@ -1,0 +1,177 @@
+.o_elsx_ai_website_builder_form .o_elsx_ai_safety_note {
+    border-left: 4px solid #017e84;
+    background: #eef8f8;
+    color: #12343b;
+}
+
+.o_elsx_ai_website_builder_form .o_elsx_ai_studio_landing {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 18px;
+    align-items: center;
+    margin: 12px 0 18px;
+    padding: 20px;
+    border: 1px solid #d9e5ea;
+    border-radius: 8px;
+    background:
+        linear-gradient(135deg, rgba(1, 126, 132, 0.10), rgba(255, 255, 255, 0.92)),
+        #fff;
+}
+
+.o_elsx_ai_website_builder_form .o_elsx_ai_studio_landing h2 {
+    margin: 0 0 8px;
+    font-size: 1.45rem;
+    line-height: 1.25;
+    letter-spacing: 0;
+    color: #17202a;
+}
+
+.o_elsx_ai_website_builder_form .o_elsx_ai_studio_landing p {
+    margin-bottom: 0;
+    color: #475569;
+}
+
+.o_elsx_ai_website_builder_form .o_elsx_ai_eyebrow {
+    margin-bottom: 8px !important;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: uppercase;
+    color: #017e84 !important;
+}
+
+.o_elsx_ai_website_builder_form .o_elsx_ai_studio_steps {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(110px, 1fr));
+    gap: 8px;
+}
+
+.o_elsx_ai_website_builder_form .o_elsx_ai_studio_steps span {
+    min-height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 10px;
+    border: 1px solid #cfdce3;
+    border-radius: 8px;
+    background: #fff;
+    color: #20313d;
+    font-weight: 600;
+}
+
+.o_elsx_ai_website_builder_form .o_group .o_inner_group > tbody > tr > td.o_td_label {
+    min-width: 155px;
+}
+
+.o_elsx_ai_website_builder_form .o_group .o_group {
+    border: 1px solid #e4e9ef;
+    border-radius: 8px;
+    padding: 12px;
+    background: #fff;
+}
+
+.o_elsx_ai_website_builder_form .o_group .o_group > .o_horizontal_separator {
+    color: #20313d;
+    font-size: 0.82rem;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.o_elsx_ai_website_builder_form .o_elsx_ai_preview_card {
+    background: #f8fafb;
+    border: 1px solid #d8dee5;
+    border-radius: 8px;
+    padding: 16px;
+    min-height: 280px;
+    overflow: auto;
+}
+
+.o_elsx_ai_preview_shell {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 20px;
+    box-shadow: 0 12px 32px rgba(23, 43, 77, 0.08);
+}
+
+.o_elsx_ai_preview_body section {
+    margin-bottom: 16px;
+}
+
+.o_elsx_ai_preview_body .container {
+    max-width: 1120px;
+}
+
+.o_elsx_ai_preview_body .btn {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+}
+
+.o_elsx_ai_preview_body .elsx-ai-visual-stack,
+.o_elsx_ai_preview_body .elsx-ai-visual-placeholder {
+    max-width: 100%;
+}
+
+.o_elsx_ai_preview_body .elsx-ai-visual-stack img {
+    max-width: 100%;
+}
+
+.o_elsx_ai_website_builder_form textarea[name="diff_text"],
+.o_elsx_ai_website_builder_form textarea[name="draft_html"],
+.o_elsx_ai_website_builder_form textarea[name="draft_css"],
+.o_elsx_ai_website_builder_form textarea[name="raw_ai_output"],
+.o_elsx_ai_website_builder_form textarea[name="asset_intents"],
+.o_elsx_ai_website_builder_form textarea[name="asset_candidates"] {
+    min-height: 360px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    white-space: pre;
+    overflow: auto;
+}
+
+@media (max-width: 991px) {
+    .o_elsx_ai_website_builder_form .o_group {
+        width: 100%;
+    }
+
+    .o_elsx_ai_website_builder_form .o_group .o_group {
+        margin-bottom: 12px;
+    }
+
+    .o_elsx_ai_website_builder_form .o_elsx_ai_preview_card {
+        padding: 12px;
+    }
+
+    .o_elsx_ai_website_builder_form .o_elsx_ai_studio_landing {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .o_elsx_ai_website_builder_form .o_form_statusbar {
+        overflow-x: auto;
+    }
+
+    .o_elsx_ai_website_builder_form .o_notebook .nav {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+    }
+
+    .o_elsx_ai_preview_shell {
+        padding: 12px;
+    }
+
+    .o_elsx_ai_website_builder_form .o_elsx_ai_studio_steps {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .o_elsx_ai_website_builder_form .o_elsx_ai_preview_card {
+        border-left: 0;
+        border-right: 0;
+        border-radius: 0;
+        margin-left: -12px;
+        margin-right: -12px;
+    }
+}

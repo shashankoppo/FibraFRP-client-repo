@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_face_attendance" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.elsx.face.attendance</field>
+        <field name="model">res.config.settings</field>
+        <field name="priority" eval="85"/>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="Face Attendance" string="Face Attendance" name="elsx_face_attendance" groups="hr_attendance.group_hr_attendance_manager">
+                    <block title="Production Safety" id="elsx_face_attendance_safety">
+                        <setting id="elsx_face_enabled_setting" help="Disabled by default. When disabled, normal Attendances remain unchanged.">
+                            <field name="elsx_face_attendance_enabled"/>
+                        </setting>
+                        <setting id="elsx_face_policy_setting" help="Start with Audit Only or Face Preferred. Use strict modes only after employee enrollment and testing.">
+                            <field name="elsx_face_attendance_mode"/>
+                        </setting>
+                    </block>
+                    <block title="Recognition Engine" id="elsx_face_attendance_engine">
+                        <setting id="elsx_face_sidecar_setting" help="Local Docker sidecar URL. The sidecar service is under the face Docker profile and is not started by default.">
+                            <field name="elsx_face_attendance_sidecar_url"/>
+                            <button name="action_test_face_sidecar" type="object" string="Test Sidecar" class="btn-secondary mt-2"/>
+                        </setting>
+                        <setting id="elsx_face_threshold_setting" help="Minimum confidence needed in strict modes. Keep conservative until tested on real devices.">
+                            <field name="elsx_face_attendance_confidence_threshold"/>
+                        </setting>
+                        <setting id="elsx_face_liveness_setting" help="Reserved for engines that return liveness. Disabled by default.">
+                            <field name="elsx_face_attendance_require_liveness"/>
+                        </setting>
+                        <setting id="elsx_face_quality_setting" help="Minimum capture quality required in High Assurance mode. Lower values are easier but weaker.">
+                            <field name="elsx_face_attendance_min_quality_score"/>
+                        </setting>
+                        <setting id="elsx_face_samples_setting" help="Minimum number of usable frames required for strict verification.">
+                            <field name="elsx_face_attendance_min_samples"/>
+                        </setting>
+                        <setting id="elsx_face_review_threshold_setting" help="Verified attendance below this confidence is marked for manual review in the audit log.">
+                            <field name="elsx_face_attendance_review_threshold"/>
+                        </setting>
+                        <setting id="elsx_face_device_setting" help="When enabled, the browser sends device evidence that is hashed before storage. High Assurance mode always requires this evidence.">
+                            <field name="elsx_face_attendance_require_device_fingerprint"/>
+                        </setting>
+                        <setting id="elsx_face_debug_retention_setting" help="Keep disabled in production. Raw camera images are not stored by default.">
+                            <field name="elsx_face_attendance_debug_retention"/>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+</odoo>

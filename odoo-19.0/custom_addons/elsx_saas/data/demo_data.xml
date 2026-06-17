@@ -7,6 +7,9 @@
             <field name="admin_email">admin@techstartup.com</field>
             <field name="plan">starter</field>
             <field name="state">active</field>
+            <field name="client_database_created">1</field>
+            <field name="modules_upgraded">1</field>
+            <field name="health_status">ok</field>
             <field name="storage_quota_gb">10</field>
             <field name="max_users">25</field>
             <field name="custom_domain">erp.techstartup.com</field>
@@ -15,8 +18,11 @@
         <record id="demo_tenant_enterprise" model="elsx.saas.tenant">
             <field name="name">globalcorp</field>
             <field name="admin_email">it@globalcorp.com</field>
-            <field name="plan">quantum</field>
+            <field name="plan">enterprise</field>
             <field name="state">active</field>
+            <field name="client_database_created">1</field>
+            <field name="modules_upgraded">1</field>
+            <field name="health_status">ok</field>
             <field name="storage_quota_gb">500</field>
             <field name="max_users">500</field>
             <field name="custom_domain">elsx.globalcorp.com</field>
@@ -25,8 +31,11 @@
         <record id="demo_tenant_luxury" model="elsx.saas.tenant">
             <field name="name">luxurybrands</field>
             <field name="admin_email">cto@luxurybrands.com</field>
-            <field name="plan">luxury</field>
+            <field name="plan">business</field>
             <field name="state">active</field>
+            <field name="client_database_created">1</field>
+            <field name="modules_upgraded">1</field>
+            <field name="health_status">ok</field>
             <field name="storage_quota_gb">100</field>
             <field name="max_users">100</field>
         </record>
@@ -35,7 +44,7 @@
             <field name="name">newclient</field>
             <field name="admin_email">admin@newclient.com</field>
             <field name="plan">starter</field>
-            <field name="state">provisioning</field>
+            <field name="state">requested</field>
             <field name="storage_quota_gb">5</field>
             <field name="max_users">10</field>
         </record>
