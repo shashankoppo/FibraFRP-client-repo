@@ -14,6 +14,20 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${PROJECT_DIR}"
 
+wait_for_db() {
+  local attempt
+  echo "==> Waiting for PostgreSQL to accept connections"
+  for attempt in $(seq 1 60); do
+    if docker compose exec -T db pg_isready -U "${DB_USER}" -d postgres >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 2
+  done
+  echo "ERROR: PostgreSQL did not become ready after 120 seconds." >&2
+  docker compose ps db >&2 || true
+  exit 1
+}
+
 if [ -z "${LIVE_DB_NAME}" ]; then
   echo "ERROR: database name is required. This script will not guess a production database." >&2
   echo "Usage: BACKUP_PASSPHRASE=... bash deploy/safe_production_update.sh <database_name>" >&2
@@ -62,11 +76,15 @@ fi
 
 echo "==> Ensuring PostgreSQL is running"
 docker compose up -d db
+wait_for_db
 
-DB_EXISTS="$(
+if ! DB_EXISTS="$(
   docker compose exec -T db psql -U "${DB_USER}" -d postgres -Atc \
     "SELECT 1 FROM pg_database WHERE datname = $(sql_quote "${LIVE_DB_NAME}");"
-)"
+)"; then
+  echo "ERROR: failed to check database ${LIVE_DB_NAME}. Refusing to continue." >&2
+  exit 1
+fi
 if [ "${DB_EXISTS}" != "1" ]; then
   echo "ERROR: Database ${LIVE_DB_NAME} does not exist." >&2
   exit 1
