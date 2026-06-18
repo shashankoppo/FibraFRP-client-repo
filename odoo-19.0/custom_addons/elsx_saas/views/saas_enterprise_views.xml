@@ -382,12 +382,11 @@
         </record>
 
         <!-- Menu Items for Enterprise Features -->
-        <record id="saas_menu_settings" model="ir.ui.menu">
-            <field name="name">Settings</field>
-            <field name="parent_id" ref="menu_elsx_saas_root"/>
-            <field name="sequence">50</field>
-            <field name="groups_id" eval="[(6, 0, [ref('base.group_system'), ref('elsx_saas.group_elsx_saas_admin')])]"/>
-        </record>
+        <menuitem id="saas_menu_settings"
+                  name="Settings"
+                  parent="menu_elsx_saas_root"
+                  sequence="50"
+                  groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
 
         <record id="action_elsx_saas_custom_field" model="ir.actions.act_window">
             <field name="name">Custom Fields</field>
@@ -395,21 +394,19 @@
             <field name="view_mode">list,form</field>
         </record>
 
-        <record id="menu_elsx_saas_custom_field" model="ir.ui.menu">
-            <field name="name">Custom Fields</field>
-            <field name="parent_id" ref="saas_menu_settings"/>
-            <field name="action" ref="action_elsx_saas_custom_field"/>
-            <field name="sequence">10</field>
-            <field name="groups_id" eval="[(6, 0, [ref('base.group_system'), ref('elsx_saas.group_elsx_saas_admin')])]"/>
-        </record>
+        <menuitem id="menu_elsx_saas_custom_field"
+                  name="Custom Fields"
+                  parent="saas_menu_settings"
+                  action="action_elsx_saas_custom_field"
+                  sequence="10"
+                  groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
 
         <!-- Automation Menu -->
-        <record id="saas_menu_automation" model="ir.ui.menu">
-            <field name="name">Automation</field>
-            <field name="parent_id" ref="menu_elsx_saas_root"/>
-            <field name="sequence">40</field>
-            <field name="groups_id" eval="[(6, 0, [ref('base.group_system'), ref('elsx_saas.group_elsx_saas_admin')])]"/>
-        </record>
+        <menuitem id="saas_menu_automation"
+                  name="Automation"
+                  parent="menu_elsx_saas_root"
+                  sequence="40"
+                  groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
 
         <record id="action_elsx_saas_workflow_automation" model="ir.actions.act_window">
             <field name="name">Workflows</field>
@@ -417,13 +414,12 @@
             <field name="view_mode">list,form</field>
         </record>
 
-        <record id="menu_elsx_saas_workflow_automation" model="ir.ui.menu">
-            <field name="name">Workflow Automation</field>
-            <field name="parent_id" ref="saas_menu_automation"/>
-            <field name="action" ref="action_elsx_saas_workflow_automation"/>
-            <field name="sequence">10</field>
-            <field name="groups_id" eval="[(6, 0, [ref('base.group_system'), ref('elsx_saas.group_elsx_saas_admin')])]"/>
-        </record>
+        <menuitem id="menu_elsx_saas_workflow_automation"
+                  name="Workflow Automation"
+                  parent="saas_menu_automation"
+                  action="action_elsx_saas_workflow_automation"
+                  sequence="10"
+                  groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
 
         <record id="action_elsx_saas_scheduled_job" model="ir.actions.act_window">
             <field name="name">Scheduled Jobs</field>
@@ -431,21 +427,19 @@
             <field name="view_mode">list,form</field>
         </record>
 
-        <record id="menu_elsx_saas_scheduled_job" model="ir.ui.menu">
-            <field name="name">Scheduled Jobs</field>
-            <field name="parent_id" ref="saas_menu_automation"/>
-            <field name="action" ref="action_elsx_saas_scheduled_job"/>
-            <field name="sequence">20</field>
-            <field name="groups_id" eval="[(6, 0, [ref('base.group_system'), ref('elsx_saas.group_elsx_saas_admin')])]"/>
-        </record>
+        <menuitem id="menu_elsx_saas_scheduled_job"
+                  name="Scheduled Jobs"
+                  parent="saas_menu_automation"
+                  action="action_elsx_saas_scheduled_job"
+                  sequence="20"
+                  groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
 
         <!-- Security Menu -->
-        <record id="saas_menu_security" model="ir.ui.menu">
-            <field name="name">Security</field>
-            <field name="parent_id" ref="menu_elsx_saas_root"/>
-            <field name="sequence">30</field>
-            <field name="groups_id" eval="[(6, 0, [ref('base.group_system'), ref('elsx_saas.group_elsx_saas_admin')])]"/>
-        </record>
+        <menuitem id="saas_menu_security"
+                  name="Security"
+                  parent="menu_elsx_saas_root"
+                  sequence="30"
+                  groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
 
         <record id="action_elsx_saas_security_policy" model="ir.actions.act_window">
             <field name="name">Security Policies</field>
@@ -453,21 +447,19 @@
             <field name="view_mode">list,form</field>
         </record>
 
-        <record id="menu_elsx_saas_security_policy" model="ir.ui.menu">
-            <field name="name">Security Policies</field>
-            <field name="parent_id" ref="saas_menu_security"/>
-            <field name="action" ref="action_elsx_saas_security_policy"/>
-            <field name="sequence">10</field>
-            <field name="groups_id" eval="[(6, 0, [ref('base.group_system'), ref('elsx_saas.group_elsx_saas_admin')])]"/>
-        </record>
+        <menuitem id="menu_elsx_saas_security_policy"
+                  name="Security Policies"
+                  parent="saas_menu_security"
+                  action="action_elsx_saas_security_policy"
+                  sequence="10"
+                  groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
 
         <!-- Reports Menu -->
-        <record id="saas_menu_reports_advanced" model="ir.ui.menu">
-            <field name="name">Report Templates</field>
-            <field name="parent_id" ref="menu_elsx_saas_root"/>
-            <field name="sequence">20</field>
-            <field name="groups_id" eval="[(6, 0, [ref('base.group_system'), ref('elsx_saas.group_elsx_saas_admin')])]"/>
-        </record>
+        <menuitem id="saas_menu_reports_advanced"
+                  name="Report Templates"
+                  parent="menu_elsx_saas_root"
+                  sequence="20"
+                  groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
 
         <record id="action_elsx_saas_report_template" model="ir.actions.act_window">
             <field name="name">Report Templates</field>
@@ -475,29 +467,26 @@
             <field name="view_mode">list,form</field>
         </record>
 
-        <record id="menu_elsx_saas_report_template" model="ir.ui.menu">
-            <field name="name">Report Templates</field>
-            <field name="parent_id" ref="saas_menu_reports_advanced"/>
-            <field name="action" ref="action_elsx_saas_report_template"/>
-            <field name="sequence">10</field>
-            <field name="groups_id" eval="[(6, 0, [ref('base.group_system'), ref('elsx_saas.group_elsx_saas_admin')])]"/>
-        </record>
+        <menuitem id="menu_elsx_saas_report_template"
+                  name="Report Templates"
+                  parent="saas_menu_reports_advanced"
+                  action="action_elsx_saas_report_template"
+                  sequence="10"
+                  groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
 
         <!-- Upgrade Management Menu -->
-        <record id="saas_menu_system" model="ir.ui.menu">
-            <field name="name">System</field>
-            <field name="parent_id" ref="menu_elsx_saas_root"/>
-            <field name="sequence">60</field>
-            <field name="groups_id" eval="[(6, 0, [ref('base.group_system'), ref('elsx_saas.group_elsx_saas_admin')])]"/>
-        </record>
+        <menuitem id="saas_menu_system"
+                  name="System"
+                  parent="menu_elsx_saas_root"
+                  sequence="60"
+                  groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
 
-        <record id="menu_elsx_saas_upgrade_log" model="ir.ui.menu">
-            <field name="name">Upgrade Logs</field>
-            <field name="parent_id" ref="saas_menu_system"/>
-            <field name="action" ref="action_elsx_saas_upgrade_log"/>
-            <field name="sequence">10</field>
-            <field name="groups_id" eval="[(6, 0, [ref('base.group_system'), ref('elsx_saas.group_elsx_saas_admin')])]"/>
-        </record>
+        <menuitem id="menu_elsx_saas_upgrade_log"
+                  name="Upgrade Logs"
+                  parent="saas_menu_system"
+                  action="action_elsx_saas_upgrade_log"
+                  sequence="10"
+                  groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
 
     </data>
 </odoo>
