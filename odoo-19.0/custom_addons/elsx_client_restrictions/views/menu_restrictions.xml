@@ -1,16 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Compatibility menu data. Standard Odoo administrator groups remain in charge. -->
+    <!-- Keep core administration available to system admins.
+         Module safety is enforced by Python guards, not by hiding Settings. -->
 
     <record id="base.menu_management" model="ir.ui.menu">
         <field name="group_ids" eval="[(4, ref('base.group_system'))]"/>
-        <field name="active" eval="False"/>
+        <field name="active" eval="True"/>
     </record>
 
     <record id="base.menu_apps" model="ir.ui.menu">
         <field name="group_ids" eval="[(4, ref('base.group_system'))]"/>
         <field name="action" eval="'ir.actions.act_window,%d' % ref('base.open_module_tree')"/>
-        <field name="active" eval="False"/>
+        <field name="active" eval="True"/>
     </record>
 
     <record id="base.menu_administration" model="ir.ui.menu">

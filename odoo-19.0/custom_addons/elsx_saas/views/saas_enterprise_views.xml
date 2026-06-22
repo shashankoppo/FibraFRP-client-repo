@@ -386,7 +386,7 @@
                   name="Settings"
                   parent="menu_elsx_saas_root"
                   sequence="50"
-                  groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
+                  groups="elsx_saas.group_elsx_saas_admin"/>
 
         <record id="action_elsx_saas_custom_field" model="ir.actions.act_window">
             <field name="name">Custom Fields</field>
@@ -399,14 +399,14 @@
                   parent="saas_menu_settings"
                   action="action_elsx_saas_custom_field"
                   sequence="10"
-                  groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
+                  groups="elsx_saas.group_elsx_saas_admin"/>
 
         <!-- Automation Menu -->
         <menuitem id="saas_menu_automation"
                   name="Automation"
                   parent="menu_elsx_saas_root"
                   sequence="40"
-                  groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
+                  groups="elsx_saas.group_elsx_saas_admin"/>
 
         <record id="action_elsx_saas_workflow_automation" model="ir.actions.act_window">
             <field name="name">Workflows</field>
@@ -419,7 +419,7 @@
                   parent="saas_menu_automation"
                   action="action_elsx_saas_workflow_automation"
                   sequence="10"
-                  groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
+                  groups="elsx_saas.group_elsx_saas_admin"/>
 
         <record id="action_elsx_saas_scheduled_job" model="ir.actions.act_window">
             <field name="name">Scheduled Jobs</field>
@@ -432,14 +432,14 @@
                   parent="saas_menu_automation"
                   action="action_elsx_saas_scheduled_job"
                   sequence="20"
-                  groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
+                  groups="elsx_saas.group_elsx_saas_admin"/>
 
         <!-- Security Menu -->
         <menuitem id="saas_menu_security"
                   name="Security"
                   parent="menu_elsx_saas_root"
                   sequence="30"
-                  groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
+                  groups="elsx_saas.group_elsx_saas_admin"/>
 
         <record id="action_elsx_saas_security_policy" model="ir.actions.act_window">
             <field name="name">Security Policies</field>
@@ -452,14 +452,14 @@
                   parent="saas_menu_security"
                   action="action_elsx_saas_security_policy"
                   sequence="10"
-                  groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
+                  groups="elsx_saas.group_elsx_saas_admin"/>
 
         <!-- Reports Menu -->
         <menuitem id="saas_menu_reports_advanced"
                   name="Report Templates"
                   parent="menu_elsx_saas_root"
                   sequence="20"
-                  groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
+                  groups="elsx_saas.group_elsx_saas_admin"/>
 
         <record id="action_elsx_saas_report_template" model="ir.actions.act_window">
             <field name="name">Report Templates</field>
@@ -472,21 +472,21 @@
                   parent="saas_menu_reports_advanced"
                   action="action_elsx_saas_report_template"
                   sequence="10"
-                  groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
+                  groups="elsx_saas.group_elsx_saas_admin"/>
 
         <!-- Upgrade Management Menu -->
         <menuitem id="saas_menu_system"
                   name="System"
                   parent="menu_elsx_saas_root"
                   sequence="60"
-                  groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
+                  groups="elsx_saas.group_elsx_saas_admin"/>
 
         <menuitem id="menu_elsx_saas_upgrade_log"
                   name="Upgrade Logs"
                   parent="saas_menu_system"
                   action="action_elsx_saas_upgrade_log"
                   sequence="10"
-                  groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
+                  groups="elsx_saas.group_elsx_saas_admin"/>
 
     </data>
 </odoo>

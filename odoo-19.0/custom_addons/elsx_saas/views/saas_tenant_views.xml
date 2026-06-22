@@ -4,7 +4,7 @@
         <field name="name">elsx.saas.tenant.list</field>
         <field name="model">elsx.saas.tenant</field>
         <field name="arch" type="xml">
-            <list string="SaaS Tenants"
+            <list string="Tenant Governance"
                   class="o_elsx_saas_list"
                   decoration-info="state in ('requested', 'provisioning')"
                   decoration-success="state == 'active'"
@@ -37,7 +37,7 @@
         <field name="name">elsx.saas.tenant.search</field>
         <field name="model">elsx.saas.tenant</field>
         <field name="arch" type="xml">
-            <search string="SaaS Tenants">
+            <search string="Tenant Governance">
                 <field name="name"/>
                 <field name="legal_name"/>
                 <field name="db_name"/>
@@ -59,7 +59,7 @@
         <field name="name">elsx.saas.tenant.form</field>
         <field name="model">elsx.saas.tenant</field>
         <field name="arch" type="xml">
-            <form string="SaaS Tenant" class="o_elsx_saas_form">
+            <form string="Tenant Governance" class="o_elsx_saas_form">
                 <header>
                     <button name="action_request_provisioning"
                             string="Request Provisioning"
@@ -91,9 +91,7 @@
                 </header>
                 <sheet>
                     <div class="alert alert-info o_elsx_saas_notice" role="alert">
-                        <strong>Production-safe registry.</strong>
-                        This console records tenant state, module requests, revenue, and deployment plans.
-                        It does not create, delete, or modify live client databases from the browser.
+                        <strong>Production-safe governance console.</strong> Track tenant health, module requests, billing, backups, and rollout plans here. It does not create, delete, or modify live client databases from the browser.
                     </div>
                     <div class="oe_button_box" name="button_box">
                         <button name="action_open_database_manager"
@@ -221,16 +219,16 @@
     </record>
 
     <record id="action_elsx_saas_tenant" model="ir.actions.act_window">
-        <field name="name">SaaS Tenants</field>
+        <field name="name">Tenant Governance</field>
         <field name="res_model">elsx.saas.tenant</field>
         <field name="view_mode">list,form</field>
         <field name="search_view_id" ref="view_elsx_saas_tenant_search"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
-                Create a SaaS tenant registry record.
+                Create a tenant governance record.
             </p>
             <p>
-                This admin console does not create or drop databases directly. Use the generated deployment plan after backup.
+                Use this for controlled SaaS operations, module requests, billing, and deployment planning. Live database changes still require reviewed backup-first deployment commands.
             </p>
         </field>
     </record>
@@ -377,18 +375,18 @@
     </record>
 
     <menuitem id="menu_elsx_saas_root"
-              name="ELSx SaaS Admin"
+              name="ELSx SaaS Control"
               web_icon="elsx_saas,static/description/icon.png"
-              groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
+              groups="elsx_saas.group_elsx_saas_admin"/>
     <menuitem id="menu_elsx_saas_tenant"
-              name="Tenants"
+              name="Tenant Governance"
               parent="menu_elsx_saas_root"
               action="action_elsx_saas_tenant"
-              groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
+              groups="elsx_saas.group_elsx_saas_admin"/>
     <menuitem id="menu_elsx_saas_module_request"
               name="Module Requests"
               parent="menu_elsx_saas_root"
               action="action_elsx_saas_module_request"
               sequence="20"
-              groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
+              groups="elsx_saas.group_elsx_saas_admin"/>
 </odoo>
