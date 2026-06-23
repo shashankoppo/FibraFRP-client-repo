@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Keep core administration available to system admins.
-         Module safety is enforced by Python guards, not by hiding Settings. -->
+    <!-- Keep Settings available to system admins, but hide raw Apps from the launcher.
+         Module safety is enforced by Python guards and the secret Apps URL. -->
 
     <record id="base.menu_management" model="ir.ui.menu">
         <field name="group_ids" eval="[(4, ref('base.group_system'))]"/>
@@ -11,7 +11,7 @@
     <record id="base.menu_apps" model="ir.ui.menu">
         <field name="group_ids" eval="[(4, ref('base.group_system'))]"/>
         <field name="action" eval="'ir.actions.act_window,%d' % ref('base.open_module_tree')"/>
-        <field name="active" eval="True"/>
+        <field name="active" eval="False"/>
     </record>
 
     <record id="base.menu_administration" model="ir.ui.menu">
