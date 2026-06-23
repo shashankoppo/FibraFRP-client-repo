@@ -108,16 +108,27 @@ function hideElement(element) {
     element.style.display = "none";
 }
 
+function hideOnlySmallAboutBlock(element) {
+    if (!element) {
+        return;
+    }
+    const nestedSettingCount = element.querySelectorAll?.(".app_settings_block, .o_setting_box, .o_setting_container").length || 0;
+    if (nestedSettingCount > 2) {
+        return;
+    }
+    hideElement(element);
+}
+
 function hideSettingsAboutBlock() {
     if (!document.body || !isSettingsView()) {
         return;
     }
 
     for (const selector of ABOUT_BLOCK_SELECTORS) {
-        document.querySelectorAll(selector).forEach(hideElement);
+        document.querySelectorAll(selector).forEach(hideOnlySmallAboutBlock);
     }
 
-    document.querySelectorAll(".o_setting_box, .o_setting_container").forEach((block) => {
+    document.querySelectorAll(".o_setting_box").forEach((block) => {
         const text = (block.textContent || "").replace(/\s+/g, " ").trim();
         if (/\bAbout\b/.test(text) && /(Community Edition|Copyright|Licensed)/i.test(text)) {
             hideElement(block);
@@ -129,10 +140,10 @@ function hideSettingsAboutBlock() {
         if (headingText !== "About") {
             return;
         }
-        const block = heading.closest(".o_setting_container, .o_setting_box");
+        const block = heading.closest(".o_setting_box, [name='about_setting_container'], [data-name='about_setting_container'], [data-key='about_setting_container']");
         const blockText = (block?.textContent || "").replace(/\s+/g, " ").trim();
         if (/(Community Edition|Copyright|Licensed)/i.test(blockText)) {
-            hideElement(block);
+            hideOnlySmallAboutBlock(block);
         }
     });
 }
