@@ -11,6 +11,7 @@ backups/
 secure_backups/
 odoo-19.0/backups/
 odoo-19.0/secure_backups/
+odoo-19.0/reports/
 *.dump
 *.pg_dump
 *.sql

@@ -5,6 +5,7 @@ access_elsx_saas_tenant_user,elsx.saas.tenant,model_elsx_saas_tenant,base.group_
 access_elsx_saas_module_request,elsx.saas.module.request,model_elsx_saas_module_request,elsx_saas.group_elsx_saas_admin,1,1,1,0
 access_elsx_saas_module_request_system,elsx.saas.module.request.system,model_elsx_saas_module_request,elsx_saas.group_elsx_saas_admin,1,1,1,0
 access_elsx_saas_module_request_user,elsx.saas.module.request,model_elsx_saas_module_request,base.group_user,0,0,0,0
+access_elsx_saas_dashboard,elsx.saas.dashboard,model_elsx_saas_dashboard,elsx_saas.group_elsx_saas_admin,1,0,1,0
 access_elsx_saas_api_token,elsx.saas.api.token,model_elsx_saas_api_token,elsx_saas.group_elsx_saas_admin,1,1,1,1
 access_elsx_saas_api_audit,elsx.saas.api.audit,model_elsx_saas_api_audit,elsx_saas.group_elsx_saas_admin,1,0,0,0
 access_elsx_saas_tenant_usage,elsx.saas.tenant.usage,model_elsx_saas_tenant_usage,elsx_saas.group_elsx_saas_admin,1,1,1,0
@@ -13,12 +14,12 @@ access_elsx_saas_webhook_event,elsx.saas.webhook.event,model_elsx_saas_webhook_e
 access_elsx_saas_support_ticket,elsx.saas.support.ticket,model_elsx_saas_support_ticket,elsx_saas.group_elsx_saas_admin,1,1,1,0
 access_elsx_saas_support_ticket_user,elsx.saas.support.ticket,model_elsx_saas_support_ticket,base.group_user,1,0,0,0
 access_elsx_saas_ticket_message,elsx.saas.ticket.message,model_elsx_saas_ticket_message,elsx_saas.group_elsx_saas_admin,1,1,1,0
-access_elsx_saas_billing_plan,elsx.saas.billing.plan,model_elsx_saas_billing_plan,elsx_saas.group_elsx_saas_admin,1,1,1,1
+access_elsx_saas_billing_plan,elsx.saas.billing.plan,model_elsx_saas_billing_plan,elsx_saas.group_elsx_saas_admin,1,1,1,0
 access_elsx_saas_billing_cycle,elsx.saas.billing.cycle,model_elsx_saas_billing_cycle,elsx_saas.group_elsx_saas_admin,1,1,1,0
 access_elsx_saas_billing_line,elsx.saas.billing.line,model_elsx_saas_billing_line,elsx_saas.group_elsx_saas_admin,1,1,1,0
 access_elsx_saas_subscription,elsx.saas.subscription,model_elsx_saas_subscription,elsx_saas.group_elsx_saas_admin,1,1,1,0
-access_elsx_saas_addon,elsx.saas.addon,model_elsx_saas_addon,elsx_saas.group_elsx_saas_admin,1,1,1,1
-access_elsx_saas_addon_limit,elsx.saas.addon.limit,model_elsx_saas_addon_limit,elsx_saas.group_elsx_saas_admin,1,1,1,1
+access_elsx_saas_addon,elsx.saas.addon,model_elsx_saas_addon,elsx_saas.group_elsx_saas_admin,1,1,1,0
+access_elsx_saas_addon_limit,elsx.saas.addon.limit,model_elsx_saas_addon_limit,elsx_saas.group_elsx_saas_admin,1,1,1,0
 access_elsx_saas_upgrade_log,elsx.saas.upgrade.log,model_elsx_saas_upgrade_log,elsx_saas.group_elsx_saas_admin,1,0,0,0
 access_elsx_saas_upgrade_log_system,elsx.saas.upgrade.log.system,model_elsx_saas_upgrade_log,elsx_saas.group_elsx_saas_admin,1,1,1,0
 access_elsx_saas_version_check,elsx.saas.version.check,model_elsx_saas_version_check,elsx_saas.group_elsx_saas_admin,1,0,0,0

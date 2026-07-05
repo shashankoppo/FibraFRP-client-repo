@@ -1,6 +1,6 @@
 {
     'name': 'ELSX ERP SaaS Master',
-    'version': '19.0.2.0.0',
+    'version': '19.0.2.1.0',
     'category': 'SaaS',
     'summary': 'Enterprise SaaS tenant registry, API management, billing, and admin governance',
     'description': '''
@@ -26,6 +26,7 @@ stays behind encrypted backup and controlled shell scripts.
         'security/saas_security.xml',
         'security/ir.model.access.csv',
         'views/saas_tenant_views.xml',
+        'views/saas_dashboard_views.xml',
         'views/saas_advanced_views.xml',
         'views/saas_enterprise_views.xml',
         'data/sequences_and_plans.xml',

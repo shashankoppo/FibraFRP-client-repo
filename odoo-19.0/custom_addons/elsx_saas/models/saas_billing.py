@@ -246,7 +246,7 @@ class ELSXSaasSubscription(models.Model):
     addon_ids = fields.Many2many('elsx.saas.addon', string='Active Add-ons')
 
     # History
-    billing_cycle_ids = fields.One2many('elsx.saas.billing.cycle', compute='_compute_billing_cycles')
+    billing_cycle_ids = fields.One2many('elsx.saas.billing.cycle', string='Billing History', compute='_compute_billing_cycles')
 
     _sql_constraints = [
         ('tenant_subscription_unique', 'unique(tenant_id)', 'A tenant can have only one active subscription record.'),

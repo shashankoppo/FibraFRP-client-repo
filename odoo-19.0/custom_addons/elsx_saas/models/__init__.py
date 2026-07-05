@@ -1,4 +1,5 @@
 from . import saas_tenant
+from . import saas_dashboard
 from . import saas_api_token
 from . import saas_usage_tracking
 from . import saas_support_ticket
