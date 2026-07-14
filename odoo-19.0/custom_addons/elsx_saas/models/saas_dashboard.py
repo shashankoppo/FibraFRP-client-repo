@@ -57,8 +57,9 @@ class ELSXSaasDashboard(models.TransientModel):
             ('risk_level', 'in', ('high', 'critical')),
             ('state', 'not in', ('installed', 'cancelled', 'rejected')),
         ])
-        open_ticket_count = Ticket.search_count([('state', 'not in', ('resolved', 'closed'))])
-        breached_ticket_count = Ticket.search_count([('sla_status', '=', 'breached')])
+        open_tickets = Ticket.search([('state', 'not in', ('resolved', 'closed'))])
+        open_ticket_count = len(open_tickets)
+        breached_ticket_count = len(open_tickets.filtered(lambda t: t.sla_status == 'breached'))
         open_invoice_count = BillingCycle.search_count([('payment_status', 'in', ('draft', 'sent', 'partial'))])
         overdue_invoice_count = BillingCycle.search_count([('payment_status', '=', 'overdue')])
         active_tenants = Tenant.search([('state', '=', 'active')])

@@ -47,9 +47,7 @@ class ELSXSaasApiToken(models.Model):
     audit_log_ids = fields.One2many('elsx.saas.api.audit', 'token_id', string='API Call Audit Log')
     audit_log_count = fields.Integer(compute='_compute_audit_count')
 
-    _sql_constraints = [
-        ('token_key_unique', 'unique(token_key)', 'API token must be unique.'),
-    ]
+    _token_key_unique = models.Constraint('UNIQUE (token_key)', 'API token must be unique.')
 
     @api.depends('tenant_id', 'permissions')
     def _compute_name(self):
@@ -220,9 +218,7 @@ class ELSXSaasApiAudit(models.Model):
     status_code = fields.Integer('HTTP Status Code')
     error_message = fields.Text()
 
-    _sql_constraints = [
-        ('audit_log_immutable', 'check(1=1)', 'This table is immutable.'),
-    ]
+    _audit_log_immutable = models.Constraint('CHECK (1=1)', 'This table is immutable.')
 
     def unlink(self):
         """Prevent deletion of audit logs."""

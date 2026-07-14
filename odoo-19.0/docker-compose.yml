@@ -13,11 +13,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-          cpus: "1.0"
     logging:
       driver: json-file
       options:
@@ -54,11 +49,6 @@ services:
       timeout: 10s
       retries: 15
       start_period: 60s
-    deploy:
-      resources:
-        limits:
-          memory: 3G
-          cpus: "2.0"
     logging:
       driver: json-file
       options:
@@ -75,7 +65,7 @@ services:
     working_dir: /app
     volumes:
       - ./custom_addons/elsx_whatsapp_marketing/sidecar:/app
-    command: sh -c "if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi && npm start"
+    command: sh -c "if [ -s package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi && npm start"
     environment:
       - ODOO_URL=http://odoo:8069
       - PORT=3000
@@ -93,11 +83,6 @@ services:
       timeout: 10s
       retries: 10
       start_period: 30s
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: "0.5"
     logging:
       driver: json-file
       options:
@@ -124,11 +109,6 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: "1.0"
     logging:
       driver: json-file
       options:
@@ -185,11 +165,6 @@ services:
           echo "[backup] Pruned backups older than 7 days. Current backups:"
           ls -lh /backups/*.pg_dump 2>/dev/null || echo "[backup] (none)"
         done
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: "0.5"
     logging:
       driver: json-file
       options:

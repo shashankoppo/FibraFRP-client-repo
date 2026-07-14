@@ -24,8 +24,8 @@ param(
     [Parameter(Mandatory=$true)]
     [string]$DbName,
 
-    [string]$InstallModules = "elsx_client_restrictions,elsx_attendance_tracking,elsx_face_attendance,elsx_saas",
-    [string]$UpgradeModules = "elsx_client_restrictions,elsx_attendance_tracking,elsx_face_attendance,elsx_saas",
+    [string]$InstallModules = "elsx_client_restrictions,elsx_attendance_tracking,elsx_face_attendance",
+    [string]$UpgradeModules = "elsx_client_restrictions,elsx_attendance_tracking,elsx_face_attendance",
     [string]$ExtraInstall   = "",
     [string]$ExtraUpgrade   = "",
     [string]$BackupDir      = "secure_backups",

@@ -5,8 +5,17 @@ from urllib.parse import quote_plus
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
 
+from ..utils import is_saas_system_enabled
+
 
 SAFE_DB_RE = re.compile(r'^[A-Za-z0-9_.-]+$')
+
+
+def _ensure_saas_system_enabled(env):
+    if not is_saas_system_enabled(env):
+        raise UserError(_(
+            'The SaaS system is deactivated. Provisioning, billing automation, and tenant module installation are disabled to protect production client data.'
+        ))
 
 
 class ELSXSaasTenant(models.Model):
@@ -33,6 +42,7 @@ class ELSXSaasTenant(models.Model):
     ], default='starter', required=True)
     admin_email = fields.Char('Tenant Admin Email')
     admin_name = fields.Char('Tenant Admin Name')
+    user_id = fields.Many2one('res.users', string='SaaS User (Owner)', help='The portal user who owns this tenant.')
     custom_domain = fields.Char('Custom Domain')
     base_url = fields.Char(
         'Base URL',
@@ -56,6 +66,8 @@ class ELSXSaasTenant(models.Model):
     ], default='unknown')
     last_health_check = fields.Datetime()
     max_users = fields.Integer('Max Users', default=10)
+    app_allowance = fields.Integer('App Allowance', default=3, help='Maximum number of custom/third-party apps allowed.')
+    installed_app_count = fields.Integer(compute='_compute_module_request_count', string='Installed Apps')
     storage_quota_gb = fields.Integer('Storage Quota (GB)', default=5)
     enable_crm = fields.Boolean(default=True)
     enable_whatsapp = fields.Boolean(default=True)
@@ -72,9 +84,13 @@ class ELSXSaasTenant(models.Model):
         required=True,
     )
     billing_cycle = fields.Selection([
+        ('weekly', 'Weekly'),
         ('monthly', 'Monthly'),
         ('quarterly', 'Quarterly'),
         ('yearly', 'Yearly'),
+        ('annual', 'Annual'),
+        ('three_year', '3-Year'),
+        ('five_year', '5-Year'),
         ('custom', 'Custom'),
     ], default='monthly', required=True)
     monthly_recurring_revenue = fields.Monetary('MRR', currency_field='currency_id')
@@ -99,9 +115,7 @@ class ELSXSaasTenant(models.Model):
     module_request_count = fields.Integer(compute='_compute_module_request_count')
     approved_module_request_count = fields.Integer(compute='_compute_module_request_count')
 
-    _sql_constraints = [
-        ('db_name_unique', 'unique(db_name)', 'Database name must be unique per SaaS tenant record.'),
-    ]
+    _db_name_unique = models.Constraint('UNIQUE (db_name)', 'Database name must be unique per SaaS tenant record.')
 
     @api.depends('name')
     def _compute_db_name(self):
@@ -170,6 +184,9 @@ class ELSXSaasTenant(models.Model):
             tenant.approved_module_request_count = len(
                 tenant.module_request_ids.filtered(lambda request: request.state in ('approved', 'staged', 'installed'))
             )
+            tenant.installed_app_count = len(
+                tenant.module_request_ids.filtered(lambda request: request.state == 'installed')
+            )
 
     @api.constrains('db_name')
     def _check_db_name(self):
@@ -205,6 +222,7 @@ class ELSXSaasTenant(models.Model):
         return seen
 
     def action_request_provisioning(self):
+        _ensure_saas_system_enabled(self.env)
         self.ensure_one()
         if not self.backup_verified:
             raise UserError(_('Verify an encrypted backup before requesting tenant provisioning.'))
@@ -218,10 +236,12 @@ class ELSXSaasTenant(models.Model):
         )
 
     def action_mark_provisioning(self):
+        _ensure_saas_system_enabled(self.env)
         self.write({'state': 'provisioning'})
         return self._notify(_('Tenant marked provisioning'), _('Administrative state only. No live database was changed.'), 'info')
 
     def action_mark_active(self):
+        _ensure_saas_system_enabled(self.env)
         for tenant in self:
             if not tenant.client_database_created:
                 raise UserError(_('Mark "Database Created" before activating %s.') % tenant.display_name)
@@ -231,14 +251,17 @@ class ELSXSaasTenant(models.Model):
         return self._notify(_('Tenant activated'), _('Tenant registry was updated. Existing tenant data was not modified.'), 'success')
 
     def action_suspend(self):
+        _ensure_saas_system_enabled(self.env)
         self.write({'state': 'suspended', 'health_status': 'warning'})
         return self._notify(_('Tenant suspended in registry'), _('This does not disable logins by itself; apply access rules separately if required.'), 'warning')
 
     def action_archive(self):
+        _ensure_saas_system_enabled(self.env)
         self.write({'state': 'archived'})
         return self._notify(_('Tenant archived in registry'), _('No database, filestore, or user data was deleted.'), 'info')
 
     def action_reset_to_draft(self):
+        _ensure_saas_system_enabled(self.env)
         self.write({'state': 'draft'})
         return self._notify(_('Tenant reset to draft'), _('Administrative state only.'), 'info')
 
@@ -251,13 +274,22 @@ class ELSXSaasTenant(models.Model):
 
     def action_open_tenant_url(self):
         self.ensure_one()
-        if not self.base_url:
-            raise UserError(_('Set Base URL first.'))
-        db_query = quote_plus(self.db_name or '')
-        separator = '&' if '?' in self.base_url else '?'
+        url = ''
+        if self.custom_domain:
+            domain = self.custom_domain.strip().rstrip('/')
+            if not domain.startswith('http'):
+                domain = 'https://' + domain
+            url = '%s/?db=%s' % (domain, quote_plus(self.db_name or ''))
+        elif self.base_url:
+            db_query = quote_plus(self.db_name or '')
+            separator = '&' if '?' in self.base_url else '?'
+            url = '%s%sdb=%s' % (self.base_url.rstrip('/'), separator, db_query)
+        else:
+            raise UserError(_('Set Base URL or Custom Domain first.'))
+
         return {
             'type': 'ir.actions.act_url',
-            'url': '%s%sdb=%s' % (self.base_url.rstrip('/'), separator, db_query),
+            'url': url,
             'target': 'new',
         }
 
@@ -300,8 +332,8 @@ class ELSXSaasModuleRequest(models.Model):
 
     name = fields.Char(required=True)
     tenant_id = fields.Many2one('elsx.saas.tenant', required=True, ondelete='cascade')
+    app_id = fields.Many2one('elsx.saas.app', string='App from Catalog')
     module_name = fields.Char(
-        required=True,
         help='Technical module name, for example website_sale or vendor_custom_module.',
     )
     source_type = fields.Selection([
@@ -310,6 +342,14 @@ class ELSXSaasModuleRequest(models.Model):
         ('third_party', 'Third-Party Addon'),
     ], default='third_party', required=True)
     vendor = fields.Char()
+
+    @api.onchange('app_id')
+    def _onchange_app_id(self):
+        if self.app_id:
+            self.name = self.app_id.name
+            self.module_name = self.app_id.module_name
+            self.monthly_cost = self.app_id.monthly_price
+            self.one_time_cost = self.app_id.one_time_price
     license_reference = fields.Char()
     state = fields.Selection([
         ('draft', 'Draft'),
@@ -407,28 +447,18 @@ class ELSXSaasModuleRequest(models.Model):
     @api.depends('tenant_id.db_name', 'module_name')
     def _compute_deployment_plan(self):
         for request in self:
-            db_name = request.tenant_id.db_name or '<db_name>'
-            module_name = request.module_name or '<module_name>'
-            request.deployment_plan = '\n'.join([
-                '# 1. Copy the third-party addon into custom_addons or an approved external_addons path.',
-                '# 2. Review manifest, license, Python/Node dependencies, controllers, security, and data files.',
-                '# 3. Test on staging/copy database first.',
-                '',
-                'cd ~/Desktop/FiberaFRP/FibraFRP-client-repo/odoo-19.0',
-                'git pull origin main',
-                'docker compose build odoo',
-                'EXTRA_UPGRADE_MODULES=%s bash deploy/safe_production_update.sh %s' % (module_name, db_name),
-                'docker compose ps',
-                'docker logs --tail 250 odoo_app',
-                '',
-                '# 4. Smoke test login, CRM, WhatsApp, invoices, attendance, and this module.',
-            ])
+            request.deployment_plan = _('SaaS system is deactivated. Tenant module installation is disabled and no client database will be changed from this UI.')
 
     def action_submit_review(self):
+        _ensure_saas_system_enabled(self.env)
+        for request in self:
+            if request.tenant_id.installed_app_count >= request.tenant_id.app_allowance:
+                raise UserError(_('App Allowance Exceeded! This tenant is only allowed %s apps. Please upgrade their plan or increase the allowance.') % request.tenant_id.app_allowance)
         self.write({'state': 'review'})
         return self._notify(_('Module request submitted'), _('Review manifest, dependencies, and staging plan before approval.'), 'info')
 
     def action_approve(self):
+        _ensure_saas_system_enabled(self.env)
         for request in self:
             if request.risk_level == 'blocked':
                 raise UserError(_('Blocked-risk module requests cannot be approved.'))
@@ -445,21 +475,60 @@ class ELSXSaasModuleRequest(models.Model):
         return self._notify(_('Module request approved'), _('Use staging before production deployment.'), 'success')
 
     def action_mark_staged(self):
+        _ensure_saas_system_enabled(self.env)
         self.write({'state': 'staged', 'staging_tested': True})
         return self._notify(_('Module staged'), _('Production remains unchanged until the safe deployment script is run.'), 'success')
 
     def action_mark_installed(self):
+        _ensure_saas_system_enabled(self.env)
         for request in self:
             if not request.production_approved:
                 raise UserError(_('Mark Production Approved before setting this request installed.'))
+            if request.monthly_cost > 0:
+                request.tenant_id.monthly_recurring_revenue += request.monthly_cost
         self.write({'state': 'installed'})
         return self._notify(_('Module request installed'), _('Registry updated only. Verify tenant health after deployment.'), 'success')
 
+    def action_install_tenant_module(self):
+        _ensure_saas_system_enabled(self.env)
+        self.ensure_one()
+        import odoo
+        from odoo import api, SUPERUSER_ID
+        from odoo.exceptions import UserError
+
+        if not self.tenant_id.db_name:
+            raise UserError(_('Tenant has no database assigned.'))
+        if self.state not in ['approved', 'staged']:
+            raise UserError(_('Request must be approved or staged before installation.'))
+
+        try:
+            db_registry = odoo.registry(self.tenant_id.db_name)
+            with db_registry.cursor() as tenant_cr:
+                tenant_env = api.Environment(tenant_cr, SUPERUSER_ID, {})
+                module = tenant_env['ir.module.module'].search([('name', '=', self.module_name)])
+                if not module:
+                    # Update local module list for tenant first just in case
+                    tenant_env['ir.module.module'].update_list()
+                    module = tenant_env['ir.module.module'].search([('name', '=', self.module_name)])
+
+                if not module:
+                    raise UserError(_('Module %s not found in tenant database even after update_list.') % self.module_name)
+
+                module.button_immediate_install()
+        except Exception as e:
+            raise UserError(_('Failed to install module on tenant database: %s') % str(e))
+
+        self.production_approved = True
+        self.action_mark_installed()
+        return self._notify(_('Module installed automatically'), _('Successfully installed %s on tenant %s.') % (self.module_name, self.tenant_id.db_name), 'success')
+
     def action_reject(self):
+        _ensure_saas_system_enabled(self.env)
         self.write({'state': 'rejected'})
         return self._notify(_('Module request rejected'), _('No server or tenant data was changed.'), 'warning')
 
     def action_reset_draft(self):
+        _ensure_saas_system_enabled(self.env)
         self.write({'state': 'draft'})
         return self._notify(_('Module request reset'), _('Administrative state only.'), 'info')
 

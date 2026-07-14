@@ -99,8 +99,22 @@ function isSettingsView() {
     return path.includes("/settings") || Boolean(document.querySelector(".o_base_settings, .app_settings_block"));
 }
 
+const SETTINGS_ROOT_SELECTORS = [
+    ".o_action_manager",
+    ".o_content",
+    ".o_base_settings",
+    ".o_form_view",
+    ".o_form_sheet",
+    ".o_renderer",
+    ".app_settings_block",
+];
+
+function isProtectedSettingsRoot(element) {
+    return SETTINGS_ROOT_SELECTORS.some((selector) => element?.matches?.(selector));
+}
+
 function hideElement(element) {
-    if (!element || element.classList?.contains("o_elsx_hidden_about")) {
+    if (!element || element.classList?.contains("o_elsx_hidden_about") || isProtectedSettingsRoot(element)) {
         return;
     }
     element.classList?.add("o_elsx_hidden_about");
@@ -109,11 +123,15 @@ function hideElement(element) {
 }
 
 function hideOnlySmallAboutBlock(element) {
-    if (!element) {
+    if (!element || isProtectedSettingsRoot(element)) {
+        return;
+    }
+    const text = (element.textContent || "").replace(/\s+/g, " ").trim();
+    if (!/(Community Edition|Copyright|Licensed|GNU|LGPL)/i.test(text)) {
         return;
     }
     const nestedSettingCount = element.querySelectorAll?.(".app_settings_block, .o_setting_box, .o_setting_container").length || 0;
-    if (nestedSettingCount > 2) {
+    if (nestedSettingCount > 1) {
         return;
     }
     hideElement(element);

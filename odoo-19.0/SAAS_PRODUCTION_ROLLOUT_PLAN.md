@@ -45,8 +45,21 @@ bash deploy/safe_update_all_dbs.sh
 
 ## Phase 2: Master Admin Instance
 
-Create a separate master database and domain for SaaS administration. The master database stores tenant registry, subscription plans, provisioning requests, module requests, telemetry snapshots, backup metadata, and billing state. It must not store tenant operational data such as contacts, invoices, chats, Meta tokens, or attendance records.
+Create a separate master database and domain for SaaS administration. The default first-time master database is `EVO_DB`, created with `bash deploy/bootstrap_saas_master_db.sh EVO_DB` only when it does not already exist. The master database stores tenant registry, subscription plans, provisioning requests, module requests, telemetry snapshots, backup metadata, and billing state. It must not store tenant operational data such as contacts, invoices, chats, Meta tokens, or attendance records.
 
+
+### Phase 2.1 First-Time Master Bootstrap
+
+Run this only on first SaaS master setup:
+
+```bash
+cd ~/Desktop/FiberaFRP/FibraFRP-client-repo/odoo-19.0 && \
+git pull origin main && \
+chmod +x entrypoint.sh deploy/*.sh && \
+bash deploy/bootstrap_saas_master_db.sh EVO_DB
+```
+
+The script refuses to use known client databases such as `FiberaFRP_DB` or `qwerty` as the SaaS master. If `EVO_DB` already exists, it exits without overwriting it.
 ## Phase 3: Template Database
 
 Create a base template database with only safe default configuration: CRM, Contacts, Sales/Invoicing as required, WhatsApp Marketing installed without live credentials, Face Attendance installed but disabled, ELSxGlobal branding/client restrictions, and SaaS-safe module protections.

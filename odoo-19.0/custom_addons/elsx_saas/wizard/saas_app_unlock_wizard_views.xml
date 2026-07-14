@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_elsx_saas_app_unlock_wizard_form" model="ir.ui.view">
+        <field name="name">elsx.saas.app.unlock.wizard.form</field>
+        <field name="model">elsx.saas.app.unlock.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Unlock App">
+                <sheet>
+                    <group>
+                        <field name="module_name" readonly="1"/>
+                        <field name="target_database" readonly="1"/>
+                        <field name="password" password="True" placeholder="Enter SaaS unlock password"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_confirm_unlock" string="Unlock &amp; Install" type="object" class="btn-primary"/>
+                    <button string="Cancel" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

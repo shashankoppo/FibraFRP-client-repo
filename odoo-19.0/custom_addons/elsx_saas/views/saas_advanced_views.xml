@@ -330,6 +330,14 @@
         <field name="name">Support Tickets</field>
         <field name="res_model">elsx.saas.support.ticket</field>
         <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No support tickets yet.
+            </p>
+            <p>
+                Track tenant support requests, assign priority and SLA timers, and record resolutions. Ticket changes are governance records and do not modify tenant databases.
+            </p>
+        </field>
     </record>
 
     <!-- ===== BILLING PLAN VIEWS ===== -->
@@ -372,6 +380,10 @@
                             <field name="setup_fee"/>
                             <field name="monthly_price"/>
                             <field name="annual_price"/>
+                            <field name="weekly_price"/>
+                            <field name="yearly_price"/>
+                            <field name="three_year_price"/>
+                            <field name="five_year_price"/>
                         </group>
                     </group>
                     <group string="Included Features">
@@ -396,6 +408,10 @@
                             <field name="support_tier"/>
                             <field name="allow_monthly"/>
                             <field name="allow_annual"/>
+                            <field name="allow_weekly"/>
+                            <field name="allow_yearly"/>
+                            <field name="allow_three_year"/>
+                            <field name="allow_five_year"/>
                         </group>
                     </group>
                     <field name="description" nolabel="1" colspan="2"/>
@@ -408,6 +424,14 @@
         <field name="name">Billing Plans</field>
         <field name="res_model">elsx.saas.billing.plan</field>
         <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Define your first pricing plan.
+            </p>
+            <p>
+                Plans set the price, user limits, storage quotas, and included modules for each subscription tier. Default Starter, Business, and Enterprise plans are created on install.
+            </p>
+        </field>
     </record>
 
     <!-- ===== BILLING CYCLE VIEWS ===== -->
@@ -490,10 +514,39 @@
         </field>
     </record>
 
+    <!-- Billing Cycle Search -->
+    <record id="view_elsx_saas_billing_cycle_search" model="ir.ui.view">
+        <field name="name">elsx.saas.billing.cycle.search</field>
+        <field name="model">elsx.saas.billing.cycle</field>
+        <field name="arch" type="xml">
+            <search string="Billing Cycles">
+                <field name="name"/>
+                <field name="tenant_id"/>
+                <filter string="Draft" name="draft" domain="[('payment_status', '=', 'draft')]"/>
+                <filter string="Sent" name="sent" domain="[('payment_status', '=', 'sent')]"/>
+                <filter string="Overdue" name="overdue" domain="[('payment_status', '=', 'overdue')]"/>
+                <filter string="Paid" name="paid" domain="[('payment_status', '=', 'paid')]"/>
+                <separator/>
+                <filter string="Group by Tenant" name="group_tenant" context="{'group_by': 'tenant_id'}"/>
+                <filter string="Group by Status" name="group_status" context="{'group_by': 'payment_status'}"/>
+                <filter string="Group by Cycle" name="group_cycle" context="{'group_by': 'billing_cycle'}"/>
+            </search>
+        </field>
+    </record>
+
     <record id="action_elsx_saas_billing_cycle" model="ir.actions.act_window">
         <field name="name">Invoices</field>
         <field name="res_model">elsx.saas.billing.cycle</field>
         <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_elsx_saas_billing_cycle_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No billing cycles yet.
+            </p>
+            <p>
+                Billing cycles are created automatically when subscriptions renew, or manually from the subscription form. They track amounts, dates, and payment status.
+            </p>
+        </field>
     </record>
 
     <!-- ===== SUBSCRIPTION VIEWS ===== -->

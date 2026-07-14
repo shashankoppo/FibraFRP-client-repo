@@ -15,7 +15,7 @@ The current production rule is simple:
 
 ## 2. Current SaaS Reality
 
-The current SaaS module is a governance and management layer. It provides records, menus, APIs, views, and safety controls for tenant management, billing plans, usage tracking, module requests, support tickets, upgrade logs, and deployment planning.
+The current SaaS module is a governance and management layer. The master control panel should run in a separate `EVO_DB` database, while client databases keep their own CRM, WhatsApp, invoices, attendance, website, and operational records. It provides records, menus, APIs, views, and safety controls for tenant management, billing plans, usage tracking, module requests, support tickets, upgrade logs, and deployment planning.
 
 It is not yet a fully automatic tenant provisioner that safely creates domains, clones template databases, configures reverse proxy routes, assigns SSL certificates, configures SMTP, and deploys isolated client instances end to end without technician review.
 
@@ -143,7 +143,32 @@ Recommended groups:
 | SaaS admin | Tenant, billing, support, and health management. |
 | System owner | Full technical access. |
 
-### 6.3 If The Menu Is Missing
+### 6.3 Role-Based Interfaces Required
+
+A production SaaS system should not expose the same screen to every user. The current system should be tested against these role-specific expectations:
+
+| Role | Required Interface | What They Should Manage | What They Must Not Touch |
+|---|---|---|---|
+| SaaS owner | Command Center and tenant registry. | Tenants, plans, billing health, platform risk, rollout status. | Live client records, Meta tokens, WhatsApp chats, invoices, or filestore directly. |
+| SaaS billing admin | Billing plans, billing cycles, subscriptions, add-ons. | Pricing, billing status, overdue follow-up, plan assignment. | Server deployment, module install/uninstall, tenant DB restore. |
+| SaaS support lead | Support tickets, tenant health, usage snapshots. | Incidents, SLA, customer communication, escalation notes. | Protected module changes, database clone/drop/restore. |
+| Implementation technician | Provisioning checklist, module request, deployment plan. | Prepare tenant records, verify domains, check backups, document deployment. | Direct production data edits from browser actions. |
+| Client admin | Their own tenant apps and business settings. | Users, company profile, CRM, invoicing, website, WhatsApp account where allowed. | SaaS master records for other tenants. |
+| Staff or employee | Normal operational apps only. | Attendance, CRM tasks, chat, invoices, support work depending on groups. | Apps module, SaaS billing, tenant lifecycle, module governance. |
+
+Missing or incomplete interfaces that still need product work before full commercial SaaS rollout:
+
+- Client-facing subscription portal with plan, renewal, invoice, and support status.
+- Tenant onboarding wizard for company, domain, admin user, modules, and service limits.
+- Domain and SSL mapping screen connected to reverse proxy automation.
+- Safe app marketplace screen that creates module requests instead of direct install actions.
+- Billing checkout/payment gateway integration and renewal reminders.
+- Staff helpdesk view separated from platform-owner deployment controls.
+- Tenant health timeline with backup, cron, WhatsApp, storage, and error events.
+- Guided empty states for every SaaS screen so a new operator knows the next safe action.
+
+Until those are implemented and tested, the SaaS module should be treated as a governance console plus controlled deployment helper, not as a fully automated commercial tenant factory.
+### 6.4 If The Menu Is Missing
 
 1. Confirm the module is installed:
 
@@ -168,7 +193,7 @@ docker logs --tail 250 odoo_app
 ```
 
 
-## 6.4 SaaS Command Center
+## 6.5 SaaS Command Center
 
 After the latest SaaS upgrade, the first screen for SaaS administrators should be:
 
@@ -178,7 +203,7 @@ ELSx SaaS Control > Command Center
 
 Use this page as the operator dashboard. It is intentionally read-mostly and does not create, clone, delete, or modify tenant databases.
 
-### 6.4.1 Command Center Areas
+### 6.5.1 Command Center Areas
 
 | Area | What It Shows | What To Do |
 |---|---|---|
@@ -189,16 +214,52 @@ Use this page as the operator dashboard. It is intentionally read-mostly and doe
 | CIA Triad | Confidentiality, integrity, and availability health. | Treat warning or danger status as a release blocker. |
 | Operator Guidance | Next safe action for the platform operator. | Follow guidance before touching production. |
 
-### 6.4.2 Command Center Safety
+### 6.5.2 Command Center Safety
 
 The dashboard reads from SaaS governance tables only. It does not touch client CRM records, WhatsApp messages, invoices, attendance entries, templates, campaigns, flows, filestore, Meta credentials, Tally settings, or production tenant databases.
 
 If the dashboard is empty, create or sync SaaS governance records first. Do not assume an empty dashboard means the production system has no clients.
 
-### 6.4.3 Who Should See It
+### 6.5.3 Who Should See It
 
 Only users in the SaaS administrator group should see the command center. Normal client users should not see SaaS tenant management, billing governance, module requests, or infrastructure health.
 
+
+## 6.6 Separate SaaS Master Database
+
+The SaaS control panel must live in a separate master database. Do not make a client database such as `FiberaFRP_DB` the SaaS master.
+
+Recommended master database name:
+
+```text
+EVO_DB
+```
+
+First-time bootstrap command:
+
+```bash
+cd ~/Desktop/FiberaFRP/FibraFRP-client-repo/odoo-19.0 && \
+git pull origin main && \
+chmod +x entrypoint.sh deploy/*.sh && \
+bash deploy/bootstrap_saas_master_db.sh EVO_DB
+```
+
+What this does:
+
+1. Starts PostgreSQL if needed.
+2. Checks whether `EVO_DB` already exists.
+3. If it exists, it stops safely and does not overwrite it.
+4. If it does not exist, it creates a clean SaaS master database.
+5. Installs only the master control modules required for SaaS governance.
+6. Leaves client databases, WhatsApp data, CRM, invoices, attendance, Tally, and filestore untouched.
+
+After creation:
+
+1. Open `/web?db=EVO_DB`.
+2. Log in as the master administrator.
+3. Assign only trusted platform operators to the ELSx SaaS administrator group.
+4. Create tenant registry records for each customer database/domain.
+5. Keep tenant operational data inside tenant databases, not inside `EVO_DB`.
 ## 7. Local Docker Desktop Testing
 
 Use Docker Desktop testing before touching production.

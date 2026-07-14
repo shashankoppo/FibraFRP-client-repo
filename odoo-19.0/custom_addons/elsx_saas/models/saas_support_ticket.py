@@ -14,8 +14,8 @@ class ELSXSaasSupportTicket(models.Model):
     name = fields.Char(string='Subject', required=True, tracking=True)
 
     # Tenant & Contact
-    tenant_id = fields.Many2one('elsx.saas.tenant', required=True, ondelete='cascade', tracking=True)
-    submitted_by = fields.Many2one('res.partner', 'Submitted By', required=True)
+    tenant_id = fields.Many2one('elsx.saas.tenant', required=True, ondelete='cascade', tracking=True, default=lambda self: self.env['elsx.saas.tenant'].search([('user_id', '=', self.env.uid)], limit=1))
+    submitted_by = fields.Many2one('res.partner', 'Submitted By', required=True, default=lambda self: self.env.user.partner_id)
     assigned_to = fields.Many2one('res.users', 'Assigned To', tracking=True)
 
     # Categories
@@ -102,9 +102,7 @@ class ELSXSaasSupportTicket(models.Model):
     # Related records
     related_module_request_id = fields.Many2one('elsx.saas.module.request', 'Related Module Request')
 
-    _sql_constraints = [
-        ('ticket_number_unique', 'unique(ticket_number)', 'Ticket number must be unique.'),
-    ]
+    _ticket_number_unique = models.Constraint('UNIQUE (ticket_number)', 'Ticket number must be unique.')
 
     @api.model_create_multi
     def create(self, vals_list):

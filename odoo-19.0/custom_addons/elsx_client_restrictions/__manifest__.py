@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'ELSX System Access Helpers',
-    'version': '2.2.1',
+    'version': '2.2.3',
     'category': 'Administration',
     'summary': 'Hidden Apps menu with controlled admin shortcut',
     'description': '''
@@ -24,6 +24,7 @@
     'data': [
         'security/security_groups.xml',
         'security/ir.model.access.csv',
+        'data/apps_access.xml',
         'views/branding_templates.xml',
         'views/menu_restrictions.xml',
         'views/module_safety_views.xml',

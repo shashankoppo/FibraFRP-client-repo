@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- KANBAN VIEW (App Store UI) -->
+    <record id="view_elsx_saas_app_kanban" model="ir.ui.view">
+        <field name="name">elsx.saas.app.kanban</field>
+        <field name="model">elsx.saas.app</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_mobile" action="action_request_app" type="object">
+                <field name="id"/>
+                <field name="name"/>
+                <field name="module_name"/>
+                <field name="summary"/>
+                <field name="category"/>
+                <field name="image_1920"/>
+                <field name="monthly_price"/>
+                <field name="one_time_price"/>
+                <field name="currency_id"/>
+                <field name="color"/>
+                <field name="is_popular"/>
+                <templates>
+                    <t t-name="kanban-box">
+                        <div t-attf-class="{{kanban_color(record.color.raw_value)}} oe_kanban_global_click o_has_icon oe_kanban_content oe_kanban_card">
+                            <div class="ribbon ribbon-top-right" t-if="record.is_popular.raw_value" style="position: absolute; top: 0; right: 0; padding: 5px; background: #ffc107; color: #000; font-size: 10px; font-weight: bold; border-bottom-left-radius: 5px;">
+                                <span>POPULAR</span>
+                            </div>
+                            <div class="o_kanban_image d-none d-md-block" style="width: 80px; height: 80px; margin-right: 15px;">
+                                <img t-att-src="kanban_image('elsx.saas.app', 'image_1920', record.id.raw_value)" alt="App Icon" class="o_image_64_max"/>
+                            </div>
+                            <div class="oe_kanban_details">
+                                <div class="o_kanban_record_top">
+                                    <div class="o_kanban_record_headings">
+                                        <strong class="o_kanban_record_title" style="font-size: 16px;">
+                                            <field name="name"/>
+                                        </strong>
+                                        <br/>
+                                        <span class="text-muted"><field name="category"/></span>
+                                    </div>
+                                </div>
+                                <div class="o_kanban_record_body mt-2 mb-2">
+                                    <div class="text-muted text-truncate" title="record.summary.raw_value">
+                                        <field name="summary"/>
+                                    </div>
+                                </div>
+                                <div class="o_kanban_record_bottom">
+                                    <div class="oe_kanban_bottom_left">
+                                        <div t-if="record.monthly_price.raw_value > 0" class="badge rounded-pill text-bg-primary">
+                                            <field name="monthly_price" widget="monetary" options="{'currency_field': 'currency_id'}"/> / mo
+                                        </div>
+                                        <div t-if="record.monthly_price.raw_value == 0" class="badge rounded-pill text-bg-success">
+                                            Free
+                                        </div>
+                                    </div>
+                                    <div class="oe_kanban_bottom_right">
+                                        <button class="btn btn-sm btn-primary" name="action_request_app" type="object">Request App</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- FORM VIEW -->
+    <record id="view_elsx_saas_app_form" model="ir.ui.view">
+        <field name="name">elsx.saas.app.form</field>
+        <field name="model">elsx.saas.app</field>
+        <field name="arch" type="xml">
+            <form string="SaaS App">
+                <sheet>
+                    <field name="image_1920" widget="image" class="oe_avatar" options="{'preview_image': 'image_1920'}"/>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" placeholder="App Name (e.g. CRM)"/>
+                        </h1>
+                        <div name="options" groups="base.group_system">
+                            <div>
+                                <field name="is_published" widget="boolean_toggle"/>
+                                <label for="is_published"/>
+                            </div>
+                            <div>
+                                <field name="is_popular" widget="boolean_toggle"/>
+                                <label for="is_popular"/>
+                            </div>
+                        </div>
+                    </div>
+                    <group>
+                        <group string="App Details">
+                            <field name="module_name" groups="base.group_system"/>
+                            <field name="category"/>
+                            <field name="sequence" groups="base.group_system"/>
+                        </group>
+                        <group string="Pricing">
+                            <field name="monthly_price" widget="monetary"/>
+                            <field name="one_time_price" widget="monetary"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Summary &amp; Description">
+                            <group>
+                                <field name="summary" placeholder="Short tagline..."/>
+                            </group>
+                            <field name="description" placeholder="Detailed HTML description..." widget="html"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- LIST VIEW (For Admins) -->
+    <record id="view_elsx_saas_app_list" model="ir.ui.view">
+        <field name="name">elsx.saas.app.list</field>
+        <field name="model">elsx.saas.app</field>
+        <field name="arch" type="xml">
+            <list string="SaaS Apps">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="module_name"/>
+                <field name="category"/>
+                <field name="monthly_price"/>
+                <field name="is_popular" widget="boolean_toggle"/>
+                <field name="is_published" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- SEARCH VIEW -->
+    <record id="view_elsx_saas_app_search" model="ir.ui.view">
+        <field name="name">elsx.saas.app.search</field>
+        <field name="model">elsx.saas.app</field>
+        <field name="arch" type="xml">
+            <search string="Apps">
+                <field name="name"/>
+                <field name="module_name"/>
+                <field name="category"/>
+                <filter string="Published" name="published" domain="[('is_published', '=', True)]"/>
+                <filter string="Free" name="free" domain="[('monthly_price', '=', 0)]"/>
+                <separator/>
+                <filter string="Group by Category" name="group_category" context="{'group_by': 'category'}"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- ACTION: APP STORE (For Users) -->
+    <record id="action_elsx_saas_app_store" model="ir.actions.act_window">
+        <field name="name">App Store</field>
+        <field name="res_model">elsx.saas.app</field>
+        <field name="view_mode">kanban,form</field>
+        <field name="domain">[('is_published', '=', True)]</field>
+        <field name="context">{'search_default_group_category': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Welcome to the App Store!
+            </p>
+            <p>
+                Browse available apps and request them to be installed on your SaaS tenant.
+            </p>
+        </field>
+    </record>
+
+    <!-- ACTION: APP CATALOG (For Admins) -->
+    <record id="action_elsx_saas_app_catalog" model="ir.actions.act_window">
+        <field name="name">App Catalog (Admin)</field>
+        <field name="res_model">elsx.saas.app</field>
+        <field name="view_mode">list,form,kanban</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first App in the Catalog!
+            </p>
+            <p>
+                Add apps here so SaaS users can discover and request them from their App Store.
+            </p>
+        </field>
+    </record>
+
+    <!-- MENU: APP CATALOG (For Admins) -->
+    <!-- MENU: APP CATALOG (For Admins) - Deprecated in favor of Native Apps
+    <menuitem id="menu_elsx_saas_app_catalog"
+              name="App Catalog"
+              parent="elsx_saas.menu_elsx_saas_root"
+              action="action_elsx_saas_app_catalog"
+              sequence="15"
+              groups="elsx_saas.group_elsx_saas_admin"/>
+    -->
+
+</odoo>

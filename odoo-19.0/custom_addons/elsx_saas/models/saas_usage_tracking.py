@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime, timedelta
 
+import odoo
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
@@ -48,9 +49,7 @@ class ELSXSaasTenantUsage(models.Model):
 
     notes = fields.Text()
 
-    _sql_constraints = [
-        ('unique_usage_date', 'unique(tenant_id, usage_date)', 'Usage metrics are recorded once per tenant per day.'),
-    ]
+    _unique_usage_date = models.Constraint('UNIQUE (tenant_id, usage_date)', 'Usage metrics are recorded once per tenant per day.')
 
     @api.depends('active_users', 'user_limit')
     def _compute_user_percentage(self):
@@ -220,38 +219,55 @@ class ELSXSaasWebhookEvent(models.Model):
         return event
 
     def _deliver_webhook(self):
-        """Attempt to deliver the webhook."""
-        import requests
+        """Attempt to deliver the webhook in a background thread."""
+        import threading
+
+        def _do_deliver(event_id, dbname):
+            import requests as _requests
+            from odoo import api, SUPERUSER_ID
+            try:
+                db_registry = odoo.registry(dbname)
+                with db_registry.cursor() as cr:
+                    env = api.Environment(cr, SUPERUSER_ID, {})
+                    event = env['elsx.saas.webhook.event'].browse(event_id)
+                    if not event.exists() or not event.webhook_url:
+                        return
+                    try:
+                        response = _requests.post(
+                            event.webhook_url,
+                            json=event.payload,
+                            headers={
+                                'Content-Type': 'application/json',
+                                'X-SaaS-Event': event.event_type,
+                                'X-SaaS-Tenant': str(event.tenant_id.id),
+                            },
+                            timeout=15,
+                        )
+                        event.write({
+                            'delivery_status': 'success' if response.status_code in (200, 201, 204) else 'failed',
+                            'http_status_code': response.status_code,
+                            'delivery_timestamp': fields.Datetime.now(),
+                            'response_body': response.text[:1000],
+                        })
+                    except Exception as e:
+                        event.delivery_attempts += 1
+                        if event.delivery_attempts >= event.max_delivery_attempts:
+                            event.delivery_status = 'failed'
+                        else:
+                            event.delivery_status = 'retrying'
+                        event.error_message = str(e)[:500]
+            except Exception:
+                pass  # Silently fail - webhook delivery is best-effort
 
         if not self.webhook_url:
             self.delivery_status = 'failed'
             self.error_message = 'No webhook URL configured'
             return
 
-        try:
-            response = requests.post(
-                self.webhook_url,
-                json=self.payload,
-                headers={
-                    'Content-Type': 'application/json',
-                    'X-SaaS-Event': self.event_type,
-                    'X-SaaS-Tenant': str(self.tenant_id.id),
-                    'X-SaaS-Timestamp': self.event_timestamp.isoformat(),
-                },
-                timeout=30,
-            )
-
-            self.write({
-                'delivery_status': 'success' if response.status_code in (200, 201, 204) else 'failed',
-                'http_status_code': response.status_code,
-                'delivery_timestamp': fields.Datetime.now(),
-                'response_body': response.text[:1000],
-            })
-        except Exception as e:
-            self.delivery_attempts += 1
-            if self.delivery_attempts >= self.max_delivery_attempts:
-                self.delivery_status = 'failed'
-            else:
-                self.delivery_status = 'retrying'
-
-            self.error_message = str(e)[:500]
+        # Fire-and-forget in background thread
+        thread = threading.Thread(
+            target=_do_deliver,
+            args=(self.id, self.env.cr.dbname),
+            daemon=True,
+        )
+        thread.start()

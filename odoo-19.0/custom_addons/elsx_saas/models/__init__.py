@@ -6,3 +6,6 @@ from . import saas_support_ticket
 from . import saas_billing
 from . import upgrade_log
 from . import saas_enterprise_features
+from . import saas_app
+from . import ir_module
+from . import saas_user_dashboard

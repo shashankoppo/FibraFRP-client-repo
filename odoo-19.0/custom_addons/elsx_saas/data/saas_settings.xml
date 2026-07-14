@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="ir_config_parameter_saas_app_unlock_password" model="ir.config_parameter">
+            <field name="key">elsx_saas.app_unlock_password</field>
+            <field name="value">ELSX-SaaS-2026</field>
+        </record>
+        <record id="ir_config_parameter_saas_tenant_admin_password" model="ir.config_parameter">
+            <field name="key">elsx_saas.tenant_admin_password</field>
+            <field name="value">ELSX-SaaS-2026</field>
+        </record>
+    </data>
+</odoo>

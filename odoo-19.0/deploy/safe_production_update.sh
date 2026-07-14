@@ -5,10 +5,11 @@ LIVE_DB_NAME="${1:-${LIVE_DB_NAME:-}}"
 DB_USER="${POSTGRES_USER:-odoo}"
 CONFIG="${ODOO_CONFIG:-/etc/odoo/odoo.conf}"
 OUTPUT_DIR="${OUTPUT_DIR:-secure_backups}"
-INSTALL_MODULES="${INSTALL_MODULES:-elsx_client_restrictions,elsx_attendance_tracking,elsx_face_attendance,elsx_saas}"
-UPGRADE_MODULES="${UPGRADE_MODULES:-elsx_client_restrictions,elsx_attendance_tracking,elsx_face_attendance,elsx_saas}"
+INSTALL_MODULES="${INSTALL_MODULES:-elsx_client_restrictions,elsx_attendance_tracking,elsx_face_attendance}"
+UPGRADE_MODULES="${UPGRADE_MODULES:-elsx_client_restrictions,elsx_attendance_tracking,elsx_face_attendance}"
 EXTRA_INSTALL_MODULES="${EXTRA_INSTALL_MODULES:-}"
 EXTRA_UPGRADE_MODULES="${EXTRA_UPGRADE_MODULES:-}"
+DEACTIVATE_SAAS_ON_UPDATE="${DEACTIVATE_SAAS_ON_UPDATE:-YES}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -59,6 +60,7 @@ fi
 
 echo "==> Install modules if missing: ${ALL_INSTALL_MODULES}"
 echo "==> Upgrade modules: ${ALL_UPGRADE_MODULES}"
+echo "==> Deactivate SaaS runtime after update: ${DEACTIVATE_SAAS_ON_UPDATE}"
 
 if [ -z "${BACKUP_PASSPHRASE:-}" ]; then
   echo "ERROR: BACKUP_PASSPHRASE is required. Refusing to upgrade without an encrypted backup." >&2
@@ -117,6 +119,10 @@ docker compose run --rm -T --no-deps odoo \
     -u "${ALL_UPGRADE_MODULES}" \
     --stop-after-init
 
+if [ "${DEACTIVATE_SAAS_ON_UPDATE}" = "YES" ]; then
+  echo "==> Deactivating SaaS runtime metadata for ${LIVE_DB_NAME} (no uninstall, no data deletion)"
+  CONFIRM_DEACTIVATE_SAAS=YES TARGET_DBS="${LIVE_DB_NAME}" bash deploy/deactivate_saas_all_dbs.sh
+fi
 echo "==> Starting Odoo and WhatsApp sidecar"
 docker compose up -d odoo sidecar
 

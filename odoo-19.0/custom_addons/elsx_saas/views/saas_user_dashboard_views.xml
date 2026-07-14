@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_elsx_saas_user_dashboard_form" model="ir.ui.view">
+        <field name="name">elsx.saas.user.dashboard.form</field>
+        <field name="model">elsx.saas.user.dashboard</field>
+        <field name="arch" type="xml">
+            <form string="My SaaS Portal" class="o_elsx_saas_form o_elsx_saas_dashboard_form">
+                <header>
+                    <button name="action_refresh" string="Refresh" type="object" class="oe_highlight"/>
+                    <button name="action_request_app" string="Browse App Store" type="object" class="btn-primary" icon="fa-cubes"/>
+                </header>
+                <sheet>
+                    <div class="o_elsx_saas_dashboard_hero" style="background: linear-gradient(135deg, #f8fbfc 0%, #eef5fd 100%); border-color: #cddbe1;">
+                        <div>
+                            <h1>My SaaS Portal</h1>
+                            <p>Manage your cloud workspace, billing, subscriptions, and support tickets from one unified interface.</p>
+                        </div>
+                    </div>
+
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_open_my_tenant" type="object" class="oe_stat_button" icon="fa-server">
+                            <div class="o_stat_info">
+                                <span class="o_stat_text">My Instance</span>
+                            </div>
+                        </button>
+                        <button name="action_open_billing" type="object" class="oe_stat_button" icon="fa-credit-card">
+                            <field name="open_invoice_count" widget="statinfo" string="Invoices"/>
+                        </button>
+                        <button name="action_open_overdue_billing" type="object" class="oe_stat_button" icon="fa-exclamation-circle"
+                                invisible="has_overdue_invoices == False">
+                            <field name="overdue_invoice_count" widget="statinfo" string="Overdue"/>
+                        </button>
+                        <button name="action_open_tickets" type="object" class="oe_stat_button" icon="fa-life-ring">
+                            <field name="open_ticket_count" widget="statinfo" string="Open Tickets"/>
+                        </button>
+                    </div>
+
+                    <field name="has_overdue_invoices" invisible="1"/>
+                    <field name="is_suspended" invisible="1"/>
+
+                    <div class="alert alert-danger o_elsx_saas_notice" role="alert" invisible="has_overdue_invoices == False">
+                        <strong>Billing Alert:</strong> You have overdue invoices. Please settle your account to prevent service interruption.
+                    </div>
+
+                    <div class="alert alert-danger o_elsx_saas_notice" role="alert" invisible="is_suspended == False">
+                        <strong>Service Suspended:</strong> Your instance has been suspended. Contact support or clear your outstanding balance immediately.
+                    </div>
+
+                    <div class="o_elsx_saas_dashboard_grid">
+                        <section class="o_elsx_saas_panel">
+                            <h2>My Subscription</h2>
+                            <div class="o_elsx_saas_metric_rows">
+                                <div><span>Tenant Name</span><field name="tenant_name" readonly="1"/></div>
+                                <div><span>Status</span><field name="tenant_state" readonly="1" widget="badge"/></div>
+                                <div><span>Monthly Plan</span><field name="monthly_recurring_revenue" readonly="1"/></div>
+                                <div><span>Next Billing</span><field name="next_billing_date" readonly="1"/></div>
+                            </div>
+                        </section>
+                        <section class="o_elsx_saas_panel">
+                            <h2>App Modules</h2>
+                            <div class="o_elsx_saas_metric_rows">
+                                <div><span>Installed Apps</span><field name="installed_app_count" readonly="1"/></div>
+                                <div><span>App Allowance</span><field name="app_allowance" readonly="1"/></div>
+                            </div>
+                            <div style="margin-top: 15px; text-align: center;">
+                                <button name="action_request_app" string="Add New App" type="object" class="btn btn-secondary"/>
+                            </div>
+                        </section>
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_elsx_saas_user_dashboard" model="ir.actions.act_window">
+        <field name="name">My SaaS Portal</field>
+        <field name="res_model">elsx.saas.user.dashboard</field>
+        <field name="view_mode">form</field>
+        <field name="target">current</field>
+        <field name="context">{'default_name': 'My SaaS Portal', 'form_view_initial_mode': 'edit'}</field>
+    </record>
+
+    <menuitem id="menu_my_saas_portal_dashboard"
+              name="My SaaS Portal"
+              parent="elsx_saas.menu_elsx_saas_root"
+              action="action_elsx_saas_user_dashboard"
+              sequence="5"
+              groups="elsx_saas.group_elsx_saas_user"/>
+
+</odoo>

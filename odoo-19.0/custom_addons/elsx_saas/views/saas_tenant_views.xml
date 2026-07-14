@@ -12,17 +12,12 @@
                   decoration-muted="state == 'archived'">
                 <field name="name"/>
                 <field name="legal_name" optional="show"/>
-                <field name="db_name"/>
-                <field name="custom_domain" optional="show"/>
                 <field name="admin_email"/>
-                <field name="plan"/>
-                <field name="monthly_recurring_revenue" optional="show"/>
-                <field name="payment_status" optional="show"/>
-                <field name="state"/>
-                <field name="health_status"/>
-                <field name="backup_verified" optional="show"/>
-                <field name="client_database_created" optional="show"/>
-                <field name="modules_upgraded" optional="show"/>
+                <field name="plan" widget="badge" decoration-info="plan == 'business'" decoration-success="plan == 'enterprise'" decoration-primary="plan == 'custom'"/>
+                <field name="installed_app_count" string="Apps"/>
+                <field name="monthly_recurring_revenue" string="MRR" optional="show"/>
+                <field name="state" widget="badge" decoration-info="state in ('requested', 'provisioning')" decoration-success="state == 'active'" decoration-warning="state == 'suspended'" decoration-muted="state == 'archived'"/>
+                <field name="health_status" widget="badge" decoration-success="health_status == 'ok'" decoration-warning="health_status == 'warning'" decoration-danger="health_status == 'error'"/>
                 <button name="action_request_provisioning"
                         string="Request"
                         type="object"
@@ -94,12 +89,6 @@
                         <strong>Production-safe governance console.</strong> Track tenant health, module requests, billing, backups, and rollout plans here. It does not create, delete, or modify live client databases from the browser.
                     </div>
                     <div class="oe_button_box" name="button_box">
-                        <button name="action_open_database_manager"
-                                type="object"
-                                class="oe_stat_button"
-                                icon="fa-database">
-                            <span>DB Manager</span>
-                        </button>
                         <button name="action_open_tenant_url"
                                 type="object"
                                 class="oe_stat_button"
@@ -111,7 +100,22 @@
                                 type="object"
                                 class="oe_stat_button"
                                 icon="fa-puzzle-piece">
-                            <field name="module_request_count" widget="statinfo" string="Module Requests"/>
+                            <div class="o_stat_info">
+                                <span class="o_stat_value"><field name="installed_app_count" nolabel="1"/> / <field name="app_allowance" nolabel="1"/></span>
+                                <span class="o_stat_text">Apps Used</span>
+                            </div>
+                        </button>
+                        <button class="oe_stat_button" icon="fa-usd" style="pointer-events: none;" name="">
+                            <div class="o_stat_info">
+                                <span class="o_stat_value"><field name="monthly_recurring_revenue" widget="monetary" options="{'currency_field': 'currency_id'}" nolabel="1"/></span>
+                                <span class="o_stat_text">MRR</span>
+                            </div>
+                        </button>
+                        <button name="action_open_database_manager"
+                                type="object"
+                                class="oe_stat_button"
+                                icon="fa-cogs">
+                            <span>Tech Console</span>
                         </button>
                     </div>
                     <div class="oe_title">
@@ -119,15 +123,18 @@
                         <h1>
                             <field name="name" placeholder="tenant-subdomain"/>
                         </h1>
+                        <div class="mt-2 mb-3">
+                            <field name="plan" widget="badge" decoration-info="plan == 'business'" decoration-success="plan == 'enterprise'" decoration-primary="plan == 'custom'" class="me-2"/>
+                            <field name="health_status" widget="badge" decoration-success="health_status == 'ok'" decoration-warning="health_status == 'warning'" decoration-danger="health_status == 'error'"/>
+                        </div>
                     </div>
                     <group>
-                        <group string="Tenant">
+                        <group string="Tenant Info">
                             <field name="legal_name"/>
-                            <field name="db_name"/>
                             <field name="plan"/>
-                            <field name="production_db"/>
+                            <field name="app_allowance"/>
                         </group>
-                        <group string="Admin">
+                        <group string="Admin Contact">
                             <field name="admin_name"/>
                             <field name="admin_email"/>
                             <field name="custom_domain"/>
@@ -136,22 +143,6 @@
                     </group>
 
                     <notebook>
-                        <page string="Safety Checklist">
-                            <group>
-                                <group string="Preflight">
-                                    <field name="backup_verified"/>
-                                    <field name="allow_provisioning"/>
-                                    <field name="client_database_created"/>
-                                    <field name="filestore_present"/>
-                                </group>
-                                <group string="Go Live">
-                                    <field name="modules_upgraded"/>
-                                    <field name="webhook_checked"/>
-                                    <field name="health_status"/>
-                                    <field name="last_health_check" readonly="1"/>
-                                </group>
-                            </group>
-                        </page>
                         <page string="Enabled Apps">
                             <group>
                                 <group string="Business Suite">
@@ -169,13 +160,20 @@
                                 <field name="protected_summary" readonly="1" nolabel="1"/>
                             </group>
                         </page>
-                        <page string="Limits">
+                        <page string="Limits &amp; Safety">
                             <group>
-                                <field name="max_users"/>
-                                <field name="storage_quota_gb"/>
+                                <group string="Resource Limits">
+                                    <field name="max_users"/>
+                                    <field name="storage_quota_gb"/>
+                                </group>
+                                <group string="Safety Preflight">
+                                    <field name="backup_verified"/>
+                                    <field name="allow_provisioning"/>
+                                    <field name="last_health_check" readonly="1"/>
+                                </group>
                             </group>
                         </page>
-                        <page string="Revenue">
+                        <page string="Revenue &amp; Billing">
                             <group>
                                 <group string="Subscription">
                                     <field name="currency_id"/>
@@ -194,20 +192,32 @@
                         </page>
                         <page string="Module Requests">
                             <field name="module_request_ids" context="{'default_tenant_id': id}">
-                                <list editable="bottom" class="o_elsx_saas_inline_list">
+                                <list class="o_elsx_saas_inline_list">
                                     <field name="name"/>
                                     <field name="module_name"/>
-                                    <field name="source_type"/>
-                                    <field name="risk_level"/>
-                                    <field name="state"/>
-                                    <field name="staging_tested"/>
-                                    <field name="production_approved"/>
+                                    <field name="state" widget="badge" decoration-success="state in ('approved', 'staged', 'installed')" decoration-warning="state == 'review'" decoration-danger="state == 'rejected'"/>
+                                    <field name="risk_level" widget="badge" decoration-danger="risk_level in ('high', 'blocked')" decoration-warning="risk_level == 'medium'"/>
                                 </list>
                             </field>
                         </page>
-                        <page string="Deployment Plan">
-                            <button name="action_copy_plan_notice" type="object" string="How To Use This Plan" class="btn-secondary"/>
-                            <field name="deployment_plan" readonly="1" nolabel="1"/>
+                        <page string="Developer Settings" groups="elsx_saas.group_elsx_saas_admin">
+                            <group>
+                                <group string="Database &amp; Routing">
+                                    <field name="db_name"/>
+                                    <field name="production_db"/>
+                                    <field name="filestore_present"/>
+                                    <field name="user_id"/>
+                                </group>
+                                <group string="Technical Checks">
+                                    <field name="client_database_created"/>
+                                    <field name="modules_upgraded"/>
+                                    <field name="webhook_checked"/>
+                                </group>
+                            </group>
+                            <group string="Deployment Plan">
+                                <button name="action_copy_plan_notice" type="object" string="How To Use This Plan" class="btn-secondary"/>
+                                <field name="deployment_plan" readonly="1" nolabel="1"/>
+                            </group>
                         </page>
                         <page string="Notes">
                             <field name="notes" nolabel="1"/>
@@ -246,16 +256,9 @@
                 <field name="name"/>
                 <field name="tenant_id"/>
                 <field name="module_name"/>
-                <field name="source_type"/>
-                <field name="vendor" optional="show"/>
-                <field name="risk_level"/>
-                <field name="state"/>
+                <field name="risk_level" widget="badge" decoration-danger="risk_level in ('high', 'blocked')" decoration-warning="risk_level == 'medium'"/>
+                <field name="state" widget="badge" decoration-success="state in ('approved', 'staged', 'installed')" decoration-warning="state == 'review'" decoration-danger="state == 'rejected'"/>
                 <field name="monthly_cost" optional="show"/>
-                <field name="backup_verified" optional="show"/>
-                <field name="manifest_reviewed" optional="show"/>
-                <field name="dependency_reviewed" optional="show"/>
-                <field name="staging_tested" optional="show"/>
-                <field name="production_approved" optional="show"/>
             </list>
         </field>
     </record>
@@ -291,7 +294,7 @@
                     <button name="action_submit_review" string="Submit Review" type="object" invisible="state != 'draft'" class="oe_highlight"/>
                     <button name="action_approve" string="Approve" type="object" invisible="state != 'review'" class="oe_highlight"/>
                     <button name="action_mark_staged" string="Mark Staged" type="object" invisible="state != 'approved'"/>
-                    <button name="action_mark_installed" string="Mark Installed" type="object" invisible="state not in ('approved', 'staged')"/>
+                    <button name="action_install_tenant_module" string="Install on Tenant" type="object" invisible="state not in ('approved', 'staged')" class="oe_highlight"/>
                     <button name="action_reject" string="Reject" type="object" invisible="state in ('installed', 'rejected', 'cancelled')"/>
                     <button name="action_reset_draft" string="Reset Draft" type="object" invisible="state not in ('review', 'rejected', 'cancelled')"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,review,approved,staged,installed"/>
@@ -306,52 +309,57 @@
                         <h1><field name="name" placeholder="Website module request"/></h1>
                     </div>
                     <group>
-                        <group string="Module">
+                        <group string="App Request">
                             <field name="tenant_id"/>
+                            <field name="app_id"/>
                             <field name="module_name"/>
-                            <field name="source_type"/>
-                            <field name="vendor"/>
-                            <field name="license_reference"/>
-                            <field name="risk_level"/>
                         </group>
                         <group string="Commercial">
-                            <field name="currency_id"/>
-                            <field name="one_time_cost"/>
-                            <field name="monthly_cost"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="monthly_cost" widget="monetary"/>
+                            <field name="one_time_cost" widget="monetary" optional="show"/>
                         </group>
                     </group>
                     <notebook>
-                        <page string="Safety Review">
+                        <page string="Risk &amp; Safety checks" groups="elsx_saas.group_elsx_saas_admin">
                             <group>
+                                <group string="Vendor Details">
+                                    <field name="source_type"/>
+                                    <field name="vendor"/>
+                                    <field name="license_reference"/>
+                                    <field name="risk_level" widget="badge" decoration-danger="risk_level in ('high', 'blocked')" decoration-warning="risk_level == 'medium'"/>
+                                </group>
                                 <group string="Runtime Needs">
                                     <field name="requires_python_package"/>
                                     <field name="requires_node_package"/>
                                     <field name="requires_external_service"/>
                                 </group>
+                            </group>
+                            <group>
                                 <group string="Business Areas">
                                     <field name="touches_crm"/>
                                     <field name="touches_whatsapp"/>
                                     <field name="touches_accounting"/>
                                     <field name="touches_attendance"/>
                                 </group>
-                            </group>
-                            <group string="Required Checks">
-                                <field name="backup_verified"/>
-                                <field name="manifest_reviewed"/>
-                                <field name="dependency_reviewed"/>
-                                <field name="staging_tested"/>
-                                <field name="production_approved"/>
+                                <group string="Required Checks">
+                                    <field name="backup_verified"/>
+                                    <field name="manifest_reviewed"/>
+                                    <field name="dependency_reviewed"/>
+                                    <field name="staging_tested"/>
+                                    <field name="production_approved"/>
+                                </group>
                             </group>
                             <group string="Impact Summary">
                                 <field name="impact_summary" readonly="1" nolabel="1"/>
                             </group>
                         </page>
-                        <page string="Deployment Plan">
+                        <page string="Deployment Plan" groups="elsx_saas.group_elsx_saas_admin">
                             <field name="deployment_plan" readonly="1" nolabel="1"/>
                         </page>
                         <page string="Notes">
                             <field name="notes" nolabel="1"/>
-                            <field name="rejection_reason" nolabel="1" placeholder="Reason if rejected or blocked"/>
+                            <field name="rejection_reason" nolabel="1" placeholder="Reason if rejected or blocked" invisible="state != 'rejected'"/>
                         </page>
                     </notebook>
                 </sheet>
@@ -377,7 +385,7 @@
     <menuitem id="menu_elsx_saas_root"
               name="ELSx SaaS Control"
               web_icon="elsx_saas,static/description/icon.png"
-              groups="elsx_saas.group_elsx_saas_admin"/>
+              groups="elsx_saas.group_elsx_saas_admin,elsx_saas.group_elsx_saas_user"/>
     <menuitem id="menu_elsx_saas_tenant"
               name="Tenant Governance"
               parent="menu_elsx_saas_root"

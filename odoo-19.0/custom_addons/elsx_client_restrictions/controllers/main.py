@@ -3,6 +3,7 @@ from odoo import http
 from odoo.http import request
 import logging
 import re
+import time
 from urllib.parse import urlencode
 from werkzeug.exceptions import Forbidden, NotFound
 from odoo.addons.web.controllers.database import Database as WebDatabaseController
@@ -149,6 +150,7 @@ class SystemAccessShortcutController(http.Controller):
     def secret_apps_access(self, token, **kwargs):
         """Open Apps only for system administrators with the configured token."""
         self._validate_secret_access(token)
+        request.session["elsx_apps_access_until"] = time.time() + 600
         action = request.env.ref("base.open_module_tree", raise_if_not_found=False)
         if not action:
             raise NotFound()

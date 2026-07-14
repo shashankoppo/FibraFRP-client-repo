@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 from odoo import _, models
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 import logging
+import time
+from odoo.http import request
 
 _logger = logging.getLogger(__name__)
 
@@ -28,6 +30,54 @@ PROTECTED_MODULES = {
 
 class IrModuleModule(models.Model):
     _inherit = 'ir.module.module'
+
+    def _elsx_apps_secret_session_allowed(self):
+        if self.env.context.get('elsx_allow_apps_access'):
+            return True
+        try:
+            return float(request.session.get('elsx_apps_access_until') or 0) >= time.time()
+        except Exception:
+            return False
+
+    def _elsx_domain_contains_apps_filter(self, domain):
+        for item in domain or []:
+            if not isinstance(item, (list, tuple)):
+                continue
+            if len(item) >= 3 and item[0] == 'application' and item[1] in ('=', '==') and item[2] is True:
+                return True
+            if self._elsx_domain_contains_apps_filter(item):
+                return True
+        return False
+
+    def _elsx_is_apps_request(self, domain=None):
+        context = self.env.context
+        return bool(
+            context.get('search_default_app')
+            or context.get('apps_action')
+            or context.get('elsx_apps_guard')
+            or self._elsx_domain_contains_apps_filter(domain)
+        )
+
+    def _elsx_check_apps_secret_read_access(self, domain=None):
+        if self.env.su or self.env.context.get('install_mode') or self.env.context.get('update_module'):
+            return
+        if not self._elsx_is_apps_request(domain):
+            return
+        if not self.env.user.has_group('base.group_system'):
+            raise AccessError(_('Only system administrators can access Apps and module management.'))
+        if not self._elsx_apps_secret_session_allowed():
+            raise AccessError(_(
+                'Apps are available only through the controlled ELSxGlobal Apps URL. '
+                'Use the secret Apps shortcut as a trusted system administrator.'
+            ))
+
+    def web_search_read(self, domain, specification, offset=0, limit=None, order=None, count_limit=None):
+        self._elsx_check_apps_secret_read_access(domain)
+        return super().web_search_read(domain, specification, offset=offset, limit=limit, order=order, count_limit=count_limit)
+
+    def web_read(self, specification):
+        self._elsx_check_apps_secret_read_access()
+        return super().web_read(specification)
 
     def _elsx_protected_module_names(self):
         params = self.env['ir.config_parameter'].sudo()

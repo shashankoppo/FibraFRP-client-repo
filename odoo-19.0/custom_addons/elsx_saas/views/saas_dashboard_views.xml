@@ -4,7 +4,7 @@
         <field name="name">elsx.saas.dashboard.form</field>
         <field name="model">elsx.saas.dashboard</field>
         <field name="arch" type="xml">
-            <form string="ELSx SaaS Command Center" class="o_elsx_saas_form o_elsx_saas_dashboard_form" create="0" edit="0" delete="0">
+            <form string="ELSx SaaS Command Center" class="o_elsx_saas_form o_elsx_saas_dashboard_form">
                 <header>
                     <button name="action_refresh" string="Refresh" type="object" class="oe_highlight"/>
                 </header>
@@ -93,7 +93,7 @@
         <field name="res_model">elsx.saas.dashboard</field>
         <field name="view_mode">form</field>
         <field name="target">current</field>
-        <field name="context">{'default_name': 'ELSx SaaS Command Center'}</field>
+        <field name="context">{'default_name': 'ELSx SaaS Command Center', 'form_view_initial_mode': 'edit'}</field>
     </record>
 
     <menuitem id="menu_elsx_saas_dashboard"

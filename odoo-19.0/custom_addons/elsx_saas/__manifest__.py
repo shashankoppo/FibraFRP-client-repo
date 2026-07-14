@@ -1,23 +1,23 @@
 {
-    'name': 'ELSX ERP SaaS Master',
-    'version': '19.0.2.1.0',
+    'name': 'ELSX ERP SaaS Master (Deactivated)',
+    'version': '19.0.3.2.0',
     'category': 'SaaS',
-    'summary': 'Enterprise SaaS tenant registry, API management, billing, and admin governance',
+    'license': 'LGPL-3',
+    'summary': 'Passive SaaS governance records with automation disabled by default',
     'description': '''
-Enterprise SaaS tenant registry with complete lifecycle management.
+Passive SaaS governance layer.
 
-Features:
-- Safe SaaS tenant registry and admin governance
-- API token management and audit logging
-- Tenant health checks and usage analytics
-- Support ticket system with SLA tracking
-- Billing plans, invoicing, and subscription management
-- Webhook events and integrations
-- Production-safe deployment controls
+Current production mode:
+- SaaS automation is disabled by default (elsx_saas.enabled = 0)
+- No tenant database is created, cloned, dropped, restored, or modified from the UI
+- No app/module is installed from the SaaS UI while disabled
+- SaaS billing crons are inactive while disabled
+- SaaS menus and native app-store overrides are hidden by the deactivation cleanup
+- Client databases, CRM, WhatsApp, invoices, attendance, Tally, website, and filestore data stay untouched
 
-This module does not create/drop databases directly from the UI. It records
-tenant lifecycle, modules, and deployment plans so production database work
-stays behind encrypted backup and controlled shell scripts.
+This addon remains installable only so existing deployments can receive the
+safe deactivation metadata update. Re-enable only after a separate production
+approval and staging verification.
     ''',
     'author': 'ELSX Evolution Engine',
     'website': 'https://elsx-erp.com',
@@ -29,17 +29,21 @@ stays behind encrypted backup and controlled shell scripts.
         'views/saas_dashboard_views.xml',
         'views/saas_advanced_views.xml',
         'views/saas_enterprise_views.xml',
+        'views/saas_app_views.xml',
+        'views/saas_user_views.xml',
+        'views/saas_user_dashboard_views.xml',
+        'views/saas_native_apps_override.xml',
         'data/sequences_and_plans.xml',
+        'data/saas_cron.xml',
+        'data/saas_deactivation.xml',
     ],
     'assets': {
         'web.assets_backend': [
             'elsx_saas/static/src/css/saas_admin.css',
         ],
     },
-    'demo': [
-        'data/demo_data.xml',
-    ],
+    'demo': [],
     'installable': True,
-    'application': True,
+    'application': False,
     'auto_install': False,
 }

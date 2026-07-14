@@ -314,3 +314,50 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* Status badge colors for CIA triad and health */
+.o_elsx_saas_form .o_field_badge[data-value="ok"] .badge,
+.o_elsx_saas_form .badge.text-bg-ok {
+    background-color: var(--elsx-saas-accent) !important;
+    color: #fff !important;
+}
+
+.o_elsx_saas_form .o_field_badge[data-value="warning"] .badge,
+.o_elsx_saas_form .badge.text-bg-warning {
+    background-color: var(--elsx-saas-warn) !important;
+    color: #fff !important;
+}
+
+.o_elsx_saas_form .o_field_badge[data-value="danger"] .badge {
+    background-color: var(--elsx-saas-danger) !important;
+    color: #fff !important;
+}
+
+/* Overdue row highlight in billing list */
+.o_elsx_saas_list .o_data_row.text-danger {
+    background-color: rgba(159, 18, 57, 0.04);
+}
+
+/* Dashboard KPI number styling */
+.o_elsx_saas_metric_rows .o_field_widget {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--elsx-saas-ink);
+}
+
+.o_elsx_saas_metric_rows .o_field_monetary {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--elsx-saas-accent);
+}
+
+/* Subscription grace period warning */
+.o_elsx_saas_grace_warning {
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: rgba(161, 92, 0, 0.08);
+    border: 1px solid rgba(161, 92, 0, 0.15);
+    color: var(--elsx-saas-warn);
+    font-size: 13px;
+    font-weight: 600;
+}

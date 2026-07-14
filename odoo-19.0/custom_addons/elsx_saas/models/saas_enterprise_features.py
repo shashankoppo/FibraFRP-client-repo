@@ -85,9 +85,7 @@ class ELSXSaasCustomField(models.Model):
         default=lambda self: self.env.user
     )
 
-    _sql_constraints = [
-        ('field_name_unique', 'unique(field_name)', 'Field name must be unique'),
-    ]
+    _field_name_unique = models.Constraint('UNIQUE (field_name)', 'Field name must be unique')
 
 
 class ELSXSaasWorkflowAutomation(models.Model):

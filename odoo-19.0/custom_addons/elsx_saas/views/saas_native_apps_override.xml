@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Deactivated SaaS app-store hooks. Kept inactive so upgrades can clean old metadata safely. -->
+    <record id="view_module_kanban_saas_override" model="ir.ui.view">
+        <field name="name">ir.module.module.kanban.saas.disabled</field>
+        <field name="model">ir.module.module</field>
+        <field name="inherit_id" ref="base.module_view_kanban"/>
+        <field name="active">False</field>
+        <field name="arch" type="xml">
+            <xpath expr="//footer" position="inside">
+                <button type="object" name="action_request_saas_module" class="btn btn-secondary btn-sm" string="SaaS Disabled" groups="base.group_no_one" invisible="1"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_module_form_saas_override" model="ir.ui.view">
+        <field name="name">ir.module.module.form.saas.disabled</field>
+        <field name="model">ir.module.module</field>
+        <field name="inherit_id" ref="base.module_form"/>
+        <field name="active">False</field>
+        <field name="arch" type="xml">
+            <xpath expr="//button[@name='button_immediate_install']" position="before">
+                <button name="action_request_saas_module" type="object" string="SaaS Disabled" class="btn btn-secondary me-1" groups="base.group_no_one" invisible="1"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

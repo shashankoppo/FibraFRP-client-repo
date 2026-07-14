@@ -5,6 +5,10 @@ _build/
 .*
 !.gitignore
 !.gitkeep
+!.dockerignore
+!.env.example
+!.gitattributes
+!custom_addons/elsx_whatsapp_marketing/sidecar/.dockerignore
 !.github
 !.mailmap
 !.weblate.json

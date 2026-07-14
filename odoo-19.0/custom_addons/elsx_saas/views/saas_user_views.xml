@@ -1,0 +1,438 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+
+    <!-- Action for SaaS users to open standard Apps -->
+    <record id="action_saas_native_apps" model="ir.actions.act_window">
+        <field name="name">Apps</field>
+        <field name="res_model">ir.module.module</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="domain">[('application', '=', True)]</field>
+        <field name="context">{}</field>
+    </record>
+
+    <!-- App Store Parent Menu -->
+    <menuitem id="menu_my_saas_app_store"
+              name="App Store"
+              parent="elsx_saas.menu_elsx_saas_root"
+              action="action_saas_native_apps"
+              sequence="10"
+              groups="elsx_saas.group_elsx_saas_user"/>
+
+    <!-- Billing Parent Menu -->
+    <menuitem id="menu_my_saas_billing"
+              name="Billing"
+              parent="elsx_saas.menu_elsx_saas_root"
+              sequence="15"
+              groups="elsx_saas.group_elsx_saas_user"/>
+
+    <!-- ======================= -->
+    <!-- BILLING PLANS           -->
+    <!-- ======================= -->
+    <record id="view_my_saas_billing_plan_list" model="ir.ui.view">
+        <field name="name">my.saas.billing.plan.list</field>
+        <field name="model">elsx.saas.billing.plan</field>
+        <field name="arch" type="xml">
+            <list string="Billing Plans" class="o_elsx_saas_list" create="0" edit="0" delete="0">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="monthly_price"/>
+                <field name="annual_price"/>
+                <field name="is_active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_my_saas_billing_plan" model="ir.actions.act_window">
+        <field name="name">Billing Plans</field>
+        <field name="res_model">elsx.saas.billing.plan</field>
+        <field name="view_mode">list</field>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_my_saas_billing_plan_list')})]"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No billing plans found.
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_my_saas_billing_plan"
+              name="Billing Plans"
+              parent="menu_my_saas_billing"
+              action="action_my_saas_billing_plan"
+              sequence="10"
+              groups="elsx_saas.group_elsx_saas_user"/>
+
+    <!-- ======================= -->
+    <!-- SUBSCRIPTIONS           -->
+    <!-- ======================= -->
+    <record id="view_my_saas_subscription_list" model="ir.ui.view">
+        <field name="name">my.saas.subscription.list</field>
+        <field name="model">elsx.saas.subscription</field>
+        <field name="arch" type="xml">
+            <list string="My Subscriptions" class="o_elsx_saas_list" create="0" edit="0" delete="0">
+                <field name="tenant_id"/>
+                <field name="plan_id"/>
+                <field name="billing_cycle"/>
+                <field name="next_billing_date"/>
+                <field name="is_active" widget="boolean_toggle"/>
+                <field name="auto_renew" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_my_saas_subscription_form" model="ir.ui.view">
+        <field name="name">my.saas.subscription.form</field>
+        <field name="model">elsx.saas.subscription</field>
+        <field name="arch" type="xml">
+            <form string="Subscription Details" class="o_elsx_saas_form" create="0" edit="0" delete="0">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="tenant_id" readonly="1" options="{'no_open': True}"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Subscription Details">
+                            <field name="plan_id" readonly="1"/>
+                            <field name="billing_cycle" readonly="1"/>
+                            <field name="next_billing_date" readonly="1"/>
+                            <field name="is_active" readonly="1"/>
+                            <field name="auto_renew" readonly="1"/>
+                        </group>
+                        <group string="Billing">
+                            <field name="custom_monthly_price" readonly="1"/>
+                            <field name="grace_period_days" readonly="1"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_my_saas_subscription" model="ir.actions.act_window">
+        <field name="name">My Subscriptions</field>
+        <field name="res_model">elsx.saas.subscription</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_my_saas_subscription_list')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('view_my_saas_subscription_form')})]"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No subscriptions found.
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_my_saas_subscription"
+              name="My Subscriptions"
+              parent="elsx_saas.menu_elsx_saas_root"
+              action="action_my_saas_subscription"
+              sequence="10"
+              groups="elsx_saas.group_elsx_saas_user"/>
+
+    <!-- ======================= -->
+    <!-- INVOICES / BILLING CYCLES-->
+    <!-- ======================= -->
+    <record id="view_my_saas_billing_cycle_list" model="ir.ui.view">
+        <field name="name">my.saas.billing.cycle.list</field>
+        <field name="model">elsx.saas.billing.cycle</field>
+        <field name="arch" type="xml">
+            <list string="Invoices" class="o_elsx_saas_list" create="0" edit="0" delete="0"
+                  decoration-danger="payment_status == 'overdue'"
+                  decoration-success="payment_status == 'paid'">
+                <field name="name"/>
+                <field name="tenant_id"/>
+                <field name="billing_cycle"/>
+                <field name="cycle_start_date"/>
+                <field name="cycle_end_date"/>
+                <field name="base_amount"/>
+                <field name="payment_status" widget="badge"
+                       decoration-danger="payment_status == 'overdue'"
+                       decoration-success="payment_status == 'paid'"
+                       decoration-info="payment_status in ('draft', 'sent')"
+                       decoration-warning="payment_status == 'partial'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_my_saas_billing_cycle_form" model="ir.ui.view">
+        <field name="name">my.saas.billing.cycle.form</field>
+        <field name="model">elsx.saas.billing.cycle</field>
+        <field name="arch" type="xml">
+            <form string="Invoice Details" class="o_elsx_saas_form" create="0" edit="0" delete="0">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Billing Info">
+                            <field name="tenant_id" readonly="1" options="{'no_open': True}"/>
+                            <field name="billing_cycle" readonly="1"/>
+                            <field name="cycle_start_date" readonly="1"/>
+                            <field name="cycle_end_date" readonly="1"/>
+                        </group>
+                        <group string="Status">
+                            <field name="base_amount" readonly="1"/>
+                            <field name="payment_status" readonly="1" widget="badge"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_my_saas_billing_cycle_search" model="ir.ui.view">
+        <field name="name">my.saas.billing.cycle.search</field>
+        <field name="model">elsx.saas.billing.cycle</field>
+        <field name="arch" type="xml">
+            <search string="Invoices">
+                <field name="name"/>
+                <field name="tenant_id"/>
+                <filter string="Draft" name="draft" domain="[('payment_status', '=', 'draft')]"/>
+                <filter string="Paid" name="paid" domain="[('payment_status', '=', 'paid')]"/>
+                <filter string="Overdue" name="overdue" domain="[('payment_status', '=', 'overdue')]"/>
+                <separator/>
+                <filter string="Group by Status" name="group_status" context="{'group_by': 'payment_status'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_my_saas_invoices" model="ir.actions.act_window">
+        <field name="name">Invoices</field>
+        <field name="res_model">elsx.saas.billing.cycle</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_my_saas_billing_cycle_search"/>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_my_saas_billing_cycle_list')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('view_my_saas_billing_cycle_form')})]"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No invoices found.
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_my_saas_invoices"
+              name="Invoices"
+              parent="menu_my_saas_billing"
+              action="action_my_saas_invoices"
+              sequence="20"
+              groups="elsx_saas.group_elsx_saas_user"/>
+
+    <!-- ======================= -->
+    <!-- SUPPORT TICKETS         -->
+    <!-- ======================= -->
+    <record id="view_my_saas_support_ticket_list" model="ir.ui.view">
+        <field name="name">my.saas.support.ticket.list</field>
+        <field name="model">elsx.saas.support.ticket</field>
+        <field name="arch" type="xml">
+            <list string="Support Tickets" class="o_elsx_saas_list"
+                  decoration-danger="priority in ('1', '2') and state not in ('resolved', 'closed')"
+                  decoration-success="state in ('resolved', 'closed')">
+                <field name="ticket_number"/>
+                <field name="name"/>
+                <field name="priority" widget="badge"/>
+                <field name="state" widget="badge"
+                       decoration-success="state in ('resolved', 'closed')"
+                       decoration-info="state == 'in_progress'"
+                       decoration-warning="state == 'waiting_customer'"/>
+                <field name="assigned_to"/>
+                <field name="sla_status" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_my_saas_support_ticket_form" model="ir.ui.view">
+        <field name="name">my.saas.support.ticket.form</field>
+        <field name="model">elsx.saas.support.ticket</field>
+        <field name="arch" type="xml">
+            <form string="Support Ticket" class="o_elsx_saas_form">
+                <header>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" placeholder="Ticket Subject..." required="1"/>
+                        </h1>
+                        <h2>
+                            <field name="ticket_number" readonly="1"/>
+                        </h2>
+                    </div>
+                    <group>
+                        <group string="Ticket Information">
+                            <field name="tenant_id" invisible="1"/>
+                            <field name="priority"/>
+                            <field name="category"/>
+                            <field name="related_module_request_id" options="{'no_create': True}"/>
+                        </group>
+                        <group string="Status Info">
+                            <field name="assigned_to" readonly="1"/>
+                            <field name="sla_status" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Description">
+                            <field name="description" widget="html" placeholder="Describe your issue..."/>
+                        </page>
+                        <page string="Resolution Notes" invisible="state not in ('resolved', 'closed')">
+                            <field name="resolution_notes" readonly="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_my_saas_support_ticket_search" model="ir.ui.view">
+        <field name="name">my.saas.support.ticket.search</field>
+        <field name="model">elsx.saas.support.ticket</field>
+        <field name="arch" type="xml">
+            <search string="Support Tickets">
+                <field name="ticket_number"/>
+                <field name="name"/>
+                <filter string="Open" name="open" domain="[('state', 'in', ('new', 'assigned', 'in_progress', 'waiting_customer', 'reopened'))]"/>
+                <filter string="Resolved/Closed" name="closed" domain="[('state', 'in', ('resolved', 'closed'))]"/>
+                <separator/>
+                <filter string="Group by Priority" name="group_priority" context="{'group_by': 'priority'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_my_saas_tickets" model="ir.actions.act_window">
+        <field name="name">Support Tickets</field>
+        <field name="res_model">elsx.saas.support.ticket</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_my_saas_support_ticket_search"/>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_my_saas_support_ticket_list')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('view_my_saas_support_ticket_form')})]"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first support ticket!
+            </p>
+            <p>
+                Our support team is here to help you. Submit an issue to get started.
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_my_saas_tickets"
+              name="Support Tickets"
+              parent="elsx_saas.menu_elsx_saas_root"
+              action="action_my_saas_tickets"
+              sequence="30"
+              groups="elsx_saas.group_elsx_saas_user"/>
+
+    <!-- ======================= -->
+    <!-- MODULE REQUESTS         -->
+    <!-- ======================= -->
+    <record id="view_my_saas_module_request_list" model="ir.ui.view">
+        <field name="name">my.saas.module.request.list</field>
+        <field name="model">elsx.saas.module.request</field>
+        <field name="arch" type="xml">
+            <list string="Module Requests" class="o_elsx_saas_list"
+                  decoration-info="state == 'review'"
+                  decoration-success="state in ('approved', 'installed')"
+                  decoration-danger="state in ('rejected', 'cancelled')">
+                <field name="name"/>
+                <field name="app_id" optional="show"/>
+                <field name="module_name" optional="hide"/>
+                <field name="state" widget="badge"
+                       decoration-info="state == 'review'"
+                       decoration-success="state in ('approved', 'installed')"
+                       decoration-danger="state in ('rejected', 'cancelled')"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_my_saas_module_request_form" model="ir.ui.view">
+        <field name="name">my.saas.module.request.form</field>
+        <field name="model">elsx.saas.module.request</field>
+        <field name="arch" type="xml">
+            <form string="Module Request" class="o_elsx_saas_form">
+                <header>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,review,approved,installed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" placeholder="Module Name..." required="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Request Info">
+                            <field name="app_id" options="{'no_create': True, 'no_open': True}"/>
+                            <field name="module_name" invisible="app_id != False"/>
+                        </group>
+                        <group string="Cost Info">
+                            <field name="one_time_cost" readonly="1"/>
+                            <field name="monthly_cost" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Details">
+                            <group>
+                                <field name="notes"/>
+                            </group>
+                        </page>
+                        <page string="Deployment" invisible="state not in ('approved', 'staged', 'installed')">
+                            <group>
+                                <field name="deployment_plan" readonly="1"/>
+                            </group>
+                        </page>
+                        <page string="Rejection Details" invisible="state != 'rejected'">
+                            <group>
+                                <field name="rejection_reason" readonly="1"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_my_saas_module_request_search" model="ir.ui.view">
+        <field name="name">my.saas.module.request.search</field>
+        <field name="model">elsx.saas.module.request</field>
+        <field name="arch" type="xml">
+            <search string="Module Requests">
+                <field name="name"/>
+                <field name="module_name"/>
+                <filter string="Pending" name="pending" domain="[('state', 'in', ('draft', 'review'))]"/>
+                <filter string="Approved" name="approved" domain="[('state', 'in', ('approved', 'staged', 'installed'))]"/>
+                <separator/>
+                <filter string="Group by State" name="group_state" context="{'group_by': 'state'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_my_saas_module_requests" model="ir.actions.act_window">
+        <field name="name">Module Requests</field>
+        <field name="res_model">elsx.saas.module.request</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_my_saas_module_request_search"/>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_my_saas_module_request_list')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('view_my_saas_module_request_form')})]"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Request a new module for your SaaS instance!
+            </p>
+            <p>
+                Need additional functionality? Submit a request here and our team will review and deploy it.
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_my_saas_module_requests"
+              name="Module Requests"
+              parent="elsx_saas.menu_elsx_saas_root"
+              action="action_my_saas_module_requests"
+              sequence="40"
+              groups="elsx_saas.group_elsx_saas_user"/>
+
+</odoo>

@@ -20,6 +20,10 @@ class ELSXSaasBillingPlan(models.Model):
     setup_fee = fields.Monetary('Setup Fee', currency_field='currency_id')
     monthly_price = fields.Monetary('Monthly Price', currency_field='currency_id', required=True)
     annual_price = fields.Monetary('Annual Price (discounted)', currency_field='currency_id')
+    weekly_price = fields.Monetary('Weekly Price', currency_field='currency_id')
+    yearly_price = fields.Monetary('Yearly Price', currency_field='currency_id')
+    three_year_price = fields.Monetary('3-Year Price', currency_field='currency_id')
+    five_year_price = fields.Monetary('5-Year Price', currency_field='currency_id')
 
     # Limits
     max_users = fields.Integer('Max Users', default=10)
@@ -45,12 +49,14 @@ class ELSXSaasBillingPlan(models.Model):
     # Billing cycle options
     allow_monthly = fields.Boolean('Allow Monthly Billing', default=True)
     allow_annual = fields.Boolean('Allow Annual Billing', default=True)
+    allow_weekly = fields.Boolean('Allow Weekly Billing', default=False)
+    allow_yearly = fields.Boolean('Allow Yearly Billing', default=True)
+    allow_three_year = fields.Boolean('Allow 3-Year Billing', default=False)
+    allow_five_year = fields.Boolean('Allow 5-Year Billing', default=False)
 
     is_active = fields.Boolean('Active', default=True)
 
-    _sql_constraints = [
-        ('plan_code_unique', 'unique(code)', 'Plan code must be unique.'),
-    ]
+    _plan_code_unique = models.Constraint('UNIQUE (code)', 'Plan code must be unique.')
 
     @api.constrains('monthly_price', 'annual_price')
     def _check_prices(self):
@@ -78,9 +84,13 @@ class ELSXSaasBillingCycle(models.Model):
     # Plan
     plan_id = fields.Many2one('elsx.saas.billing.plan', 'Plan', required=True)
     billing_cycle = fields.Selection([
+        ('weekly', 'Weekly'),
         ('monthly', 'Monthly'),
         ('quarterly', 'Quarterly'),
+        ('yearly', 'Yearly'),
         ('annual', 'Annual'),
+        ('three_year', '3-Year'),
+        ('five_year', '5-Year'),
         ('custom', 'Custom'),
     ], required=True)
 
@@ -118,9 +128,7 @@ class ELSXSaasBillingCycle(models.Model):
     # Adjustments
     notes = fields.Text('Notes')
 
-    _sql_constraints = [
-        ('invoice_number_unique', 'unique(name)', 'Invoice number must be unique.'),
-    ]
+    _invoice_number_unique = models.Constraint('UNIQUE (name)', 'Invoice number must be unique.')
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -161,6 +169,18 @@ class ELSXSaasBillingCycle(models.Model):
         """Mark invoice as overdue."""
         self.payment_status = 'overdue'
         self.message_post(body=_('Invoice marked as overdue.'))
+
+    @api.model
+    def _cron_detect_overdue(self):
+        """Cron job: mark billing cycles as overdue when past due date."""
+        today = fields.Date.today()
+        overdue_cycles = self.search([
+            ('due_date', '<', today),
+            ('payment_status', 'in', ('draft', 'sent', 'partial')),
+        ])
+        for cycle in overdue_cycles:
+            cycle.payment_status = 'overdue'
+            cycle.message_post(body=_('Automatically marked overdue by scheduled check on %s.') % today)
 
 
 class ELSXSaasBillingLine(models.Model):
@@ -216,9 +236,13 @@ class ELSXSaasSubscription(models.Model):
 
     # Billing
     billing_cycle = fields.Selection([
+        ('weekly', 'Weekly'),
         ('monthly', 'Monthly'),
         ('quarterly', 'Quarterly'),
+        ('yearly', 'Yearly'),
         ('annual', 'Annual'),
+        ('three_year', '3-Year'),
+        ('five_year', '5-Year'),
         ('custom', 'Custom'),
     ], default='monthly', required=True)
 
@@ -239,6 +263,7 @@ class ELSXSaasSubscription(models.Model):
     is_active = fields.Boolean('Active', default=True)
     is_trial = fields.Boolean('Trial Subscription', default=False)
     trial_end_date = fields.Date('Trial End Date')
+    grace_period_days = fields.Integer('Grace Period (Days)', default=7, help='Days after billing date before suspension warning.')
 
     auto_renew = fields.Boolean('Auto-Renew', default=True)
 
@@ -248,9 +273,7 @@ class ELSXSaasSubscription(models.Model):
     # History
     billing_cycle_ids = fields.One2many('elsx.saas.billing.cycle', string='Billing History', compute='_compute_billing_cycles')
 
-    _sql_constraints = [
-        ('tenant_subscription_unique', 'unique(tenant_id)', 'A tenant can have only one active subscription record.'),
-    ]
+    _tenant_subscription_unique = models.Constraint('UNIQUE (tenant_id)', 'A tenant can have only one active subscription record.')
 
     @api.depends('tenant_id')
     def _compute_billing_cycles(self):
@@ -297,6 +320,55 @@ class ELSXSaasSubscription(models.Model):
                 'sticky': True,
             },
         }
+
+    @api.model
+    def _cron_auto_generate_invoices(self):
+        """Cron job: generate next billing cycle for subscriptions due today or earlier."""
+        today = fields.Date.today()
+        due_subs = self.search([
+            ('is_active', '=', True),
+            ('next_billing_date', '<=', today),
+        ])
+        BillingCycle = self.env['elsx.saas.billing.cycle']
+        for sub in due_subs:
+            plan = sub.plan_id
+            if not plan:
+                continue
+            cycle_map = {
+                'weekly': 7,
+                'monthly': 30,
+                'quarterly': 90,
+                'yearly': 365,
+                'annual': 365,
+                'three_year': 1095,
+                'five_year': 1825,
+                'custom': 30,
+            }
+            days = cycle_map.get(sub.billing_cycle, 30)
+            cycle_end = today + timedelta(days=days)
+            price = sub.custom_monthly_price or plan.monthly_price
+            if sub.billing_cycle == 'weekly' and plan.weekly_price:
+                price = plan.weekly_price
+            elif sub.billing_cycle == 'annual' and plan.annual_price:
+                price = plan.annual_price
+            elif sub.billing_cycle == 'yearly' and (plan.yearly_price or plan.annual_price):
+                price = plan.yearly_price or plan.annual_price
+            elif sub.billing_cycle == 'three_year' and plan.three_year_price:
+                price = plan.three_year_price
+            elif sub.billing_cycle == 'five_year' and plan.five_year_price:
+                price = plan.five_year_price
+            BillingCycle.create({
+                'tenant_id': sub.tenant_id.id,
+                'plan_id': plan.id,
+                'billing_cycle': sub.billing_cycle,
+                'cycle_start_date': today,
+                'cycle_end_date': cycle_end,
+                'invoice_date': today,
+                'due_date': today + timedelta(days=14),
+                'base_amount': price,
+                'payment_status': 'draft',
+            })
+            sub.next_billing_date = cycle_end
 
 
 class ELSXSaasAddon(models.Model):
