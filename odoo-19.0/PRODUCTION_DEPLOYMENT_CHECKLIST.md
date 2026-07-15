@@ -18,6 +18,10 @@ unless a restore is explicitly intended and a verified backup exists.
 
    For the hardened production compose file, use:
    `docker compose -f docker-compose.prod.yml up -d --build`
+
+   For Alpine Proxmox LXC hosts that fail on
+   `net.ipv4.ip_unprivileged_port_start`, use:
+   `docker compose -f docker-compose.alpine-lxc.yml up -d --build`
 4. Enable the WhatsApp sidecar only when its secrets are configured and approved:
    `docker compose -f docker-compose.prod.yml --profile whatsapp up -d --build sidecar`
 5. Upgrade a client database only through the encrypted-backup path:
@@ -32,6 +36,28 @@ unless a restore is explicitly intended and a verified backup exists.
   Runtime containers are pinned by Docker images, so the host distribution does
   not change the Odoo/PostgreSQL runtime packages. Compose memory and CPU limits
   are intentionally not set, to avoid low-memory install failures on Alpine hosts.
+
+  Alpine package baseline:
+
+  ```sh
+  apk update
+  apk add git docker docker-cli-compose bash curl
+  rc-service docker start
+  rc-update add docker default
+  ```
+
+- Alpine Proxmox LXC: first run
+  `sh deploy/verify_alpine_docker_runtime.sh`. If Docker reports
+  `net.ipv4.ip_unprivileged_port_start`, the host is blocking Docker network
+  namespace sysctls before Odoo starts. Use an Alpine VM/bare-metal host,
+  enable nested Docker support for the Proxmox CT, or run the fallback compose
+  file with host networking:
+  `docker compose -f docker-compose.alpine-lxc.yml up -d --build`.
+
+  The fallback keeps the same named volumes (`odoo-db-data`, `odoo-web-data`,
+  and `odoo-db-backups`) but does not create an internal Docker bridge network.
+  PostgreSQL binds to `127.0.0.1`; ports `5432`, `8069`, `3000`, and optional
+  `8071` must be free on the Alpine LXC host.
 
 ## Production Compose
 

@@ -1,0 +1,163 @@
+services:
+  db:
+    image: postgres:15
+    restart: unless-stopped
+    network_mode: host
+    command: ["postgres", "-c", "listen_addresses=127.0.0.1"]
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-odoo}
+      - POSTGRES_USER=${POSTGRES_USER:-odoo}
+    volumes:
+      - odoo-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER:-odoo} -d $${POSTGRES_DB:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  odoo:
+    build: .
+    image: odoo-custom:19.0
+    container_name: odoo_app
+    restart: unless-stopped
+    init: true
+    network_mode: host
+    environment:
+      - DB_HOST=127.0.0.1
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER:-odoo}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-odoo}
+    volumes:
+      - .:/opt/odoo
+      - ./odoo.docker.conf:/etc/odoo/odoo.conf
+      - odoo-web-data:/root/.local/share/Odoo
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8069/web/health >/dev/null || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 15
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  sidecar:
+    image: node:18-alpine
+    container_name: whatsapp_sidecar
+    restart: unless-stopped
+    init: true
+    network_mode: host
+    working_dir: /app
+    volumes:
+      - ./custom_addons/elsx_whatsapp_marketing/sidecar:/app
+    command: sh -c "if [ -s package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi && npm start"
+    environment:
+      - ODOO_URL=http://127.0.0.1:8069
+      - PORT=3000
+      - SIDECAR_SECRET=${SIDECAR_SECRET:-}
+      - VERIFY_TOKEN=${WHATSAPP_VERIFY_TOKEN:-}
+      - META_APP_SECRET=${META_APP_SECRET:-}
+    depends_on:
+      odoo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/health || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  face_sidecar:
+    build: ./face_sidecar
+    image: elsx-face-sidecar:1.0
+    container_name: face_sidecar
+    restart: unless-stopped
+    init: true
+    profiles:
+      - face
+    network_mode: host
+    environment:
+      - PORT=8071
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8071/health', timeout=5)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  db-backup:
+    image: postgres:15
+    container_name: odoo_db_backup
+    restart: unless-stopped
+    profiles:
+      - backup
+    network_mode: host
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-odoo}
+      - PGPASSWORD=${POSTGRES_PASSWORD:-odoo}
+    volumes:
+      - odoo-db-backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        echo "[backup] Automated daily backup service started"
+        while true; do
+          now=$$(date +%s)
+          target=$$(date -d "tomorrow 02:00 UTC" +%s 2>/dev/null || date -d "02:00 UTC + 1 day" +%s)
+          sleep_secs=$$(( target - now ))
+          [ $$sleep_secs -le 0 ] && sleep_secs=86400
+          echo "[backup] Next backup in $$sleep_secs seconds (at 02:00 UTC)"
+          sleep $$sleep_secs
+
+          echo "[backup] Starting backup at $$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          for db in $$(psql -h 127.0.0.1 -U $${POSTGRES_USER:-odoo} -d postgres -Atc \
+            "SELECT datname FROM pg_database WHERE datistemplate = false AND datallowconn = true AND datname NOT IN ('postgres') ORDER BY datname;"); do
+            STAMP=$$(date -u +%Y%m%d_%H%M%S)
+            DUMP_FILE="/backups/$${db}_$${STAMP}.pg_dump"
+            echo "[backup] Dumping $${db} -> $${DUMP_FILE}"
+            pg_dump -h 127.0.0.1 -U $${POSTGRES_USER:-odoo} -d "$${db}" --format=custom -f "$${DUMP_FILE}" && \
+              echo "[backup] $${db} OK" || \
+              echo "[backup] $${db} FAILED"
+          done
+
+          find /backups -name '*.pg_dump' -mtime +7 -delete
+          echo "[backup] Pruned backups older than 7 days. Current backups:"
+          ls -lh /backups/*.pg_dump 2>/dev/null || echo "[backup] (none)"
+        done
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+volumes:
+  odoo-db-data:
+  odoo-web-data:
+  odoo-db-backups:

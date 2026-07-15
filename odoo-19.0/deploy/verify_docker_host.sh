@@ -59,6 +59,7 @@ case "$OS_ID" in
     if ! have bash; then
       warn "bash is not installed. Runtime compose works, but existing deploy/*.sh maintenance scripts require bash."
     fi
+    warn "If this is a Proxmox LXC host, run: sh deploy/verify_alpine_docker_runtime.sh"
     ;;
   *)
     warn "Host is not Ubuntu or Alpine. Continuing with generic Docker checks."
@@ -82,6 +83,11 @@ echo "$COMPOSE_FILE config OK"
 if [ -f docker-compose.yml ]; then
   docker compose -f docker-compose.yml config --quiet
   echo "docker-compose.yml config OK"
+fi
+
+if [ -f docker-compose.alpine-lxc.yml ]; then
+  docker compose -f docker-compose.alpine-lxc.yml config --quiet
+  echo "docker-compose.alpine-lxc.yml config OK"
 fi
 
 echo "-- Data volume declaration"

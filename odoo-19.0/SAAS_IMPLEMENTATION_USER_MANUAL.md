@@ -278,6 +278,15 @@ Then:
 docker compose up -d --build
 ```
 
+On Alpine Proxmox LXC hosts, if Docker fails with
+`net.ipv4.ip_unprivileged_port_start`, run the Alpine runtime check and start
+with the LXC fallback compose file:
+
+```sh
+sh deploy/verify_alpine_docker_runtime.sh
+docker compose -f docker-compose.alpine-lxc.yml up -d --build
+```
+
 ### 7.2 Confirm Containers
 
 ```bash
