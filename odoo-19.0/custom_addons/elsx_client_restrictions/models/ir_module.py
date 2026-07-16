@@ -1,9 +1,13 @@
 # -*- coding: utf-8 -*-
 from odoo import _, models
+from odoo.http import request
 from odoo.exceptions import UserError
 import logging
+import time
 
 _logger = logging.getLogger(__name__)
+
+APPS_UNLOCK_SESSION_KEY = 'elsx_apps_unlocked_until'
 
 
 PROTECTED_MODULES = {
@@ -31,6 +35,38 @@ REMOVED_RESTRICTION_MODULES = {
 
 class IrModuleModule(models.Model):
     _inherit = 'ir.module.module'
+
+    def _elsx_check_apps_password_unlocked(self):
+        if self.env.context.get('elsx_apps_password_unlocked'):
+            return
+        try:
+            session = request.session
+        except Exception:
+            # Non-HTTP operations such as CLI upgrades must remain deployable.
+            return
+        try:
+            unlocked_until = int(session.get(APPS_UNLOCK_SESSION_KEY, 0) or 0)
+        except Exception:
+            unlocked_until = 0
+        if unlocked_until <= int(time.time()):
+            raise UserError(_(
+                'Apps password required. Open the Apps menu and unlock it before managing modules.'
+            ))
+
+    def _elsx_is_apps_page_request(self, domain=None):
+        context = self.env.context
+        if (
+            context.get('search_default_app')
+            or context.get('apps_action')
+            or context.get('elsx_apps_guard')
+        ):
+            return True
+        domain_text = repr(domain or [])
+        return 'application' in domain_text and 'True' in domain_text
+
+    def _elsx_check_apps_read_allowed(self, domain=None):
+        if self._elsx_is_apps_page_request(domain=domain):
+            self._elsx_check_apps_password_unlocked()
 
     def _elsx_protected_module_names(self):
         params = self.env['ir.config_parameter'].sudo()
@@ -133,29 +169,68 @@ class IrModuleModule(models.Model):
         except Exception:
             _logger.exception("Could not repair stale ELSxGlobal brand promotion view before module operation.")
 
+    def button_install(self):
+        self._elsx_check_apps_password_unlocked()
+        self._elsx_rescue_brand_promotion_view()
+        return super(IrModuleModule, self).button_install()
+
+    def search_read(
+        self,
+        domain=None,
+        fields=None,
+        offset=0,
+        limit=None,
+        order=None,
+        **read_kwargs,
+    ):
+        self._elsx_check_apps_read_allowed(domain=domain)
+        return super(IrModuleModule, self).search_read(
+            domain=domain,
+            fields=fields,
+            offset=offset,
+            limit=limit,
+            order=order,
+            **read_kwargs,
+        )
+
     def button_immediate_install(self):
         """
         Compatibility hook only. Odoo handles dependency installation.
         """
+        self._elsx_check_apps_password_unlocked()
         self._elsx_rescue_brand_promotion_view()
         return super(IrModuleModule, self).button_immediate_install()
+
+    def button_upgrade(self):
+        self._elsx_check_apps_password_unlocked()
+        self._elsx_rescue_brand_promotion_view()
+        return super(IrModuleModule, self).button_upgrade()
 
     def button_immediate_upgrade(self):
         """
         Compatibility hook only. Odoo handles module upgrades.
         """
+        self._elsx_check_apps_password_unlocked()
         self._elsx_rescue_brand_promotion_view()
         return super(IrModuleModule, self).button_immediate_upgrade()
 
+    def button_uninstall_wizard(self):
+        self._elsx_check_apps_password_unlocked()
+        self._elsx_check_protected_uninstall()
+        return super(IrModuleModule, self).button_uninstall_wizard()
+
     def button_uninstall(self):
+        self._elsx_check_apps_password_unlocked()
         self._elsx_check_protected_uninstall()
         return super(IrModuleModule, self).button_uninstall()
 
     def button_immediate_uninstall(self):
+        self._elsx_check_apps_password_unlocked()
         self._elsx_check_protected_uninstall()
         return super(IrModuleModule, self).button_immediate_uninstall()
 
     def module_uninstall(self):
+        self._elsx_check_apps_password_unlocked()
         self._elsx_check_protected_uninstall()
         return super(IrModuleModule, self).module_uninstall()
 
@@ -163,4 +238,5 @@ class IrModuleModule(models.Model):
         """
         Compatibility hook only. Never auto-upgrade modules from this addon.
         """
+        self._elsx_check_apps_password_unlocked()
         return super(IrModuleModule, self).update_list()

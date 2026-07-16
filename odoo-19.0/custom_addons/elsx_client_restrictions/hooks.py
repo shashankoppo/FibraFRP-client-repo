@@ -25,6 +25,11 @@ def _normalize_legacy_timezones(env):
 
 def post_init_hook(env):
     params = env["ir.config_parameter"].sudo()
+    if not params.get_param("elsx_client_restrictions.apps_password_hash"):
+        params.set_param(
+            "elsx_client_restrictions.apps_password_hash",
+            "ef4f50116b7e91c31b2213129dc59fed3b6c833ef35a480b95d54dc483335dba",
+        )
     if not params.get_param("elsx_client_restrictions.apps_secret_token"):
         params.set_param(
             "elsx_client_restrictions.apps_secret_token",

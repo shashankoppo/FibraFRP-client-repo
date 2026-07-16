@@ -33,6 +33,41 @@ class IrUiMenu(models.Model):
         return self.env.ref(xmlid, raise_if_not_found=False)
 
     @api.model
+    def _elsx_get_apps_password_action(self):
+        """Return/create the Apps password gate action.
+
+        The record is created at runtime so production deployments that only
+        pull code and rebuild containers do not need an immediate module update.
+        """
+        action = self._elsx_ref('elsx_client_restrictions.action_apps_password_gate')
+        if action and action._name == 'ir.actions.act_url':
+            return action.sudo()
+
+        action_model = self.env['ir.actions.act_url'].sudo()
+        action = action_model.search([('url', '=', '/elsx/apps/unlock')], limit=1)
+        if not action:
+            action = action_model.create({
+                'name': 'Apps Password Gate',
+                'url': '/elsx/apps/unlock',
+                'target': 'self',
+            })
+
+        imd = self.env['ir.model.data'].sudo()
+        if not imd.search([
+            ('module', '=', 'elsx_client_restrictions'),
+            ('name', '=', 'action_apps_password_gate'),
+            ('model', '=', 'ir.actions.act_url'),
+        ], limit=1):
+            imd.create({
+                'module': 'elsx_client_restrictions',
+                'name': 'action_apps_password_gate',
+                'model': 'ir.actions.act_url',
+                'res_id': action.id,
+                'noupdate': True,
+            })
+        return action
+
+    @api.model
     def _elsx_restore_core_admin_metadata(self):
         """Repair old access-helper metadata during normal container startup.
 
@@ -46,11 +81,13 @@ class IrUiMenu(models.Model):
         try:
             group_system = self._elsx_ref('base.group_system')
             module_action = self._elsx_ref('base.open_module_tree')
+            apps_gate_action = self._elsx_get_apps_password_action() or module_action
             settings_action = self._elsx_ref('base_setup.action_general_configuration')
             menu_specs = (
                 ('base.menu_administration', settings_action),
-                ('base.menu_management', module_action),
-                ('base.menu_apps', module_action),
+                ('base.menu_management', apps_gate_action),
+                ('base.menu_apps', apps_gate_action),
+                ('base.menu_module_tree', apps_gate_action),
             )
             repaired = []
             for xmlid, action in menu_specs:
@@ -64,7 +101,7 @@ class IrUiMenu(models.Model):
                 if group_system and group_system not in menu.group_ids:
                     vals.setdefault('group_ids', []).append((4, group_system.id))
                 if action and menu.action != action:
-                    vals['action'] = 'ir.actions.act_window,%s' % action.id
+                    vals['action'] = '%s,%s' % (action._name, action.id)
                 if vals:
                     menu.write(vals)
                     repaired.append(xmlid)
