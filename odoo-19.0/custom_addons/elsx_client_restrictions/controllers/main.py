@@ -109,7 +109,7 @@ if not getattr(WebDatabaseController._render_template, '_elsx_branded', False):
 
 class SystemAccessShortcutController(http.Controller):
     """
-    Secret admin-only shortcut for the Apps action.
+    Secret admin-only shortcuts for Apps and Settings actions.
 
     This controller keeps controlled token URL access available for
     administrators. Standard Odoo login and system-admin permissions still
@@ -138,6 +138,27 @@ class SystemAccessShortcutController(http.Controller):
             )
             raise NotFound()
 
+    def _repair_access_metadata(self):
+        menu_model = request.env['ir.ui.menu'].sudo()
+        repair = getattr(menu_model, '_elsx_repair_startup_metadata', None)
+        if repair:
+            repair()
+
+    def _redirect_to_backend_action(self, action_xmlid, menu_xmlid=None):
+        action = request.env.ref(action_xmlid, raise_if_not_found=False)
+        if not action:
+            raise NotFound()
+        menu = request.env.ref(menu_xmlid, raise_if_not_found=False) if menu_xmlid else False
+        query = {
+            'cids': request.env.company.id,
+        }
+        if menu:
+            query.update({
+                'menu_id': menu.id,
+                'active_id': menu.id,
+            })
+        return request.redirect('/odoo/action-%s?%s' % (action.id, urlencode(query)))
+
     @http.route("/elsx-secret/apps", type="http", auth="user", website=False)
     @http.route("/action-39", type="http", auth="user", website=False)
     def blocked_apps_access(self, **kwargs):
@@ -149,18 +170,19 @@ class SystemAccessShortcutController(http.Controller):
     def secret_apps_access(self, token, **kwargs):
         """Open Apps only for system administrators with the configured token."""
         self._validate_secret_access(token)
-        action = request.env.ref("base.open_module_tree", raise_if_not_found=False)
-        if not action:
-            raise NotFound()
-        menu = request.env.ref("base.menu_apps", raise_if_not_found=False)
-        query = {
-            "search_default_app": 1,
-            "cids": request.env.company.id,
-        }
-        if menu:
-            query.update({
-                "menu_id": menu.id,
-                "active_id": menu.id,
-            })
+        self._repair_access_metadata()
         _logger.info("Apps secret URL used by administrator: %s", request.env.user.login)
-        return request.redirect("/odoo/action-%s?%s" % (action.id, urlencode(query)))
+        return self._redirect_to_backend_action('base.open_module_tree', 'base.menu_management')
+
+    @http.route("/elsx-secret/settings", type="http", auth="user", website=False)
+    def blocked_settings_access(self, **kwargs):
+        """Return a 404 for old or incomplete Settings shortcuts."""
+        raise NotFound()
+
+    @http.route("/elsx-secret/settings/<string:token>", type="http", auth="user", website=False)
+    def secret_settings_access(self, token, **kwargs):
+        """Open Settings only for system administrators with the configured token."""
+        self._validate_secret_access(token)
+        self._repair_access_metadata()
+        _logger.info("Settings secret URL used by administrator: %s", request.env.user.login)
+        return self._redirect_to_backend_action('base_setup.action_general_configuration', 'base.menu_administration')

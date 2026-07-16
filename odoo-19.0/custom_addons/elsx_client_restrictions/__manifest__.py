@@ -22,7 +22,7 @@
     'author': 'ELSX Evolution Engine',
     'website': 'https://elsx-erp.com',
     'license': 'LGPL-3',
-    'depends': ['base', 'web'],
+    'depends': ['base', 'base_setup', 'web'],
     'data': [
         'security/security_groups.xml',
         'security/ir.model.access.csv',

@@ -4,6 +4,8 @@ import logging
 
 _logger = logging.getLogger(__name__)
 
+ASSET_REPAIR_MARKER = 'apps-settings-saas-assets-2026-07-16-v2'
+
 
 AI_OCR_SETTINGS_ARCH = """
 <data>
@@ -44,9 +46,10 @@ class IrUiMenu(models.Model):
         try:
             group_system = self._elsx_ref('base.group_system')
             module_action = self._elsx_ref('base.open_module_tree')
+            settings_action = self._elsx_ref('base_setup.action_general_configuration')
             menu_specs = (
-                ('base.menu_administration', None),
-                ('base.menu_management', None),
+                ('base.menu_administration', settings_action),
+                ('base.menu_management', module_action),
                 ('base.menu_apps', module_action),
             )
             repaired = []
@@ -188,10 +191,34 @@ class IrUiMenu(models.Model):
             _logger.exception('Could not deactivate SaaS metadata during startup repair.')
 
     @api.model
+    def _elsx_refresh_backend_assets_once(self):
+        """Drop stale generated backend assets once after this repair ships."""
+        try:
+            params = self.env['ir.config_parameter'].sudo()
+            if params.get_param('elsx_client_restrictions.asset_repair_marker') == ASSET_REPAIR_MARKER:
+                return
+
+            assets = self.env['ir.attachment'].sudo().search([
+                ('url', '=like', '/web/assets/%'),
+            ])
+            count = len(assets)
+            if assets:
+                assets.unlink()
+
+            params.set_param('elsx_client_restrictions.asset_repair_marker', ASSET_REPAIR_MARKER)
+            self.env.registry.clear_cache('assets')
+            self.env.registry.clear_cache('templates')
+            if count:
+                _logger.info('Cleared %s generated web asset attachment(s) after Apps/Settings repair.', count)
+        except Exception:
+            _logger.exception('Could not clear generated web asset attachments after Apps/Settings repair.')
+
+    @api.model
     def _elsx_repair_startup_metadata(self):
         self._elsx_restore_core_admin_metadata()
         self._elsx_repair_known_settings_views()
         self._elsx_deactivate_saas_metadata()
+        self._elsx_refresh_backend_assets_once()
 
     @api.model
     def load_menus(self, debug):
