@@ -3,7 +3,6 @@ from odoo import http
 from odoo.http import request
 import logging
 import re
-import time
 from urllib.parse import urlencode
 from werkzeug.exceptions import Forbidden, NotFound
 from odoo.addons.web.controllers.database import Database as WebDatabaseController
@@ -112,9 +111,9 @@ class SystemAccessShortcutController(http.Controller):
     """
     Secret admin-only shortcut for the Apps action.
 
-    The Apps menu itself is hidden from the normal Odoo navigation. This
-    controller keeps controlled access available for administrators who know
-    the configured token URL.
+    This controller keeps controlled token URL access available for
+    administrators. Standard Odoo login and system-admin permissions still
+    protect Apps and module management.
     """
 
     def _get_apps_token(self):
@@ -150,7 +149,6 @@ class SystemAccessShortcutController(http.Controller):
     def secret_apps_access(self, token, **kwargs):
         """Open Apps only for system administrators with the configured token."""
         self._validate_secret_access(token)
-        request.session["elsx_apps_access_until"] = time.time() + 600
         action = request.env.ref("base.open_module_tree", raise_if_not_found=False)
         if not action:
             raise NotFound()

@@ -6,20 +6,17 @@
         <field name="priority" eval="99"/>
         <field name="inherit_id" ref="base.res_config_settings_view_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//div[hasclass('settings')]" position="inside">
-                <h2>ELSX AI Engines</h2>
-                <div class="row mt16 o_settings_container">
-                    <div class="col-12 col-lg-6 o_setting_box">
-                        <div class="o_setting_right_pane">
-                            <label for="elsx_active_llm_engine"/>
+            <xpath expr="//form" position="inside">
+                <app data-string="ELSX AI OCR" string="ELSX AI OCR" name="elsx_ai_ocr" groups="base.group_system">
+                    <block title="Vision Engine" id="elsx_ai_ocr_settings">
+                        <setting id="elsx_active_llm_engine_setting" help="Select the abstracted AI backend used for OCR and document extraction.">
                             <field name="elsx_active_llm_engine"/>
-                            <div class="text-muted">Select the abstracted AI backend for OCR and logic.</div>
-                            
-                            <label for="elsx_openai_api_key" class="mt16"/>
+                        </setting>
+                        <setting id="elsx_openai_api_key_setting" help="Optional API key for Vision extraction. Leave empty when using a non-OpenAI engine.">
                             <field name="elsx_openai_api_key" password="True"/>
-                        </div>
-                    </div>
-                </div>
+                        </setting>
+                    </block>
+                </app>
             </xpath>
         </field>
     </record>

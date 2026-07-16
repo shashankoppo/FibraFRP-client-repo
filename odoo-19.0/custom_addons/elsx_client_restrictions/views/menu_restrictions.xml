@@ -1,21 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Keep Settings available to system admins, but hide raw Apps from the launcher.
-         Module safety is enforced by Python guards and the secret Apps URL. -->
+    <!-- Keep Settings and Apps available to system administrators.
+         Standard Odoo login/groups protect module management; the secret URL
+         remains available as a controlled admin shortcut. -->
 
     <record id="base.menu_management" model="ir.ui.menu">
         <field name="group_ids" eval="[(4, ref('base.group_system'))]"/>
-        <field name="active" eval="False"/>
+        <field name="active" eval="True"/>
     </record>
 
     <record id="base.menu_apps" model="ir.ui.menu">
         <field name="group_ids" eval="[(4, ref('base.group_system'))]"/>
         <field name="action" eval="'ir.actions.act_window,%d' % ref('base.open_module_tree')"/>
-        <field name="active" eval="False"/>
+        <field name="active" eval="True"/>
     </record>
 
     <record id="base.menu_administration" model="ir.ui.menu">
         <field name="group_ids" eval="[(6, 0, [ref('base.group_system')])]"/>
+        <field name="active" eval="True"/>
     </record>
 
 </odoo>
