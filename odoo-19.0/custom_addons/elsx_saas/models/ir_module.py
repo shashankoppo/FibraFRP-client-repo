@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import _, api, fields, models
+from odoo import _, api, models
 from odoo.exceptions import UserError
 
 from ..utils import is_saas_system_enabled
@@ -7,10 +7,6 @@ from ..utils import is_saas_system_enabled
 
 class IrModuleModule(models.Model):
     _inherit = 'ir.module.module'
-
-    saas_monthly_price = fields.Monetary('SaaS Monthly Price', currency_field='currency_id', default=0.0)
-    saas_setup_price = fields.Monetary('SaaS Setup Price', currency_field='currency_id', default=0.0)
-    currency_id = fields.Many2one('res.currency', default=lambda self: self.env.company.currency_id)
 
     def action_request_saas_module(self):
         """Disabled SaaS app request entry point."""
@@ -36,8 +32,6 @@ class IrModuleModule(models.Model):
                 'default_tenant_id': tenant_user.id,
                 'default_name': self.shortdesc or self.name,
                 'default_module_name': self.name,
-                'default_monthly_cost': self.saas_monthly_price,
-                'default_one_time_cost': self.saas_setup_price,
             },
         }
 
