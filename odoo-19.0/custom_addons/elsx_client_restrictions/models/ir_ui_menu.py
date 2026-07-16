@@ -95,9 +95,103 @@ class IrUiMenu(models.Model):
             _logger.exception('Could not repair stale ELSX AI OCR Settings view metadata.')
 
     @api.model
+    def _elsx_deactivate_saas_metadata(self):
+        """Hide the removed SaaS feature during normal container rebuilds.
+
+        Existing production databases may still have ``elsx_saas`` installed,
+        and deploys often only rebuild containers without running ``-u`` or an
+        uninstall. This cleanup is deliberately limited to SaaS technical
+        metadata so customer operational records remain intact.
+        """
+        try:
+            module = self.env['ir.module.module'].sudo().search([('name', '=', 'elsx_saas')], limit=1)
+            if not module:
+                return
+
+            params = self.env['ir.config_parameter'].sudo()
+            if params.get_param('elsx_saas.enabled') != '0':
+                params.set_param('elsx_saas.enabled', '0')
+
+            saas_groups = self.env['res.groups'].sudo()
+            for xmlid in (
+                'elsx_saas.group_elsx_saas_app_user',
+                'elsx_saas.group_elsx_saas_user',
+                'elsx_saas.group_elsx_saas_admin',
+            ):
+                group = self._elsx_ref(xmlid)
+                if group:
+                    saas_groups |= group.sudo()
+
+            base_user = self._elsx_ref('base.group_user')
+            base_system = self._elsx_ref('base.group_system')
+            base_apps_menu = self._elsx_ref('base.menu_management')
+            changed_group_count = 0
+            for group in saas_groups:
+                changed = False
+                if base_user and group.id in base_user.sudo().implied_ids.ids:
+                    base_user.sudo().write({'implied_ids': [(3, group.id)]})
+                    changed = True
+                if base_system and group.id in base_system.sudo().implied_ids.ids:
+                    base_system.sudo().write({'implied_ids': [(3, group.id)]})
+                    changed = True
+                if base_apps_menu and group.id in base_apps_menu.sudo().group_ids.ids:
+                    base_apps_menu.sudo().write({'group_ids': [(3, group.id)]})
+                    changed = True
+                if group.users:
+                    # Remove only SaaS-specific group memberships so old user
+                    # assignments cannot keep the removed SaaS app visible.
+                    group.write({'users': [(5, 0, 0)]})
+                    changed = True
+                if changed:
+                    changed_group_count += 1
+
+            imd = self.env['ir.model.data'].sudo()
+            menu_ids = imd.search([
+                ('module', '=', 'elsx_saas'),
+                ('model', '=', 'ir.ui.menu'),
+            ]).mapped('res_id')
+            menus = self.env['ir.ui.menu'].sudo().with_context(active_test=False).browse(menu_ids).exists()
+            root_menu = self._elsx_ref('elsx_saas.menu_elsx_saas_root')
+            if root_menu:
+                menus |= self.env['ir.ui.menu'].sudo().with_context(active_test=False).search([
+                    ('id', 'child_of', root_menu.id),
+                ])
+            active_menus = menus.filtered('active')
+            if active_menus:
+                active_menus.write({'active': False})
+
+            view_ids = imd.search([
+                ('module', '=', 'elsx_saas'),
+                ('model', '=', 'ir.ui.view'),
+            ]).mapped('res_id')
+            views = self.env['ir.ui.view'].sudo().with_context(active_test=False).browse(view_ids).exists()
+            active_views = views.filtered('active')
+            if active_views:
+                active_views.write({'active': False})
+
+            cron_ids = imd.search([
+                ('module', '=', 'elsx_saas'),
+                ('model', '=', 'ir.cron'),
+            ]).mapped('res_id')
+            crons = self.env['ir.cron'].sudo().with_context(active_test=False).browse(cron_ids).exists()
+            active_crons = crons.filtered('active')
+            if active_crons:
+                active_crons.write({'active': False})
+
+            if active_menus or changed_group_count or active_views or active_crons:
+                self.env.registry.clear_cache()
+                _logger.info(
+                    'Deactivated SaaS metadata during startup repair: %s menus, %s groups, %s views, %s crons.',
+                    len(active_menus), changed_group_count, len(active_views), len(active_crons),
+                )
+        except Exception:
+            _logger.exception('Could not deactivate SaaS metadata during startup repair.')
+
+    @api.model
     def _elsx_repair_startup_metadata(self):
         self._elsx_restore_core_admin_metadata()
         self._elsx_repair_known_settings_views()
+        self._elsx_deactivate_saas_metadata()
 
     @api.model
     def load_menus(self, debug):
