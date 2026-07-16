@@ -153,7 +153,6 @@ class SystemAccessShortcutController(http.Controller):
 
     def _set_apps_unlocked(self):
         request.session[self.APPS_UNLOCK_SESSION_KEY] = int(time.time()) + self.APPS_UNLOCK_TTL_SECONDS
-        request.session.modified = True
 
     def _safe_next_url(self, next_url):
         if next_url and next_url.startswith('/') and not next_url.startswith('//'):
