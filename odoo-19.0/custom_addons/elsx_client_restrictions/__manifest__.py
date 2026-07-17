@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'ELSX System Access Helpers',
-    'version': '2.3.0',
+    'version': '2.3.1',
     'category': 'Administration',
     'summary': 'Admin Apps access helper with controlled shortcut',
     'description': '''
@@ -12,7 +12,8 @@
         technical module was already installed.
 
         Current behavior:
-        - Settings and Apps remain available to system administrators
+        - Settings remains available to system administrators
+        - Apps requires the configured password before module access
         - Secret Apps URL remains available as an admin-only shortcut
         - No broad ir.module.module read interception
         - elsx_saas is no longer protected from safe uninstall

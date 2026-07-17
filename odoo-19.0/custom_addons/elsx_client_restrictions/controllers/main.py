@@ -118,7 +118,7 @@ class SystemAccessShortcutController(http.Controller):
     """
 
     APPS_UNLOCK_SESSION_KEY = "elsx_apps_unlocked_until"
-    APPS_UNLOCK_TTL_SECONDS = 8 * 60 * 60
+    APPS_UNLOCK_TTL_SECONDS = 30 * 60
 
     def _get_apps_token(self):
         return request.env["ir.config_parameter"].sudo().get_param(
@@ -153,6 +153,9 @@ class SystemAccessShortcutController(http.Controller):
 
     def _set_apps_unlocked(self):
         request.session[self.APPS_UNLOCK_SESSION_KEY] = int(time.time()) + self.APPS_UNLOCK_TTL_SECONDS
+
+    def _clear_apps_unlock(self):
+        request.session.pop(self.APPS_UNLOCK_SESSION_KEY, None)
 
     def _safe_next_url(self, next_url):
         if next_url and next_url.startswith('/') and not next_url.startswith('//'):
@@ -239,17 +242,17 @@ class SystemAccessShortcutController(http.Controller):
         default_next = self._get_backend_action_url('base.open_module_tree', 'base.menu_management', {'search_default_app': 1})
         next_url = self._safe_next_url(kwargs.get('next')) or default_next
 
-        if self._is_apps_unlocked():
-            return request.redirect(next_url)
-
         if request.httprequest.method == 'POST':
             password = kwargs.get('password', '')
             if request.env['ir.config_parameter'].sudo()._elsx_verify_apps_password(password):
                 self._set_apps_unlocked()
                 _logger.info('Apps password gate unlocked by administrator: %s', request.env.user.login)
                 return request.redirect(next_url)
+            self._clear_apps_unlock()
             return self._render_apps_password_form(next_url, error='Invalid Apps password.')
 
+        # Entering Apps from its menu always starts a fresh password challenge.
+        self._clear_apps_unlock()
         return self._render_apps_password_form(next_url)
 
     @http.route('/elsx-secret/apps', type='http', auth='user', website=False)

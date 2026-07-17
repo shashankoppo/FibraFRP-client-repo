@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import _, models
+from odoo import _, api, models
 from odoo.http import request
 from odoo.exceptions import UserError
 import logging
@@ -191,6 +191,19 @@ class IrModuleModule(models.Model):
             limit=limit,
             order=order,
             **read_kwargs,
+        )
+
+    @api.model
+    @api.readonly
+    def web_search_read(self, domain, specification, offset=0, limit=None, order=None, count_limit=None):
+        self._elsx_check_apps_read_allowed(domain=domain)
+        return super(IrModuleModule, self).web_search_read(
+            domain,
+            specification,
+            offset=offset,
+            limit=limit,
+            order=order,
+            count_limit=count_limit,
         )
 
     def button_immediate_install(self):
