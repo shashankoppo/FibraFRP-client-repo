@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'ELSX System Access Helpers',
-    'version': '2.3.1',
+    'version': '2.3.2',
     'category': 'Administration',
     'summary': 'Admin Apps access helper with controlled shortcut',
     'description': '''

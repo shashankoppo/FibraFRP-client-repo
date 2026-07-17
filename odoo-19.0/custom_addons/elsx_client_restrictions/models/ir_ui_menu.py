@@ -177,10 +177,10 @@ class IrUiMenu(models.Model):
                 if base_apps_menu and group.id in base_apps_menu.sudo().group_ids.ids:
                     base_apps_menu.sudo().write({'group_ids': [(3, group.id)]})
                     changed = True
-                if group.users:
+                if group.user_ids:
                     # Remove only SaaS-specific group memberships so old user
                     # assignments cannot keep the removed SaaS app visible.
-                    group.write({'users': [(5, 0, 0)]})
+                    group.write({'user_ids': [(5, 0, 0)]})
                     changed = True
                 if changed:
                     changed_group_count += 1
