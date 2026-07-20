@@ -1,0 +1,11 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_elsx_ai_provider_user,elsx.ai.provider.user,model_elsx_ai_provider,base.group_user,1,0,0,0
+access_elsx_ai_provider_admin,elsx.ai.provider.admin,model_elsx_ai_provider,base.group_system,1,1,1,1
+access_elsx_ai_prompt_user,elsx.ai.prompt.user,model_elsx_ai_prompt,base.group_user,1,0,0,0
+access_elsx_ai_prompt_admin,elsx.ai.prompt.admin,model_elsx_ai_prompt,base.group_system,1,1,1,1
+access_elsx_ai_job_user,elsx.ai.job.user,model_elsx_ai_job,base.group_user,1,1,1,0
+access_elsx_ai_job_admin,elsx.ai.job.admin,model_elsx_ai_job,base.group_system,1,1,1,1
+access_elsx_ai_job_log_user,elsx.ai.job.log.user,model_elsx_ai_job_log,base.group_user,1,0,0,0
+access_elsx_ai_job_log_admin,elsx.ai.job.log.admin,model_elsx_ai_job_log,base.group_system,1,1,1,1
+access_elsx_ai_tool_user,elsx.ai.tool.user,model_elsx_ai_tool,base.group_user,1,0,0,0
+access_elsx_ai_tool_admin,elsx.ai.tool.admin,model_elsx_ai_tool,base.group_system,1,1,1,1

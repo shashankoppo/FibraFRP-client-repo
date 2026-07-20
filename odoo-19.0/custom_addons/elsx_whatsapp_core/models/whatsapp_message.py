@@ -13,6 +13,7 @@ import threading
 import random
 import pytz
 import time
+import uuid
 
 _logger = logging.getLogger(__name__)
 
@@ -60,6 +61,7 @@ def notify_sidecar_background(env, message_id, event_type='new_message'):
                     'message': {
                         'id': msg.id,
                         'wamid': msg.message_id,
+                        'correlation_id': msg.correlation_id,
                         'body': msg.body,
                         'direction': msg.direction,
                         'type': msg.message_type,
@@ -103,6 +105,13 @@ class WhatsAppMessage(models.Model):
 
     # Message details
     message_id = fields.Char('Message ID', help='WhatsApp Cloud API Message ID')
+    correlation_id = fields.Char(
+        'Correlation ID',
+        default=lambda self: self.env.context.get('whatsapp_correlation_id') or str(uuid.uuid4()),
+        copy=False,
+        readonly=True,
+        index=True,
+    )
     message_type = fields.Selection([
         ('text', 'Text'),
         ('image', 'Image'),
@@ -997,6 +1006,7 @@ class WhatsAppMessage(models.Model):
         return True
 
     def action_send(self):
+        self.env['whatsapp.runtime.guard'].assert_enabled()
         """
         Sends the message via Meta Cloud API using account_id.send_message.
         Unified entry point for Draft, Queued, and One-Click messages.
@@ -1142,6 +1152,8 @@ class WhatsAppMessage(models.Model):
 
     @api.model
     def _cron_process_broadcast_queue(self, limit=100):
+        if not self.env['whatsapp.runtime.guard'].is_enabled():
+            return 0
         """
         High-priority processor for the broadcast campaign queue.
         Processes newly 'queued' messages that haven't failed yet.
@@ -1186,6 +1198,8 @@ class WhatsAppMessage(models.Model):
 
     @api.model
     def _cron_retry_failed(self):
+        if not self.env['whatsapp.runtime.guard'].is_enabled():
+            return 0
         """
         Cron job to retry failed messages with exponential backoff.
         """

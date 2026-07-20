@@ -57,7 +57,7 @@ services:
       - odoo-network
 
   sidecar:
-    build: ./custom_addons/elsx_whatsapp_marketing/sidecar
+    build: ./services/whatsapp_sidecar
     image: elsx-whatsapp-sidecar:1.0
     container_name: whatsapp_sidecar
     restart: unless-stopped

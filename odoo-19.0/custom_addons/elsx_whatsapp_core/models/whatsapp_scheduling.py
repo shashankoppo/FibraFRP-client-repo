@@ -263,6 +263,7 @@ class WhatsAppScheduledMessage(models.Model):
         return False
 
     def action_schedule(self):
+        self.env['whatsapp.runtime.guard'].assert_enabled()
         """Schedule the message"""
         for record in self:
             if record.schedule_type == 'recurring':
@@ -289,6 +290,7 @@ class WhatsAppScheduledMessage(models.Model):
         }
     
     def action_send_now(self):
+        self.env['whatsapp.runtime.guard'].assert_enabled()
         """Send the message immediately"""
         self.ensure_one()
         
@@ -395,6 +397,8 @@ class WhatsAppScheduledMessage(models.Model):
 
     @api.model
     def _cron_send_scheduled(self):
+        if not self.env['whatsapp.runtime.guard'].is_enabled():
+            return 0
         """Cron job to process scheduled messages that are due"""
         now = fields.Datetime.now()
         
@@ -533,6 +537,7 @@ class WhatsAppScheduledCampaign(models.Model):
         return False
 
     def action_schedule(self):
+        self.env['whatsapp.runtime.guard'].assert_enabled()
         """Schedule the campaign"""
         for record in self:
             if record.schedule_type == 'recurring':
@@ -549,6 +554,7 @@ class WhatsAppScheduledCampaign(models.Model):
         self.write({'status': 'scheduled'})
     
     def action_send(self):
+        self.env['whatsapp.runtime.guard'].assert_enabled()
         """Execute the campaign"""
         for record in self:
             campaign = record.campaign_id
@@ -580,6 +586,8 @@ class WhatsAppScheduledCampaign(models.Model):
 
     @api.model
     def _cron_process_scheduled_campaigns(self):
+        if not self.env['whatsapp.runtime.guard'].is_enabled():
+            return 0
         """Cron job to process scheduled campaigns that are due"""
         now = fields.Datetime.now()
         scheduled_campaigns = self.search([

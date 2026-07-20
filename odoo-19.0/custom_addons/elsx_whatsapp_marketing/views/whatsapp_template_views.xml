@@ -142,11 +142,10 @@
                             </group>
                         </div>
                         <div class="col-md-5">
-                            <div class="card shadow-sm border-0 bg-light p-3 sticky-top" style="top: 20px;">
-                                <h6 class="text-uppercase text-muted fw-bold mb-2">Customer Preview Checklist</h6>
-                                <p class="text-muted small mb-2">Resolved text, media readiness, buttons, and Meta send warnings.</p>
-                                <field name="preview_text" nolabel="1" readonly="1" class="wa-safe-preview-text"/>
-                            </div>
+                            <field name="preview_payload_json"
+                                   widget="whatsapp_phone_preview"
+                                   nolabel="1"
+                                   readonly="1"/>
                         </div>
                     </div>
                     <notebook>

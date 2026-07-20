@@ -64,7 +64,7 @@ services:
     init: true
     working_dir: /app
     volumes:
-      - ./custom_addons/elsx_whatsapp_marketing/sidecar:/app
+      - ./services/whatsapp_sidecar:/app
     command: sh -c "if [ -s package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi && npm start"
     environment:
       - ODOO_URL=http://odoo:8069

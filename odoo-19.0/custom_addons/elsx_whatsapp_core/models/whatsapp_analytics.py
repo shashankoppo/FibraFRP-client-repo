@@ -645,6 +645,72 @@ class WhatsAppAnalytics(models.Model):
             **conversion_sections,
         }
 
+    @api.model
+    def get_overview_v2(self):
+        '''Return a bounded operational overview focused on exceptions and next actions.'''
+        Chat = self.env['whatsapp.chat'].sudo()
+        Message = self.env['whatsapp.message'].sudo()
+        Campaign = self.env['whatsapp.campaign'].sudo()
+        now = fields.Datetime.now()
+        since = now - timedelta(hours=24)
+        values = {
+            'needs_reply': Chat.search_count([
+                ('state', '=', 'open'),
+                ('needs_reply', '=', True),
+            ]),
+            'unassigned': Chat.search_count([
+                ('state', '=', 'open'),
+                ('assigned_user_id', '=', False),
+            ]),
+            'unread': Chat.search_count([
+                ('state', '=', 'open'),
+                ('unread_count', '>', 0),
+            ]),
+            'failed_messages': Message.search_count([
+                ('direction', '=', 'outbound'),
+                ('status', '=', 'failed'),
+                ('create_date', '>=', since),
+            ]),
+            'active_campaigns': Campaign.search_count([
+                ('state', 'in', ('scheduled', 'running')),
+            ]),
+        }
+        warnings = []
+        if values['failed_messages']:
+            warnings.append({
+                'code': 'failed_messages',
+                'level': 'danger',
+                'title': _('%s failed outbound messages') % values['failed_messages'],
+                'action': 'elsx_whatsapp_marketing.action_whatsapp_message',
+            })
+        if values['unassigned']:
+            warnings.append({
+                'code': 'unassigned',
+                'level': 'warning',
+                'title': _('%s conversations need assignment') % values['unassigned'],
+                'action': 'elsx_whatsapp_marketing.action_whatsapp_team_inbox',
+            })
+        if values['needs_reply']:
+            warnings.append({
+                'code': 'needs_reply',
+                'level': 'info',
+                'title': _('%s customers are waiting for a reply') % values['needs_reply'],
+                'action': 'elsx_whatsapp_marketing.action_whatsapp_team_inbox',
+            })
+        if not warnings:
+            warnings.append({
+                'code': 'clear',
+                'level': 'success',
+                'title': _('No urgent WhatsApp exceptions.'),
+                'action': False,
+            })
+        return {
+            'generated_at': fields.Datetime.to_string(now),
+            'runtime_enabled': self.env['whatsapp.runtime.guard'].is_enabled(),
+            'metrics': values,
+            'exceptions': warnings,
+        }
+
 class WhatsAppAnalyticsReportHelper(models.Model):
     """Helper model to generate analytics reports"""
     _name = 'whatsapp.analytics.report'

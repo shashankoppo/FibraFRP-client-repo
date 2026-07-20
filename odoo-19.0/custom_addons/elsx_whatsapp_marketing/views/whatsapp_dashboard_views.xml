@@ -7,6 +7,39 @@
         <field name="tag">whatsapp_marketing_dashboard</field>
     </record>
 
+    <record id="action_whatsapp_overview_v2" model="ir.actions.client">
+        <field name="name">WhatsApp Overview</field>
+        <field name="tag">elsx_whatsapp_overview_v2</field>
+    </record>
+
+    <record id="action_whatsapp_overview_router" model="ir.actions.server">
+        <field name="name">WhatsApp Overview</field>
+        <field name="model_id" ref="elsx_whatsapp_core.model_whatsapp_analytics"/>
+        <field name="state">code</field>
+        <field name="code">
+version = env.user.get_whatsapp_ui_version()
+xmlid = 'elsx_whatsapp_marketing.action_whatsapp_overview_v2' if version == 'v2' else 'elsx_whatsapp_marketing.action_whatsapp_dashboard_client'
+action = env.ref(xmlid).read()[0]
+        </field>
+    </record>
+
+    <record id="action_whatsapp_root_router" model="ir.actions.server">
+        <field name="name">WhatsApp</field>
+        <field name="model_id" ref="elsx_whatsapp_core.model_whatsapp_chat"/>
+        <field name="state">code</field>
+        <field name="code">
+role = env.user.get_whatsapp_workspace_role()
+if role == 'manager':
+    version = env.user.get_whatsapp_ui_version()
+    xmlid = 'elsx_whatsapp_marketing.action_whatsapp_overview_v2' if version == 'v2' else 'elsx_whatsapp_marketing.action_whatsapp_dashboard_client'
+elif role == 'marketer':
+    xmlid = 'elsx_whatsapp_marketing.action_whatsapp_campaign'
+else:
+    xmlid = 'elsx_whatsapp_marketing.action_whatsapp_team_inbox'
+action = env.ref(xmlid).read()[0]
+        </field>
+    </record>
+
     <!-- Kept for backward compatibility -->
     <record id="action_whatsapp_dashboard_server" model="ir.actions.server">
         <field name="name">WhatsApp Dashboard (Legacy)</field>

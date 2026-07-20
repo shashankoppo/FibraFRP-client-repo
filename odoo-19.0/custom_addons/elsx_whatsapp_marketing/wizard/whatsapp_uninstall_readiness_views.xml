@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_whatsapp_uninstall_readiness_wizard_form" model="ir.ui.view">
+        <field name="name">whatsapp.uninstall.readiness.wizard.form</field>
+        <field name="model">whatsapp.uninstall.readiness.wizard</field>
+        <field name="arch" type="xml">
+            <form string="WhatsApp Uninstall Readiness">
+                <sheet>
+                    <group>
+                        <field name="backup_reference"/>
+                        <field name="backup_confirmed"/>
+                        <field name="expected_confirmation" readonly="1"/>
+                        <field name="typed_confirmation" password="True"/>
+                    </group>
+                    <group invisible="not readiness_id">
+                        <field name="readiness_id" readonly="1"/>
+                        <field name="state" readonly="1"/>
+                        <field name="blocker_count" readonly="1"/>
+                        <field name="authorization_expires_at" readonly="1" invisible="state != 'authorized'"/>
+                    </group>
+                    <group string="Readiness Results" invisible="not readiness_id">
+                        <field name="report_text" nolabel="1" readonly="1"/>
+                    </group>
+                    <field name="authorization_token" invisible="1"/>
+                </sheet>
+                <footer>
+                    <button name="action_run_checks"
+                            type="object"
+                            string="Run Readiness Checks"
+                            class="btn-primary"/>
+                    <button name="action_authorize"
+                            type="object"
+                            string="Create 15-Minute Authorization"
+                            class="btn-primary"
+                            invisible="state != 'ready'"/>
+                    <button name="action_open_uninstall_confirmation"
+                            type="object"
+                            string="Open Odoo Uninstall Confirmation"
+                            class="btn-danger"
+                            invisible="state != 'authorized'"/>
+                    <button string="Close" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_whatsapp_uninstall_readiness" model="ir.actions.act_window">
+        <field name="name">Uninstall Readiness</field>
+        <field name="res_model">whatsapp.uninstall.readiness.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="views" eval="[(False, 'form')]"/>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem id="menu_whatsapp_uninstall_readiness"
+              name="Uninstall Readiness"
+              parent="menu_whatsapp_technical"
+              action="action_whatsapp_uninstall_readiness"
+              sequence="90"
+              groups="base.group_system"/>
+</odoo>

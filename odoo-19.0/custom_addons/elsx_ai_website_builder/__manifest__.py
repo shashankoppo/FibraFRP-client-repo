@@ -19,7 +19,7 @@ SEO, UX, and module planning.
     'author': 'ELSxGlobal',
     'website': 'https://elsxglobal.com',
     'license': 'LGPL-3',
-    'depends': ['website', 'elsx_whatsapp_marketing'],
+    'depends': ['website', 'elsx_ai_core'],
     'data': [
         'security/ai_website_builder_security.xml',
         'security/ir.model.access.csv',

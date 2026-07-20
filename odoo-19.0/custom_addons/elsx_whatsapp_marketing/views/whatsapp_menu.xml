@@ -6,7 +6,36 @@
     <menuitem id="menu_whatsapp_root"
               name="WhatsApp Marketing"
               sequence="50"
+              action="action_whatsapp_root_router"
               web_icon="elsx_whatsapp_marketing,static/description/icon.png"/>
+
+    <menuitem id="menu_whatsapp_overview"
+              name="Overview"
+              parent="menu_whatsapp_root"
+              sequence="1"
+              action="action_whatsapp_overview_router"/>
+
+    <menuitem id="menu_whatsapp_templates_section"
+              name="Templates"
+              parent="menu_whatsapp_root"
+              sequence="30"/>
+
+    <menuitem id="menu_whatsapp_audience"
+              name="Audience"
+              parent="menu_whatsapp_root"
+              sequence="40"/>
+
+    <menuitem id="menu_whatsapp_config"
+              name="Settings"
+              parent="menu_whatsapp_root"
+              sequence="70"
+              groups="base.group_system"/>
+
+    <menuitem id="menu_whatsapp_technical"
+              name="Technical"
+              parent="menu_whatsapp_config"
+              sequence="90"
+              groups="base.group_system"/>
 
     <!-- =====================================================
          SECTION 1: ENGAGE (Sequence 1-25)
@@ -14,9 +43,9 @@
          ===================================================== -->
 
     <menuitem id="menu_whatsapp_engage"
-              name="Engage"
+              name="Inbox"
               parent="menu_whatsapp_root"
-              sequence="1"/>
+              sequence="10"/>
 
     <!-- 1. Team Inbox (Industrial Messaging Console) -->
     <record id="action_whatsapp_chat" model="ir.actions.act_window">
@@ -65,8 +94,8 @@
     <!-- 4. Contacts (quick access — action defined in whatsapp_contact_views.xml) -->
     <menuitem id="menu_whatsapp_contacts_engage"
               name="Contacts"
-              parent="menu_whatsapp_engage"
-              sequence="20"
+              parent="menu_whatsapp_audience"
+              sequence="10"
               action="action_whatsapp_contact"/>
 
     <!-- =====================================================
@@ -76,7 +105,7 @@
     <menuitem id="menu_whatsapp_campaigns_section"
               name="Campaigns"
               parent="menu_whatsapp_root"
-              sequence="30"/>
+              sequence="20"/>
 
     <menuitem id="menu_whatsapp_campaigns"
               name="All Campaigns"
@@ -99,20 +128,20 @@
 
     <menuitem id="menu_whatsapp_segment"
               name="Audience Segments"
-              parent="menu_whatsapp_campaigns_section"
-              sequence="35"
+              parent="menu_whatsapp_audience"
+              sequence="20"
               action="action_whatsapp_segment"/>
 
     <menuitem id="menu_whatsapp_campaign_forms"
               name="Forms / Webviews"
-              parent="menu_whatsapp_campaigns_section"
-              sequence="36"
+              parent="menu_whatsapp_audience"
+              sequence="30"
               action="action_whatsapp_form"/>
 
     <menuitem id="menu_whatsapp_campaign_form_submissions"
               name="Form Submissions"
-              parent="menu_whatsapp_campaigns_section"
-              sequence="39"
+              parent="menu_whatsapp_audience"
+              sequence="31"
               action="action_whatsapp_form_submission"/>
 
     <!-- Scheduled Campaigns -->
@@ -129,21 +158,21 @@
               action="action_whatsapp_scheduled_campaign"/>
 
     <menuitem id="menu_whatsapp_templates"
-              name="My Templates"
-              parent="menu_whatsapp_campaigns_section"
-              sequence="40"
+              name="Templates"
+              parent="menu_whatsapp_templates_section"
+              sequence="10"
               action="action_whatsapp_template"/>
 
     <menuitem id="menu_whatsapp_templates_archived"
               name="Archived Templates"
-              parent="menu_whatsapp_campaigns_section"
-              sequence="42"
+              parent="menu_whatsapp_templates_section"
+              sequence="20"
               action="action_whatsapp_template_archived"/>
 
     <menuitem id="menu_whatsapp_sample_templates"
               name="Template Library"
-              parent="menu_whatsapp_campaigns_section"
-              sequence="45"
+              parent="menu_whatsapp_templates_section"
+              sequence="30"
               action="action_whatsapp_sample_templates"/>
 
     <!-- Link to Meta Template Creation -->
@@ -155,8 +184,8 @@
 
     <menuitem id="menu_meta_template_creation"
               name="Create Template (Meta)"
-              parent="menu_whatsapp_campaigns_section"
-              sequence="41"
+              parent="menu_whatsapp_templates_section"
+              sequence="40"
               action="action_meta_template_creation"/>
 
     <!-- =====================================================
@@ -193,13 +222,15 @@
               name="Flow Steps"
               parent="menu_whatsapp_automation"
               sequence="53"
-              action="whatsapp_bot_flow_step_action"/>
+              action="whatsapp_bot_flow_step_action"
+              active="False"/>
 
     <menuitem id="menu_whatsapp_bot_flow_buttons"
               name="Flow Buttons"
               parent="menu_whatsapp_automation"
               sequence="54"
-              action="whatsapp_bot_flow_button_action"/>
+              action="whatsapp_bot_flow_button_action"
+              active="False"/>
 
     <!-- Bot Rules -->
     <menuitem id="menu_whatsapp_bot_rules"
@@ -210,21 +241,23 @@
 
     <menuitem id="menu_whatsapp_quick_replies"
               name="Quick Replies"
-              parent="menu_whatsapp_automation"
-              sequence="60"
+              parent="menu_whatsapp_templates_section"
+              sequence="50"
               action="action_whatsapp_quick_reply"/>
 
     <menuitem id="menu_whatsapp_forms"
               name="Forms / Webviews"
               parent="menu_whatsapp_automation"
               sequence="62"
-              action="action_whatsapp_form"/>
+              action="action_whatsapp_form"
+              active="False"/>
 
     <menuitem id="menu_whatsapp_form_submissions"
               name="Form Submissions"
               parent="menu_whatsapp_automation"
               sequence="63"
-              action="action_whatsapp_form_submission"/>
+              action="action_whatsapp_form_submission"
+              active="False"/>
 
     <!-- =====================================================
          SECTION 4: ANALYTICS (Sequence 70-80)
@@ -233,7 +266,7 @@
     <menuitem id="menu_whatsapp_analytics_section"
               name="Analytics"
               parent="menu_whatsapp_root"
-              sequence="70"/>
+              sequence="60"/>
 
     <record id="action_whatsapp_analytics" model="ir.actions.act_window">
         <field name="name">Analytics Dashboard</field>
@@ -243,14 +276,14 @@
     </record>
 
     <menuitem id="menu_whatsapp_analytics"
-              name="Dashboard"
+              name="Performance"
               parent="menu_whatsapp_analytics_section"
               sequence="71"
-              action="action_whatsapp_dashboard_client"/>
+              action="action_whatsapp_overview_router"/>
 
     <menuitem id="menu_whatsapp_api_log"
               name="Outbound API Logs"
-              parent="menu_whatsapp_analytics_section"
+              parent="menu_whatsapp_technical"
               action="action_whatsapp_api_log"
               sequence="73"/>
 
@@ -263,8 +296,8 @@
 
     <menuitem id="menu_whatsapp_media_library"
               name="Media Library"
-              parent="menu_whatsapp_analytics_section"
-              sequence="75"
+              parent="menu_whatsapp_templates_section"
+              sequence="60"
               action="action_whatsapp_media_library"/>
 
     <!-- =====================================================
@@ -273,8 +306,8 @@
 
     <menuitem id="menu_whatsapp_compliance_section"
               name="Compliance"
-              parent="menu_whatsapp_root"
-              sequence="85"
+              parent="menu_whatsapp_config"
+              sequence="50"
               groups="base.group_system"/>
 
     <record id="action_whatsapp_compliance" model="ir.actions.act_window">
@@ -307,12 +340,6 @@
          SECTION 6: CONFIGURATION (Sequence 100+)
          Admin-only settings
          ===================================================== -->
-
-    <menuitem id="menu_whatsapp_config"
-              name="Configuration"
-              parent="menu_whatsapp_root"
-              sequence="100"
-              groups="base.group_system"/>
 
     <menuitem id="menu_whatsapp_accounts"
               name="WhatsApp Accounts"
@@ -355,7 +382,8 @@
               name="Commerce / Shop"
               parent="menu_whatsapp_campaigns_section"
               sequence="38"
-              action="action_whatsapp_commerce_setup"/>
+              action="action_whatsapp_commerce_setup"
+              active="False"/>
 
     <menuitem id="menu_whatsapp_commerce_setup"
               name="Commerce / Shop Setup"
@@ -386,52 +414,52 @@
 
     <menuitem id="menu_whatsapp_contact_tags"
               name="Contact Tags"
-              parent="menu_whatsapp_config"
-              sequence="25"
+              parent="menu_whatsapp_audience"
+              sequence="40"
               action="action_whatsapp_contact_tag"/>
 
     <menuitem id="menu_whatsapp_placeholders"
               name="Placeholder Guide"
-              parent="menu_whatsapp_config"
+              parent="menu_whatsapp_technical"
               sequence="30"
               action="action_whatsapp_placeholder"/>
 
     <menuitem id="menu_whatsapp_import"
               name="Bulk Import"
-              parent="menu_whatsapp_config"
-              sequence="31"
+              parent="menu_whatsapp_audience"
+              sequence="50"
               action="action_whatsapp_import_wizard"/>
 
     <menuitem id="menu_whatsapp_ai_jobs"
               name="AI Jobs"
-              parent="menu_whatsapp_config"
+              parent="menu_whatsapp_technical"
               sequence="35"
               action="action_elsx_ai_job"/>
 
     <menuitem id="menu_whatsapp_ai_providers"
               name="AI Providers"
-              parent="menu_whatsapp_config"
+              parent="menu_whatsapp_technical"
               sequence="36"
               action="action_elsx_ai_provider"
               groups="base.group_system"/>
 
     <menuitem id="menu_whatsapp_ai_prompts"
               name="AI Prompts"
-              parent="menu_whatsapp_config"
+              parent="menu_whatsapp_technical"
               sequence="37"
               action="action_elsx_ai_prompt"
               groups="base.group_system"/>
 
     <menuitem id="menu_whatsapp_ai_tools"
               name="AI Tools"
-              parent="menu_whatsapp_config"
+              parent="menu_whatsapp_technical"
               sequence="38"
               action="action_elsx_ai_tool"
               groups="base.group_system"/>
 
     <menuitem id="menu_whatsapp_system_health"
               name="System Health"
-              parent="menu_whatsapp_config"
+              parent="menu_whatsapp_technical"
               sequence="40"
               action="action_whatsapp_diagnostic_snapshot"
               groups="base.group_system"/>
@@ -446,7 +474,7 @@
 
     <menuitem id="menu_whatsapp_webhook_logs"
               name="Webhook Logs"
-              parent="menu_whatsapp_config"
+              parent="menu_whatsapp_technical"
               sequence="90"
               action="action_whatsapp_webhook_log"/>
 

@@ -29,6 +29,41 @@ wait_for_db() {
   exit 1
 }
 
+capture_identity_snapshot() {
+  local output_file="$1"
+  shift
+  local table count checksum
+
+  : > "${output_file}"
+  for table in "$@"; do
+    if [[ ! "${table}" =~ ^[a-z0-9_]+$ ]]; then
+      echo "ERROR: refusing to audit unexpected table name: ${table}" >&2
+      exit 1
+    fi
+    count="$(
+      docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -Atc \
+        "SELECT count(*) FROM ${table};"
+    )"
+    checksum="$(
+      docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -Atc \
+        "COPY (SELECT id FROM ${table} ORDER BY id) TO STDOUT" \
+        | sha256sum | awk '{print $1}'
+    )"
+    printf '%s|%s|%s\n' "${table}" "${count}" "${checksum}" >> "${output_file}"
+  done
+
+  count="$(
+    docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -Atc \
+      "SELECT count(*) FROM ir_attachment WHERE res_model LIKE 'whatsapp.%' OR res_model LIKE 'elsx.ai.%';"
+  )"
+  checksum="$(
+    docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -Atc \
+      "COPY (SELECT id FROM ir_attachment WHERE res_model LIKE 'whatsapp.%' OR res_model LIKE 'elsx.ai.%' ORDER BY id) TO STDOUT" \
+      | sha256sum | awk '{print $1}'
+  )"
+  printf '%s|%s|%s\n' 'ir_attachment_whatsapp_ai' "${count}" "${checksum}" >> "${output_file}"
+}
+
 if [ -z "${LIVE_DB_NAME}" ]; then
   echo "ERROR: database name is required. This script will not guess a production database." >&2
   echo "Usage: BACKUP_PASSPHRASE=... bash deploy/safe_production_update.sh <database_name>" >&2
@@ -92,6 +127,13 @@ if [ "${DB_EXISTS}" != "1" ]; then
   exit 1
 fi
 
+echo "==> Building Odoo image before the maintenance window"
+docker compose build odoo
+
+echo "==> Stopping Odoo and WhatsApp sidecar for a consistent backup and module upgrade"
+docker compose stop sidecar >/dev/null 2>&1 || true
+docker compose stop odoo >/dev/null 2>&1 || true
+
 echo "==> Creating encrypted backup before any module upgrade"
 OUTPUT_DIR="${OUTPUT_DIR}" BACKUP_PASSPHRASE="${BACKUP_PASSPHRASE}" \
   bash deploy/export_live_encrypted_backup.sh "${LIVE_DB_NAME}"
@@ -101,14 +143,45 @@ if [ -z "${LATEST_BACKUP}" ] || [ ! -s "${LATEST_BACKUP}" ]; then
   echo "ERROR: encrypted backup was not created or is empty. Refusing to continue." >&2
   exit 1
 fi
+echo "==> Verifying encrypted archive integrity and passphrase"
+if ! openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
+  -pass env:BACKUP_PASSPHRASE -in "${LATEST_BACKUP}" 2>/dev/null \
+  | tar -tzf - >/dev/null; then
+  echo "ERROR: encrypted backup could not be decrypted and listed. Refusing to continue." >&2
+  exit 1
+fi
+BACKUP_REFERENCE="$(basename "${LATEST_BACKUP}")"
+BACKUP_SHA256="$(sha256sum "${LATEST_BACKUP}" | awk '{print $1}')"
+BACKUP_VERIFIED_AT="$(date -u '+%Y-%m-%d %H:%M:%S')"
 echo "==> Verified encrypted backup: ${LATEST_BACKUP}"
+echo "==> Backup SHA-256: ${BACKUP_SHA256}"
 
-echo "==> Building Odoo image"
-docker compose build odoo
-
-echo "==> Stopping Odoo and WhatsApp sidecar for a clean module upgrade"
-docker compose stop sidecar >/dev/null 2>&1 || true
-docker compose stop odoo >/dev/null 2>&1 || true
+echo "==> Capturing protected business-row identity snapshot"
+mapfile -t PROTECTED_TABLES < <(
+  docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -Atc \
+    "SELECT DISTINCT tables.tablename
+       FROM pg_tables AS tables
+       JOIN information_schema.columns AS columns
+         ON columns.table_schema = tables.schemaname
+        AND columns.table_name = tables.tablename
+        AND columns.column_name = 'id'
+      WHERE tables.schemaname = 'public'
+        AND NOT EXISTS (
+            SELECT 1
+              FROM ir_model AS models
+             WHERE replace(models.model, '.', '_') = tables.tablename
+               AND models.transient
+        )
+        AND (
+             tables.tablename LIKE 'whatsapp\\_%%' ESCAPE '\\'
+          OR tables.tablename LIKE 'elsx_ai\\_%%' ESCAPE '\\'
+          OR tables.tablename IN ('res_partner', 'crm_lead', 'sale_order', 'account_move')
+        )
+      ORDER BY tables.tablename;"
+)
+IDENTITY_SNAPSHOT_BEFORE="${LATEST_BACKUP}.business-identities.before.sha256"
+IDENTITY_SNAPSHOT_AFTER="${LATEST_BACKUP}.business-identities.after.sha256"
+capture_identity_snapshot "${IDENTITY_SNAPSHOT_BEFORE}" "${PROTECTED_TABLES[@]}"
 
 echo "==> Installing/upgrading requested modules through the backup-protected path"
 docker compose run --rm -T --no-deps odoo \
@@ -118,6 +191,36 @@ docker compose run --rm -T --no-deps odoo \
     -i "${ALL_INSTALL_MODULES}" \
     -u "${ALL_UPGRADE_MODULES}" \
     --stop-after-init
+
+echo "==> Verifying protected business-row identities after module upgrade"
+capture_identity_snapshot "${IDENTITY_SNAPSHOT_AFTER}" "${PROTECTED_TABLES[@]}"
+if ! diff -u "${IDENTITY_SNAPSHOT_BEFORE}" "${IDENTITY_SNAPSHOT_AFTER}"; then
+  echo "ERROR: protected business-row identities changed during the module upgrade." >&2
+  echo "Odoo remains stopped. Review the snapshots and encrypted backup before any recovery action." >&2
+  exit 1
+fi
+echo "==> Protected row counts and SHA-256 identity checksums are unchanged"
+
+echo "==> Registering verified backup marker for guarded WhatsApp maintenance"
+docker compose run --rm -T --no-deps \
+  -e ELSX_BACKUP_REFERENCE="${BACKUP_REFERENCE}" \
+  -e ELSX_BACKUP_DATABASE="${LIVE_DB_NAME}" \
+  -e ELSX_BACKUP_SHA256="${BACKUP_SHA256}" \
+  -e ELSX_BACKUP_VERIFIED_AT="${BACKUP_VERIFIED_AT}" \
+  odoo python3 /opt/odoo/odoo-bin shell \
+    -c "${CONFIG}" -d "${LIVE_DB_NAME}" --no-http <<'PY'
+import os
+
+params = env['ir.config_parameter'].sudo()
+for key, value in {
+    'elsx.whatsapp.last_verified_backup.reference': os.environ['ELSX_BACKUP_REFERENCE'],
+    'elsx.whatsapp.last_verified_backup.database': os.environ['ELSX_BACKUP_DATABASE'],
+    'elsx.whatsapp.last_verified_backup.sha256': os.environ['ELSX_BACKUP_SHA256'],
+    'elsx.whatsapp.last_verified_backup.verified_at': os.environ['ELSX_BACKUP_VERIFIED_AT'],
+}.items():
+    params.set_param(key, value)
+env.cr.commit()
+PY
 
 if [ "${DEACTIVATE_SAAS_ON_UPDATE}" = "YES" ]; then
   echo "==> Deactivating SaaS runtime metadata for ${LIVE_DB_NAME} (no uninstall, no data deletion)"
@@ -130,7 +233,7 @@ echo "==> Module state check"
 docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
   "SELECT name, state, latest_version
      FROM ir_module_module
-    WHERE name IN ('elsx_client_restrictions','elsx_attendance_tracking','elsx_face_attendance','elsx_saas','elsx_whatsapp_marketing','elsx_tally_integration','crm','account','hr_attendance')
+    WHERE name IN ('elsx_client_restrictions','elsx_attendance_tracking','elsx_face_attendance','elsx_saas','elsx_ai_core','elsx_whatsapp_core','elsx_whatsapp_gateway','elsx_whatsapp_marketing','elsx_ai_marketing','elsx_ai_website_builder','elsx_tally_integration','crm','account','hr_attendance')
     ORDER BY name;"
 
 echo "==> Container status"

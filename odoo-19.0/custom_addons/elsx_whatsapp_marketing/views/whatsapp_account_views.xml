@@ -121,6 +121,11 @@
                         </h1>
                     </div>
                     <group>
+                        <field name="setup_progress" widget="progressbar"/>
+                        <field name="setup_next_step" readonly="1" invisible="setup_complete"/>
+                        <field name="setup_complete" invisible="1"/>
+                    </group>
+                    <group>
                         <group string="Account Details">
                             <field name="phone_number"/>
                             <field name="phone_number_id"/>

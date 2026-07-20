@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
+import base64
 import json
 import time
+import uuid
 
 from markupsafe import Markup, escape
 
@@ -13,6 +15,7 @@ class WhatsAppDiagnosticSnapshot(models.Model):
     _order = 'create_date desc, id desc'
 
     name = fields.Char(required=True, default=lambda self: fields.Datetime.to_string(fields.Datetime.now()))
+    correlation_id = fields.Char(readonly=True, copy=False, index=True)
     snapshot_html = fields.Html(sanitize=False, readonly=True)
     snapshot_text = fields.Text(readonly=True)
     snapshot_json = fields.Text(readonly=True)
@@ -22,6 +25,7 @@ class WhatsAppDiagnosticSnapshot(models.Model):
         ('critical', 'Critical'),
     ], default='ok', required=True, index=True)
     duration_ms = fields.Float(readonly=True)
+    snapshot_attachment_id = fields.Many2one('ir.attachment', readonly=True, copy=False)
 
     @api.model
     def _count_if_model(self, model_name, domain=None):
@@ -174,9 +178,12 @@ class WhatsAppDiagnosticSnapshot(models.Model):
     def action_capture_now(self):
         start = time.monotonic()
         data = self._collect_snapshot()
+        correlation_id = str(uuid.uuid4())
+        data['correlation_id'] = correlation_id
         severity = self._severity_for_snapshot(data)
         snapshot = self.create({
             'name': 'WhatsApp Stabilization Snapshot %s' % data['generated_at'],
+            'correlation_id': correlation_id,
             'snapshot_json': json.dumps(data, ensure_ascii=False, indent=2),
             'snapshot_html': self._render_snapshot_html(data),
             'snapshot_text': self._render_snapshot_text(data),
@@ -191,4 +198,42 @@ class WhatsAppDiagnosticSnapshot(models.Model):
             'view_mode': 'form',
             'views': [(False, 'form')],
             'target': 'current',
+        }
+
+    @api.model
+    def _redact_export_value(self, value):
+        sensitive_parts = ('token', 'secret', 'password', 'authorization', 'access_key')
+        if isinstance(value, dict):
+            return {
+                key: '[redacted]' if any(part in str(key).lower() for part in sensitive_parts)
+                else self._redact_export_value(item)
+                for key, item in value.items()
+            }
+        if isinstance(value, list):
+            return [self._redact_export_value(item) for item in value]
+        return value
+
+    def action_export_redacted_json(self):
+        self.ensure_one()
+        payload = json.loads(self.snapshot_json or '{}')
+        payload = self._redact_export_value(payload)
+        content = json.dumps(payload, ensure_ascii=False, indent=2).encode()
+        filename = 'whatsapp-diagnostic-%s.json' % (self.correlation_id or self.id)
+        values = {
+            'name': filename,
+            'datas': base64.b64encode(content),
+            'mimetype': 'application/json',
+            'res_model': self._name,
+            'res_id': self.id,
+        }
+        if self.snapshot_attachment_id:
+            self.snapshot_attachment_id.sudo().write(values)
+            attachment = self.snapshot_attachment_id
+        else:
+            attachment = self.env['ir.attachment'].sudo().create(values)
+            self.snapshot_attachment_id = attachment
+        return {
+            'type': 'ir.actions.act_url',
+            'url': '/web/content/%s?download=1' % attachment.id,
+            'target': 'self',
         }

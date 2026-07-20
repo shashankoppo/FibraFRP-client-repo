@@ -181,6 +181,46 @@ class WhatsAppWebhook(http.Controller):
         'read': 4,
     }
 
+    @http.route(
+        '/whatsapp/gateway/health',
+        type='http',
+        auth='none',
+        methods=['GET'],
+        csrf=False,
+    )
+    def gateway_health(self, **kwargs):
+        db_name = kwargs.get('db') or request.params.get('db')
+        if not db_name:
+            return request.make_json_response({
+                'status': 'ok',
+                'gateway': 'available',
+                'core': 'unchecked',
+                'runtime': 'unchecked',
+            })
+
+        env, cr, db_name = _get_env(db_name=db_name)
+        if not env or not cr:
+            return request.make_json_response({
+                'status': 'degraded',
+                'gateway': 'available',
+                'core': 'unavailable',
+                'runtime': 'unavailable',
+            }, status=503)
+        try:
+            enabled = env['ir.config_parameter'].sudo().get_param(
+                'whatsapp.runtime.enabled',
+                default='True',
+            ) == 'True'
+            return request.make_json_response({
+                'status': 'ok' if enabled else 'paused',
+                'gateway': 'available',
+                'core': 'available',
+                'runtime': 'enabled' if enabled else 'paused',
+                'database': db_name,
+            })
+        finally:
+            cr.close()
+
     def _is_serialization_failure(self, exc):
         """PostgreSQL asks for a transaction retry when concurrent webhook workers touch the same row."""
         if isinstance(exc, WebhookSerializationRetry):
@@ -335,6 +375,11 @@ class WhatsAppWebhook(http.Controller):
                         registry = Registry(db_name)
                         with registry.cursor() as thread_cr:
                             thread_env = api.Environment(thread_cr, odoo.SUPERUSER_ID, {})
+                            thread_log = thread_env['whatsapp.webhook.log'].browse(log_id)
+                            thread_env = thread_env(context=dict(
+                                thread_env.context,
+                                whatsapp_correlation_id=thread_log.correlation_id,
+                            ))
                             thread_log = thread_env['whatsapp.webhook.log'].browse(log_id)
                             thread_acc = thread_env['whatsapp.account'].browse(account_id) if account_id else None
                             payload_json = json.loads(thread_log.raw_payload)
@@ -1336,7 +1381,10 @@ class WhatsAppWebhook(http.Controller):
         env, cr, _ = _get_env(payload=payload)
         if not env:
             _logger.error('[SIDECAR-IN] Could not initialize environment for security check')
-            return request.make_json_response({'status': 'error', 'message': 'System Initialization Error'}, status=500)
+            return request.make_json_response(
+                {'status': 'error', 'message': 'WhatsApp Core Unavailable'},
+                status=503,
+            )
 
         try:
             expected_secret = env['ir.config_parameter'].sudo().get_param('whatsapp.sidecar.secret')

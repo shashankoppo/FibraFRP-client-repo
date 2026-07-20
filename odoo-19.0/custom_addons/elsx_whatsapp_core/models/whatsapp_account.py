@@ -9,6 +9,7 @@ import io
 import mimetypes
 import random
 import secrets
+import uuid
 from urllib.parse import quote
 from datetime import timedelta
 
@@ -53,6 +54,9 @@ class WhatsAppAccount(models.Model):
     # Statistics
     message_count = fields.Integer('Total Messages', compute='_compute_statistics')
     campaign_count = fields.Integer('Total Campaigns', compute='_compute_statistics')
+    setup_progress = fields.Integer('Setup Progress', compute='_compute_setup_progress')
+    setup_next_step = fields.Char('Next Setup Step', compute='_compute_setup_progress')
+    setup_complete = fields.Boolean('Setup Complete', compute='_compute_setup_progress')
     
     # Relations
     message_ids = fields.One2many('whatsapp.message', 'account_id', string='Messages')
@@ -61,6 +65,35 @@ class WhatsAppAccount(models.Model):
     compliance_policy_ids = fields.One2many('whatsapp.compliance.policy', 'account_id', string='Compliance Policies')
     team_member_ids = fields.One2many('whatsapp.team.member', 'account_id', string='Team Members')
     media_ids = fields.One2many('whatsapp.media.library', 'account_id', string='Media Library')
+
+    @api.depends(
+        'phone_number_id',
+        'business_account_id',
+        'access_token',
+        'status',
+        'webhook_status',
+        'template_ids.status',
+        'team_member_ids.user_id',
+    )
+    def _compute_setup_progress(self):
+        for account in self:
+            steps = [
+                (
+                    bool(account.phone_number_id and account.business_account_id and account.access_token),
+                    _('Complete Meta account credentials'),
+                ),
+                (account.status == 'connected', _('Test the Meta connection')),
+                (account.webhook_status == 'verified', _('Verify the webhook')),
+                (bool(account.template_ids.filtered(lambda item: item.status == 'approved')), _('Sync or approve a template')),
+                (bool(account.team_member_ids), _('Add a team member')),
+            ]
+            completed = sum(1 for done, _label in steps if done)
+            account.setup_progress = int((completed / len(steps)) * 100)
+            account.setup_complete = completed == len(steps)
+            account.setup_next_step = next(
+                (label for done, label in steps if not done),
+                _('Setup complete'),
+            )
     
     # Settings
     auto_reply_enabled = fields.Boolean('Auto Reply Enabled', default=False)
@@ -797,6 +830,11 @@ class WhatsAppAccount(models.Model):
         self.ensure_one()
         to_number = self.env['whatsapp.message']._normalize_phone(to_number, account=self, strict=True)
         existing_msg = kwargs.get('existing_message')
+        correlation_id = (
+            kwargs.get('correlation_id')
+            or (existing_msg.correlation_id if existing_msg else False)
+            or str(uuid.uuid4())
+        )
         partner_id = kwargs.get('partner_id') or (existing_msg.partner_id.id if existing_msg and existing_msg.partner_id else False)
         campaign_id = kwargs.get('campaign_id') or (existing_msg.campaign_id.id if existing_msg and existing_msg.campaign_id else False)
         flow_id = kwargs.get('flow_id') or (existing_msg.flow_id.id if existing_msg and existing_msg.flow_id else False)
@@ -939,12 +977,14 @@ class WhatsAppAccount(models.Model):
                 next_retry_at = fields.Datetime.now() + timedelta(seconds=retry_delay)
                 if existing_msg:
                     existing_msg.write({
+                        'correlation_id': correlation_id,
                         'status': 'queued',
                         'error_message': 'Rate limit exceeded; queued for retry.',
                         'next_retry_at': next_retry_at,
                     })
                     return existing_msg
                 queued_vals = {
+                    'correlation_id': correlation_id,
                     'account_id': self.id,
                     'phone_number': to_number,
                     'partner_id': partner_id,
@@ -990,6 +1030,7 @@ class WhatsAppAccount(models.Model):
             
             # Create Industrial API Log
             log_vals = {
+                'correlation_id': correlation_id,
                 'account_id': self.id,
                 'endpoint': url,
                 'method': 'POST',
@@ -1031,6 +1072,7 @@ class WhatsAppAccount(models.Model):
                 body = f"Media: {message_type}"
 
             vals = {
+                'correlation_id': correlation_id,
                 'account_id': self.id,
                 'phone_number': to_number,
                 'partner_id': partner_id,
@@ -1163,6 +1205,7 @@ class WhatsAppAccount(models.Model):
             else:
                 try:
                     self.env['whatsapp.message'].create({
+                        'correlation_id': correlation_id,
                         'account_id': self.id,
                         'phone_number': to_number,
                         'partner_id': partner_id,

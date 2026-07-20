@@ -4160,6 +4160,8 @@ class WhatsAppBotFlow(models.Model):
         return {'stop': False}
 
     def _execute_flow(self, message, source='manual'):
+        if not self.env['whatsapp.runtime.guard'].is_enabled():
+            return False
         self.ensure_one()
 
         first_step = self._get_first_step()

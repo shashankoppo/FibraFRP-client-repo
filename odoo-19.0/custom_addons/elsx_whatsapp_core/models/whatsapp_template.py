@@ -238,6 +238,67 @@ class WhatsAppTemplate(models.Model):
     
     preview_html = fields.Html('Preview', compute='_compute_preview_html')
     preview_text = fields.Text('Preview Text', compute='_compute_preview_html')
+    preview_payload_json = fields.Text(
+        'Structured Preview',
+        compute='_compute_preview_payload_json',
+    )
+
+    @api.depends(
+        'body',
+        'header_type',
+        'header_text',
+        'header_media_file',
+        'header_media_filename',
+        'header_media_url',
+        'footer',
+        'has_buttons',
+        'button_type',
+        'button_text_1',
+        'button_text_2',
+        'button_text_3',
+        'cta_url_text',
+        'cta_url_link',
+        'cta_phone_text',
+        'cta_phone_number',
+        'copy_code_example',
+        'is_carousel',
+        'variable_ids.name',
+        'variable_ids.sample_value',
+        'variable_ids.fallback_value',
+        'variable_ids.odoo_field',
+        'card_ids.sequence',
+        'card_ids.header_type',
+        'card_ids.header_media_file',
+        'card_ids.header_media_filename',
+        'card_ids.header_media_url',
+        'card_ids.body',
+        'card_ids.button_type_1',
+        'card_ids.button_text_1',
+        'card_ids.button_text_2',
+        'card_ids.button_url_1',
+    )
+    def _compute_preview_payload_json(self):
+        for record in self:
+            try:
+                record.preview_payload_json = json.dumps(
+                    record.get_preview_payload(),
+                    sort_keys=True,
+                )
+            except Exception as exc:
+                record.preview_payload_json = json.dumps({
+                    'version': 1,
+                    'header': {'type': 'none', 'text': '', 'media_url': False},
+                    'body': record.body or '',
+                    'footer': record.footer or '',
+                    'buttons': [],
+                    'carousel': [],
+                    'variables': [],
+                    'warnings': [{
+                        'code': 'preview_error',
+                        'severity': 'error',
+                        'message': str(exc),
+                    }],
+                })
 
     def _log_meta_audit(self, event, status=False, reason=False, raw_data=False):
         """Store Meta status/sync feedback so admins can debug template health."""
@@ -1394,6 +1455,192 @@ class WhatsAppTemplate(models.Model):
             """
             
             rec.preview_html = device_shell
+
+    def get_preview_payload(self, partner_id=False, record_model=False, record_id=False):
+        '''Return one structured preview contract for every WhatsApp UI surface.'''
+        self.ensure_one()
+        partner = self.env['res.partner'].browse(partner_id).exists() if partner_id else False
+        record = False
+        if record_model and record_id and record_model in self.env:
+            record = self.env[record_model].browse(record_id).exists()
+
+        def render_text(value):
+            rendered = self._render_preview_text(
+                value,
+                partner=partner,
+                record=record,
+                highlight=False,
+            )
+            return html2plaintext(rendered or '').strip()
+
+        variables = []
+        warnings = []
+        variable_by_name = {variable.name: variable for variable in self.variable_ids}
+        for name in self._extract_variable_names():
+            variable = variable_by_name.get(name)
+            value = self._resolve_variable_value(
+                variable,
+                partner=partner,
+                record=record,
+            ) if variable else ''
+            variables.append({
+                'name': name,
+                'value': str(value or ''),
+                'sample': variable.sample_value if variable else '',
+                'fallback': variable.fallback_value if variable else '',
+                'odoo_field': variable.odoo_field if variable else '',
+            })
+            if not variable:
+                warnings.append({
+                    'code': 'unmapped_variable',
+                    'severity': 'error',
+                    'message': 'Variable %s has no mapping row.' % name,
+                })
+            elif not value:
+                warnings.append({
+                    'code': 'empty_variable',
+                    'severity': 'warning',
+                    'message': 'Variable %s resolves to an empty value.' % name,
+                })
+
+        header_media_url = False
+        if self.header_type in ('image', 'video', 'document'):
+            header_media_url = self._preview_media_url(
+                field_name='header_media_file',
+                media_type=self.header_type,
+                media_file=self.header_media_file,
+                media_url=self.header_media_url,
+            )
+            if not header_media_url:
+                warnings.append({
+                    'code': 'missing_header_media',
+                    'severity': 'error',
+                    'message': '%s header media is missing.' % self.header_type.title(),
+                })
+
+        buttons = []
+        if self.has_buttons and self.button_type == 'quick_reply':
+            buttons = [
+                {'type': 'quick_reply', 'text': text, 'value': text}
+                for text in (
+                    self.button_text_1,
+                    self.button_text_2,
+                    self.button_text_3,
+                )
+                if text
+            ]
+        elif self.has_buttons and self.button_type == 'call_to_action':
+            if self.cta_url_text:
+                buttons.append({
+                    'type': 'url',
+                    'text': self.cta_url_text,
+                    'value': render_text(self.cta_url_link),
+                })
+            if self.cta_phone_text:
+                buttons.append({
+                    'type': 'phone',
+                    'text': self.cta_phone_text,
+                    'value': self.cta_phone_number or '',
+                })
+        elif self.has_buttons and self.button_type == 'copy_code':
+            buttons.append({
+                'type': 'copy_code',
+                'text': 'Copy code',
+                'value': self.copy_code_example or '',
+            })
+
+        carousel = []
+        for card in self.card_ids.sorted('sequence'):
+            card_media_url = False
+            if card.header_media_file and card.id:
+                route = 'image' if card.header_type == 'image' else 'content'
+                card_media_url = '/web/%s/whatsapp.template.card/%s/header_media_file' % (
+                    route,
+                    card.id,
+                )
+            elif card.header_media_url and str(card.header_media_url).startswith(
+                ('http://', 'https://')
+            ):
+                card_media_url = card.header_media_url
+            card_buttons = []
+            if card.button_text_1:
+                card_buttons.append({
+                    'type': card.button_type_1 or 'quick_reply',
+                    'text': card.button_text_1,
+                    'value': card.button_url_1 or card.button_text_1,
+                })
+            if card.button_text_2:
+                card_buttons.append({
+                    'type': 'quick_reply',
+                    'text': card.button_text_2,
+                    'value': card.button_text_2,
+                })
+            carousel.append({
+                'id': card.id,
+                'header': {
+                    'type': card.header_type,
+                    'media_url': card_media_url,
+                    'filename': card.header_media_filename or '',
+                },
+                'body': render_text(card.body),
+                'buttons': card_buttons,
+            })
+            if not card_media_url:
+                warnings.append({
+                    'code': 'missing_carousel_media',
+                    'severity': 'error',
+                    'message': 'Carousel card %s is missing media.' % (
+                        card.sequence or len(carousel)
+                    ),
+                })
+
+        variable_names = self._extract_variable_names()
+        variable_numbers = [
+            int(re.findall(r'\d+', name)[0])
+            for name in variable_names
+        ]
+        expected_numbers = list(range(1, len(variable_numbers) + 1))
+        if variable_numbers != expected_numbers:
+            warnings.append({
+                'code': 'variable_validation',
+                'severity': 'error',
+                'message': (
+                    'Template variables must be sequential without gaps. '
+                    'Found %s; expected %s.'
+                ) % (
+                    ', '.join(variable_names),
+                    ', '.join('{{%s}}' % number for number in expected_numbers),
+                ),
+            })
+        if not (self.body or '').strip():
+            warnings.append({
+                'code': 'missing_body',
+                'severity': 'error',
+                'message': 'Template body is required.',
+            })
+
+        return {
+            'version': 1,
+            'template': {
+                'id': self.id,
+                'name': self.name,
+                'status': self.status,
+                'category': self.category,
+                'language': self.language,
+            },
+            'header': {
+                'type': self.header_type or 'none',
+                'text': render_text(self.header_text),
+                'media_url': header_media_url,
+                'filename': self.header_media_filename or '',
+            },
+            'body': render_text(self.body),
+            'footer': self.footer or '',
+            'buttons': buttons,
+            'carousel': carousel,
+            'variables': variables,
+            'warnings': warnings,
+        }
 
     def action_preview(self):
         """Preview the template"""

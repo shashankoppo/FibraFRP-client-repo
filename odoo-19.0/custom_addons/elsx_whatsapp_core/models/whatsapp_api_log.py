@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api
 import logging
+import uuid
 
 _logger = logging.getLogger(__name__)
 
@@ -10,6 +11,13 @@ class WhatsAppApiLog(models.Model):
     _order = 'create_date desc'
 
     account_id = fields.Many2one('whatsapp.account', string='Account', ondelete='cascade')
+    correlation_id = fields.Char(
+        'Correlation ID',
+        default=lambda self: str(uuid.uuid4()),
+        copy=False,
+        readonly=True,
+        index=True,
+    )
     endpoint = fields.Char('Endpoint')
     method = fields.Selection([('GET', 'GET'), ('POST', 'POST'), ('DELETE', 'DELETE')], string='Method', default='POST')
     

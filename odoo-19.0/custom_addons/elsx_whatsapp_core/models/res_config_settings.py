@@ -5,6 +5,17 @@ from odoo import api, fields, models
 class ResConfigSettings(models.TransientModel):
     _inherit = 'res.config.settings'
 
+    whatsapp_runtime_enabled = fields.Boolean(
+        string='WhatsApp Runtime Enabled',
+        default=True,
+        config_parameter='whatsapp.runtime.enabled',
+    )
+    whatsapp_ui_version = fields.Selection([
+        ('legacy', 'Legacy'),
+        ('v2', 'V2'),
+    ], string='Default WhatsApp Interface', default='legacy',
+        config_parameter='whatsapp.ui.version')
+
     # Sidecar Real-Time Settings
     whatsapp_sidecar_url = fields.Char(
         string='Real-time Sidecar URL',

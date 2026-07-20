@@ -768,7 +768,270 @@ class WhatsAppCampaign(models.Model):
             }
         }
     
+    def _launch_review_partner_source(self, limit=10000):
+        '''Resolve an audience for review without refreshing segments or creating contacts.'''
+        self.ensure_one()
+        Partner = self.env['res.partner'].sudo()
+        if self.partner_ids:
+            return self.partner_ids[:limit + 1], len(self.partner_ids), []
+
+        warnings = []
+        domain = False
+        if self.target_type == 'all':
+            domain = self._partner_phone_domain()
+        elif self.target_type == 'segment' and self.domain_filter:
+            parsed = safe_eval(self.domain_filter)
+            if not isinstance(parsed, (list, tuple)):
+                raise UserError(_('The audience domain must be a list or tuple.'))
+            domain = list(parsed)
+        elif self.target_type == 'segment' and self.segment_id:
+            partners = self.segment_id.contact_ids
+            return partners[:limit + 1], len(partners), warnings
+        elif self.target_type == 'manual':
+            return self.partner_ids, len(self.partner_ids), warnings
+        elif self.target_type == 'crm_stage':
+            lead_domain = [('partner_id', '!=', False)]
+            if self.crm_stage_id:
+                lead_domain.append(('stage_id', '=', self.crm_stage_id.id))
+            leads = self.env['crm.lead'].sudo().search(lead_domain, limit=limit + 1)
+            partners = leads.mapped('partner_id')
+            return partners[:limit + 1], len(partners), warnings
+        elif self.target_type == 'tags' and self.tag_ids:
+            domain = self._partner_phone_domain() + [
+                ('category_id', 'in', self.tag_ids.ids),
+            ]
+        elif self.target_type == 'csv':
+            return Partner.browse(), 0, warnings
+
+        if domain is False:
+            return Partner.browse(), 0, warnings
+        total = Partner.search_count(domain)
+        return Partner.search(domain, limit=limit + 1), total, warnings
+
+    def _launch_review_csv_rows(self, limit=10000):
+        self.ensure_one()
+        if self.target_type != 'csv' or not self.csv_file:
+            return [], 0
+        try:
+            content = base64.b64decode(self.csv_file).decode('utf-8', errors='ignore')
+            reader = csv.DictReader(io.StringIO(content))
+        except Exception as exc:
+            raise UserError(_('The audience CSV could not be read: %s') % exc)
+        rows = []
+        total = 0
+        for raw_row in reader:
+            total += 1
+            if len(rows) >= limit + 1:
+                continue
+            row = {
+                str(key or '').strip().lower(): value
+                for key, value in raw_row.items()
+            }
+            rows.append({
+                'name': row.get('name') or '',
+                'phone': row.get('phone') or row.get('mobile') or row.get('whatsapp') or '',
+            })
+        return rows, total
+
+    def get_launch_review(self):
+        '''Return a read-only launch review; never create contacts or messages.'''
+        self.ensure_one()
+        limit = 10000
+        warnings = []
+        blockers = []
+        partners = self.env['res.partner']
+        source_total = 0
+        csv_rows = []
+
+        try:
+            partners, source_total, source_warnings = self._launch_review_partner_source(
+                limit=limit
+            )
+            warnings.extend(source_warnings)
+            csv_rows, csv_total = self._launch_review_csv_rows(limit=limit)
+            if self.target_type == 'csv':
+                source_total = csv_total
+        except (UserError, ValueError) as exc:
+            blockers.append({
+                'code': 'audience_configuration',
+                'message': str(exc),
+            })
+
+        counts_complete = source_total <= limit
+        if not counts_complete:
+            blockers.append({
+                'code': 'audience_review_limit',
+                'message': _(
+                    'Audience exceeds %(limit)s recipients. Split it into reviewed segments before launch.'
+                ) % {'limit': limit},
+            })
+
+        consent_excluded_ids = set()
+        if partners and self.account_id and 'whatsapp.consent.log' in self.env:
+            consent_logs = self.env['whatsapp.consent.log'].sudo().search([
+                ('account_id', '=', self.account_id.id),
+                ('partner_id', 'in', partners.ids),
+                ('status', 'in', ('opted_out', 'revoked')),
+            ])
+            consent_excluded_ids = set(consent_logs.mapped('partner_id').ids)
+
+        normalized = {}
+        invalid = 0
+        opt_in_excluded = 0
+        consent_excluded = 0
+        sample_entries = []
+        Message = self.env['whatsapp.message']
+
+        for partner in partners[:limit]:
+            if 'whatsapp_opt_in' in partner._fields and not partner.whatsapp_opt_in:
+                opt_in_excluded += 1
+                continue
+            if partner.id in consent_excluded_ids:
+                consent_excluded += 1
+                continue
+            raw_phone = getattr(partner, 'mobile', False) or partner.phone
+            try:
+                phone = Message._normalize_phone(raw_phone, account=self.account_id)
+            except Exception:
+                phone = False
+            if not phone:
+                invalid += 1
+                continue
+            if phone in normalized:
+                continue
+            normalized[phone] = partner
+
+        for row in csv_rows[:limit]:
+            try:
+                phone = Message._normalize_phone(row['phone'], account=self.account_id)
+            except Exception:
+                phone = False
+            if not phone:
+                invalid += 1
+                continue
+            normalized.setdefault(phone, False)
+
+        for phone, partner in list(normalized.items())[:5]:
+            if self.template_id:
+                preview = self.template_id.get_preview_payload(
+                    partner_id=partner.id if partner else False,
+                )
+            else:
+                preview = {
+                    'body': self._render_body_for_partner(
+                        self.message_body or '',
+                        partner,
+                    ) if partner else (self.message_body or ''),
+                    'header': {'type': 'none', 'text': '', 'media_url': False},
+                    'footer': '',
+                    'buttons': [],
+                    'carousel': [],
+                    'variables': [],
+                    'warnings': [],
+                }
+            sample_entries.append({
+                'partner_id': partner.id if partner else False,
+                'name': partner.display_name if partner else phone,
+                'phone': phone,
+                'preview': preview,
+            })
+
+        eligible = len(normalized)
+        duplicate_count = max(
+            0,
+            min(source_total, limit)
+            - invalid
+            - opt_in_excluded
+            - consent_excluded
+            - eligible,
+        )
+        if not self.account_id:
+            blockers.append({'code': 'account', 'message': _('Select a WhatsApp account.')})
+        if not eligible:
+            blockers.append({
+                'code': 'eligible_audience',
+                'message': _('No eligible recipients remain after validation and exclusions.'),
+            })
+        if not self.env['whatsapp.runtime.guard'].is_enabled():
+            blockers.append({
+                'code': 'runtime_paused',
+                'message': _('WhatsApp sending and automation are paused.'),
+            })
+        if self.template_id:
+            if self.template_id.status != 'approved':
+                blockers.append({
+                    'code': 'template_status',
+                    'message': _('The selected template is not approved by Meta.'),
+                })
+            payload = self.template_id.get_preview_payload(
+                partner_id=sample_entries[0]['partner_id'] if sample_entries else False,
+            )
+            for item in payload.get('warnings', []):
+                target = blockers if item.get('severity') == 'error' else warnings
+                target.append({
+                    'code': item.get('code') or 'template_preview',
+                    'message': item.get('message') or _('Template preview warning.'),
+                })
+        elif not (self.message_body or '').strip():
+            blockers.append({
+                'code': 'content',
+                'message': _('Select an approved template or enter campaign content.'),
+            })
+
+        policy = self.env['whatsapp.compliance.policy'].sudo().search([
+            ('account_id', '=', self.account_id.id),
+            ('active', '=', True),
+        ], limit=1) if self.account_id else False
+        quiet = False
+        if policy and self.account_id:
+            probe = Message.new({
+                'account_id': self.account_id.id,
+                'phone_number': '0000000000',
+                'direction': 'outbound',
+                'message_type': 'text',
+                'campaign_id': self.id,
+                'is_automated': True,
+            })
+            quiet = probe._current_quiet_hour(policy)
+        if quiet:
+            warnings.append({
+                'code': 'quiet_hours',
+                'message': _('Quiet hours are active: %s') % quiet.display_name,
+            })
+        if invalid:
+            warnings.append({
+                'code': 'invalid_numbers',
+                'message': _('%s recipient phone numbers are invalid.') % invalid,
+            })
+
+        return {
+            'version': 1,
+            'campaign_id': self.id,
+            'counts': {
+                'source': source_total,
+                'reviewed': min(source_total, limit),
+                'deduplicated': eligible,
+                'duplicates': duplicate_count,
+                'opt_in_excluded': opt_in_excluded,
+                'consent_excluded': consent_excluded,
+                'invalid_numbers': invalid,
+                'eligible': eligible,
+                'complete': counts_complete,
+            },
+            'samples': sample_entries,
+            'warnings': warnings,
+            'blockers': blockers,
+            'can_launch': not blockers,
+            'schedule': {
+                'type': self.schedule_type,
+                'date': fields.Datetime.to_string(self.schedule_date)
+                if self.schedule_date else False,
+                'quiet_hours_active': bool(quiet),
+            },
+        }
+
     def action_send_campaign(self):
+        self.env['whatsapp.runtime.guard'].assert_enabled()
         """Send campaign messages and turn unexpected failures into operator-safe errors."""
         self.ensure_one()
         try:
@@ -1066,6 +1329,7 @@ class WhatsAppCampaign(models.Model):
             _logger.info(f"Campaign {record.name} execution triggered. Queued for background worker chunking.")
 
     def action_process_queue(self):
+        self.env['whatsapp.runtime.guard'].assert_enabled()
         """Safe Sending Rate Limiter: Processes 50 draft messages at a time"""
         self.ensure_one()
         if self.state == 'scheduled' and self.schedule_date and self.schedule_date > fields.Datetime.now():
@@ -1159,6 +1423,8 @@ class WhatsAppCampaign(models.Model):
 
     @api.model
     def _cron_process_global_queue(self):
+        if not self.env['whatsapp.runtime.guard'].is_enabled():
+            return 0
         """
         Enterprise Background Worker: Runs every minute.
         Fetches up to 500 draft messages and sends them to respect Meta API TPS limits.
@@ -1305,6 +1571,7 @@ class WhatsAppCampaign(models.Model):
         return True
 
     def action_retry_failed_messages(self):
+        self.env['whatsapp.runtime.guard'].assert_enabled()
         for campaign in self:
             failed = campaign.message_ids.filtered(lambda msg: msg.status == 'failed')
             failed.write({

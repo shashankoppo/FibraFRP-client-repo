@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api
 import logging
+import uuid
 
 _logger = logging.getLogger(__name__)
 
@@ -13,6 +14,13 @@ class WhatsAppWebhookLog(models.Model):
     _rec_name = 'event_type'
 
     account_id = fields.Many2one('whatsapp.account', string='Account')
+    correlation_id = fields.Char(
+        'Correlation ID',
+        default=lambda self: str(uuid.uuid4()),
+        copy=False,
+        readonly=True,
+        index=True,
+    )
     event_type = fields.Char('Event Type', index=True)
     field_type = fields.Char('Field')  # e.g. "messages", "account_alerts"
     phone_number = fields.Char('Phone Number')

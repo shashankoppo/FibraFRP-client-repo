@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_whatsapp_campaign_wizard_form" model="ir.ui.view">
+        <field name="name">whatsapp.campaign.wizard.form</field>
+        <field name="model">whatsapp.campaign.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Guided WhatsApp Campaign">
+                <header>
+                    <field name="step"
+                           widget="statusbar"
+                           statusbar_visible="audience,content,personalization,schedule,review"/>
+                </header>
+                <sheet>
+                    <field name="campaign_id" invisible="1"/>
+                    <group invisible="step != 'audience'">
+                        <group string="Campaign">
+                            <field name="name"/>
+                            <field name="account_id"/>
+                            <field name="campaign_type"/>
+                            <field name="target_type"/>
+                        </group>
+                        <group string="Audience">
+                            <field name="segment_id"
+                                   invisible="target_type != 'segment'"/>
+                            <field name="domain_filter"
+                                   invisible="target_type != 'segment'"/>
+                            <field name="crm_stage_id"
+                                   invisible="target_type != 'crm_stage'"/>
+                            <field name="tag_ids"
+                                   widget="many2many_tags"
+                                   invisible="target_type != 'tags'"/>
+                            <field name="partner_ids"
+                                   widget="many2many_tags"
+                                   invisible="target_type != 'manual'"/>
+                            <field name="csv_filename" invisible="1"/>
+                            <field name="csv_file"
+                                   filename="csv_filename"
+                                   invisible="target_type != 'csv'"/>
+                        </group>
+                    </group>
+
+                    <group invisible="step != 'content'">
+                        <field name="template_id"
+                               options="{'no_create': True}"
+                               domain="[('account_id', '=', account_id), ('status', '=', 'approved')]"/>
+                        <field name="message_body"
+                               widget="text"
+                               invisible="template_id"/>
+                    </group>
+
+                    <div invisible="step != 'personalization'" class="row g-4">
+                        <div class="col-lg-5">
+                            <group>
+                                <field name="preview_partner_id"
+                                       domain="[('id', 'in', partner_ids)]"/>
+                            </group>
+                        </div>
+                        <div class="col-lg-7">
+                            <field name="preview_payload_json"
+                                   widget="whatsapp_phone_preview"
+                                   nolabel="1"
+                                   readonly="1"/>
+                        </div>
+                    </div>
+
+                    <group invisible="step != 'schedule'">
+                        <field name="schedule_type" widget="radio"/>
+                        <field name="schedule_date"
+                               invisible="schedule_type != 'scheduled'"
+                               required="schedule_type == 'scheduled'"/>
+                    </group>
+
+                    <group invisible="step != 'review'">
+                        <group>
+                            <field name="eligible_count" readonly="1"/>
+                            <field name="warning_count" readonly="1"/>
+                            <field name="blocker_count" readonly="1"/>
+                            <field name="can_launch" readonly="1"/>
+                        </group>
+                        <field name="review_text" nolabel="1" readonly="1"/>
+                        <field name="review_json" invisible="1"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_previous"
+                            type="object"
+                            string="Previous"
+                            class="btn-secondary"
+                            invisible="step == 'audience'"/>
+                    <button name="action_next"
+                            type="object"
+                            string="Next"
+                            class="btn-primary"
+                            invisible="step == 'review'"/>
+                    <button name="action_refresh_review"
+                            type="object"
+                            string="Refresh Review"
+                            class="btn-secondary"
+                            invisible="step != 'review'"/>
+                    <button name="action_test_send"
+                            type="object"
+                            string="Test Send"
+                            class="btn-secondary"
+                            invisible="step != 'review' or not template_id"/>
+                    <button name="action_launch"
+                            type="object"
+                            string="Launch Campaign"
+                            class="btn-primary"
+                            invisible="step != 'review' or not can_launch"/>
+                    <button string="Close" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_whatsapp_campaign_wizard" model="ir.actions.act_window">
+        <field name="name">Guided Campaign</field>
+        <field name="res_model">whatsapp.campaign.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="views" eval="[(False, 'form')]"/>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem id="menu_whatsapp_campaign_wizard"
+              name="Create Campaign"
+              parent="menu_whatsapp_campaigns_section"
+              action="action_whatsapp_campaign_wizard"
+              sequence="30"
+              groups="elsx_whatsapp_marketing.group_whatsapp_manager"/>
+</odoo>

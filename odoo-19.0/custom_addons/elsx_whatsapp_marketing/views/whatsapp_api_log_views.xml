@@ -6,6 +6,7 @@
         <field name="arch" type="xml">
             <list string="API Logs" decoration-danger="not success" decoration-success="success" create="false">
                 <field name="create_date" string="Time"/>
+                <field name="correlation_id" optional="hide"/>
                 <field name="account_id"/>
                 <field name="endpoint"/>
                 <field name="status_code"/>
@@ -32,6 +33,7 @@
                     <group>
                         <group>
                             <field name="create_date"/>
+                            <field name="correlation_id"/>
                             <field name="account_id"/>
                             <field name="latency"/>
                         </group>

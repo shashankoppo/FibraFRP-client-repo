@@ -11,6 +11,7 @@
         <field name="arch" type="xml">
             <list string="Webhook Events" decoration-danger="status == 'error'" decoration-muted="status == 'ignored'">
                 <field name="create_date" string="Received At" optional="show"/>
+                <field name="correlation_id" optional="hide"/>
                 <field name="event_type" string="Event"/>
                 <field name="account_id" optional="show"/>
                 <field name="phone_number" optional="show"/>
@@ -39,6 +40,7 @@
                     <group>
                         <group>
                             <field name="account_id"/>
+                            <field name="correlation_id"/>
                             <field name="phone_number"/>
                             <field name="message_id" string="WAMID"/>
                             <field name="create_date" string="Received At"/>
@@ -64,6 +66,7 @@
                 <field name="event_type" string="Event Type"/>
                 <field name="phone_number"/>
                 <field name="message_id" string="WAMID"/>
+                <field name="correlation_id"/>
                 <filter string="Errors" name="errors" domain="[('status','=','error')]"/>
                 <separator/>
                 <group>
