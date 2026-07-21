@@ -13,8 +13,15 @@ unless a restore is explicitly intended and a verified backup exists.
    - `odoo-db-backups` for optional backup dumps.
 2. Validate host and compose syntax without changing services:
    `sh deploy/verify_docker_host.sh`
-3. Build and start core services only after a backup window is approved:
+3. Build and start core services during an approved maintenance window:
    `docker compose up -d --build`
+
+   The recreated Odoo container now checks every Odoo database before starting.
+   Databases with WhatsApp Marketing installed receive one verified encrypted
+   backup and one idempotent module upgrade per source release. Databases already
+   at that release and databases without WhatsApp are read-only skips. Odoo does
+   not start if backup, migration, module-state, or protected-row verification
+   fails.
 
    For the hardened production compose file, use:
    `docker compose -f docker-compose.prod.yml up -d --build`
@@ -24,7 +31,7 @@ unless a restore is explicitly intended and a verified backup exists.
    `docker compose -f docker-compose.alpine-lxc.yml up -d --build`
 4. Enable the WhatsApp sidecar only when its secrets are configured and approved:
    `docker compose -f docker-compose.prod.yml --profile whatsapp up -d --build sidecar`
-5. Upgrade a client database only through the encrypted-backup path:
+5. For exceptional manual maintenance, the named-database path remains available:
    `BACKUP_PASSPHRASE=... bash deploy/safe_production_update.sh <database_name>`
 
 ## Ubuntu And Alpine Hosts
@@ -80,18 +87,21 @@ uninstall, or volume-delete commands.
 Use this production-safe sequence after pulling code:
 
 ```bash
-git pull origin main
+git pull --ff-only origin main
 sh deploy/verify_docker_host.sh
-read -s -p "Backup passphrase: " BACKUP_PASSPHRASE && echo
-export BACKUP_PASSPHRASE
-bash deploy/safe_production_update.sh YOUR_CLIENT_DB
+docker compose up -d --build
 ```
 
-The safe update script refuses to guess a database, requires an encrypted backup,
-keeps Docker volumes intact, does not uninstall modules, and leaves SaaS runtime
-metadata disabled after the update. Do not use `docker compose down -v`,
-`docker volume rm`, `dropdb`, or restore scripts unless a destructive restore is
-explicitly approved.
+The prestart upgrade gate discovers only existing Odoo databases, skips databases
+without WhatsApp Marketing, encrypts and verifies a release-specific backup in
+the existing `odoo-db-backups` volume, persists the original protected-row
+identity manifest beside that backup, and writes a per-database release marker
+only after success. Repeating the normal Compose command is therefore a no-op for
+database migration until relevant source files change. Failed retries continue
+to compare against the original pre-upgrade identities. The manual named-database
+script remains available for controlled maintenance. Do not use
+`docker compose down -v`, `docker volume rm`, `dropdb`, or restore scripts unless
+a destructive restore is explicitly approved.
 ## Client Data Safety
 
 - Never delete Docker volumes during updates.

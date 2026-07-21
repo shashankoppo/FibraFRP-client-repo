@@ -33,10 +33,14 @@ services:
       - DB_PORT=5432
       - DB_USER=${POSTGRES_USER:-odoo}
       - DB_PASSWORD=${POSTGRES_PASSWORD:-odoo}
+      - ELSX_AUTO_UPGRADE=${ELSX_AUTO_UPGRADE:-YES}
+      - ELSX_AUTO_UPGRADE_RELEASE=${ELSX_AUTO_UPGRADE_RELEASE:-}
+      - ELSX_AUTO_UPGRADE_BACKUP_PASSPHRASE=${BACKUP_PASSPHRASE:-}
     volumes:
       - .:/opt/odoo
       - ./odoo.docker.conf:/etc/odoo/odoo.conf
       - odoo-web-data:/root/.local/share/Odoo
+      - odoo-db-backups:/backups
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
