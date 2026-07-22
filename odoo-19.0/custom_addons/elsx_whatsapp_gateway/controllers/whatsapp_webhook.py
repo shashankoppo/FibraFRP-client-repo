@@ -6,6 +6,7 @@ import json
 import hashlib
 import hmac
 import logging
+import os
 import time
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
@@ -13,6 +14,8 @@ from concurrent.futures import ThreadPoolExecutor
 _logger = logging.getLogger(__name__)
 
 WEBHOOK_EXECUTOR = ThreadPoolExecutor(max_workers=4, thread_name_prefix='wa-webhook')
+WHATSAPP_SHELL_MODULE = 'elsx_whatsapp_marketing'
+ACTIVE_MODULE_STATES = frozenset(('installed', 'to upgrade'))
 
 
 def _mask_secret(value):
@@ -22,6 +25,29 @@ def _mask_secret(value):
     if len(value) <= 8:
         return '***'
     return f"{value[:3]}...{value[-3:]}"
+
+
+def _whatsapp_runtime_state(env):
+    """Return shell and runtime state without creating or changing records."""
+    module = env['ir.module.module']._get(WHATSAPP_SHELL_MODULE)
+    application_installed = bool(
+        module and module.state in ACTIVE_MODULE_STATES
+    )
+    runtime_configured = env['ir.config_parameter'].sudo().get_param(
+        'whatsapp.runtime.enabled',
+        default='True',
+    ) == 'True'
+    return {
+        'application_installed': application_installed,
+        'runtime_enabled': application_installed and runtime_configured,
+        'reason': (
+            None
+            if application_installed and runtime_configured
+            else 'runtime_paused'
+            if application_installed
+            else 'application_uninstalled'
+        ),
+    }
 
 
 class WebhookSerializationRetry(Exception):
@@ -64,8 +90,10 @@ def _get_env(db_name=None, payload=None):
         except Exception:
             return False
 
-    def account_score(account):
+    def account_score(env, account):
+        runtime = _whatsapp_runtime_state(env)
         return (
+            100 if runtime['runtime_enabled'] else 0,
             10 if account.is_primary_webhook_db else 0,
             5 if account.webhook_status == 'verified' else 0,
             3 if account.status == 'connected' else 0,
@@ -94,7 +122,7 @@ def _get_env(db_name=None, payload=None):
                     ('active', '=', True),
                 ], limit=1)
                 if account:
-                    matches.append((account_score(account), db))
+                    matches.append((account_score(env, account), db))
             except Exception:
                 pass
             finally:
@@ -123,7 +151,7 @@ def _get_env(db_name=None, payload=None):
                 ('active', '=', True),
             ], limit=1)
             if primary_acc:
-                primary_matches.append((account_score(primary_acc), db))
+                primary_matches.append((account_score(env, primary_acc), db))
         except Exception:
             pass
         finally:
@@ -207,15 +235,30 @@ class WhatsAppWebhook(http.Controller):
                 'runtime': 'unavailable',
             }, status=503)
         try:
-            enabled = env['ir.config_parameter'].sudo().get_param(
-                'whatsapp.runtime.enabled',
-                default='True',
-            ) == 'True'
+            runtime = _whatsapp_runtime_state(env)
+            application = (
+                'installed'
+                if runtime['application_installed']
+                else 'uninstalled'
+            )
             return request.make_json_response({
-                'status': 'ok' if enabled else 'paused',
+                'status': (
+                    'ok'
+                    if runtime['runtime_enabled']
+                    else 'paused'
+                    if runtime['application_installed']
+                    else 'inactive'
+                ),
                 'gateway': 'available',
                 'core': 'available',
-                'runtime': 'enabled' if enabled else 'paused',
+                'application': application,
+                'runtime': (
+                    'enabled'
+                    if runtime['runtime_enabled']
+                    else 'paused'
+                    if runtime['application_installed']
+                    else 'disabled'
+                ),
                 'database': db_name,
             })
         finally:
@@ -276,6 +319,13 @@ class WhatsAppWebhook(http.Controller):
                 )
                 return request.make_response('Database Not Found', status=503)
             try:
+                runtime = _whatsapp_runtime_state(env)
+                if not runtime['runtime_enabled']:
+                    _logger.info(
+                        '[WH-VERIFY] Ignored while WhatsApp is inactive: %s',
+                        runtime['reason'],
+                    )
+                    return request.make_response('WhatsApp Inactive', status=404)
                 domain = [('webhook_verify_token', '=', token), ('active', '=', True)]
                 if account_id:
                     domain.append(('id', '=', account_id))
@@ -347,6 +397,14 @@ class WhatsAppWebhook(http.Controller):
 
             try:
                 with cr:
+                    runtime = _whatsapp_runtime_state(env)
+                    if not runtime['runtime_enabled']:
+                        _logger.info(
+                            '[WH-POST] Acknowledged without persistence: %s db=%s',
+                            runtime['reason'],
+                            db_name,
+                        )
+                        return request.make_response('EVENT_IGNORED', status=200)
                     account = _find_account(env, account_id, payload)
 
                     ok, message, status = self._verify_meta_signature(
@@ -376,6 +434,15 @@ class WhatsAppWebhook(http.Controller):
                         with registry.cursor() as thread_cr:
                             thread_env = api.Environment(thread_cr, odoo.SUPERUSER_ID, {})
                             thread_log = thread_env['whatsapp.webhook.log'].browse(log_id)
+                            runtime = _whatsapp_runtime_state(thread_env)
+                            if not runtime['runtime_enabled']:
+                                thread_log.sudo().write({'status': 'ignored'})
+                                thread_cr.commit()
+                                _logger.info(
+                                    '[WH-DISPATCH-THREAD] Stopped before dispatch: %s',
+                                    runtime['reason'],
+                                )
+                                return
                             thread_env = thread_env(context=dict(
                                 thread_env.context,
                                 whatsapp_correlation_id=thread_log.correlation_id,
@@ -421,6 +488,14 @@ class WhatsAppWebhook(http.Controller):
     # =========================================================
     def _dispatch_change(self, env, account, field, value, raw_data):
         """Route each webhook change to the right processor"""
+        runtime = _whatsapp_runtime_state(env)
+        if not runtime['runtime_enabled']:
+            _logger.info(
+                '[WH-DISPATCH] Ignored field=%s while inactive: %s',
+                field,
+                runtime['reason'],
+            )
+            return
         _logger.info(f'[WH-DISPATCH] field={field} account={account.id if account else None}')
 
         # Log every event for audit
@@ -1324,6 +1399,8 @@ class WhatsAppWebhook(http.Controller):
     @http.route('/whatsapp/media/<string:media_id>', type='http', auth='user')
     def whatsapp_media_proxy(self, media_id, **kwargs):
         """Fetch media from Meta and serve it to the browser"""
+        if not _whatsapp_runtime_state(request.env)['runtime_enabled']:
+            return request.not_found()
         try:
             env, cr, _ = _get_env()
             with cr:
@@ -1387,10 +1464,27 @@ class WhatsAppWebhook(http.Controller):
             )
 
         try:
-            expected_secret = env['ir.config_parameter'].sudo().get_param('whatsapp.sidecar.secret')
-            if not expected_secret or secret != expected_secret:
+            expected_secret = (
+                os.environ.get('SIDECAR_SECRET')
+                or env['ir.config_parameter'].sudo().get_param('whatsapp.sidecar.secret')
+            )
+            if (
+                not expected_secret
+                or not secret
+                or not hmac.compare_digest(str(secret), str(expected_secret))
+            ):
                 _logger.warning('[SIDECAR-IN] Unauthorized access attempt with secret %s', _mask_secret(secret))
                 return request.make_json_response({'status': 'error', 'message': 'Unauthorized'}, status=403)
+            runtime = _whatsapp_runtime_state(env)
+            if not runtime['runtime_enabled']:
+                _logger.info(
+                    '[SIDECAR-IN] Acknowledged without persistence: %s',
+                    runtime['reason'],
+                )
+                return request.make_json_response({
+                    'status': 'ignored',
+                    'reason': runtime['reason'],
+                })
         finally:
             cr.close()
 
@@ -1415,6 +1509,12 @@ class WhatsAppWebhook(http.Controller):
             # We'll use the same processing logic as _handle_post
             # but we need to pass the payload object
             try:
+                runtime = _whatsapp_runtime_state(env)
+                if not runtime['runtime_enabled']:
+                    return {
+                        'status': 'ignored',
+                        'reason': runtime['reason'],
+                    }
                 # Find account
                 account = _find_account(env, None, payload)
                 if not account:

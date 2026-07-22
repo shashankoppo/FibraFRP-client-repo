@@ -38,6 +38,20 @@ const RECENT_EVENTS_KEY = process.env.REDIS_RECENT_EVENTS_KEY || 'elsx:whatsapp:
 const MAX_ATTEMPTS = parseInt(process.env.MAX_FORWARD_ATTEMPTS || '12', 10);
 const QUEUE_INTERVAL_MS = parseInt(process.env.QUEUE_INTERVAL_MS || '2000', 10);
 
+function missingRequiredSecrets() {
+    return [
+        ['SIDECAR_SECRET', SIDECAR_SECRET],
+        ['WHATSAPP_VERIFY_TOKEN', VERIFY_TOKEN],
+        ['META_APP_SECRET', META_APP_SECRET],
+    ]
+        .filter(([, value]) => !String(value || '').trim())
+        .map(([name]) => name);
+}
+
+function configurationReady() {
+    return missingRequiredSecrets().length === 0;
+}
+
 let redis = null;
 let redisReady = false;
 const memoryQueue = [];
@@ -183,8 +197,7 @@ async function forwardToOdoo(item) {
 
 function verifyMetaSignature(req) {
     if (!META_APP_SECRET) {
-        console.warn('[SIDECAR] META_APP_SECRET not configured; Meta HMAC verification skipped');
-        return true;
+        return false;
     }
 
     const signature = req.headers['x-hub-signature-256'] || '';
@@ -203,6 +216,8 @@ function verifyMetaSignature(req) {
 }
 
 async function processQueue() {
+    if (!configurationReady()) return;
+
     const item = await dequeueWebhook();
     if (!item) return;
 
@@ -257,12 +272,14 @@ async function getQueueStats() {
 }
 
 app.get('/health', async (req, res) => {
-    res.status(200).json({
-        status: 'healthy',
-        version: '1.2.0',
+    const missing = missingRequiredSecrets();
+    res.status(missing.length ? 503 : 200).json({
+        status: missing.length ? 'misconfigured' : 'healthy',
+        version: '1.3.0',
         odoo_url: ODOO_URL,
         redis: redisReady ? 'connected' : 'fallback',
         queue: await getQueueStats(),
+        missing_secrets: missing,
     });
 });
 
@@ -280,6 +297,9 @@ app.get('/events/recent', async (req, res) => {
 });
 
 app.get('/webhook', (req, res) => {
+    if (!configurationReady()) {
+        return res.status(503).send('Sidecar configuration incomplete');
+    }
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
@@ -293,6 +313,9 @@ app.get('/webhook', (req, res) => {
 });
 
 app.post('/webhook', async (req, res) => {
+    if (!configurationReady()) {
+        return res.status(503).send('Sidecar configuration incomplete');
+    }
     const body = req.body;
     console.log('[SIDECAR] Incoming webhook from Meta');
 
@@ -311,6 +334,9 @@ app.post('/webhook', async (req, res) => {
 });
 
 app.post('/relay/new-message', async (req, res) => {
+    if (!configurationReady()) {
+        return res.status(503).json({ error: 'Sidecar configuration incomplete' });
+    }
     const authHeader = req.headers['x-sidecar-key'];
     if (authHeader !== SIDECAR_SECRET) {
         return res.status(403).json({ error: 'Unauthorized' });
@@ -343,6 +369,10 @@ io.on('connection', (socket) => {
 });
 
 initRedis().finally(() => {
+    const missing = missingRequiredSecrets();
+    if (missing.length) {
+        console.error('[SIDECAR] Missing required secrets: ' + missing.join(', '));
+    }
     setInterval(processQueue, QUEUE_INTERVAL_MS);
     server.listen(PORT, '0.0.0.0', () => {
         console.log(`[SIDECAR] Industrial Sidecar running on port ${PORT}`);

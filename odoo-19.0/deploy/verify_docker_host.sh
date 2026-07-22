@@ -11,7 +11,7 @@ PROJECT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 cd "$PROJECT_DIR"
 
 VERIFY_RUNNING=${VERIFY_RUNNING:-1}
-REQUIRE_SIDECAR=${REQUIRE_SIDECAR:-0}
+REQUIRE_SIDECAR=${REQUIRE_SIDECAR:-1}
 COMPOSE_FILE=${COMPOSE_FILE:-docker-compose.prod.yml}
 
 fail() {
@@ -110,7 +110,7 @@ if [ "$VERIFY_RUNNING" = "1" ]; then
   if http_ok "http://127.0.0.1:${SIDECAR_HTTP_PORT:-3000}/health"; then
     echo "WhatsApp sidecar health OK"
   elif [ "$REQUIRE_SIDECAR" = "1" ]; then
-    fail "WhatsApp sidecar is required but not reachable."
+    fail "WhatsApp sidecar is required but unhealthy. Check SIDECAR_SECRET, WHATSAPP_VERIFY_TOKEN, and META_APP_SECRET."
   else
     warn "WhatsApp sidecar is not reachable. Set REQUIRE_SIDECAR=1 to make this fatal."
   fi

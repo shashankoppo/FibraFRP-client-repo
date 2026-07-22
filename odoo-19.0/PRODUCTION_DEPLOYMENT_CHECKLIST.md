@@ -13,13 +13,14 @@ unless a restore is explicitly intended and a verified backup exists.
    - `odoo-db-backups` for optional backup dumps.
 2. Validate host and compose syntax without changing services:
    `sh deploy/verify_docker_host.sh`
-3. Build and start core services during an approved maintenance window:
-   `docker compose up -d --build`
+3. On a new server, build and start PostgreSQL, Odoo, and WhatsApp sidecar:
+   `docker compose up -d --build && docker compose ps`
 
    The recreated Odoo container now checks every Odoo database before starting.
-   Databases with WhatsApp Marketing installed receive one verified encrypted
-   backup and one idempotent module upgrade per source release. Databases already
-   at that release and databases without WhatsApp are read-only skips. Odoo does
+   Databases with WhatsApp Core or Marketing installed receive one verified
+   encrypted backup and one idempotent module upgrade per source release.
+   Databases already at that release and databases without WhatsApp infrastructure
+   are read-only skips. Odoo does
    not start if backup, migration, module-state, or protected-row verification
    fails.
 
@@ -29,8 +30,8 @@ unless a restore is explicitly intended and a verified backup exists.
    For Alpine Proxmox LXC hosts that fail on
    `net.ipv4.ip_unprivileged_port_start`, use:
    `docker compose -f docker-compose.alpine-lxc.yml up -d --build`
-4. Enable the WhatsApp sidecar only when its secrets are configured and approved:
-   `docker compose -f docker-compose.prod.yml --profile whatsapp up -d --build sidecar`
+4. Set `SIDECAR_SECRET`, `WHATSAPP_VERIFY_TOKEN`, and `META_APP_SECRET` in `.env`.
+   The sidecar starts automatically and reports unhealthy if any are missing.
 5. For exceptional manual maintenance, the named-database path remains available:
    `BACKUP_PASSPHRASE=... bash deploy/safe_production_update.sh <database_name>`
 
@@ -71,7 +72,8 @@ unless a restore is explicitly intended and a verified backup exists.
 Use `docker-compose.prod.yml` for production rollouts. It avoids bind-mounting
 the entire repository into the Odoo container, builds the WhatsApp sidecar as an
 image instead of installing dependencies into the working tree at startup, keeps
-optional sidecars behind profiles, and reads production secrets from `.env`.
+optional face and backup services behind profiles, and reads production secrets
+from `.env`. WhatsApp sidecar is part of the default service set.
 
 The existing `docker-compose.yml` is still suitable for current/local operation
 and has not been changed in a way that restarts or migrates live data.
@@ -84,16 +86,14 @@ named volumes, PostgreSQL databases, Odoo filestore files, or client records.
 Client data is touched only when an operator runs database update, restore,
 uninstall, or volume-delete commands.
 
-Use this production-safe sequence after pulling code:
+Use this production-safe command for every normal update:
 
 ```bash
-git pull --ff-only origin main
-sh deploy/verify_docker_host.sh
-docker compose up -d --build
+git pull --ff-only origin main && docker compose stop sidecar && docker compose up -d --build && docker compose ps
 ```
 
 The prestart upgrade gate discovers only existing Odoo databases, skips databases
-without WhatsApp Marketing, encrypts and verifies a release-specific backup in
+without WhatsApp infrastructure, encrypts and verifies a release-specific backup in
 the existing `odoo-db-backups` volume, persists the original protected-row
 identity manifest beside that backup, and writes a per-database release marker
 only after success. Repeating the normal Compose command is therefore a no-op for

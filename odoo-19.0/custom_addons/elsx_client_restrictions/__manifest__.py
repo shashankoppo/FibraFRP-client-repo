@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'ELSX System Access Helpers',
-    'version': '2.4.1',
+    'version': '2.5.0',
     'category': 'Administration',
     'summary': 'Admin Apps access helper with controlled shortcut',
     'description': '''
@@ -17,6 +17,7 @@
         - Secret Apps URL remains available as an admin-only shortcut
         - No broad ir.module.module read interception
         - elsx_saas is no longer protected from safe uninstall
+        - WhatsApp shell uninstall preserves protected Core records
         - No automatic module upgrade side effects
         - Standard Odoo group permissions remain in charge
     ''',

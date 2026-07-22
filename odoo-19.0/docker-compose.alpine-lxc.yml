@@ -3,15 +3,16 @@ services:
     image: postgres:15
     restart: unless-stopped
     network_mode: host
-    command: ["postgres", "-c", "listen_addresses=127.0.0.1"]
+    command: ["postgres", "-c", "listen_addresses=127.0.0.1", "-p", "${POSTGRES_PORT:-5432}"]
     environment:
       - POSTGRES_DB=postgres
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-odoo}
       - POSTGRES_USER=${POSTGRES_USER:-odoo}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
     volumes:
       - odoo-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER:-odoo} -d $${POSTGRES_DB:-postgres}"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p $${POSTGRES_PORT:-5432} -U $${POSTGRES_USER:-odoo} -d $${POSTGRES_DB:-postgres}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -30,12 +31,18 @@ services:
     network_mode: host
     environment:
       - DB_HOST=127.0.0.1
-      - DB_PORT=5432
+      - DB_PORT=${POSTGRES_PORT:-5432}
       - DB_USER=${POSTGRES_USER:-odoo}
       - DB_PASSWORD=${POSTGRES_PASSWORD:-odoo}
+      - ODOO_HTTP_PORT=${ODOO_HTTP_PORT:-8069}
+      - ODOO_LIMIT_MEMORY_HARD=${ODOO_LIMIT_MEMORY_HARD:-0}
+      - ODOO_LIMIT_MEMORY_SOFT=${ODOO_LIMIT_MEMORY_SOFT:-0}
+      - ODOO_DB_MAXCONN=${ODOO_DB_MAXCONN:-64}
+      - ODOO_MAX_CRON_THREADS=${ODOO_MAX_CRON_THREADS:-1}
       - ELSX_AUTO_UPGRADE=${ELSX_AUTO_UPGRADE:-YES}
       - ELSX_AUTO_UPGRADE_RELEASE=${ELSX_AUTO_UPGRADE_RELEASE:-}
       - ELSX_AUTO_UPGRADE_BACKUP_PASSPHRASE=${BACKUP_PASSPHRASE:-}
+      - SIDECAR_SECRET=${SIDECAR_SECRET:-}
     volumes:
       - .:/opt/odoo
       - ./odoo.docker.conf:/etc/odoo/odoo.conf
@@ -47,7 +54,7 @@ services:
       db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8069/web/health >/dev/null || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:$${ODOO_HTTP_PORT:-8069}/web/health >/dev/null || exit 1"]
       interval: 20s
       timeout: 10s
       retries: 15
@@ -69,8 +76,8 @@ services:
       - ./services/whatsapp_sidecar:/app
     command: sh -c "if [ -s package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi && npm start"
     environment:
-      - ODOO_URL=http://127.0.0.1:8069
-      - PORT=3000
+      - ODOO_URL=http://127.0.0.1:${ODOO_HTTP_PORT:-8069}
+      - PORT=${SIDECAR_HTTP_PORT:-3000}
       - SIDECAR_SECRET=${SIDECAR_SECRET:-}
       - VERIFY_TOKEN=${WHATSAPP_VERIFY_TOKEN:-}
       - META_APP_SECRET=${META_APP_SECRET:-}
@@ -78,7 +85,7 @@ services:
       odoo:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/health || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:$${PORT:-3000}/health || exit 1"]
       interval: 20s
       timeout: 10s
       retries: 10
@@ -99,9 +106,9 @@ services:
       - face
     network_mode: host
     environment:
-      - PORT=8071
+      - PORT=${FACE_SIDECAR_HTTP_PORT:-8071}
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8071/health', timeout=5)\""]
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:$${PORT:-8071}/health', timeout=5)\""]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -122,6 +129,7 @@ services:
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-odoo}
       - PGPASSWORD=${POSTGRES_PASSWORD:-odoo}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
     volumes:
       - odoo-db-backups:/backups
     depends_on:
@@ -141,12 +149,12 @@ services:
           sleep $$sleep_secs
 
           echo "[backup] Starting backup at $$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          for db in $$(psql -h 127.0.0.1 -U $${POSTGRES_USER:-odoo} -d postgres -Atc \
+          for db in $$(psql -h 127.0.0.1 -p $${POSTGRES_PORT:-5432} -U $${POSTGRES_USER:-odoo} -d postgres -Atc \
             "SELECT datname FROM pg_database WHERE datistemplate = false AND datallowconn = true AND datname NOT IN ('postgres') ORDER BY datname;"); do
             STAMP=$$(date -u +%Y%m%d_%H%M%S)
             DUMP_FILE="/backups/$${db}_$${STAMP}.pg_dump"
             echo "[backup] Dumping $${db} -> $${DUMP_FILE}"
-            pg_dump -h 127.0.0.1 -U $${POSTGRES_USER:-odoo} -d "$${db}" --format=custom -f "$${DUMP_FILE}" && \
+            pg_dump -h 127.0.0.1 -p $${POSTGRES_PORT:-5432} -U $${POSTGRES_USER:-odoo} -d "$${db}" --format=custom -f "$${DUMP_FILE}" && \
               echo "[backup] $${db} OK" || \
               echo "[backup] $${db} FAILED"
           done

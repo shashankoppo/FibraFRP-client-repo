@@ -141,10 +141,16 @@ upgrade_database() {
   local safe_release="$3"
   local safe_database backup_result backup_file backup_sha verified_at
   local before_snapshot after_snapshot installed_count protected_table_list
+  local shell_was_installed shell_is_installed
   local expected_backup_file snapshot_temp
   local -a protected_tables
 
   safe_database="$(printf '%s' "${database}" | tr -c 'A-Za-z0-9_.-' '_')"
+  shell_was_installed="$(
+    psql_db "${database}" -Atc "SELECT count(*) FROM ir_module_module
+      WHERE name = 'elsx_whatsapp_marketing'
+        AND state IN ('installed', 'to upgrade', 'to install');"
+  )"
   protected_table_list="$(
     psql_db "${database}" -Atc \
       "SELECT DISTINCT tables.tablename
@@ -214,11 +220,21 @@ upgrade_database() {
       "SELECT count(*) FROM ir_module_module
         WHERE name IN (
           'elsx_client_restrictions', 'elsx_ai_core', 'elsx_whatsapp_core',
-          'elsx_whatsapp_gateway', 'elsx_whatsapp_marketing'
+          'elsx_whatsapp_gateway'
         ) AND state = 'installed';"
   )"
-  if [ "${installed_count}" != '5' ]; then
-    log "Required WhatsApp bridge modules are not all installed in ${database}; Odoo will not start."
+  if [ "${installed_count}" != '4' ]; then
+    log "Required persistent WhatsApp bridge modules are not all installed in ${database}; Odoo will not start."
+    return 1
+  fi
+
+  shell_is_installed="$(
+    psql_db "${database}" -Atc "SELECT count(*) FROM ir_module_module
+      WHERE name = 'elsx_whatsapp_marketing'
+        AND state = 'installed';"
+  )"
+  if [ "${shell_is_installed}" != "${shell_was_installed}" ]; then
+    log "WhatsApp application lifecycle changed unexpectedly in ${database}; Odoo will not start."
     return 1
   fi
 
@@ -304,14 +320,18 @@ for database in "${databases[@]}"; do
     continue
   fi
 
-  whatsapp_installed="$(
+  whatsapp_infrastructure_installed="$(
     psql_db "${database}" -Atc \
       "SELECT count(*) FROM ir_module_module
-        WHERE name = 'elsx_whatsapp_marketing'
+        WHERE name IN (
+          'elsx_whatsapp_core',
+          'elsx_whatsapp_gateway',
+          'elsx_whatsapp_marketing'
+        )
           AND state IN ('installed', 'to upgrade', 'to install');"
   )"
-  if [ "${whatsapp_installed}" != '1' ]; then
-    log "Skipping ${database}; WhatsApp Marketing is not installed."
+  if [ "${whatsapp_infrastructure_installed}" = '0' ]; then
+    log "Skipping ${database}; WhatsApp infrastructure is not installed."
     continue
   fi
 

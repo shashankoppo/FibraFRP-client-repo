@@ -20,7 +20,6 @@ PROTECTED_MODULES = {
     'account',
     'hr',
     'hr_attendance',
-    'elsx_whatsapp_marketing',
     'elsx_whatsapp_core',
     'elsx_whatsapp_gateway',
     'elsx_attendance_tracking',
@@ -32,6 +31,7 @@ PROTECTED_MODULES = {
 
 REMOVED_RESTRICTION_MODULES = {
     'elsx_saas',
+    'elsx_whatsapp_marketing',
 }
 
 
@@ -87,40 +87,10 @@ class IrModuleModule(models.Model):
             _logger.exception('Could not compute downstream module dependencies for ELSx module guard.')
         return candidates.filtered(lambda module: module.name in self._elsx_protected_module_names())
 
-    def _elsx_whatsapp_uninstall_authorization(self, prepare=False, finalize=False):
-        model_name = 'elsx.whatsapp.uninstall.readiness'
-        if model_name not in self.env:
-            raise UserError(_(
-                'WhatsApp Core readiness services are unavailable. The protected uninstall cannot continue.'
-            ))
-        Readiness = self.env[model_name]
-        token = self.env.context.get('elsx_whatsapp_uninstall_token')
-        if token:
-            readiness = Readiness.validate_authorization_token(token)
-        elif finalize:
-            readiness = Readiness.authorized_for_finalize()
-        else:
-            raise UserError(_(
-                'WhatsApp requires a successful readiness audit and a single-use 15-minute authorization.'
-            ))
-        if prepare:
-            readiness.prepare_uninstall()
-        return readiness
-
-    def _elsx_check_protected_uninstall(self, prepare=False, finalize=False):
+    def _elsx_check_protected_uninstall(self):
         protected = self._elsx_protected_uninstall_candidates()
-        whatsapp_shell = protected.filtered(
-            lambda module: module.name == 'elsx_whatsapp_marketing'
-        )
-        readiness = False
-        if whatsapp_shell:
-            readiness = self._elsx_whatsapp_uninstall_authorization(
-                prepare=prepare,
-                finalize=finalize,
-            )
-            protected -= whatsapp_shell
         if self.env.context.get('elsx_allow_protected_module_uninstall'):
-            return readiness
+            return
         if protected:
             names = ', '.join(sorted(protected.mapped('name')))
             raise UserError(_(
@@ -128,7 +98,6 @@ class IrModuleModule(models.Model):
                 "The operation would remove protected modules: %s\n\n"
                 "Create a verified encrypted backup and use a technical recovery plan before removing protected modules."
             ) % names)
-        return readiness
 
     def _elsx_rescue_brand_promotion_view(self):
         """Repair the old branding override before installing modules.
@@ -267,21 +236,18 @@ class IrModuleModule(models.Model):
 
     def button_uninstall(self):
         self._elsx_check_apps_password_unlocked()
-        self._elsx_check_protected_uninstall(prepare=True)
+        self._elsx_check_protected_uninstall()
         return super(IrModuleModule, self).button_uninstall()
 
     def button_immediate_uninstall(self):
         self._elsx_check_apps_password_unlocked()
-        self._elsx_check_protected_uninstall(prepare=True)
+        self._elsx_check_protected_uninstall()
         return super(IrModuleModule, self).button_immediate_uninstall()
 
     def module_uninstall(self):
         self._elsx_check_apps_password_unlocked()
-        readiness = self._elsx_check_protected_uninstall(finalize=True)
-        result = super(IrModuleModule, self).module_uninstall()
-        if readiness:
-            readiness.consume()
-        return result
+        self._elsx_check_protected_uninstall()
+        return super(IrModuleModule, self).module_uninstall()
 
     def update_list(self):
         """

@@ -57,5 +57,6 @@
               parent="menu_whatsapp_technical"
               action="action_whatsapp_uninstall_readiness"
               sequence="90"
-              groups="base.group_system"/>
+              groups="base.group_system"
+              active="False"/>
 </odoo>

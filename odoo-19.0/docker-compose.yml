@@ -28,15 +28,21 @@ services:
     restart: unless-stopped
     init: true
     ports:
-      - "8069:8069"
+      - "${ODOO_HTTP_PORT:-8069}:${ODOO_HTTP_PORT:-8069}"
     environment:
       - DB_HOST=db
       - DB_PORT=5432
       - DB_USER=${POSTGRES_USER:-odoo}
       - DB_PASSWORD=${POSTGRES_PASSWORD:-odoo}
+      - ODOO_HTTP_PORT=${ODOO_HTTP_PORT:-8069}
+      - ODOO_LIMIT_MEMORY_HARD=${ODOO_LIMIT_MEMORY_HARD:-0}
+      - ODOO_LIMIT_MEMORY_SOFT=${ODOO_LIMIT_MEMORY_SOFT:-0}
+      - ODOO_DB_MAXCONN=${ODOO_DB_MAXCONN:-64}
+      - ODOO_MAX_CRON_THREADS=${ODOO_MAX_CRON_THREADS:-1}
       - ELSX_AUTO_UPGRADE=${ELSX_AUTO_UPGRADE:-YES}
       - ELSX_AUTO_UPGRADE_RELEASE=${ELSX_AUTO_UPGRADE_RELEASE:-}
       - ELSX_AUTO_UPGRADE_BACKUP_PASSPHRASE=${BACKUP_PASSPHRASE:-}
+      - SIDECAR_SECRET=${SIDECAR_SECRET:-}
     volumes:
       - .:/opt/odoo
       - ./odoo.docker.conf:/etc/odoo/odoo.conf
@@ -48,7 +54,7 @@ services:
       db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8069/web/health >/dev/null || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:$${ODOO_HTTP_PORT:-8069}/web/health >/dev/null || exit 1"]
       interval: 20s
       timeout: 10s
       retries: 15
@@ -71,7 +77,7 @@ services:
       - ./services/whatsapp_sidecar:/app
     command: sh -c "if [ -s package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi && npm start"
     environment:
-      - ODOO_URL=http://odoo:8069
+      - ODOO_URL=http://odoo:${ODOO_HTTP_PORT:-8069}
       - PORT=3000
       - SIDECAR_SECRET=${SIDECAR_SECRET:-}
       - VERIFY_TOKEN=${WHATSAPP_VERIFY_TOKEN:-}

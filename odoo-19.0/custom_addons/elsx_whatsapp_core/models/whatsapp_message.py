@@ -40,6 +40,8 @@ def notify_sidecar_background(env, message_id, event_type='new_message'):
             registry = odoo.modules.registry.Registry(db_name)
             with registry.cursor() as cr:
                 new_env = api.Environment(cr, odoo.SUPERUSER_ID, {})
+                if not new_env['whatsapp.runtime.guard'].is_enabled():
+                    return
 
                 params = new_env['ir.config_parameter'].sudo()
                 if params.get_param('whatsapp.realtime.mode', default='bus') != 'socket':

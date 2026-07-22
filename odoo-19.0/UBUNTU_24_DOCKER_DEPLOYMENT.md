@@ -35,8 +35,9 @@ cp deploy/ubuntu24.env.example .env
 nano .env
 ```
 
-The defaults still work without `.env`, but production should set strong
-database and sidecar secrets.
+Production requires `.env` values for `SIDECAR_SECRET`,
+`WHATSAPP_VERIFY_TOKEN`, and `META_APP_SECRET`. The sidecar starts but remains
+unhealthy and rejects operational routes if any are missing.
 
 ## 3. Build and Start
 
@@ -341,27 +342,25 @@ After pulling code, every database that uses WhatsApp Marketing must receive a
 module upgrade. Updating only one database leaves other databases with old stored
 views and can keep errors such as missing campaign fields alive.
 
-For one production database, use the backup-first updater and pass the database
-name explicitly:
+For every normal update, use:
 
 ```bash
-git pull origin main
+git pull --ff-only origin main && docker compose stop sidecar && docker compose up -d --build && docker compose ps
+```
+
+The Odoo startup gate discovers eligible databases, creates and verifies an
+encrypted backup, upgrades persistent Core/Gateway modules, preserves whether
+the visible WhatsApp app is installed, and verifies protected row identities
+before Odoo starts. The named-database updater remains available for exceptional
+manual maintenance:
+
+```bash
 read -s -p "Backup passphrase: " BACKUP_PASSPHRASE && echo
 export BACKUP_PASSPHRASE
 bash deploy/safe_production_update.sh FiberaFRP_DB
 ```
 
-For all application databases on the server, use the all-DB updater. It requires
-an explicit confirmation flag so it cannot run tenant-wide by accident:
-
-```bash
-git pull origin main
-read -s -p "Backup passphrase: " BACKUP_PASSPHRASE && echo
-export BACKUP_PASSPHRASE
-CONFIRM_ALL_DBS=YES bash deploy/safe_update_all_dbs.sh
-```
-
-Both safe scripts:
+Both the normal and manual update paths:
 
 - Starts PostgreSQL.
 - Creates encrypted backups before module changes.

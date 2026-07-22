@@ -1,6 +1,6 @@
 {
   "name": "elsx-whatsapp-sidecar",
-  "version": "1.0.0",
+  "version": "1.3.0",
   "description": "Industrial-grade WebSocket sidecar for Odoo WhatsApp Marketing",
   "main": "server.js",
   "scripts": {
