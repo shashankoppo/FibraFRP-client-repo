@@ -2,7 +2,7 @@
 {
     'name': 'ELSX WhatsApp Core',
     'summary': 'Persistent WhatsApp records and runtime services independent of the removable UI shell',
-    'version': '19.0.1.1.0',
+    'version': '19.0.1.1.1',
     'category': 'Hidden',
     'author': 'ELSX Global',
     'license': 'LGPL-3',

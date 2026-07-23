@@ -7,7 +7,6 @@ from . import sale_order
 from . import ui_preferences
 from . import uninstall_readiness
 from . import whatsapp_account
-from . import whatsapp_analytics
 from . import whatsapp_api_log
 from . import whatsapp_bot
 from . import whatsapp_bot_flow
@@ -29,3 +28,7 @@ from . import whatsapp_sample_template
 from . import whatsapp_scheduling
 from . import whatsapp_template
 from . import whatsapp_webhook_log
+
+# Odoo 19 calls _auto_init() and init() in registration order. SQL reporting
+# views must therefore be registered after the concrete tables they query.
+from . import whatsapp_analytics

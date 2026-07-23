@@ -110,6 +110,10 @@ class TestWhatsAppCoreContracts(TransactionCase):
         self.env.user.whatsapp_workspace_role = 'marketer'
         self.assertEqual(self.env.user.get_whatsapp_workspace_role(), 'marketer')
 
+    def test_reporting_views_are_queryable(self):
+        self.env.cr.execute("SELECT id FROM whatsapp_analytics LIMIT 1")
+        self.env.cr.execute("SELECT id FROM whatsapp_team_performance LIMIT 1")
+
     def test_uninstall_authorization_expires(self):
         token = 'single-use-test-token'
         readiness = self.env['elsx.whatsapp.uninstall.readiness'].sudo().create({
