@@ -1,22 +1,12 @@
-# ELSX System Access Helpers
+# ELSX Apps Password Gate
 
-This addon preserves a known Apps URL path for trusted administrators while
-leaving normal Odoo Settings, Apps, and group permissions in charge.
+This addon keeps Odoo Community administration native except for one control:
+system administrators must enter the configured password before opening Apps.
 
-Current behavior:
+- Settings, Users, Companies, groups, and menus use standard Odoo behavior.
+- Odoo's normal dependency rules control module install and uninstall impact.
+- CLI upgrades remain available without an HTTP password session.
+- A successful Apps unlock lasts 30 minutes; entering Apps again starts a fresh challenge.
 
-- Settings and Apps remain available to system administrators.
-- System administrators can also open Apps through `/elsx-secret/apps/<token>`.
-- Legacy bookmarks using `/action-39/<token>` continue to redirect to Apps.
-- The secret token is stored in `elsx_client_restrictions.apps_secret_token` and
-  is created automatically on install/upgrade if missing.
-- Older production metadata that hid Apps or broke Settings is repaired
-  idempotently at menu load time; this touches only Odoo technical metadata.
-- `elsx_saas` is no longer protected by this helper, so it can be removed by a
-  backup-first uninstall script when explicitly requested.
-- Module installs/upgrades stay under Odoo permissions and the backup-first
-  deployment scripts; this addon does not auto-upgrade modules during app-list
-  refresh or container startup.
-
-Use Odoo Settings and user groups for normal access control. Share the Apps URL
-only with trusted system administrators.
+The password is stored only as a SHA-256 hash in
+`elsx_client_restrictions.apps_password_hash`.

@@ -10,7 +10,7 @@ ODOO_BIN="${ODOO_BIN:-/opt/odoo/odoo-bin}"
 BACKUP_DIR="${ELSX_AUTO_UPGRADE_BACKUP_DIR:-/backups/auto-upgrade}"
 INSTALL_MODULES="${ELSX_AUTO_INSTALL_MODULES:-elsx_client_restrictions,elsx_ai_core,elsx_whatsapp_core,elsx_whatsapp_gateway}"
 UPGRADE_MODULES="${ELSX_AUTO_UPGRADE_MODULES:-elsx_client_restrictions,elsx_ai_core,elsx_whatsapp_core,elsx_whatsapp_gateway,elsx_whatsapp_marketing,elsx_ai_marketing,elsx_ai_website_builder}"
-MARKER_KEY="elsx.auto_upgrade.whatsapp.release"
+MARKER_KEY="elsx.auto_upgrade.release"
 
 log() {
   printf '[auto-upgrade] %s\n' "$*" >&2
@@ -46,10 +46,15 @@ roots = [
     base / 'custom_addons' / 'elsx_whatsapp_core',
     base / 'custom_addons' / 'elsx_whatsapp_gateway',
     base / 'custom_addons' / 'elsx_whatsapp_marketing',
+    base / 'deploy' / 'removal_capsules' / 'elsx_saas',
 ]
-extensions = {'.py', '.xml', '.csv', '.js', '.css'}
+files = [
+    base / 'deploy' / 'auto_upgrade_on_start.sh',
+    base / 'deploy' / 'remove_retired_saas_db.sh',
+]
+extensions = {'.py', '.xml', '.csv', '.js', '.css', '.sh'}
 digest = hashlib.sha256()
-for path in sorted(
+paths = {
     file
     for root in roots
     if root.exists()
@@ -57,7 +62,9 @@ for path in sorted(
     if file.is_file()
     and file.suffix in extensions
     and '__pycache__' not in file.parts
-):
+}
+paths.update(file for file in files if file.exists())
+for path in sorted(paths):
     digest.update(path.relative_to(base).as_posix().encode())
     digest.update(b'\0')
     digest.update(path.read_bytes())
@@ -96,6 +103,25 @@ capture_identity_snapshot() {
       | sha256sum | awk '{print $1}'
   )"
   printf '%s|%s|%s\n' 'ir_attachment_whatsapp_ai' "${count}" "${checksum}" >> "${output_file}"
+
+  count="$(
+    psql_db "${database}" -Atc \
+      "SELECT count(*) FROM ir_attachment
+        WHERE COALESCE(res_model, '') NOT LIKE 'elsx.saas.%'
+          AND COALESCE(url, '') NOT LIKE '/web/assets/%';"
+  )"
+  checksum="$(
+    psql_db "${database}" -Atc \
+      "COPY (
+         SELECT id, COALESCE(store_fname, ''), COALESCE(checksum, '')
+           FROM ir_attachment
+          WHERE COALESCE(res_model, '') NOT LIKE 'elsx.saas.%'
+            AND COALESCE(url, '') NOT LIKE '/web/assets/%'
+          ORDER BY id
+       ) TO STDOUT" \
+      | sha256sum | awk '{print $1}'
+  )"
+  printf '%s|%s|%s\n' 'ir_attachment_non_saas' "${count}" "${checksum}" >> "${output_file}"
 }
 
 verify_encrypted_backup() {
@@ -141,15 +167,27 @@ upgrade_database() {
   local safe_release="$3"
   local safe_database backup_result backup_file backup_sha verified_at
   local before_snapshot after_snapshot installed_count protected_table_list
-  local shell_was_installed shell_is_installed
+  local bridge_was_present shell_was_installed shell_is_installed
+  local saas_was_installed
   local expected_backup_file snapshot_temp
   local -a protected_tables
 
   safe_database="$(printf '%s' "${database}" | tr -c 'A-Za-z0-9_.-' '_')"
+  bridge_was_present="$(
+    psql_db "${database}" -Atc "SELECT count(*) FROM ir_module_module
+      WHERE name IN (
+        'elsx_whatsapp_core', 'elsx_whatsapp_gateway', 'elsx_whatsapp_marketing'
+      ) AND state IN ('installed', 'to upgrade', 'to install');"
+  )"
   shell_was_installed="$(
     psql_db "${database}" -Atc "SELECT count(*) FROM ir_module_module
       WHERE name = 'elsx_whatsapp_marketing'
         AND state IN ('installed', 'to upgrade', 'to install');"
+  )"
+  saas_was_installed="$(
+    psql_db "${database}" -Atc "SELECT count(*) FROM ir_module_module
+      WHERE name = 'elsx_saas'
+        AND state != 'uninstalled';"
   )"
   protected_table_list="$(
     psql_db "${database}" -Atc \
@@ -191,20 +229,46 @@ upgrade_database() {
   backup_sha="${backup_result##*|}"
   after_snapshot="$(mktemp)"
 
-  log "Installing/upgrading WhatsApp bridge modules in ${database}."
-  python3 "${ODOO_BIN}" \
-    -c "${ODOO_CONFIG}" \
-    --db_host="${DB_HOST}" \
-    --db_port="${DB_PORT}" \
-    --db_user="${DB_USER}" \
-    --db_password="${DB_PASSWORD}" \
-    -d "${database}" \
-    -i "${INSTALL_MODULES}" \
-    -u "${UPGRADE_MODULES}" \
-    --without-demo=True \
-    --stop-after-init \
-    --no-http \
-    --log-level=error
+  if [ "${saas_was_installed}" != '0' ]; then
+    log "Uninstalling the retired SaaS module from ${database}."
+    if ! bash /opt/odoo/deploy/remove_retired_saas_db.sh "${database}"; then
+      log "SaaS did not uninstall cleanly in ${database}; Odoo will not start."
+      log "Verified recovery backup: ${backup_file}"
+      return 1
+    fi
+  fi
+
+  if [ "${bridge_was_present}" != '0' ]; then
+    log "Installing/upgrading Apps access, AI, and WhatsApp modules in ${database}."
+    python3 "${ODOO_BIN}" \
+      -c "${ODOO_CONFIG}" \
+      --db_host="${DB_HOST}" \
+      --db_port="${DB_PORT}" \
+      --db_user="${DB_USER}" \
+      --db_password="${DB_PASSWORD}" \
+      -d "${database}" \
+      -i "${INSTALL_MODULES}" \
+      -u "${UPGRADE_MODULES}" \
+      --without-demo=True \
+      --stop-after-init \
+      --no-http \
+      --log-level=error
+  else
+    log "Installing/upgrading the Apps password gate in ${database}."
+    python3 "${ODOO_BIN}" \
+      -c "${ODOO_CONFIG}" \
+      --db_host="${DB_HOST}" \
+      --db_port="${DB_PORT}" \
+      --db_user="${DB_USER}" \
+      --db_password="${DB_PASSWORD}" \
+      -d "${database}" \
+      -i elsx_client_restrictions \
+      -u elsx_client_restrictions \
+      --without-demo=True \
+      --stop-after-init \
+      --no-http \
+      --log-level=error
+  fi
 
   capture_identity_snapshot "${database}" "${after_snapshot}" "${protected_tables[@]}"
   if ! diff -u "${before_snapshot}" "${after_snapshot}"; then
@@ -215,17 +279,19 @@ upgrade_database() {
   fi
   rm -f "${after_snapshot}"
 
-  installed_count="$(
-    psql_db "${database}" -Atc \
-      "SELECT count(*) FROM ir_module_module
-        WHERE name IN (
-          'elsx_client_restrictions', 'elsx_ai_core', 'elsx_whatsapp_core',
-          'elsx_whatsapp_gateway'
-        ) AND state = 'installed';"
-  )"
-  if [ "${installed_count}" != '4' ]; then
-    log "Required persistent WhatsApp bridge modules are not all installed in ${database}; Odoo will not start."
-    return 1
+  if [ "${bridge_was_present}" != '0' ]; then
+    installed_count="$(
+      psql_db "${database}" -Atc \
+        "SELECT count(*) FROM ir_module_module
+          WHERE name IN (
+            'elsx_client_restrictions', 'elsx_ai_core', 'elsx_whatsapp_core',
+            'elsx_whatsapp_gateway'
+          ) AND state = 'installed';"
+    )"
+    if [ "${installed_count}" != '4' ]; then
+      log "Required persistent WhatsApp bridge modules are not all installed in ${database}; Odoo will not start."
+      return 1
+    fi
   fi
 
   shell_is_installed="$(
@@ -255,7 +321,7 @@ import os
 
 params = env['ir.config_parameter'].sudo()
 for key, value in {
-    'elsx.auto_upgrade.whatsapp.release': os.environ['ELSX_AUTO_RELEASE'],
+    'elsx.auto_upgrade.release': os.environ['ELSX_AUTO_RELEASE'],
     'elsx.whatsapp.last_verified_backup.reference': os.environ['ELSX_BACKUP_REFERENCE'],
     'elsx.whatsapp.last_verified_backup.database': os.environ['ELSX_BACKUP_DATABASE'],
     'elsx.whatsapp.last_verified_backup.sha256': os.environ['ELSX_BACKUP_SHA256'],
@@ -317,21 +383,6 @@ for database in "${databases[@]}"; do
   )"
   if [ "${has_modules}" != 't' ]; then
     log "Skipping non-Odoo database ${database}."
-    continue
-  fi
-
-  whatsapp_infrastructure_installed="$(
-    psql_db "${database}" -Atc \
-      "SELECT count(*) FROM ir_module_module
-        WHERE name IN (
-          'elsx_whatsapp_core',
-          'elsx_whatsapp_gateway',
-          'elsx_whatsapp_marketing'
-        )
-          AND state IN ('installed', 'to upgrade', 'to install');"
-  )"
-  if [ "${whatsapp_infrastructure_installed}" = '0' ]; then
-    log "Skipping ${database}; WhatsApp infrastructure is not installed."
     continue
   fi
 

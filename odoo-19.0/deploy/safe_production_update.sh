@@ -9,7 +9,6 @@ INSTALL_MODULES="${INSTALL_MODULES:-elsx_client_restrictions,elsx_attendance_tra
 UPGRADE_MODULES="${UPGRADE_MODULES:-elsx_client_restrictions,elsx_attendance_tracking,elsx_face_attendance}"
 EXTRA_INSTALL_MODULES="${EXTRA_INSTALL_MODULES:-}"
 EXTRA_UPGRADE_MODULES="${EXTRA_UPGRADE_MODULES:-}"
-DEACTIVATE_SAAS_ON_UPDATE="${DEACTIVATE_SAAS_ON_UPDATE:-YES}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -62,6 +61,25 @@ capture_identity_snapshot() {
       | sha256sum | awk '{print $1}'
   )"
   printf '%s|%s|%s\n' 'ir_attachment_whatsapp_ai' "${count}" "${checksum}" >> "${output_file}"
+
+  count="$(
+    docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -Atc \
+      "SELECT count(*) FROM ir_attachment
+        WHERE COALESCE(res_model, '') NOT LIKE 'elsx.saas.%'
+          AND COALESCE(url, '') NOT LIKE '/web/assets/%';"
+  )"
+  checksum="$(
+    docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -Atc \
+      "COPY (
+         SELECT id, COALESCE(store_fname, ''), COALESCE(checksum, '')
+           FROM ir_attachment
+          WHERE COALESCE(res_model, '') NOT LIKE 'elsx.saas.%'
+            AND COALESCE(url, '') NOT LIKE '/web/assets/%'
+          ORDER BY id
+       ) TO STDOUT" \
+      | sha256sum | awk '{print $1}'
+  )"
+  printf '%s|%s|%s\n' 'ir_attachment_non_saas' "${count}" "${checksum}" >> "${output_file}"
 }
 
 if [ -z "${LIVE_DB_NAME}" ]; then
@@ -95,7 +113,6 @@ fi
 
 echo "==> Install modules if missing: ${ALL_INSTALL_MODULES}"
 echo "==> Upgrade modules: ${ALL_UPGRADE_MODULES}"
-echo "==> Deactivate SaaS runtime after update: ${DEACTIVATE_SAAS_ON_UPDATE}"
 
 if [ -z "${BACKUP_PASSPHRASE:-}" ]; then
   echo "ERROR: BACKUP_PASSPHRASE is required. Refusing to upgrade without an encrypted backup." >&2
@@ -183,6 +200,10 @@ IDENTITY_SNAPSHOT_BEFORE="${LATEST_BACKUP}.business-identities.before.sha256"
 IDENTITY_SNAPSHOT_AFTER="${LATEST_BACKUP}.business-identities.after.sha256"
 capture_identity_snapshot "${IDENTITY_SNAPSHOT_BEFORE}" "${PROTECTED_TABLES[@]}"
 
+echo "==> Removing retired SaaS module through Odoo's normal uninstall path"
+docker compose run --rm -T --no-deps odoo \
+  bash /opt/odoo/deploy/remove_retired_saas_db.sh "${LIVE_DB_NAME}"
+
 echo "==> Installing/upgrading requested modules through the backup-protected path"
 docker compose run --rm -T --no-deps odoo \
   python3 /opt/odoo/odoo-bin \
@@ -222,10 +243,6 @@ for key, value in {
 env.cr.commit()
 PY
 
-if [ "${DEACTIVATE_SAAS_ON_UPDATE}" = "YES" ]; then
-  echo "==> Deactivating SaaS runtime metadata for ${LIVE_DB_NAME} (no uninstall, no data deletion)"
-  CONFIRM_DEACTIVATE_SAAS=YES TARGET_DBS="${LIVE_DB_NAME}" bash deploy/deactivate_saas_all_dbs.sh
-fi
 echo "==> Starting Odoo and WhatsApp sidecar"
 docker compose up -d odoo sidecar
 

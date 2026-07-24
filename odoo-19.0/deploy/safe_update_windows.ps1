@@ -10,9 +10,9 @@
 #   2. Takes a plain pg_dump of every database into .\secure_backups\
 #   3. Rebuilds the Odoo image
 #   4. Stops Odoo + sidecar (DB stays running, data untouched)
-#   5. Runs module install/upgrade --stop-after-init
-#   6. Restarts Odoo + sidecar
-#   7. Waits for healthy, prints module states
+#   5. Removes the retired SaaS module through Odoo's normal uninstall path
+#   6. Runs module install/upgrade --stop-after-init
+#   7. Restarts Odoo + sidecar and prints module states
 #
 # What it NEVER does:
 #   - Never runs docker compose down -v (volumes are never deleted)
@@ -41,12 +41,12 @@ Set-Location $ProjectRoot
 
 Write-Host "==> Production-safe update for database: $DbName" -ForegroundColor Cyan
 
-# ── 1. Validate backup passphrase ─────────────────────────────────────────────
+# 1. Validate backup passphrase
 if (-not $env:BACKUP_PASSPHRASE) {
     Write-Error "ERROR: Set `$env:BACKUP_PASSPHRASE before running this script. Refusing to proceed without backup capability."
 }
 
-# ── 2. Validate database exists ───────────────────────────────────────────────
+# 2. Validate database exists
 $dbExists = docker compose exec -T db psql -U $DbUser -d postgres -Atc `
     "SELECT 1 FROM pg_database WHERE datname = '$DbName';" 2>&1
 if ($dbExists -ne "1") {
@@ -54,7 +54,7 @@ if ($dbExists -ne "1") {
 }
 Write-Host "==> Database '$DbName' confirmed." -ForegroundColor Green
 
-# ── 3. Backup ALL databases ───────────────────────────────────────────────────
+# 3. Backup all databases
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 New-Item -ItemType Directory -Force -Path $BackupDir | Out-Null
 
@@ -67,7 +67,7 @@ foreach ($db in $allDbs) {
     $db = $db.Trim()
     if (-not $db) { continue }
     $dumpFile = "$BackupDir\${db}_${timestamp}.pg_dump"
-    Write-Host "    Dumping $db → $dumpFile"
+    Write-Host "    Dumping $db -> $dumpFile"
     docker compose exec -T db pg_dump -U $DbUser -d $db --format=custom | Set-Content -Path $dumpFile -AsByteStream
     if (-not (Test-Path $dumpFile) -or (Get-Item $dumpFile).Length -eq 0) {
         Write-Host "    FAILED backup for $db" -ForegroundColor Red
@@ -83,17 +83,17 @@ if (-not $backupOk) {
 }
 Write-Host "==> All databases backed up successfully." -ForegroundColor Green
 
-# ── 4. Build new Odoo image ───────────────────────────────────────────────────
+# 4. Build new Odoo image
 Write-Host "==> Building Odoo image..." -ForegroundColor Cyan
 docker compose build odoo
 if ($LASTEXITCODE -ne 0) { Write-Error "ERROR: docker compose build failed." }
 
-# ── 5. Stop Odoo + sidecar (DB stays up, data untouched) ─────────────────────
+# 5. Stop Odoo and sidecar (database remains running)
 Write-Host "==> Stopping Odoo and WhatsApp sidecar..." -ForegroundColor Cyan
 docker compose stop sidecar 2>$null
 docker compose stop odoo 2>$null
 
-# ── 6. Install / upgrade modules ──────────────────────────────────────────────
+# 6. Install and upgrade modules
 $allInstall = $InstallModules
 if ($ExtraInstall) { $allInstall = "$allInstall,$ExtraInstall" }
 $allUpgrade = $UpgradeModules
@@ -102,6 +102,11 @@ if ($ExtraUpgrade) { $allUpgrade = "$allUpgrade,$ExtraUpgrade" }
 Write-Host "==> Installing: $allInstall" -ForegroundColor Cyan
 Write-Host "==> Upgrading:  $allUpgrade" -ForegroundColor Cyan
 
+Write-Host "==> Removing retired SaaS module if present" -ForegroundColor Cyan
+docker compose run --rm -T --no-deps odoo `
+    bash /opt/odoo/deploy/remove_retired_saas_db.sh $DbName
+if ($LASTEXITCODE -ne 0) { Write-Error "ERROR: SaaS uninstall failed. Odoo remains stopped and the backup is available." }
+
 docker compose run --rm -T --no-deps odoo `
     python3 /opt/odoo/odoo-bin `
         -c /etc/odoo/odoo.conf `
@@ -109,13 +114,13 @@ docker compose run --rm -T --no-deps odoo `
         -i $allInstall `
         -u $allUpgrade `
         --stop-after-init
-if ($LASTEXITCODE -ne 0) { Write-Error "ERROR: Module upgrade failed. DB is intact — restore not needed unless Odoo reports migration errors." }
+if ($LASTEXITCODE -ne 0) { Write-Error "ERROR: Module upgrade failed. DB is intact; restore only if Odoo reports migration errors." }
 
-# ── 7. Restart Odoo + sidecar ────────────────────────────────────────────────
+# 7. Restart Odoo and sidecar
 Write-Host "==> Starting Odoo and WhatsApp sidecar..." -ForegroundColor Cyan
 docker compose up -d odoo sidecar
 
-# ── 8. Wait for healthy ────────────────────────────────────────────────────────
+# 8. Wait for health check
 Write-Host "==> Waiting for Odoo to become healthy (up to 120s)..." -ForegroundColor Cyan
 $deadline = (Get-Date).AddSeconds(120)
 $healthy = $false
@@ -128,16 +133,16 @@ while ((Get-Date) -lt $deadline) {
 if (-not $healthy) { Write-Warning "Odoo did not become healthy within 120s. Check: docker logs --tail 100 odoo_app" }
 else { Write-Host "==> Odoo is healthy." -ForegroundColor Green }
 
-# ── 9. Module state report ────────────────────────────────────────────────────
+# 9. Report module states
 Write-Host "==> Module states in $DbName :" -ForegroundColor Cyan
 docker compose exec -T db psql -U $DbUser -d $DbName -c `
     "SELECT name, state, latest_version FROM ir_module_module WHERE name IN ('elsx_client_restrictions','elsx_attendance_tracking','elsx_face_attendance','elsx_saas','elsx_whatsapp_marketing','elsx_tally_integration','crm','account','hr_attendance') ORDER BY name;"
 
-# ── 10. Container status ──────────────────────────────────────────────────────
+# 10. Show container status
 docker compose ps
 
 Write-Host ""
 Write-Host "==> Safe update complete." -ForegroundColor Green
-Write-Host "    Backups in: .\$BackupDir\"
+Write-Host "    Backups in: .\$BackupDir"
 Write-Host "    Check logs: docker logs --tail 250 odoo_app"
 Write-Host "    Prune old backups (>7 days): Get-ChildItem $BackupDir\*.pg_dump | Where-Object LastWriteTime -lt (Get-Date).AddDays(-7) | Remove-Item"

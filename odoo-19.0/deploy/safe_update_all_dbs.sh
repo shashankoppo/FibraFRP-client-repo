@@ -10,7 +10,6 @@ INSTALL_MODULES="${INSTALL_MODULES:-elsx_client_restrictions,elsx_attendance_tra
 UPGRADE_MODULES="${UPGRADE_MODULES:-elsx_client_restrictions,elsx_attendance_tracking,elsx_face_attendance}"
 EXTRA_INSTALL_MODULES="${EXTRA_INSTALL_MODULES:-}"
 EXTRA_UPGRADE_MODULES="${EXTRA_UPGRADE_MODULES:-}"
-DEACTIVATE_SAAS_ON_UPDATE="${DEACTIVATE_SAAS_ON_UPDATE:-YES}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -69,7 +68,6 @@ fi
 echo "==> Safe all-database update"
 echo "==> Install modules if missing: ${ALL_INSTALL_MODULES}"
 echo "==> Upgrade modules: ${ALL_UPGRADE_MODULES}"
-echo "==> Deactivate SaaS runtime after update: ${DEACTIVATE_SAAS_ON_UPDATE}"
 
 echo "==> Ensuring PostgreSQL is running"
 docker compose up -d db
@@ -134,6 +132,10 @@ docker compose stop odoo >/dev/null 2>&1 || true
 
 for DB in "${DATABASES[@]}"; do
   echo
+  echo "---- Removing retired SaaS module on ${DB}"
+  docker compose run --rm -T --no-deps odoo \
+    bash /opt/odoo/deploy/remove_retired_saas_db.sh "${DB}"
+
   echo "---- Installing/upgrading modules on ${DB}"
   docker compose run --rm -T --no-deps odoo \
     python3 /opt/odoo/odoo-bin \
@@ -145,11 +147,6 @@ for DB in "${DATABASES[@]}"; do
 done
 
 echo
-if [ "${DEACTIVATE_SAAS_ON_UPDATE}" = "YES" ]; then
-  TARGET_DBS_JOINED="$(IFS=,; echo "${DATABASES[*]}")"
-  echo "==> Deactivating SaaS runtime metadata for target databases (no uninstall, no data deletion)"
-  CONFIRM_DEACTIVATE_SAAS=YES TARGET_DBS="${TARGET_DBS_JOINED}" bash deploy/deactivate_saas_all_dbs.sh
-fi
 echo "==> Starting Odoo and WhatsApp sidecar"
 docker compose up -d odoo sidecar
 

@@ -24,7 +24,6 @@ export INSTALL_MODULES="${INSTALL_MODULES:-elsx_client_restrictions}"
 export UPGRADE_MODULES="${UPGRADE_MODULES:-elsx_client_restrictions}"
 export EXTRA_INSTALL_MODULES="$(append_modules "${EXTRA_INSTALL_MODULES:-}" 'elsx_ai_core,elsx_whatsapp_core,elsx_whatsapp_gateway')"
 export EXTRA_UPGRADE_MODULES="$(append_modules "${EXTRA_UPGRADE_MODULES:-}" 'elsx_ai_core,elsx_whatsapp_core,elsx_whatsapp_gateway,elsx_whatsapp_marketing,elsx_ai_marketing,elsx_ai_website_builder')"
-export DEACTIVATE_SAAS_ON_UPDATE="${DEACTIVATE_SAAS_ON_UPDATE:-NO}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 exec bash "${SCRIPT_DIR}/safe_production_update.sh" "${LIVE_DB_NAME}"

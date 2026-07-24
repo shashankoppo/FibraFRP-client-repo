@@ -1,1 +1,1 @@
-from . import test_module_guard
+from . import test_apps_password_gate
