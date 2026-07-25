@@ -161,6 +161,40 @@ create_or_verify_backup() {
   printf '%s|%s\n' "${backup_file}" "${checksum}"
 }
 
+legacy_admin_panel_present() {
+  local database="$1"
+  psql_db "${database}" -Atc "
+    SELECT CASE WHEN
+      EXISTS (
+        SELECT 1
+          FROM ir_model_data
+         WHERE module = 'elsx_client_restrictions'
+           AND name IN (
+             'menu_elsx_module_safety',
+             'action_module_safety',
+             'view_module_safety_form',
+             'view_module_safety_tree',
+             'action_apps_password_unlock',
+             'view_apps_password_unlock_form',
+             'group_secret_apps_access'
+           )
+      )
+      OR EXISTS (
+        SELECT 1
+          FROM ir_ui_menu
+         WHERE COALESCE(name::text, '') ILIKE '%Safe Module Change%'
+      )
+      OR EXISTS (
+        SELECT 1
+          FROM ir_config_parameter
+         WHERE key IN (
+           'elsx_client_restrictions.apps_password_hash',
+           'elsx_client_restrictions.apps_secret_token'
+         )
+      )
+    THEN 't' ELSE 'f' END;"
+}
+
 upgrade_database() {
   local database="$1"
   local release="$2"
@@ -390,9 +424,13 @@ for database in "${databases[@]}"; do
     psql_db "${database}" -Atc \
       "SELECT value FROM ir_config_parameter WHERE key = '${MARKER_KEY}' LIMIT 1;"
   )"
-  if [ "${current_release}" = "${release}" ]; then
+  legacy_admin_panel="$(legacy_admin_panel_present "${database}")"
+  if [ "${current_release}" = "${release}" ] && [ "${legacy_admin_panel}" != 't' ]; then
     log "Database ${database} is already current (${release})."
     continue
+  fi
+  if [ "${legacy_admin_panel}" = 't' ]; then
+    log "Legacy admin restriction panel is still present in ${database}; forcing native admin cleanup."
   fi
 
   pending=1
