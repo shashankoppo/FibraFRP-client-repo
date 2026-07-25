@@ -24,5 +24,5 @@ def _normalize_legacy_timezones(env):
 
 
 def post_init_hook(env):
-    env["ir.config_parameter"].sudo()._elsx_prepare_apps_gate()
+    env["ir.config_parameter"].sudo()._elsx_restore_native_administration()
     _normalize_legacy_timezones(env)

@@ -239,7 +239,7 @@ upgrade_database() {
   fi
 
   if [ "${bridge_was_present}" != '0' ]; then
-    log "Installing/upgrading Apps access, AI, and WhatsApp modules in ${database}."
+    log "Installing/upgrading native administration cleanup, AI, and WhatsApp modules in ${database}."
     python3 "${ODOO_BIN}" \
       -c "${ODOO_CONFIG}" \
       --db_host="${DB_HOST}" \
@@ -254,7 +254,7 @@ upgrade_database() {
       --no-http \
       --log-level=error
   else
-    log "Installing/upgrading the Apps password gate in ${database}."
+    log "Installing/upgrading native administration cleanup in ${database}."
     python3 "${ODOO_BIN}" \
       -c "${ODOO_CONFIG}" \
       --db_host="${DB_HOST}" \

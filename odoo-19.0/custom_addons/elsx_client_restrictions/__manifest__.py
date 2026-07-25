@@ -1,25 +1,23 @@
 # -*- coding: utf-8 -*-
 {
-    "name": "ELSX Apps Password Gate",
-    "version": "2.6.0",
+    "name": "ELSX Native Administration Cleanup",
+    "version": "2.7.0",
     "category": "Administration",
-    "summary": "Password protection for the native Odoo Apps screen",
+    "summary": "Removes legacy restrictions and restores native Odoo administration",
     "description": """
-ELSX Apps Password Gate
-=======================
+ELSX Native Administration Cleanup
+==================================
 
-This compatibility addon has one access-control responsibility: system
-administrators must enter the configured Apps password before opening Odoo's
-native Apps screen. Settings, Users, Companies, module dependencies, and all
-other Odoo access rules remain under standard Odoo Community behavior.
+This technical compatibility addon removes retired ELSX access restrictions
+and restores native Odoo Community Settings, Users, Companies, Apps, groups,
+access-rights, and record-rule administration.
     """,
     "author": "ELSX",
     "website": "https://elsxglobal.com",
     "license": "LGPL-3",
     "depends": ["base", "base_setup", "web"],
     "data": [
-        "data/apps_access.xml",
-        "views/menu_restrictions.xml",
+        "data/native_admin_cleanup.xml",
     ],
     "installable": True,
     "application": False,

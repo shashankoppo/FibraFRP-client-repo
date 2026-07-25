@@ -1,12 +1,11 @@
 # Deployment
 
-The normal container startup upgrades this addon behind the encrypted-backup
-release gate. It restores native Settings metadata, removes obsolete helper
-groups and generated assets, and leaves business records unchanged.
+Ubuntu and Alpine container startup upgrades this compatibility addon through
+the encrypted-backup release gate.
 
-After deployment, verify:
+After deployment, verify that Settings, Users, Companies, and Apps open their
+native Odoo 19 Community actions, Administrator can manage user permissions,
+and Safe Module Change is absent.
 
-1. Settings and Users open without an Apps password.
-2. Apps opens the password form.
-3. An incorrect password cannot load Apps.
-4. The configured password opens native Apps and normal module operations work.
+Use `?debug=1` or Odoo's Activate Developer Mode command to expose native
+Groups, Access Rights, and Record Rules technical buttons.

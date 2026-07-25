@@ -1,1 +1,1 @@
-from . import test_apps_password_gate
+from . import test_native_administration
