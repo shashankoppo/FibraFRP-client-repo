@@ -1,6 +1,6 @@
 {
     'name': 'ELSX AI Document OCR Engine',
-    'version': '1.0.1',
+    'version': '1.0',
     'summary': 'AI OCR and Document Extraction',
     'description': 'OpenAI/AWS Textract vision integration for extracting vendor bills automatically.',
     'author': 'ELSX',

@@ -5,9 +5,8 @@ DB_USER="${POSTGRES_USER:-odoo}"
 CONFIG="${ODOO_CONFIG:-/etc/odoo/odoo.conf}"
 OUTPUT_DIR="${OUTPUT_DIR:-secure_backups}"
 DB_NAME_EXCLUDES="${DB_NAME_EXCLUDES:-postgres}"
-TARGET_DBS="${TARGET_DBS:-}"
-INSTALL_MODULES="${INSTALL_MODULES:-elsx_client_restrictions,elsx_attendance_tracking,elsx_face_attendance}"
-UPGRADE_MODULES="${UPGRADE_MODULES:-elsx_client_restrictions,elsx_attendance_tracking,elsx_face_attendance}"
+INSTALL_MODULES="${INSTALL_MODULES:-elsx_client_restrictions,elsx_attendance_tracking,elsx_face_attendance,elsx_saas}"
+UPGRADE_MODULES="${UPGRADE_MODULES:-elsx_client_restrictions,elsx_attendance_tracking,elsx_face_attendance,elsx_saas}"
 EXTRA_INSTALL_MODULES="${EXTRA_INSTALL_MODULES:-}"
 EXTRA_UPGRADE_MODULES="${EXTRA_UPGRADE_MODULES:-}"
 
@@ -29,15 +28,8 @@ wait_for_db() {
   exit 1
 }
 
-if [ -n "${TARGET_DBS}" ]; then
-  if [ "${CONFIRM_TARGET_DBS:-NO}" != "YES" ]; then
-    echo "ERROR: set CONFIRM_TARGET_DBS=YES when TARGET_DBS is used." >&2
-    echo "Example: TARGET_DBS=FiberaFRP_DB CONFIRM_TARGET_DBS=YES BACKUP_PASSPHRASE=... bash deploy/safe_update_all_dbs.sh" >&2
-    exit 2
-  fi
-elif [ "${CONFIRM_ALL_DBS:-NO}" != "YES" ]; then
+if [ "${CONFIRM_ALL_DBS:-NO}" != "YES" ]; then
   echo "ERROR: set CONFIRM_ALL_DBS=YES to upgrade every application database." >&2
-  echo "For a single production DB, use TARGET_DBS=FiberaFRP_DB CONFIRM_TARGET_DBS=YES instead." >&2
   echo "This guard prevents accidental tenant-wide changes." >&2
   exit 2
 fi
@@ -84,21 +76,7 @@ if ! DB_LIST_OUTPUT="$(docker compose exec -T db psql -U "${DB_USER}" -d postgre
   echo "ERROR: failed to list application databases. Refusing to continue." >&2
   exit 1
 fi
-if [ -n "${TARGET_DBS}" ]; then
-  IFS=',' read -r -a REQUESTED_DATABASES <<< "${TARGET_DBS}"
-  DATABASES=()
-  for REQUESTED_DB in "${REQUESTED_DATABASES[@]}"; do
-    REQUESTED_DB="$(echo "${REQUESTED_DB}" | xargs)"
-    [ -z "${REQUESTED_DB}" ] && continue
-    if ! printf '%s\n' "${DB_LIST_OUTPUT}" | grep -Fxq "${REQUESTED_DB}"; then
-      echo "ERROR: requested database '${REQUESTED_DB}' was not found or is excluded." >&2
-      echo "Available application databases:" >&2
-      printf '%s\n' "${DB_LIST_OUTPUT}" >&2
-      exit 1
-    fi
-    DATABASES+=("${REQUESTED_DB}")
-  done
-elif [ -n "${DB_LIST_OUTPUT}" ]; then
+if [ -n "${DB_LIST_OUTPUT}" ]; then
   mapfile -t DATABASES <<< "${DB_LIST_OUTPUT}"
 else
   DATABASES=()
@@ -109,11 +87,7 @@ if [ "${#DATABASES[@]}" -eq 0 ]; then
   exit 0
 fi
 
-if [ -n "${TARGET_DBS}" ]; then
-  echo "==> Target databases (explicit): ${DATABASES[*]}"
-else
-  echo "==> Target databases (all application DBs): ${DATABASES[*]}"
-fi
+echo "==> Target databases: ${DATABASES[*]}"
 
 for DB in "${DATABASES[@]}"; do
   echo
@@ -132,10 +106,6 @@ docker compose stop odoo >/dev/null 2>&1 || true
 
 for DB in "${DATABASES[@]}"; do
   echo
-  echo "---- Removing retired SaaS module on ${DB}"
-  docker compose run --rm -T --no-deps odoo \
-    bash /opt/odoo/deploy/remove_retired_saas_db.sh "${DB}"
-
   echo "---- Installing/upgrading modules on ${DB}"
   docker compose run --rm -T --no-deps odoo \
     python3 /opt/odoo/odoo-bin \

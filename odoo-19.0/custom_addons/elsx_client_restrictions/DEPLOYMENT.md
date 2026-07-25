@@ -1,11 +1,10 @@
 # Deployment
 
-Ubuntu and Alpine container startup upgrades this compatibility addon through
-the encrypted-backup release gate.
+Deploy this addon like any normal custom module. It does not add special access
+gates or module-management side effects.
 
-After deployment, verify that Settings, Users, Companies, and Apps open their
-native Odoo 19 Community actions, Administrator can manage user permissions,
-and Safe Module Change is absent.
+Recommended check after upgrade:
 
-Use `?debug=1` or Odoo's Activate Developer Mode command to expose native
-Groups, Access Rights, and Record Rules technical buttons.
+- Apps menu opens for administrators.
+- Regular users see only menus allowed by their Odoo groups.
+- Module list refresh does not trigger automatic upgrades.

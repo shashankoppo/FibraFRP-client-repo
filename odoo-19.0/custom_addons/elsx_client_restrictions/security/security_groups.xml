@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Compatibility XML id kept so older databases keep upgrading cleanly. -->
+    <record id="group_secret_apps_access" model="res.groups">
+        <field name="name">ELSx Controlled Apps Manager</field>
+        <field name="implied_ids" eval="[(4, ref('base.group_system'))]"/>
+        <field name="comment">Can use the controlled Apps management shortcut. Keep assigned only to trusted technical administrators.</field>
+    </record>
+</odoo>

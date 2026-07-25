@@ -6,7 +6,7 @@
     'description': 'Uses the shared ELSX AI service layer to draft CRM replies and marketing copy with user approval.',
     'author': 'ELSX Evolution Engine',
     'website': 'https://elsx-erp.com',
-    'depends': ['crm', 'mail', 'elsx_ai_core'],
+    'depends': ['crm', 'mail', 'elsx_whatsapp_marketing'],
     'data': [
         'security/ir.model.access.csv',
         'views/marketing_ai_views.xml',

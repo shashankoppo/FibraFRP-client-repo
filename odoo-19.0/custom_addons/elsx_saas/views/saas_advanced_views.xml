@@ -1,0 +1,618 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ===== API TOKENS VIEWS ===== -->
+    <record id="view_elsx_saas_api_token_list" model="ir.ui.view">
+        <field name="name">elsx.saas.api.token.list</field>
+        <field name="model">elsx.saas.api.token</field>
+        <field name="arch" type="xml">
+            <list string="API Tokens" class="o_elsx_saas_list" decoration-success="is_active" decoration-muted="not is_active">
+                <field name="display_key"/>
+                <field name="tenant_id"/>
+                <field name="description"/>
+                <field name="permissions"/>
+                <field name="expires_on"/>
+                <field name="days_until_expiry" optional="hide"/>
+                <field name="last_used" optional="show"/>
+                <field name="is_active"/>
+                <button name="action_view_audit_log" type="object" icon="fa-bars" title="View API Audit Log"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_elsx_saas_api_token_form" model="ir.ui.view">
+        <field name="name">elsx.saas.api.token.form</field>
+        <field name="model">elsx.saas.api.token</field>
+        <field name="arch" type="xml">
+            <form string="API Token" class="o_elsx_saas_form">
+                <header>
+                    <button name="action_extend_expiry" string="Extend Expiry" type="object" class="oe_highlight" invisible="not is_active"/>
+                    <button name="action_regenerate_token" string="Regenerate Token" type="object" invisible="not is_active"/>
+                    <button name="action_deactivate" string="Deactivate" type="object" invisible="not is_active"/>
+                    <button name="action_activate" string="Reactivate" type="object" invisible="is_active"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-warning o_elsx_saas_notice" role="alert">
+                        <strong>Security Warning:</strong> Store your token key securely. It will only be displayed once. Do not share it with untrusted parties.
+                    </div>
+                    <group>
+                        <group string="Token Identity">
+                            <field name="tenant_id" readonly="1"/>
+                            <field name="description"/>
+                            <field name="display_key" readonly="1"/>
+                            <field name="last_four" readonly="1"/>
+                        </group>
+                        <group string="Status">
+                            <field name="is_active"/>
+                            <field name="expires_on"/>
+                            <field name="days_until_expiry" readonly="1"/>
+                            <field name="created_by" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Access Control">
+                            <field name="permissions"/>
+                            <field name="scope"/>
+                            <field name="allowed_models" placeholder="model1,model2,model3"/>
+                            <field name="allowed_ips" placeholder="192.168.1.1,192.168.1.2"/>
+                        </group>
+                        <group string="Usage">
+                            <field name="last_used" readonly="1"/>
+                            <field name="last_used_ip" readonly="1"/>
+                            <field name="audit_log_count" readonly="1" widget="statinfo" string="API Calls"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_elsx_saas_api_token" model="ir.actions.act_window">
+        <field name="name">API Tokens</field>
+        <field name="res_model">elsx.saas.api.token</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- ===== HEALTH CHECK VIEWS ===== -->
+    <record id="view_elsx_saas_health_check_list" model="ir.ui.view">
+        <field name="name">elsx.saas.health.check.list</field>
+        <field name="model">elsx.saas.health.check</field>
+        <field name="arch" type="xml">
+            <list string="Health Checks" class="o_elsx_saas_list" decoration-success="overall_status == 'ok'" decoration-warning="overall_status == 'warning'" decoration-danger="overall_status in ('error', 'critical')">
+                <field name="tenant_id"/>
+                <field name="check_date"/>
+                <field name="overall_status"/>
+                <field name="is_reachable"/>
+                <field name="db_reachable"/>
+                <field name="response_time_ms" optional="show"/>
+                <field name="has_alerts"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_elsx_saas_health_check_form" model="ir.ui.view">
+        <field name="name">elsx.saas.health.check.form</field>
+        <field name="model">elsx.saas.health.check</field>
+        <field name="arch" type="xml">
+            <form string="Health Check" class="o_elsx_saas_form" readonly="1">
+                <sheet>
+                    <div class="alert alert-info o_elsx_saas_notice" role="alert">
+                        <strong>Read-only health log.</strong>
+                        This record summarizes checks and does not change tenant databases or user data.
+                    </div>
+                    <group>
+                        <group string="Basic Info">
+                            <field name="tenant_id"/>
+                            <field name="check_date"/>
+                            <field name="overall_status"/>
+                        </group>
+                        <group string="Connectivity">
+                            <field name="http_status"/>
+                            <field name="is_reachable"/>
+                            <field name="response_time_ms"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Database">
+                            <field name="db_reachable"/>
+                            <field name="db_connection_time_ms"/>
+                        </group>
+                        <group string="Storage">
+                            <field name="filestore_status"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Modules">
+                            <field name="critical_modules_active"/>
+                            <field name="failed_modules"/>
+                        </group>
+                        <group string="Alerts">
+                            <field name="has_alerts"/>
+                            <field name="alert_message"/>
+                        </group>
+                    </group>
+                    <field name="check_result" nolabel="1"/>
+                    <field name="error_details" nolabel="1" placeholder="Error details if any" invisible="not error_details"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_elsx_saas_health_check" model="ir.actions.act_window">
+        <field name="name">Health Checks</field>
+        <field name="res_model">elsx.saas.health.check</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- ===== USAGE TRACKING VIEWS ===== -->
+    <record id="view_elsx_saas_tenant_usage_list" model="ir.ui.view">
+        <field name="name">elsx.saas.tenant.usage.list</field>
+        <field name="model">elsx.saas.tenant.usage</field>
+        <field name="arch" type="xml">
+            <list string="Usage Metrics" class="o_elsx_saas_list" decoration-warning="user_limit_percentage >= 80 or storage_limit_percentage >= 80">
+                <field name="usage_date"/>
+                <field name="tenant_id"/>
+                <field name="active_users"/>
+                <field name="user_limit_percentage" optional="show" widget="bar"/>
+                <field name="used_storage_gb"/>
+                <field name="storage_limit_percentage" optional="show" widget="bar"/>
+                <field name="api_requests_count" optional="show"/>
+                <field name="backup_status" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_elsx_saas_tenant_usage_form" model="ir.ui.view">
+        <field name="name">elsx.saas.tenant.usage.form</field>
+        <field name="model">elsx.saas.tenant.usage</field>
+        <field name="arch" type="xml">
+            <form string="Usage Metrics" class="o_elsx_saas_form" readonly="1">
+                <sheet>
+                    <div class="alert alert-info o_elsx_saas_notice" role="alert">
+                        <strong>Usage snapshot.</strong>
+                        Use this for capacity and billing review. It does not enforce limits by itself.
+                    </div>
+                    <group>
+                        <group string="Date &amp; Tenant">
+                            <field name="usage_date"/>
+                            <field name="tenant_id"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Users">
+                            <group>
+                                <field name="active_users"/>
+                                <field name="total_users"/>
+                                <field name="user_limit"/>
+                                <field name="user_limit_percentage" widget="gauge"/>
+                            </group>
+                        </page>
+                        <page string="Storage">
+                            <group>
+                                <field name="used_storage_gb"/>
+                                <field name="allocated_storage_gb"/>
+                                <field name="storage_limit_percentage" widget="gauge"/>
+                            </group>
+                        </page>
+                        <page string="Features">
+                            <group>
+                                <field name="crm_records_created"/>
+                                <field name="invoices_generated"/>
+                                <field name="attendance_entries"/>
+                                <field name="whatsapp_messages_sent"/>
+                            </group>
+                        </page>
+                        <page string="Performance">
+                            <group>
+                                <field name="api_requests_count"/>
+                                <field name="error_requests_count"/>
+                                <field name="slow_requests_count"/>
+                                <field name="avg_response_time_ms"/>
+                            </group>
+                        </page>
+                        <page string="System Health">
+                            <group>
+                                <field name="database_size_mb"/>
+                                <field name="backup_status"/>
+                                <field name="last_backup_time"/>
+                                <field name="notes"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_elsx_saas_tenant_usage" model="ir.actions.act_window">
+        <field name="name">Usage Metrics</field>
+        <field name="res_model">elsx.saas.tenant.usage</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- ===== SUPPORT TICKET VIEWS ===== -->
+    <record id="view_elsx_saas_support_ticket_list" model="ir.ui.view">
+        <field name="name">elsx.saas.support.ticket.list</field>
+        <field name="model">elsx.saas.support.ticket</field>
+        <field name="arch" type="xml">
+            <list string="Support Tickets" class="o_elsx_saas_list" decoration-info="state == 'assigned'" decoration-success="state == 'resolved'" decoration-warning="sla_status == 'at_risk'" decoration-danger="sla_status == 'breached'">
+                <field name="ticket_number"/>
+                <field name="name" string="Subject"/>
+                <field name="tenant_id"/>
+                <field name="category"/>
+                <field name="priority"/>
+                <field name="state"/>
+                <field name="assigned_to" optional="show"/>
+                <field name="sla_status" optional="show"/>
+                <field name="sla_timer_hours" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_elsx_saas_support_ticket_form" model="ir.ui.view">
+        <field name="name">elsx.saas.support.ticket.form</field>
+        <field name="model">elsx.saas.support.ticket</field>
+        <field name="arch" type="xml">
+            <form string="Support Ticket" class="o_elsx_saas_form">
+                <header>
+                    <button name="action_assign_to_me" string="Assign to Me" type="object" invisible="state not in ('new', 'waiting_customer')" class="oe_highlight"/>
+                    <button name="action_start_work" string="Start Work" type="object" invisible="state != 'assigned'"/>
+                    <button name="action_mark_waiting_customer" string="Waiting for Customer" type="object" invisible="state != 'in_progress'"/>
+                    <button name="action_resolve" string="Resolve" type="object" invisible="state != 'in_progress'" class="oe_highlight"/>
+                    <button name="action_close" string="Close" type="object" invisible="state not in ('resolved', 'waiting_customer')"/>
+                    <button name="action_reopen" string="Reopen" type="object" invisible="state not in ('resolved', 'closed')"/>
+                    <field name="state" widget="statusbar" statusbar_visible="new,assigned,in_progress,resolved,closed"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-info o_elsx_saas_notice" role="alert">
+                        <strong>Support workspace.</strong>
+                        Ticket state changes are administrative only and do not modify tenant databases.
+                    </div>
+                    <group>
+                        <group string="Ticket Info">
+                            <field name="ticket_number" readonly="1"/>
+                            <field name="tenant_id" readonly="1"/>
+                            <field name="submitted_by"/>
+                            <field name="assigned_to"/>
+                        </group>
+                        <group string="Priority &amp; Category">
+                            <field name="priority"/>
+                            <field name="category"/>
+                            <field name="severity"/>
+                            <field name="sub_category"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Subject">
+                            <field name="name" nolabel="1" colspan="2"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Description">
+                            <field name="description" nolabel="1" readonly="1"/>
+                        </page>
+                        <page string="Timeline">
+                            <group>
+                                <field name="create_date" readonly="1"/>
+                                <field name="first_response_date" readonly="1"/>
+                                <field name="hours_to_first_response" readonly="1"/>
+                                <field name="resolution_date" readonly="1"/>
+                                <field name="hours_to_resolution" readonly="1"/>
+                                <field name="closed_date" readonly="1"/>
+                            </group>
+                        </page>
+                        <page string="SLA &amp; Service">
+                            <group>
+                                <field name="sla_timer_hours" readonly="1" widget="gauge"/>
+                                <field name="sla_status" readonly="1"/>
+                                <field name="message_count" readonly="1" widget="statinfo" string="Messages"/>
+                                <field name="attachments_count" readonly="1"/>
+                            </group>
+                        </page>
+                        <page string="Resolution">
+                            <group>
+                                <field name="resolution_category"/>
+                                <field name="resolution_notes"/>
+                                <field name="is_customer_satisfied"/>
+                                <field name="satisfaction_reason"/>
+                            </group>
+                        </page>
+                        <page string="Internal Notes">
+                            <field name="internal_notes" nolabel="1"/>
+                        </page>
+                    </notebook>
+                    <field name="message_ids" widget="mail_thread" options="{'post_refresh': 'recipients'}"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_elsx_saas_support_ticket" model="ir.actions.act_window">
+        <field name="name">Support Tickets</field>
+        <field name="res_model">elsx.saas.support.ticket</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- ===== BILLING PLAN VIEWS ===== -->
+    <record id="view_elsx_saas_billing_plan_list" model="ir.ui.view">
+        <field name="name">elsx.saas.billing.plan.list</field>
+        <field name="model">elsx.saas.billing.plan</field>
+        <field name="arch" type="xml">
+            <list string="Billing Plans" class="o_elsx_saas_list" decoration-success="is_active">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="monthly_price"/>
+                <field name="annual_price" optional="show"/>
+                <field name="max_users"/>
+                <field name="storage_quota_gb"/>
+                <field name="support_tier"/>
+                <field name="is_active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_elsx_saas_billing_plan_form" model="ir.ui.view">
+        <field name="name">elsx.saas.billing.plan.form</field>
+        <field name="model">elsx.saas.billing.plan</field>
+        <field name="arch" type="xml">
+            <form string="Billing Plan" class="o_elsx_saas_form">
+                <sheet>
+                    <div class="alert alert-info o_elsx_saas_notice" role="alert">
+                        <strong>Plan catalogue.</strong>
+                        Billing plans define commercial packaging; they do not install modules automatically.
+                    </div>
+                    <group>
+                        <group string="Plan Identity">
+                            <field name="name"/>
+                            <field name="code"/>
+                            <field name="sequence"/>
+                            <field name="is_active"/>
+                        </group>
+                        <group string="Pricing">
+                            <field name="currency_id"/>
+                            <field name="setup_fee"/>
+                            <field name="monthly_price"/>
+                            <field name="annual_price"/>
+                        </group>
+                    </group>
+                    <group string="Included Features">
+                        <group>
+                            <field name="enable_crm"/>
+                            <field name="enable_accounting"/>
+                            <field name="enable_whatsapp"/>
+                        </group>
+                        <group>
+                            <field name="enable_attendance"/>
+                            <field name="enable_face_attendance"/>
+                            <field name="enable_tally"/>
+                        </group>
+                    </group>
+                    <group string="Limits &amp; Support">
+                        <group>
+                            <field name="max_users"/>
+                            <field name="storage_quota_gb"/>
+                            <field name="api_calls_per_day"/>
+                        </group>
+                        <group>
+                            <field name="support_tier"/>
+                            <field name="allow_monthly"/>
+                            <field name="allow_annual"/>
+                        </group>
+                    </group>
+                    <field name="description" nolabel="1" colspan="2"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_elsx_saas_billing_plan" model="ir.actions.act_window">
+        <field name="name">Billing Plans</field>
+        <field name="res_model">elsx.saas.billing.plan</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- ===== BILLING CYCLE VIEWS ===== -->
+    <record id="view_elsx_saas_billing_cycle_list" model="ir.ui.view">
+        <field name="name">elsx.saas.billing.cycle.list</field>
+        <field name="model">elsx.saas.billing.cycle</field>
+        <field name="arch" type="xml">
+            <list string="Invoices" class="o_elsx_saas_list" decoration-success="payment_status == 'paid'" decoration-warning="payment_status == 'due'" decoration-danger="payment_status == 'overdue'">
+                <field name="name"/>
+                <field name="tenant_id"/>
+                <field name="invoice_date"/>
+                <field name="due_date"/>
+                <field name="total_amount"/>
+                <field name="paid_amount" optional="show"/>
+                <field name="payment_status"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_elsx_saas_billing_cycle_form" model="ir.ui.view">
+        <field name="name">elsx.saas.billing.cycle.form</field>
+        <field name="model">elsx.saas.billing.cycle</field>
+        <field name="arch" type="xml">
+            <form string="Invoice" class="o_elsx_saas_form">
+                <header>
+                    <button name="action_send_invoice" string="Send Invoice" type="object" invisible="payment_status not in ('draft', 'sent')"/>
+                    <button name="action_mark_paid" string="Mark Paid" type="object" invisible="payment_status == 'paid'"/>
+                    <field name="payment_status" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-info o_elsx_saas_notice" role="alert">
+                        <strong>SaaS billing record.</strong>
+                        This is a SaaS subscription invoice tracker and is separate from client accounting documents unless explicitly integrated.
+                    </div>
+                    <group>
+                        <group string="Invoice">
+                            <field name="name" readonly="1"/>
+                            <field name="tenant_id"/>
+                            <field name="plan_id"/>
+                            <field name="billing_cycle"/>
+                        </group>
+                        <group string="Dates">
+                            <field name="cycle_start_date"/>
+                            <field name="cycle_end_date"/>
+                            <field name="invoice_date"/>
+                            <field name="due_date"/>
+                        </group>
+                    </group>
+                    <group string="Amounts">
+                        <group>
+                            <field name="currency_id"/>
+                            <field name="base_amount"/>
+                            <field name="setup_fee"/>
+                        </group>
+                        <group>
+                            <field name="discount_amount"/>
+                            <field name="tax_amount"/>
+                            <field name="total_amount" class="oe_subtotal_footer_separator"/>
+                        </group>
+                    </group>
+                    <group string="Payment">
+                        <group>
+                            <field name="paid_amount"/>
+                            <field name="paid_date"/>
+                        </group>
+                    </group>
+                    <field name="line_ids" nolabel="1">
+                        <list editable="bottom" class="o_elsx_saas_inline_list">
+                            <field name="sequence"/>
+                            <field name="description"/>
+                            <field name="item_type"/>
+                            <field name="quantity"/>
+                            <field name="unit_price"/>
+                            <field name="subtotal" readonly="1"/>
+                        </list>
+                    </field>
+                    <field name="notes" nolabel="1" placeholder="Notes..."/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_elsx_saas_billing_cycle" model="ir.actions.act_window">
+        <field name="name">Invoices</field>
+        <field name="res_model">elsx.saas.billing.cycle</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- ===== SUBSCRIPTION VIEWS ===== -->
+    <record id="view_elsx_saas_subscription_form" model="ir.ui.view">
+        <field name="name">elsx.saas.subscription.form</field>
+        <field name="model">elsx.saas.subscription</field>
+        <field name="arch" type="xml">
+            <form string="Subscription" class="o_elsx_saas_form">
+                <header>
+                    <button name="action_upgrade_plan" string="Upgrade Plan" type="object" invisible="not is_active" class="oe_highlight"/>
+                    <button name="action_add_addon" string="Add Add-on" type="object" invisible="not is_active"/>
+                    <button name="action_cancel_subscription" string="Cancel" type="object" invisible="not is_active"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-warning o_elsx_saas_notice" role="alert">
+                        <strong>Controlled subscription changes.</strong>
+                        Plan and add-on changes update SaaS governance only; run reviewed deployment commands before changing a tenant environment.
+                    </div>
+                    <group>
+                        <group string="Subscription">
+                            <field name="tenant_id" readonly="1"/>
+                            <field name="plan_id"/>
+                            <field name="billing_cycle"/>
+                            <field name="payment_method"/>
+                        </group>
+                        <group string="Dates">
+                            <field name="activation_date"/>
+                            <field name="next_billing_date"/>
+                            <field name="cancellation_date" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Billing">
+                        <group>
+                            <field name="currency_id" readonly="1"/>
+                            <field name="custom_monthly_price" placeholder="Leave blank to use plan default"/>
+                        </group>
+                        <group>
+                            <field name="is_trial"/>
+                            <field name="trial_end_date" invisible="not is_trial"/>
+                            <field name="auto_renew"/>
+                            <field name="is_active"/>
+                        </group>
+                    </group>
+                    <field name="addon_ids" nolabel="1" placeholder="Select active add-ons"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_elsx_saas_subscription" model="ir.actions.act_window">
+        <field name="name">Subscriptions</field>
+        <field name="res_model">elsx.saas.subscription</field>
+        <field name="view_mode">form</field>
+    </record>
+
+    <!-- ===== MENU ITEMS ===== -->
+    <menuitem id="menu_elsx_saas_api"
+              name="API &amp; Integration"
+              parent="menu_elsx_saas_root"
+              sequence="30"
+              groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
+    <menuitem id="menu_elsx_saas_api_token"
+              name="API Tokens"
+              parent="menu_elsx_saas_api"
+              action="action_elsx_saas_api_token"
+              sequence="10"
+              groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
+
+    <menuitem id="menu_elsx_saas_monitoring"
+              name="Monitoring &amp; Health"
+              parent="menu_elsx_saas_root"
+              sequence="40"
+              groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
+    <menuitem id="menu_elsx_saas_health_check"
+              name="Health Checks"
+              parent="menu_elsx_saas_monitoring"
+              action="action_elsx_saas_health_check"
+              sequence="10"
+              groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
+    <menuitem id="menu_elsx_saas_tenant_usage"
+              name="Usage Metrics"
+              parent="menu_elsx_saas_monitoring"
+              action="action_elsx_saas_tenant_usage"
+              sequence="20"
+              groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
+
+    <menuitem id="menu_elsx_saas_support"
+              name="Support &amp; Tickets"
+              parent="menu_elsx_saas_root"
+              sequence="50"
+              groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
+    <menuitem id="menu_elsx_saas_support_ticket"
+              name="Support Tickets"
+              parent="menu_elsx_saas_support"
+              action="action_elsx_saas_support_ticket"
+              sequence="10"
+              groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
+
+    <menuitem id="menu_elsx_saas_billing"
+              name="Billing &amp; Subscriptions"
+              parent="menu_elsx_saas_root"
+              sequence="60"
+              groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
+    <menuitem id="menu_elsx_saas_billing_plan"
+              name="Billing Plans"
+              parent="menu_elsx_saas_billing"
+              action="action_elsx_saas_billing_plan"
+              sequence="10"
+              groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
+    <menuitem id="menu_elsx_saas_billing_cycle"
+              name="Invoices"
+              parent="menu_elsx_saas_billing"
+              action="action_elsx_saas_billing_cycle"
+              sequence="20"
+              groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
+    <menuitem id="menu_elsx_saas_subscription"
+              name="Subscriptions"
+              parent="menu_elsx_saas_billing"
+              action="action_elsx_saas_subscription"
+              sequence="30"
+              groups="base.group_system,elsx_saas.group_elsx_saas_admin"/>
+</odoo>

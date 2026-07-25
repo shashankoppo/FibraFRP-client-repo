@@ -8,20 +8,15 @@ Use [UBUNTU_24_DOCKER_DEPLOYMENT.md](UBUNTU_24_DOCKER_DEPLOYMENT.md) for
 server setup, exact clone restore, fresh database setup, WhatsApp webhook checks,
 Tally routing, and post-deploy verification.
 
-For every normal production update, use the same command from the repository
-directory:
+For production updates with multiple databases, pull/build the code and run the
+all-database module upgrade script so every database receives the latest stored
+views, menus, and actions:
 
 ```bash
-git pull --ff-only origin main && docker compose stop sidecar && docker compose up -d --build && docker compose ps
-```
-
-This never removes the named database, filestore, or backup volumes. Odoo's
-startup gate creates and verifies an encrypted backup before upgrading each
-eligible database. The sidecar is stopped only while the application is rebuilt.
-For a new server, clone the repository, configure `.env`, then run:
-
-```bash
-docker compose up -d --build && docker compose ps
+git pull origin main
+docker compose down
+docker compose build odoo
+bash deploy/upgrade_module_all_dbs.sh elsx_whatsapp_marketing
 ```
 
 For the current production/live database, use `FiberaFRP_DB` as the primary
@@ -54,8 +49,9 @@ docker compose build odoo
 bash deploy/recover_live_modules.sh FiberaFRP_DB
 ```
 
-This restores the apps, menus, schema, and custom module logic over the retained
-WhatsApp Core records. The script also re-merges WhatsApp sample templates,
+This restores the apps, menus, schema, and custom module logic. If the uninstall
+already deleted business records, restore those records from a pre-uninstall
+database/filestore backup. The script also re-merges WhatsApp sample templates,
 production forms, and FiberaFRP flow blueprints as inactive reviewable defaults;
 it does not push or recreate live Meta credentials from Git.
 

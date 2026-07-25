@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<odoo noupdate="1">
+<odoo>
     <!-- 1. Welcome Message (Marketing) -->
     <record id="whatsapp_template_welcome" model="whatsapp.template">
         <field name="name">welcome_message_pro</field>

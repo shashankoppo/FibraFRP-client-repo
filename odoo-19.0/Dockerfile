@@ -31,7 +31,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libjpeg62-turbo \
     zlib1g \
     postgresql-client \
-    openssl \
     ca-certificates \
     curl \
     node-less \

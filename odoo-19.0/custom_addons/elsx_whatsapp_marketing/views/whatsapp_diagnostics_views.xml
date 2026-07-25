@@ -21,15 +21,12 @@
             <form create="0" edit="0">
                 <header>
                     <button name="action_capture_now" string="Capture New Snapshot" type="object" class="btn-primary"/>
-                    <button name="action_export_redacted_json" string="Export Redacted JSON" type="object" icon="fa-download" invisible="not snapshot_json"/>
                 </header>
                 <sheet>
                     <group>
                         <field name="name"/>
-                        <field name="correlation_id"/>
                         <field name="severity"/>
                         <field name="duration_ms"/>
-                        <field name="snapshot_attachment_id" invisible="1"/>
                     </group>
                     <notebook>
                         <page string="Summary">

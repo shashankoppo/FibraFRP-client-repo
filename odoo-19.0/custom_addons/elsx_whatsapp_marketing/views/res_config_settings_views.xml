@@ -43,12 +43,6 @@
                     </block>
 
                     <block title="Dashboard &amp; User Experience" id="whatsapp_dashboard_ux_setting">
-                        <setting id="whatsapp_runtime_enabled_setting" help="Pauses all outbound sends, campaign dispatch, scheduling, and flow automation when disabled.">
-                            <field name="whatsapp_runtime_enabled"/>
-                        </setting>
-                        <setting id="whatsapp_ui_version_setting" help="Database default. A user-specific override can be set on the user record.">
-                            <field name="whatsapp_ui_version"/>
-                        </setting>
                         <setting id="whatsapp_dashboard_refresh_setting" help="Refresh the WhatsApp dashboard automatically without forcing users to reload the browser. Set 0 to disable auto-refresh.">
                             <field name="whatsapp_dashboard_refresh_seconds"/>
                         </setting>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="group_elsx_saas_admin" model="res.groups">
+        <field name="name">ELSx SaaS Administrator</field>
+        <field name="implied_ids" eval="[(4, ref('base.group_system'))]"/>
+        <field name="comment">Can access the SaaS governance console, tenant registry, module request review, and deployment plans.</field>
+    </record>
+</odoo>

@@ -16,19 +16,10 @@ verify_output.txt
 
 # Python artifacts
 venv19/
-.venv/
 __pycache__/
 *.pyc
 *.pyo
 *.egg-info
-.pytest_cache/
-.ruff_cache/
-
-# JavaScript artifacts
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 
 # Windows scripts
 *.bat
@@ -41,7 +32,6 @@ setup/
 # Deployment scripts (not needed inside the container)
 deploy/
 secure_backups/
-reports/
 
 # Scratch / AI / dev tooling
 brain/
