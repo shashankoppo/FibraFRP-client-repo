@@ -14,20 +14,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${PROJECT_DIR}"
 
-wait_for_db() {
-  local attempt
-  echo "==> Waiting for PostgreSQL to accept connections"
-  for attempt in $(seq 1 60); do
-    if docker compose exec -T db pg_isready -U "${DB_USER}" -d postgres >/dev/null 2>&1; then
-      return 0
-    fi
-    sleep 2
-  done
-  echo "ERROR: PostgreSQL did not become ready after 120 seconds." >&2
-  docker compose ps db >&2 || true
-  exit 1
-}
-
 if [ "${CONFIRM_ALL_DBS:-NO}" != "YES" ]; then
   echo "ERROR: set CONFIRM_ALL_DBS=YES to upgrade every application database." >&2
   echo "This guard prevents accidental tenant-wide changes." >&2
@@ -63,24 +49,17 @@ echo "==> Upgrade modules: ${ALL_UPGRADE_MODULES}"
 
 echo "==> Ensuring PostgreSQL is running"
 docker compose up -d db
-wait_for_db
 
 EXCLUDE_SQL="'$(echo "${DB_NAME_EXCLUDES}" | sed "s/,/','/g")'"
-DB_LIST_SQL="SELECT datname
-               FROM pg_database
-              WHERE datistemplate = false
-                AND datallowconn = true
-                AND datname NOT IN (${EXCLUDE_SQL})
-              ORDER BY datname;"
-if ! DB_LIST_OUTPUT="$(docker compose exec -T db psql -U "${DB_USER}" -d postgres -Atc "${DB_LIST_SQL}")"; then
-  echo "ERROR: failed to list application databases. Refusing to continue." >&2
-  exit 1
-fi
-if [ -n "${DB_LIST_OUTPUT}" ]; then
-  mapfile -t DATABASES <<< "${DB_LIST_OUTPUT}"
-else
-  DATABASES=()
-fi
+mapfile -t DATABASES < <(
+  docker compose exec -T db psql -U "${DB_USER}" -d postgres -Atc \
+    "SELECT datname
+       FROM pg_database
+      WHERE datistemplate = false
+        AND datallowconn = true
+        AND datname NOT IN (${EXCLUDE_SQL})
+      ORDER BY datname;"
+)
 
 if [ "${#DATABASES[@]}" -eq 0 ]; then
   echo "No application databases found. Nothing to update."
