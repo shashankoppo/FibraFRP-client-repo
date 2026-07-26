@@ -16,6 +16,7 @@ DB_PASSWORD="${DB_PASSWORD:-}"
 ODOO_CONFIG="${ODOO_RC:-/etc/odoo/odoo.conf}"
 ODOO_BIN="${ODOO_BIN:-/opt/odoo/odoo-bin}"
 TARGET_DBS="${ELSX_NATIVE_ADMIN_CLEANUP_DBS:-}"
+EXPECTED_MODULE_VERSIONS="'2.8.0','19.0.2.8.0'"
 
 log() {
   printf '[native-admin-cleanup] %s\n' "$*" >&2
@@ -62,7 +63,20 @@ while IFS= read -r database; do
   needs_cleanup="$(
     psql_db "${database}" -Atc "
       SELECT CASE WHEN
-        EXISTS (
+        NOT EXISTS (
+          SELECT 1
+            FROM ir_module_module
+           WHERE name = 'elsx_client_restrictions'
+             AND state = 'installed'
+        )
+        OR EXISTS (
+          SELECT 1
+            FROM ir_module_module
+           WHERE name = 'elsx_client_restrictions'
+             AND state = 'installed'
+             AND COALESCE(latest_version, '') NOT IN (${EXPECTED_MODULE_VERSIONS})
+        )
+        OR EXISTS (
           SELECT 1
             FROM ir_model_data
            WHERE module = 'elsx_client_restrictions'
@@ -83,27 +97,22 @@ while IFS= read -r database; do
         OR EXISTS (
           SELECT 1
             FROM ir_config_parameter
-           WHERE key IN (
-             'elsx_client_restrictions.apps_password_hash',
-             'elsx_client_restrictions.apps_secret_token'
-           )
+           WHERE key = 'elsx_client_restrictions.apps_secret_token'
         )
-        OR EXISTS (
+        OR NOT EXISTS (
           SELECT 1
-            FROM ir_module_module
-           WHERE name = 'elsx_client_restrictions'
-             AND state = 'installed'
-             AND COALESCE(latest_version, '') <> '2.7.0'
+            FROM ir_config_parameter
+           WHERE key = 'elsx_client_restrictions.apps_password_hash'
         )
       THEN 't' ELSE 'f' END;"
   )"
 
   if [ "${needs_cleanup}" != 't' ]; then
-    log "${database} already has native Odoo administration metadata."
+    log "${database} already has native Odoo administration metadata and Apps lock."
     continue
   fi
 
-  log "Restoring native Odoo administration metadata in ${database}."
+  log "Applying native administration cleanup and Apps lock in ${database}."
   python3 "${ODOO_BIN}" \
     -c "${ODOO_CONFIG}" \
     --db_host="${DB_HOST}" \
