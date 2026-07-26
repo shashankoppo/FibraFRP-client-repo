@@ -19,17 +19,19 @@ class TestNativeAdministration(TransactionCase):
         self.assertEqual(action.res_model, "res.users")
         self.assertEqual(action_form.view_id, form_view)
 
-    def test_settings_and_apps_use_native_actions(self):
+    def test_settings_uses_native_action_and_apps_menu_is_locked(self):
         settings = self.env.ref("base_setup.action_general_configuration")
         apps = self.env.ref("base.open_module_tree")
         apps_menu = self.env.ref("base.menu_module_tree")
 
         self.assertEqual(settings.res_model, "res.config.settings")
-        self.assertEqual(apps_menu.action, apps)
-        self.assertFalse(
+        self.assertEqual(apps.res_model, "ir.module.module")
+        self.assertEqual(apps_menu.action._name, "ir.actions.act_url")
+        self.assertEqual(apps_menu.action.url, "/elsx/apps/unlock")
+        self.assertTrue(
             hasattr(
                 self.env["ir.module.module"],
-                "_elsx_check_apps_password_unlocked",
+                "_elsx_require_apps_unlocked",
             )
         )
 
