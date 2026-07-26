@@ -10,6 +10,10 @@ until pg_isready -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}"; do
   sleep 2
 done
 
+if [ "$#" -eq 2 ] && [ "$1" = "python3" ] && [ "$2" = "odoo-bin" ]; then
+  bash /opt/odoo/deploy/restore_native_admin_on_start.sh
+fi
+
 # ── Start Odoo ────────────────────────────────────────────────────────────────
 echo "Starting Odoo..."
 exec "$@" -c "${ODOO_RC}" \

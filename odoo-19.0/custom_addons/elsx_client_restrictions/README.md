@@ -1,13 +1,16 @@
-# ELSX System Access Helpers
+# ELSX Native Administration Cleanup
 
-This addon is kept as a compatibility shell for databases where the existing
-`elsx_client_restrictions` technical module was already installed.
+This technical compatibility addon removes retired ELSX access restrictions.
+It does not replace Odoo access control.
 
-Current behavior:
+- Settings, Users, Companies, Apps, groups, access rights, and record rules use
+  native Odoo 19 Community behavior.
+- The built-in Administrator retains System Administration and Access Rights.
+- Legacy Apps passwords, secret URLs, module guards, safety menus, custom
+  branding views, and restriction groups are removed.
+- Client users, companies, business records, attachments, and functional
+  modules are not deleted or rewritten.
 
-- Standard Odoo access groups control menus and actions.
-- The addon leaves the Apps menu to standard Odoo group behavior.
-- The addon does not auto-upgrade modules during app-list refresh.
-- `/action-39` remains only as a legacy bookmark shortcut to the normal Apps action.
-
-Use Odoo Settings and user groups for access control.
+Odoo 19 has a newer native Users form than earlier Odoo versions. Enable
+Developer Mode when the Groups, Access Rights, and Record Rules technical
+buttons are needed.
