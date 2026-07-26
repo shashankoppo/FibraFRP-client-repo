@@ -2,7 +2,7 @@
 {
     'name': "ELSX WhatsApp Business",
     'summary': "WhatsApp Business Console with API, CRM, Campaigns, Automation, and AI Drafts",
-    'version': '19.0.3.0.32',
+    'version': '19.0.3.0.33',
     'category': 'Marketing/WhatsApp',
     'author': "ELSX Global",
     'license': 'LGPL-3',
