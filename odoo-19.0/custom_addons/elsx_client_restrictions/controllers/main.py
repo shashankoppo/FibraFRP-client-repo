@@ -12,8 +12,18 @@ APPS_UNLOCK_SECONDS = 30 * 60
 
 class ElsxAppsLockController(http.Controller):
 
+    def _clear_unlock(self):
+        try:
+            if APPS_UNLOCK_SESSION_KEY in request.session:
+                del request.session[APPS_UNLOCK_SESSION_KEY]
+        except Exception:
+            pass
+
     def _render_unlock_form(self, error=None):
-        company_name = request.env.company.name or "Odoo"
+        try:
+            company_name = request.env.company.name or "Odoo"
+        except Exception:
+            company_name = "Odoo"
         error_html = ""
         if error:
             error_html = """
@@ -105,10 +115,10 @@ class ElsxAppsLockController(http.Controller):
     @http.route("/elsx/apps/unlock", type="http", auth="user", methods=["GET", "POST"], csrf=True)
     def unlock_apps(self, **post):
         if request.httprequest.method == "GET":
-            request.session.pop(APPS_UNLOCK_SESSION_KEY, None)
+            self._clear_unlock()
             return self._render_unlock_form()
 
-        request.session.pop(APPS_UNLOCK_SESSION_KEY, None)
+        self._clear_unlock()
         if not request.env.user.has_group("base.group_system"):
             return self._render_unlock_form("Only Odoo administrators can unlock Apps.")
 
@@ -116,5 +126,8 @@ class ElsxAppsLockController(http.Controller):
         if not request.env["ir.config_parameter"].sudo()._elsx_apps_password_matches(password):
             return self._render_unlock_form("Incorrect Apps password.")
 
-        request.session[APPS_UNLOCK_SESSION_KEY] = time.time() + APPS_UNLOCK_SECONDS
+        try:
+            request.session[APPS_UNLOCK_SESSION_KEY] = time.time() + APPS_UNLOCK_SECONDS
+        except Exception:
+            return self._render_unlock_form("Could not create an Apps unlock session. Please refresh and try again.")
         return request.redirect("/odoo/apps")

@@ -14,6 +14,14 @@ APPS_UNLOCK_SESSION_KEY = "elsx_apps_unlocked_until"
 APPS_UNLOCK_URL = "/elsx/apps/unlock"
 
 
+def _clear_apps_unlock_session():
+    try:
+        if APPS_UNLOCK_SESSION_KEY in request.session:
+            del request.session[APPS_UNLOCK_SESSION_KEY]
+    except Exception:
+        pass
+
+
 class IrConfigParameter(models.Model):
     _inherit = "ir.config_parameter"
 
@@ -105,7 +113,7 @@ class IrModuleModule(models.Model):
             unlocked_until = 0
         if unlocked_until > time.time():
             return True
-        request.session.pop(APPS_UNLOCK_SESSION_KEY, None)
+        _clear_apps_unlock_session()
         raise AccessError(
             "Apps is password protected. Open Apps from the menu and enter the Apps password."
         )

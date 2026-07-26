@@ -16,6 +16,12 @@ class ResConfigSettings(models.TransientModel):
         config_parameter='whatsapp.sidecar.secret',
         help="Secret key used to authenticate requests between Odoo and the Node sidecar"
     )
+    whatsapp_runtime_enabled = fields.Boolean(
+        string='Enable WhatsApp Runtime',
+        default=True,
+        config_parameter='whatsapp.runtime.enabled',
+        help="Compatibility switch for older settings views. Keep enabled for normal WhatsApp operation."
+    )
     whatsapp_realtime_mode = fields.Selection([
         ('bus', 'Odoo Bus'),
         ('socket', 'Sidecar Socket'),
