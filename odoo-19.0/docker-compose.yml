@@ -65,7 +65,7 @@ services:
     working_dir: /app
     volumes:
       - ./custom_addons/elsx_whatsapp_marketing/sidecar:/app
-    command: sh -c "npm ci --omit=dev && npm start"
+    command: sh -c "if [ -s package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi && npm start"
     environment:
       - ODOO_URL=http://odoo:8069
       - PORT=3000
