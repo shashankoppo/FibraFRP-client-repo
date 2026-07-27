@@ -20,16 +20,11 @@ class ElsxAppsLockController(http.Controller):
             pass
 
     def _render_unlock_form(self, error=None):
-        try:
-            company_name = request.env.company.name or "Odoo"
-        except Exception:
-            company_name = "Odoo"
         error_html = ""
         if error:
             error_html = """
                 <div class="alert alert-danger" role="alert">%s</div>
             """ % html.escape(error)
-        csrf_token = request.csrf_token()
         return request.make_response("""
 <!doctype html>
 <html lang="en">
@@ -95,10 +90,9 @@ class ElsxAppsLockController(http.Controller):
 <body>
     <main>
         <h1>Unlock Apps</h1>
-        <p>Apps management is protected for %s. Enter the developer password to continue.</p>
+        <p>Apps management is protected. Enter the developer password to continue.</p>
         %s
         <form method="post" action="/elsx/apps/unlock" autocomplete="off">
-            <input type="hidden" name="csrf_token" value="%s">
             <label for="apps_password">Apps password</label>
             <input id="apps_password" name="apps_password" type="password" autofocus required>
             <div class="actions">
@@ -110,14 +104,15 @@ class ElsxAppsLockController(http.Controller):
     </main>
 </body>
 </html>
-        """ % (html.escape(company_name), error_html, html.escape(csrf_token)), headers=[("Content-Type", "text/html; charset=utf-8")])
+        """ % error_html, headers=[("Content-Type", "text/html; charset=utf-8")])
 
-    @http.route("/elsx/apps/unlock", type="http", auth="user", methods=["GET", "POST"], csrf=True)
-    def unlock_apps(self, **post):
-        if request.httprequest.method == "GET":
-            self._clear_unlock()
-            return self._render_unlock_form()
+    @http.route("/elsx/apps/unlock", type="http", auth="user", methods=["GET"], csrf=False)
+    def unlock_apps_form(self, **post):
+        self._clear_unlock()
+        return self._render_unlock_form()
 
+    @http.route("/elsx/apps/unlock", type="http", auth="user", methods=["POST"], csrf=False)
+    def unlock_apps_submit(self, **post):
         self._clear_unlock()
         if not request.env.user.has_group("base.group_system"):
             return self._render_unlock_form("Only Odoo administrators can unlock Apps.")
