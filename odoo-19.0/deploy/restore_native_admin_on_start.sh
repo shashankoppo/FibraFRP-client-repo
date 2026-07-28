@@ -18,6 +18,7 @@ ODOO_BIN="${ODOO_BIN:-/opt/odoo/odoo-bin}"
 TARGET_DBS="${ELSX_NATIVE_ADMIN_CLEANUP_DBS:-}"
 EXPECTED_MODULE_VERSIONS="'2.8.0','19.0.2.8.0'"
 EXPECTED_REBRAND_VERSIONS="'1.1.2','19.0.1.1.2'"
+ASSET_PURGE_MARKER="rebrand-js-noop-1.1.2"
 
 log() {
   printf '[native-admin-cleanup] %s\n' "$*" >&2
@@ -37,6 +38,39 @@ psql_db() {
     "$@"
 }
 
+purge_generated_assets() {
+  local database="$1"
+  if ! has_attachments="$(
+    psql_db "${database}" -Atc "SELECT to_regclass('public.ir_attachment') IS NOT NULL;"
+  )"; then
+    log "Skipping generated asset purge in ${database}; could not inspect attachment table."
+    return 0
+  fi
+  if [ "${has_attachments}" != 't' ]; then
+    return 0
+  fi
+
+  if ! removed_assets="$(
+    psql_db "${database}" -Atc "
+      WITH removed AS (
+        DELETE FROM ir_attachment
+         WHERE COALESCE(url, '') LIKE '/web/assets/%'
+         RETURNING id
+      )
+      SELECT COUNT(*) FROM removed;"
+  )"; then
+    log "Generated asset purge failed in ${database}; Odoo will continue startup."
+    return 0
+  fi
+  log "Purged ${removed_assets} generated web asset attachment(s) in ${database}."
+  psql_db "${database}" -c "
+    INSERT INTO ir_config_parameter (key, value, create_uid, create_date, write_uid, write_date)
+    VALUES ('elsx_rebrand.generated_assets_purge', '${ASSET_PURGE_MARKER}', 1, NOW(), 1, NOW())
+    ON CONFLICT (key) DO UPDATE
+      SET value = EXCLUDED.value,
+          write_uid = EXCLUDED.write_uid,
+          write_date = EXCLUDED.write_date;" >/dev/null || true
+}
 if [ -n "${TARGET_DBS}" ]; then
   database_list="$(printf '%s' "${TARGET_DBS}" | tr ',' '\n')"
 else
@@ -124,6 +158,12 @@ while IFS= read -r database; do
              AND state = 'installed'
              AND COALESCE(latest_version, '') NOT IN (${EXPECTED_REBRAND_VERSIONS})
         )
+        OR NOT EXISTS (
+          SELECT 1
+            FROM ir_config_parameter
+           WHERE key = 'elsx_rebrand.generated_assets_purge'
+             AND value = '${ASSET_PURGE_MARKER}'
+        )
       THEN 't' ELSE 'f' END;"
   )"; then
     log "Skipping ${database}; could not inspect cleanup/rebrand state."
@@ -151,5 +191,6 @@ while IFS= read -r database; do
     --log-level=error; then
     log "Cleanup/rebrand failed in ${database}; Odoo will continue startup so the database can be inspected."
   fi
+  purge_generated_assets "${database}"
 
 done <<< "${database_list}"
