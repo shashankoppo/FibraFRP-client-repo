@@ -17,7 +17,7 @@ ODOO_CONFIG="${ODOO_RC:-/etc/odoo/odoo.conf}"
 ODOO_BIN="${ODOO_BIN:-/opt/odoo/odoo-bin}"
 TARGET_DBS="${ELSX_NATIVE_ADMIN_CLEANUP_DBS:-}"
 EXPECTED_MODULE_VERSIONS="'2.8.0','19.0.2.8.0'"
-EXPECTED_REBRAND_VERSIONS="'1.1.0','19.0.1.1.0'"
+EXPECTED_REBRAND_VERSIONS="'1.1.1','19.0.1.1.1'"
 
 log() {
   printf '[native-admin-cleanup] %s\n' "$*" >&2
