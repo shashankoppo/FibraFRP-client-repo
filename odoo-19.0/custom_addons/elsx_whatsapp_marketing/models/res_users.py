@@ -1,9 +1,28 @@
 # -*- coding: utf-8 -*-
-from odoo import models
+from odoo import fields, models
 
 
 class ResUsers(models.Model):
     _inherit = 'res.users'
+
+    whatsapp_ui_version_override = fields.Selection([
+        ('default', 'Use Database Default'),
+        ('legacy', 'Legacy'),
+        ('v2', 'V2'),
+    ],
+        string='WhatsApp UI Version Override',
+        default='default',
+        compute='_compute_whatsapp_ui_version_override',
+        inverse='_inverse_whatsapp_ui_version_override',
+        store=False,
+    )
+
+    def _compute_whatsapp_ui_version_override(self):
+        for user in self:
+            user.whatsapp_ui_version_override = 'default'
+
+    def _inverse_whatsapp_ui_version_override(self):
+        return True
 
     def get_whatsapp_workspace_role(self):
         """Compatibility role used by older WhatsApp menu server actions.

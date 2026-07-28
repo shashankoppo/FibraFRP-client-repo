@@ -22,6 +22,15 @@ class ResConfigSettings(models.TransientModel):
         config_parameter='whatsapp.runtime.enabled',
         help="Compatibility switch for older settings views. Keep enabled for normal WhatsApp operation."
     )
+    whatsapp_ui_version = fields.Selection([
+        ('legacy', 'Legacy'),
+        ('v2', 'V2'),
+    ],
+        string='WhatsApp UI Version',
+        default='legacy',
+        config_parameter='whatsapp.ui.version',
+        help="Compatibility setting for databases that still have older WhatsApp V2 settings metadata. Keep Legacy for this rolled-back UI.",
+    )
     whatsapp_realtime_mode = fields.Selection([
         ('bus', 'Odoo Bus'),
         ('socket', 'Sidecar Socket'),
