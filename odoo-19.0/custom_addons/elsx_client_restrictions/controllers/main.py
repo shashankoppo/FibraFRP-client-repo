@@ -97,7 +97,7 @@ class ElsxAppsLockController(http.Controller):
             <input id="apps_password" name="apps_password" type="password" autofocus required>
             <div class="actions">
                 <button type="submit">Unlock Apps</button>
-                <a href="/odoo">Back to Odoo</a>
+                <a href="/odoo">Back to ELSxGlobal</a>
             </div>
         </form>
         <small>Access stays unlocked for 30 minutes after a correct password.</small>

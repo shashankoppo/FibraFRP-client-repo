@@ -1,20 +1,19 @@
 #!/bin/bash
 set -e
 
-# ── Wait for database ─────────────────────────────────────────────────────────
-# The DB_PASSWORD from .env is passed to Odoo via --db_password below,
-# which always overrides the value in odoo.conf. The conf file is also kept
-# in sync manually (odoo.docker.conf) so direct odoo-bin invocations work too.
+# Wait for database. DB_PASSWORD from .env is passed to Odoo below and
+# overrides odoo.conf so direct odoo-bin invocations use the same credentials.
 until pg_isready -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}"; do
   echo "Waiting for database (${DB_HOST}:${DB_PORT})..."
   sleep 2
 done
 
-if [ "$#" -eq 2 ] && [ "$1" = "python3" ] && [ "$2" = "odoo-bin" ]; then
-  bash /opt/odoo/deploy/restore_native_admin_on_start.sh
-fi
+case " $* " in
+  *" odoo-bin "*|*"/odoo-bin "*)
+    bash /opt/odoo/deploy/restore_native_admin_on_start.sh
+    ;;
+esac
 
-# ── Start Odoo ────────────────────────────────────────────────────────────────
 echo "Starting Odoo..."
 exec "$@" -c "${ODOO_RC}" \
   --db_host="${DB_HOST}" \

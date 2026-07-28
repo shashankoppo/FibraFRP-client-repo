@@ -2,21 +2,31 @@
 <odoo>
     <template id="web_layout_rebrand" inherit_id="web.layout">
         <xpath expr="//title" position="replace">
-            <title>ELSX ERP | Global Strategic Ecosystem</title>
+            <title t-esc="title or 'ELSxGlobal'"/>
         </xpath>
         <xpath expr="//head" position="inside">
-            <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&amp;family=Inter:wght@300;400;700&amp;display=swap" rel="stylesheet"/>
             <link rel="icon" type="image/x-icon" href="/elsx_rebrand/static/src/img/favicon.ico"/>
         </xpath>
     </template>
 
-    <!-- Luxury Cyberpunk Login Page -->
-    <template id="login_rebrand" inherit_id="web.login_layout">
-         <xpath expr="//div[hasclass('text-center')]" position="replace">
-            <div class="text-center mb-4" style="background: rgba(0,0,0,0.6); padding: 40px; border-radius: 20px; border: 1px solid #00DBDE; box-shadow: 0 0 20px #00DBDE;">
-                <img src="/elsx_rebrand/static/src/img/logo.png" alt="ELSX ERP" style="max-height: 120px; filter: drop-shadow(0 0 10px #00DBDE);"/>
-                <h1 style="color: #00DBDE; font-family: 'Orbitron', sans-serif; font-weight: bold; margin-top: 20px; text-transform: uppercase; letter-spacing: 5px;">ELSX ERP</h1>
-                <p style="color: #FC00FF; font-family: 'Inter', sans-serif; font-size: 0.9rem; letter-spacing: 2px;">The Planet's Best Strategic Ecosystem</p>
+    <template id="brand_promotion_message_rebrand" inherit_id="web.brand_promotion_message">
+        <xpath expr="//t[@t-set='odoo_logo']" position="replace">
+            <t t-set="odoo_logo">
+                <a target="_blank" href="https://elsxglobal.com" class="badge text-bg-light text-decoration-none">ELSxGlobal</a>
+            </t>
+        </xpath>
+    </template>
+
+    <template id="login_footer_rebrand" inherit_id="web.login_layout">
+        <xpath expr="//a[contains(@href, 'odoo.com')]" position="replace">
+            <a href="https://elsxglobal.com" target="_blank">Powered by <span>ELSxGlobal</span></a>
+        </xpath>
+    </template>
+
+    <template id="login_logo_rebrand" inherit_id="web.login_layout">
+        <xpath expr="//div[hasclass('text-center') and hasclass('pb-3')]" position="replace">
+            <div class="text-center pb-3 border-bottom mb-4">
+                <img src="/elsx_rebrand/static/src/img/logo.png" alt="ELSxGlobal" style="max-height:120px; max-width:100%; width:auto"/>
             </div>
         </xpath>
     </template>
