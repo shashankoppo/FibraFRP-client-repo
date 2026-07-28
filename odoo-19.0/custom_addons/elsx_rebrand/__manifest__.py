@@ -1,6 +1,6 @@
 {
     'name': 'ELSxGlobal Rebrand',
-    'version': '1.1.1',
+    'version': '1.1.2',
     'category': 'Tools',
     'summary': 'Replace visible Odoo UI branding with ELSxGlobal',
     'description': 'Rebrands visible backend, frontend, login, footer, title, and browser UI strings to ELSxGlobal without touching business data.',
