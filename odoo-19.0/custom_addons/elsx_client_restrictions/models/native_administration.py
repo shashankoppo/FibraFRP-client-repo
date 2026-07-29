@@ -181,6 +181,10 @@ class IrConfigParameter(models.Model):
         module_menu = self._ref("base.menu_module_tree")
         action = self._ref("base.open_module_tree")
         search_view = self._ref("base.view_module_filter")
+        third_party_menu = self._ref("base.menu_third_party")
+        theme_store_menu = self._ref("base.menu_theme_store")
+        third_party_action = self._ref("base.action_third_party")
+        theme_store_action = self._ref("base.action_theme_store")
         system_group = self._ref("base.group_system")
 
         if action:
@@ -216,6 +220,21 @@ class IrConfigParameter(models.Model):
                 "active": True,
                 "parent_id": menu.id,
                 "action": "ir.actions.act_window,%s" % action.id,
+                "group_ids": [Command.clear()],
+            })
+
+        if menu and third_party_menu and third_party_action:
+            third_party_menu.sudo().write({
+                "active": True,
+                "parent_id": menu.id,
+                "action": "ir.actions.act_url,%s" % third_party_action.id,
+                "group_ids": [Command.clear()],
+            })
+        if menu and theme_store_menu and theme_store_action:
+            theme_store_menu.sudo().write({
+                "active": True,
+                "parent_id": menu.id,
+                "action": "ir.actions.act_url,%s" % theme_store_action.id,
                 "group_ids": [Command.clear()],
             })
 

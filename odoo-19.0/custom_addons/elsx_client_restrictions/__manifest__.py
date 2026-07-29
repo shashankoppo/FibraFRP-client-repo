@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "ELSX Native Administration Cleanup",
-    "version": "2.8.3",
+    "version": "2.8.4",
     "category": "Administration",
     "summary": "Removes legacy restrictions and restores native Odoo administration",
     "description": """

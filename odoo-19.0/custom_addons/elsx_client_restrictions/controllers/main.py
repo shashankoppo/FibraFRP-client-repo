@@ -130,6 +130,9 @@ class ElsxAppsLockController(http.Controller):
         except Exception:
             return self._render_unlock_form("Could not create an Apps unlock session. Please refresh and try again.")
         action = request.env.ref("base.open_module_tree", raise_if_not_found=False)
+        menu = request.env.ref("base.menu_module_tree", raise_if_not_found=False)
+        if action and menu:
+            return request.redirect("/odoo/action-base.open_module_tree?menu_id=%s" % menu.id)
         if action:
             return request.redirect("/odoo/action-base.open_module_tree")
         return request.redirect("/odoo/apps")
