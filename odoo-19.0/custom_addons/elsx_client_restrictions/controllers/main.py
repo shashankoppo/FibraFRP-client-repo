@@ -90,7 +90,7 @@ class ElsxAppsLockController(http.Controller):
 <body>
     <main>
         <h1>Unlock Apps</h1>
-        <p>Apps management is protected. Enter the developer password to continue.</p>
+        <p>Apps management is protected. Log in as an administrator, then enter the developer password to continue.</p>
         %s
         <form method="post" action="/elsx/apps/unlock" autocomplete="off">
             <label for="apps_password">Apps password</label>
@@ -106,12 +106,12 @@ class ElsxAppsLockController(http.Controller):
 </html>
         """ % error_html, headers=[("Content-Type", "text/html; charset=utf-8")])
 
-    @http.route("/elsx/apps/unlock", type="http", auth="user", methods=["GET"], csrf=False)
+    @http.route("/elsx/apps/unlock", type="http", auth="public", methods=["GET"], csrf=False)
     def unlock_apps_form(self, **post):
         self._clear_unlock()
         return self._render_unlock_form()
 
-    @http.route("/elsx/apps/unlock", type="http", auth="user", methods=["POST"], csrf=False)
+    @http.route("/elsx/apps/unlock", type="http", auth="public", methods=["POST"], csrf=False)
     def unlock_apps_submit(self, **post):
         self._clear_unlock()
         if not request.env.user.has_group("base.group_system"):
