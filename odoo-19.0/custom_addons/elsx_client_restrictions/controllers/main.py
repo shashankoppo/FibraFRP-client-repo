@@ -25,7 +25,7 @@ class ElsxAppsLockController(http.Controller):
             error_html = """
                 <div class="alert alert-danger" role="alert">%s</div>
             """ % html.escape(error)
-        return request.make_response("""
+        html_doc = """
 <!doctype html>
 <html lang="en">
 <head>
@@ -91,7 +91,7 @@ class ElsxAppsLockController(http.Controller):
     <main>
         <h1>Unlock Apps</h1>
         <p>Apps management is protected. Log in as an administrator, then enter the developer password to continue.</p>
-        %s
+        __ERROR_HTML__
         <form method="post" action="/elsx/apps/unlock" autocomplete="off">
             <label for="apps_password">Apps password</label>
             <input id="apps_password" name="apps_password" type="password" autofocus required>
@@ -104,7 +104,11 @@ class ElsxAppsLockController(http.Controller):
     </main>
 </body>
 </html>
-        """ % error_html, headers=[("Content-Type", "text/html; charset=utf-8")])
+        """
+        return request.make_response(
+            html_doc.replace("__ERROR_HTML__", error_html),
+            headers=[("Content-Type", "text/html; charset=utf-8")],
+        )
 
     @http.route("/elsx/apps/unlock", type="http", auth="public", methods=["GET"], csrf=False)
     def unlock_apps_form(self, **post):
