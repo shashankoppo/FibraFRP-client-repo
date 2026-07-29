@@ -1,2 +1,3 @@
 # -*- coding: utf-8 -*-
-# Part of ELSX ERP.
+from . import models
+from .hooks import post_init_hook

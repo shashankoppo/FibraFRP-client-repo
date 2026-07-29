@@ -30,4 +30,31 @@
             </div>
         </xpath>
     </template>
+
+    <template id="webclient_bootstrap_icon_rebrand" inherit_id="web.webclient_bootstrap">
+        <xpath expr="//link[@rel='apple-touch-icon']" position="replace">
+            <link rel="apple-touch-icon" href="/elsx_rebrand/static/src/img/logo.png"/>
+        </xpath>
+    </template>
+
+    <template id="webclient_offline_rebrand" inherit_id="web.webclient_offline">
+        <xpath expr="//img[@alt='Odoo logo']" position="replace">
+            <img src="/elsx_rebrand/static/src/img/logo.png" alt="ELSxGlobal logo"/>
+        </xpath>
+        <xpath expr="//p[contains(text(), 'Odoo will load')]" position="replace">
+            <p>Check your network connection and come back here. ELSxGlobal will load as soon as you're back online.</p>
+        </xpath>
+    </template>
+
+    <template id="report_layout_title_rebrand" inherit_id="web.report_layout">
+        <xpath expr="//title" position="replace">
+            <title><t t-esc="title or 'ELSxGlobal Report'"/></title>
+        </xpath>
+    </template>
+
+    <template id="report_preview_layout_title_rebrand" inherit_id="web.report_preview_layout">
+        <xpath expr="//title" position="replace">
+            <title><t t-esc="title or 'ELSxGlobal Report'"/></title>
+        </xpath>
+    </template>
 </odoo>
