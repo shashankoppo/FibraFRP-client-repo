@@ -38,11 +38,13 @@
     </template>
 
     <template id="webclient_offline_rebrand" inherit_id="web.webclient_offline">
-        <xpath expr="//img[@alt='Odoo logo']" position="replace">
-            <img src="/elsx_rebrand/static/src/img/logo.png" alt="ELSxGlobal logo"/>
-        </xpath>
-        <xpath expr="//p[contains(text(), 'Odoo will load')]" position="replace">
-            <p>Check your network connection and come back here. ELSxGlobal will load as soon as you're back online.</p>
+        <xpath expr="//div[hasclass('card')]" position="replace">
+            <div class="card">
+                <img src="/elsx_rebrand/static/src/img/logo.png" alt="ELSxGlobal logo"/>
+                <h1>You are offline</h1>
+                <p>Check your network connection and come back here. ELSxGlobal will load as soon as you're back online.</p>
+                <button onclick="location.reload()">Check again</button>
+            </div>
         </xpath>
     </template>
 

@@ -17,8 +17,8 @@ ODOO_CONFIG="${ODOO_RC:-/etc/odoo/odoo.conf}"
 ODOO_BIN="${ODOO_BIN:-/opt/odoo/odoo-bin}"
 TARGET_DBS="${ELSX_NATIVE_ADMIN_CLEANUP_DBS:-}"
 EXPECTED_MODULE_VERSIONS="'2.8.4','19.0.2.8.4'"
-EXPECTED_REBRAND_VERSIONS="'1.2.0','19.0.1.2.0'"
-ASSET_PURGE_MARKER="rebrand-js-noop-1.1.2"
+EXPECTED_REBRAND_VERSIONS="'1.2.1','19.0.1.2.1'"
+ASSET_PURGE_MARKER="rebrand-qweb-safe-1.2.1"
 
 log() {
   printf '[native-admin-cleanup] %s\n' "$*" >&2
