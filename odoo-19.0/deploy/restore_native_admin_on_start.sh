@@ -16,7 +16,7 @@ DB_PASSWORD="${DB_PASSWORD:-}"
 ODOO_CONFIG="${ODOO_RC:-/etc/odoo/odoo.conf}"
 ODOO_BIN="${ODOO_BIN:-/opt/odoo/odoo-bin}"
 TARGET_DBS="${ELSX_NATIVE_ADMIN_CLEANUP_DBS:-}"
-EXPECTED_MODULE_VERSIONS="'2.8.4','19.0.2.8.4'"
+EXPECTED_MODULE_VERSIONS="'2.8.5','19.0.2.8.5'"
 EXPECTED_REBRAND_VERSIONS="'1.2.1','19.0.1.2.1'"
 EXPECTED_DIALOG_VERSIONS="'19.0.1.0.4'"
 ASSET_PURGE_MARKER="rebrand-qweb-safe-1.2.1"
@@ -37,6 +37,53 @@ psql_db() {
     -X -v ON_ERROR_STOP=1 \
     -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${database}" \
     "$@"
+}
+
+
+clear_broken_menu_actions() {
+  local database="$1"
+  if ! removed_menus="$(
+    psql_db "${database}" -Atc "
+      WITH broken AS (
+        SELECT m.id
+          FROM ir_ui_menu m
+         WHERE m.action IS NOT NULL
+           AND m.action::text <> ''
+           AND split_part(m.action::text, ',', 2) ~ '^[0-9]+$'
+           AND (
+             (split_part(m.action::text, ',', 1) = 'ir.actions.server'
+              AND NOT EXISTS (SELECT 1 FROM ir_act_server a WHERE a.id = split_part(m.action::text, ',', 2)::integer))
+             OR (split_part(m.action::text, ',', 1) = 'ir.actions.act_window'
+              AND NOT EXISTS (SELECT 1 FROM ir_act_window a WHERE a.id = split_part(m.action::text, ',', 2)::integer))
+             OR (split_part(m.action::text, ',', 1) = 'ir.actions.act_url'
+              AND NOT EXISTS (SELECT 1 FROM ir_act_url a WHERE a.id = split_part(m.action::text, ',', 2)::integer))
+             OR (split_part(m.action::text, ',', 1) = 'ir.actions.client'
+              AND NOT EXISTS (SELECT 1 FROM ir_act_client a WHERE a.id = split_part(m.action::text, ',', 2)::integer))
+             OR (split_part(m.action::text, ',', 1) = 'ir.actions.report'
+              AND NOT EXISTS (SELECT 1 FROM ir_act_report_xml a WHERE a.id = split_part(m.action::text, ',', 2)::integer))
+             OR split_part(m.action::text, ',', 1) NOT IN (
+                'ir.actions.server',
+                'ir.actions.act_window',
+                'ir.actions.act_url',
+                'ir.actions.client',
+                'ir.actions.report'
+             )
+           )
+      ), cleared AS (
+        UPDATE ir_ui_menu
+           SET action = NULL,
+               write_date = NOW()
+         WHERE id IN (SELECT id FROM broken)
+         RETURNING id
+      )
+      SELECT COUNT(*) FROM cleared;"
+  )"; then
+    log "Broken menu-action cleanup failed in ${database}; Odoo will continue startup."
+    return 0
+  fi
+  if [ "${removed_menus}" != '0' ]; then
+    log "Cleared ${removed_menus} broken menu action pointer(s) in ${database}."
+  fi
 }
 
 purge_generated_assets() {
@@ -102,6 +149,8 @@ while IFS= read -r database; do
     continue
   fi
 
+  clear_broken_menu_actions "${database}"
+
   if ! needs_cleanup="$(
     psql_db "${database}" -Atc "
       SELECT CASE WHEN
@@ -117,6 +166,26 @@ while IFS= read -r database; do
            WHERE name = 'elsx_client_restrictions'
              AND state = 'installed'
              AND COALESCE(latest_version, '') NOT IN (${EXPECTED_MODULE_VERSIONS})
+        )
+        OR EXISTS (
+          SELECT 1
+            FROM ir_ui_menu m
+           WHERE m.action IS NOT NULL
+             AND m.action::text <> ''
+             AND split_part(m.action::text, ',', 2) ~ '^[0-9]+$'
+             AND (
+               (split_part(m.action::text, ',', 1) = 'ir.actions.server'
+                AND NOT EXISTS (SELECT 1 FROM ir_act_server a WHERE a.id = split_part(m.action::text, ',', 2)::integer))
+               OR (split_part(m.action::text, ',', 1) = 'ir.actions.act_window'
+                AND NOT EXISTS (SELECT 1 FROM ir_act_window a WHERE a.id = split_part(m.action::text, ',', 2)::integer))
+               OR (split_part(m.action::text, ',', 1) = 'ir.actions.act_url'
+                AND NOT EXISTS (SELECT 1 FROM ir_act_url a WHERE a.id = split_part(m.action::text, ',', 2)::integer))
+               OR (split_part(m.action::text, ',', 1) = 'ir.actions.client'
+                AND NOT EXISTS (SELECT 1 FROM ir_act_client a WHERE a.id = split_part(m.action::text, ',', 2)::integer))
+               OR (split_part(m.action::text, ',', 1) = 'ir.actions.report'
+                AND NOT EXISTS (SELECT 1 FROM ir_act_report_xml a WHERE a.id = split_part(m.action::text, ',', 2)::integer))
+               OR split_part(m.action::text, ',', 1) NOT IN ('ir.actions.server','ir.actions.act_window','ir.actions.act_url','ir.actions.client','ir.actions.report')
+             )
         )
         OR EXISTS (
           SELECT 1

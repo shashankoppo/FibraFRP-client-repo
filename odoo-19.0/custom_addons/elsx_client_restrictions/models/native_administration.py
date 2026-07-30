@@ -2,7 +2,7 @@
 import logging
 
 from odoo import Command, api, models
-from odoo.exceptions import UserError
+from odoo.exceptions import MissingError, UserError
 
 
 _logger = logging.getLogger(__name__)
@@ -53,6 +53,7 @@ class IrConfigParameter(models.Model):
         self._restore_users()
         self._restore_companies()
         self._repair_ai_settings_view()
+        self._clear_broken_menu_actions()
         self._remove_legacy_restriction_records()
         self.sudo().search([("key", "in", LEGACY_PARAMETER_KEYS)]).unlink()
         if not self._native_administration_is_ready():
@@ -341,6 +342,43 @@ class IrConfigParameter(models.Model):
                 "arch_updated": False,
                 "active": True,
             })
+
+
+    def _clear_broken_menu_actions(self):
+        """Clear menu action pointers whose target action record no longer exists."""
+        removed = 0
+        for menu in self.env["ir.ui.menu"].sudo().search([("action", "!=", False)]):
+            try:
+                action = menu.action
+            except MissingError:
+                menu.write({"action": False})
+                removed += 1
+                continue
+            if not action:
+                continue
+            if hasattr(action, "exists"):
+                if not action.sudo().exists():
+                    menu.write({"action": False})
+                    removed += 1
+                continue
+            action_ref = str(action)
+            if "," not in action_ref:
+                continue
+            model_name, record_id = action_ref.split(",", 1)
+            try:
+                record_id = int(record_id)
+                target_model = self.env[model_name]
+            except (KeyError, TypeError, ValueError):
+                menu.write({"action": False})
+                removed += 1
+                continue
+            if not target_model.sudo().browse(record_id).exists():
+                menu.write({"action": False})
+                removed += 1
+        if removed:
+            _logger.warning(
+                "Cleared %s broken ir.ui.menu action pointer(s).", removed
+            )
 
     def _remove_legacy_restriction_records(self):
         for model_name in LEGACY_MODELS_IN_UNLINK_ORDER:
