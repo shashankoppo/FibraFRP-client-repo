@@ -1,6 +1,6 @@
 {
     'name': 'ELSxGlobal Rebrand',
-    'version': '1.2.1',
+    'version': '1.2.2',
     'category': 'Tools',
     'summary': 'Replace visible platform UI branding with ELSxGlobal',
     'description': 'Rebrands visible backend, frontend, login, footer, title, browser, PWA, report, and Apps metadata strings to ELSxGlobal without touching business data.',
@@ -12,6 +12,14 @@
         'data/rebrand_runtime.xml',
         'views/rebrand_assets.xml',
     ],
+    'assets': {
+        'web.assets_backend': [
+            'elsx_rebrand/static/src/css/website_editor_compat.css',
+        ],
+        'html_builder.iframe_add_dialog': [
+            'elsx_rebrand/static/src/css/website_editor_iframe_compat.css',
+        ],
+    },
     'installable': True,
     'application': False,
     'auto_install': True,
