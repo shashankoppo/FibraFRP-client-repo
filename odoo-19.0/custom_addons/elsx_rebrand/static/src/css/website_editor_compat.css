@@ -28,24 +28,25 @@
 
 .o_add_snippet_dialog aside {
     flex: 0 0 250px;
+    display: flex;
+    flex-direction: column;
     min-height: 0;
     max-height: calc(100vh - 8rem);
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-    scrollbar-width: thin;
+    overflow: hidden !important;
 }
 
 .o_add_snippet_dialog aside .list-group {
+    flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto !important;
+    overflow-x: hidden !important;
     scrollbar-width: thin;
 }
 
 .o_add_snippet_dialog .position-relative.flex-grow-1.flex-shrink-1 {
     min-width: 0;
     min-height: 0;
-    overflow: auto !important;
-    scrollbar-width: thin;
+    overflow: hidden !important;
 }
 
 .o_add_snippet_dialog .o_add_snippet_iframe {
@@ -53,17 +54,16 @@
     min-height: 100%;
 }
 
-.o_add_snippet_dialog ::-webkit-scrollbar {
-    width: 12px;
-    height: 12px;
+.o_add_snippet_dialog aside .list-group::-webkit-scrollbar {
+    width: 10px;
 }
 
-.o_add_snippet_dialog ::-webkit-scrollbar-thumb {
+.o_add_snippet_dialog aside .list-group::-webkit-scrollbar-thumb {
     background: #8f8f8f;
     border: 3px solid #f1f4f5;
     border-radius: 8px;
 }
 
-.o_add_snippet_dialog ::-webkit-scrollbar-track {
+.o_add_snippet_dialog aside .list-group::-webkit-scrollbar-track {
     background: #f1f4f5;
 }
