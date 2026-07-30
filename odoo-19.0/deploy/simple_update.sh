@@ -10,7 +10,7 @@ cd "${PROJECT_DIR}"
 
 INSTALL_MODULES="${INSTALL_MODULES:-elsx_client_restrictions,elsx_rebrand}"
 UPGRADE_MODULES="${UPGRADE_MODULES:-website,web_editor,html_editor,html_builder,elsx_client_restrictions,elsx_rebrand}"
-OPTIONAL_UPGRADE_MODULES="${OPTIONAL_UPGRADE_MODULES:-muk_web_dialog,muk_web_appsbar}"
+OPTIONAL_UPGRADE_MODULES="${OPTIONAL_UPGRADE_MODULES:-muk_web_dialog,muk_web_appsbar,muk_web_theme}"
 DB_NAME_EXCLUDES="${DB_NAME_EXCLUDES:-postgres}"
 SKIP_PULL="${SKIP_PULL:-NO}"
 SKIP_BUILD="${SKIP_BUILD:-NO}"

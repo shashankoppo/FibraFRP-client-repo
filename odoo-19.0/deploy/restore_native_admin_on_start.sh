@@ -20,6 +20,7 @@ EXPECTED_MODULE_VERSIONS="'2.8.6','19.0.2.8.6'"
 EXPECTED_REBRAND_VERSIONS="'1.2.1','19.0.1.2.1'"
 EXPECTED_DIALOG_VERSIONS="'19.0.1.0.4'"
 EXPECTED_APPSBAR_VERSIONS="'19.0.1.1.3'"
+EXPECTED_THEME_VERSIONS="'19.0.1.4.2'"
 ASSET_PURGE_MARKER="rebrand-qweb-safe-1.2.1"
 
 log() {
@@ -249,6 +250,13 @@ while IFS= read -r database; do
              AND state = 'installed'
              AND COALESCE(latest_version, '') NOT IN (${EXPECTED_APPSBAR_VERSIONS})
         )
+        OR EXISTS (
+          SELECT 1
+            FROM ir_module_module
+           WHERE name = 'muk_web_theme'
+             AND state = 'installed'
+             AND COALESCE(latest_version, '') NOT IN (${EXPECTED_THEME_VERSIONS})
+        )
       THEN 't' ELSE 'f' END;"
   )"; then
     log "Skipping ${database}; could not inspect cleanup/rebrand state."
@@ -265,7 +273,7 @@ while IFS= read -r database; do
     psql_db "${database}" -Atc "
       SELECT COALESCE(string_agg(name, ',' ORDER BY name), '')
         FROM ir_module_module
-       WHERE name IN ('muk_web_dialog','muk_web_appsbar')
+       WHERE name IN ('muk_web_dialog','muk_web_appsbar','muk_web_theme')
          AND state = 'installed';"
   )" && [ -n "${optional_ui_modules}" ]; then
     upgrade_modules="${upgrade_modules},${optional_ui_modules}"
