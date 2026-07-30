@@ -10,6 +10,7 @@ cd "${PROJECT_DIR}"
 
 INSTALL_MODULES="${INSTALL_MODULES:-elsx_client_restrictions,elsx_rebrand}"
 UPGRADE_MODULES="${UPGRADE_MODULES:-website,web_editor,html_editor,html_builder,elsx_client_restrictions,elsx_rebrand}"
+OPTIONAL_UPGRADE_MODULES="${OPTIONAL_UPGRADE_MODULES:-muk_web_dialog}"
 DB_NAME_EXCLUDES="${DB_NAME_EXCLUDES:-postgres}"
 SKIP_PULL="${SKIP_PULL:-NO}"
 SKIP_BUILD="${SKIP_BUILD:-NO}"
@@ -21,6 +22,19 @@ log() {
 
 quote_csv_for_sql() {
   printf "'%s'" "$(printf '%s' "$1" | sed "s/'/''/g; s/,/','/g")"
+}
+
+installed_optional_modules_for_db() {
+  local database="$1"
+  local modules_csv="$2"
+  local modules_sql
+  if [ -z "${modules_csv}" ]; then
+    return 0
+  fi
+  modules_sql="$(quote_csv_for_sql "${modules_csv}")"
+  docker compose exec -T db sh -lc \
+    "psql -U \"\$POSTGRES_USER\" -d \"${database}\" -Atc \"SELECT COALESCE(string_agg(name, ',' ORDER BY name), '') FROM ir_module_module WHERE state = 'installed' AND name IN (${modules_sql});\"" \
+    2>/dev/null || true
 }
 
 if [ "${SKIP_PULL}" != "YES" ]; then
@@ -64,17 +78,24 @@ fi
 log "Upgrading modules in ${#DATABASES[@]} database(s): ${DATABASES[*]}"
 log "Install-if-missing: ${INSTALL_MODULES}"
 log "Upgrade: ${UPGRADE_MODULES}"
+log "Optional installed upgrade: ${OPTIONAL_UPGRADE_MODULES}"
 
 log 'Stopping Odoo for clean module upgrade. Sidecar remains running/dormant.'
 docker compose stop odoo >/dev/null 2>&1 || true
 
 for DB in "${DATABASES[@]}"; do
+  DB_UPGRADE_MODULES="${UPGRADE_MODULES}"
+  INSTALLED_OPTIONAL_MODULES="$(installed_optional_modules_for_db "${DB}" "${OPTIONAL_UPGRADE_MODULES}" | tr -d '\r')"
+  if [ -n "${INSTALLED_OPTIONAL_MODULES}" ]; then
+    DB_UPGRADE_MODULES="${DB_UPGRADE_MODULES},${INSTALLED_OPTIONAL_MODULES}"
+  fi
   log "Upgrading database: ${DB}"
+  log "Database upgrade modules: ${DB_UPGRADE_MODULES}"
   docker compose run --rm -T --no-deps odoo \
     python3 /opt/odoo/odoo-bin \
       -d "${DB}" \
       -i "${INSTALL_MODULES}" \
-      -u "${UPGRADE_MODULES}" \
+      -u "${DB_UPGRADE_MODULES}" \
       --without-demo=True \
       --stop-after-init \
       --no-http

@@ -18,6 +18,7 @@ ODOO_BIN="${ODOO_BIN:-/opt/odoo/odoo-bin}"
 TARGET_DBS="${ELSX_NATIVE_ADMIN_CLEANUP_DBS:-}"
 EXPECTED_MODULE_VERSIONS="'2.8.4','19.0.2.8.4'"
 EXPECTED_REBRAND_VERSIONS="'1.2.1','19.0.1.2.1'"
+EXPECTED_DIALOG_VERSIONS="'19.0.1.0.3'"
 ASSET_PURGE_MARKER="rebrand-qweb-safe-1.2.1"
 
 log() {
@@ -164,6 +165,13 @@ while IFS= read -r database; do
            WHERE key = 'elsx_rebrand.generated_assets_purge'
              AND value = '${ASSET_PURGE_MARKER}'
         )
+        OR EXISTS (
+          SELECT 1
+            FROM ir_module_module
+           WHERE name = 'muk_web_dialog'
+             AND state = 'installed'
+             AND COALESCE(latest_version, '') NOT IN (${EXPECTED_DIALOG_VERSIONS})
+        )
       THEN 't' ELSE 'f' END;"
   )"; then
     log "Skipping ${database}; could not inspect cleanup/rebrand state."
@@ -175,7 +183,19 @@ while IFS= read -r database; do
     continue
   fi
 
-  log "Applying native administration cleanup, Apps lock, and ELSxGlobal rebrand in ${database}."
+  upgrade_modules="elsx_client_restrictions,elsx_rebrand"
+  if optional_dialog_module="$(
+    psql_db "${database}" -Atc "
+      SELECT CASE WHEN EXISTS (
+        SELECT 1 FROM ir_module_module
+         WHERE name = 'muk_web_dialog'
+           AND state = 'installed'
+      ) THEN 'muk_web_dialog' ELSE '' END;"
+  )" && [ -n "${optional_dialog_module}" ]; then
+    upgrade_modules="${upgrade_modules},${optional_dialog_module}"
+  fi
+
+  log "Applying native administration cleanup, Apps lock, ELSxGlobal rebrand, and installed UI compatibility fixes in ${database}."
   if ! python3 "${ODOO_BIN}" \
     -c "${ODOO_CONFIG}" \
     --db_host="${DB_HOST}" \
@@ -184,7 +204,7 @@ while IFS= read -r database; do
     --db_password="${DB_PASSWORD}" \
     -d "${database}" \
     -i elsx_client_restrictions,elsx_rebrand \
-    -u elsx_client_restrictions,elsx_rebrand \
+    -u "${upgrade_modules}" \
     --without-demo=True \
     --stop-after-init \
     --no-http \

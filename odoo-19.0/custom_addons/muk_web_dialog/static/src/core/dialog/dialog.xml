@@ -26,7 +26,7 @@
 	    </xpath>
 	    <xpath expr="//t[@t-if='!fullscreen']" position="before">
 	    	<button 
-				t-if="!fullscreen"
+				t-if="!fullscreen and !this.data?.disableMukSizeToggle"
 				type="button" 
 				class="btn float-end me-1 mk_btn_dialog_size" 
 				t-on-click="() => this.onClickDialogSizeToggle()"
