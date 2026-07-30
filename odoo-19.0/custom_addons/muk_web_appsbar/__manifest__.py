@@ -5,7 +5,7 @@
         This module adds a sidebar to the main screen. The sidebar has a list
         of all installed apps similar to the home menu to ease navigation.
     ''',
-    'version': '19.0.1.1.2',
+    'version': '19.0.1.1.3',
     'category': 'Tools/UI',
     'author': 'MuK IT',
     'website': 'http://www.mukit.at',
