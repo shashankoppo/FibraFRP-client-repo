@@ -16,6 +16,11 @@ class ResConfigSettings(models.TransientModel):
         config_parameter='whatsapp.sidecar.secret',
         help="Secret key used to authenticate requests between Odoo and the Node sidecar"
     )
+    whatsapp_public_webhook_base_url = fields.Char(
+        string='Public Webhook Base URL',
+        config_parameter='whatsapp.public.webhook.base.url',
+        help="Public domain used in Meta webhook setup, for example https://example.com. Leave empty to use Odoo's web.base.url."
+    )
     whatsapp_runtime_enabled = fields.Boolean(
         string='Enable WhatsApp Runtime',
         default=True,
@@ -194,6 +199,21 @@ class ResConfigSettings(models.TransientModel):
         default=False,
         help="Safety guard. Keep disabled: AI should not send customer WhatsApp messages automatically."
     )
+
+    def action_use_odoo_base_url_for_whatsapp_webhook(self):
+        params = self.env['ir.config_parameter'].sudo()
+        base_url = (params.get_param('web.base.url') or '').strip().rstrip('/')
+        params.set_param('whatsapp.public.webhook.base.url', base_url)
+        self.whatsapp_public_webhook_base_url = base_url
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': 'Webhook URL Updated',
+                'message': 'WhatsApp webhook base URL now uses the current Odoo base URL.',
+                'type': 'success',
+            },
+        }
 
     def action_sync_all_whatsapp_contacts(self):
         """One-time synchronization from res.partner to whatsapp.contact"""

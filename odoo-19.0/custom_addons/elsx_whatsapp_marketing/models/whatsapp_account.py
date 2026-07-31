@@ -257,11 +257,34 @@ class WhatsAppAccount(models.Model):
             record.message_count = len(record.message_ids)
             record.campaign_count = len(record.campaign_ids)
     
+    @api.model
+    def _get_webhook_base_url(self):
+        params = self.env['ir.config_parameter'].sudo()
+        base_url = (
+            params.get_param('whatsapp.public.webhook.base.url')
+            or params.get_param('web.base.url')
+            or ''
+        )
+        return base_url.strip().rstrip('/')
+
     def _compute_webhook_url(self):
-        base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
+        base_url = self._get_webhook_base_url()
         db_query = quote(self.env.cr.dbname or '')
         for record in self:
             record.webhook_url = f"{base_url}/whatsapp/webhook?db={db_query}"
+
+    def action_refresh_webhook_url(self):
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Webhook URL Ready'),
+                'message': _('Current webhook URL: %s') % self.webhook_url,
+                'type': 'success',
+                'sticky': True,
+            },
+        }
 
     @api.model
     def _get_default_account(self):
@@ -696,7 +719,7 @@ class WhatsAppAccount(models.Model):
         self.ensure_one()
         now = fields.Datetime.now()
         if not self.token_bucket_last_fill:
-            # First-time initialization — safe to use ORM since it's a one-time write
+            # First-time initialization - safe to use ORM since it's a one-time write
             self.sudo().write({
                 'token_bucket_last_fill': now,
                 'token_bucket_level': max((self.rate_limit_capacity or 1.0) - 1.0, 0.0),

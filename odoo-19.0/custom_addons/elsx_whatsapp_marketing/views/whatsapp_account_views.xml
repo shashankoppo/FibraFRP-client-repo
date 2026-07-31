@@ -137,6 +137,7 @@
                             <field name="two_factor_pin" password="1"/>
                             <button name="action_register_phone" string="Register Phone" type="object" class="oe_highlight"/>
                             <field name="webhook_url" readonly="1"/>
+                            <button name="action_refresh_webhook_url" string="Show Current Webhook URL" type="object" class="btn-secondary" icon="fa-copy"/>
                             <field name="webhook_verify_token"/>
                         </group>
                     </group>
@@ -284,6 +285,7 @@
                             <group>
                                 <group string="Webhook Health">
                                     <field name="webhook_url" readonly="1" widget="copy_clipboard"/>
+                                    <button name="action_refresh_webhook_url" string="Show Current Webhook URL" type="object" class="btn-secondary" icon="fa-copy"/>
                                     <field name="webhook_verify_token" password="True"/>
                                     <field name="webhook_status" widget="badge" 
                                            decoration-success="webhook_status == 'verified'" 

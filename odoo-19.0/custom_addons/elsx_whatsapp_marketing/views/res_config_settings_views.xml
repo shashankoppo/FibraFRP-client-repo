@@ -19,6 +19,12 @@
                         <setting id="whatsapp_sidecar_secret_setting" help="Security token used to authenticate webhook relays between Odoo and the Sidecar.">
                             <field name="whatsapp_sidecar_secret" password="True"/>
                         </setting>
+                        <setting id="whatsapp_public_webhook_base_url_setting" help="Public domain used in Meta webhook setup. Leave empty to use the native Odoo web.base.url.">
+                            <div class="d-flex flex-column gap-2">
+                                <field name="whatsapp_public_webhook_base_url" placeholder="https://your-domain.com"/>
+                                <button name="action_use_odoo_base_url_for_whatsapp_webhook" string="Use Current Odoo URL" type="object" class="btn-secondary"/>
+                            </div>
+                        </setting>
                     </block>
 
                     <block title="General Configuration" id="whatsapp_general_setting">
