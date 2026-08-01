@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+<t t-name="elsx_website_snippets.ElsxWebsiteSectionOption">
+    <BuilderRow label.translate="Mood">
+        <BuilderSelect>
+            <BuilderSelectItem classAction="'elsx-theme-soft'">Calm Trust</BuilderSelectItem>
+            <BuilderSelectItem classAction="'elsx-theme-ocean'">Ocean Tech</BuilderSelectItem>
+            <BuilderSelectItem classAction="'elsx-theme-warm'">Warm Premium</BuilderSelectItem>
+            <BuilderSelectItem classAction="'elsx-theme-luxe'">Luxury Dark</BuilderSelectItem>
+            <BuilderSelectItem classAction="'elsx-theme-gradient'">High Impact</BuilderSelectItem>
+            <BuilderSelectItem classAction="'elsx-theme-graphite'">Graphite</BuilderSelectItem>
+        </BuilderSelect>
+    </BuilderRow>
+    <BuilderRow label.translate="Psychology">
+        <BuilderSelect>
+            <BuilderSelectItem classAction="'elsx-psych-trust'">Trust</BuilderSelectItem>
+            <BuilderSelectItem classAction="'elsx-psych-urgency'">Urgency</BuilderSelectItem>
+            <BuilderSelectItem classAction="'elsx-psych-premium'">Premium</BuilderSelectItem>
+            <BuilderSelectItem classAction="'elsx-psych-calm'">Calm</BuilderSelectItem>
+        </BuilderSelect>
+    </BuilderRow>
+    <BuilderRow label.translate="Density">
+        <BuilderSelect>
+            <BuilderSelectItem classAction="'elsx-density-compact'">Compact</BuilderSelectItem>
+            <BuilderSelectItem classAction="'elsx-density-balanced'">Balanced</BuilderSelectItem>
+            <BuilderSelectItem classAction="'elsx-density-airy'">Airy</BuilderSelectItem>
+            <BuilderSelectItem classAction="'elsx-density-cinematic'">Cinematic</BuilderSelectItem>
+        </BuilderSelect>
+    </BuilderRow>
+    <BuilderRow label.translate="Corners">
+        <BuilderSelect>
+            <BuilderSelectItem classAction="'elsx-radius-none'">Sharp</BuilderSelectItem>
+            <BuilderSelectItem classAction="'elsx-radius-soft'">Soft</BuilderSelectItem>
+            <BuilderSelectItem classAction="'elsx-radius-round'">Round</BuilderSelectItem>
+            <BuilderSelectItem classAction="'elsx-radius-organic'">Organic</BuilderSelectItem>
+        </BuilderSelect>
+    </BuilderRow>
+    <BuilderRow label.translate="Depth">
+        <BuilderSelect>
+            <BuilderSelectItem classAction="'elsx-depth-flat'">Flat</BuilderSelectItem>
+            <BuilderSelectItem classAction="'elsx-depth-soft'">Soft Shadow</BuilderSelectItem>
+            <BuilderSelectItem classAction="'elsx-depth-float'">Floating</BuilderSelectItem>
+            <BuilderSelectItem classAction="'elsx-depth-glow'">Glow</BuilderSelectItem>
+        </BuilderSelect>
+    </BuilderRow>
+    <BuilderRow label.translate="Motion">
+        <BuilderSelect>
+            <BuilderSelectItem classAction="'elsx-motion-none'">None</BuilderSelectItem>
+            <BuilderSelectItem classAction="'elsx-motion-lift'">Lift</BuilderSelectItem>
+            <BuilderSelectItem classAction="'elsx-motion-glow'">Glow</BuilderSelectItem>
+            <BuilderSelectItem classAction="'elsx-motion-tilt'">Tilt</BuilderSelectItem>
+        </BuilderSelect>
+    </BuilderRow>
+    <BuilderRow label.translate="Developer">
+        <BuilderCheckbox classAction="'elsx-dev-outline'">Show editable zones</BuilderCheckbox>
+    </BuilderRow>
+</t>
+
+<t t-name="elsx_website_snippets.ElsxLogoSliderOption">
+    <BuilderRow label.translate="Flow">
+        <BuilderSelect>
+            <BuilderSelectItem classAction="'elsx-marquee-left'">Left</BuilderSelectItem>
+            <BuilderSelectItem classAction="'elsx-marquee-right'">Right</BuilderSelectItem>
+            <BuilderSelectItem classAction="'elsx-marquee-static'">Static Grid</BuilderSelectItem>
+        </BuilderSelect>
+    </BuilderRow>
+    <BuilderRow label.translate="Speed">
+        <BuilderRange styleAction="'--elsx-logo-speed'" min="8" max="80" step="2" unit="'s'" displayRangeValue="true"/>
+    </BuilderRow>
+    <BuilderRow label.translate="Logo Style">
+        <BuilderSelect>
+            <BuilderSelectItem classAction="'elsx-logo-carded'">Cards</BuilderSelectItem>
+            <BuilderSelectItem classAction="'elsx-logo-outline'">Outline</BuilderSelectItem>
+            <BuilderSelectItem classAction="'elsx-logo-glass'">Glass</BuilderSelectItem>
+            <BuilderSelectItem classAction="'elsx-logo-minimal'">Minimal</BuilderSelectItem>
+        </BuilderSelect>
+    </BuilderRow>
+    <BuilderRow label.translate="Logo Size">
+        <BuilderSelect>
+            <BuilderSelectItem classAction="'elsx-logo-size-sm'">Small</BuilderSelectItem>
+            <BuilderSelectItem classAction="'elsx-logo-size-md'">Medium</BuilderSelectItem>
+            <BuilderSelectItem classAction="'elsx-logo-size-lg'">Large</BuilderSelectItem>
+        </BuilderSelect>
+    </BuilderRow>
+</t>
+
+</templates>

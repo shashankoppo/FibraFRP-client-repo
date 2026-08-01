@@ -1,4 +1,4 @@
-﻿.s_elsx_logo_cloud,
+.s_elsx_logo_cloud,
 .s_elsx_logo_slider,
 .s_elsx_testimonials,
 .s_elsx_case_studies,
@@ -168,3 +168,100 @@
 .elsx-logo-slide:hover img { filter: grayscale(0); opacity: 1; transform: scale(1.04); }
 @keyframes elsx-logo-marquee { from { transform: translateX(0); } to { transform: translateX(calc(-50% - 0.5rem)); } }
 @media (prefers-reduced-motion: reduce) { .elsx-logo-track { animation: none; flex-wrap: wrap; justify-content: center; width: auto; } }
+
+/* ELSX visual builder presets: class-based, editable in Odoo, no page data mutation. */
+.s_elsx_logo_cloud,
+.s_elsx_logo_slider,
+.s_elsx_testimonials,
+.s_elsx_case_studies,
+.s_elsx_stats,
+.s_elsx_industries,
+.s_elsx_faq,
+.s_elsx_cta,
+.s_elsx_process,
+.s_elsx_comparison,
+.s_elsx_brochure,
+.s_elsx_trust_badges {
+    --elsx-primary: #0f766e;
+    --elsx-secondary: #2563eb;
+    --elsx-accent: #f59e0b;
+    --elsx-bg: #f8fafc;
+    --elsx-surface: rgba(255, 255, 255, 0.92);
+    --elsx-text: #0f172a;
+    --elsx-muted: #64748b;
+    --elsx-border: rgba(15, 23, 42, 0.1);
+    --elsx-radius: 1rem;
+    --elsx-shadow: 0 18px 46px rgba(15, 23, 42, 0.09);
+    --elsx-logo-speed: 32s;
+    isolation: isolate;
+}
+
+.elsx-theme-ocean { --elsx-primary: #0284c7; --elsx-secondary: #14b8a6; --elsx-accent: #67e8f9; --elsx-bg: #ecfeff; --elsx-surface: rgba(255,255,255,.9); background: radial-gradient(circle at 10% 0%, rgba(103,232,249,.34), transparent 32%), linear-gradient(180deg, #ecfeff, #fff); color: var(--elsx-text); }
+.elsx-theme-warm { --elsx-primary: #c2410c; --elsx-secondary: #be123c; --elsx-accent: #fbbf24; --elsx-bg: #fff7ed; --elsx-surface: rgba(255,255,255,.92); background: radial-gradient(circle at 85% 10%, rgba(251,191,36,.28), transparent 30%), linear-gradient(180deg, #fff7ed, #fff); color: var(--elsx-text); }
+.elsx-theme-luxe { --elsx-primary: #f59e0b; --elsx-secondary: #a855f7; --elsx-accent: #fde68a; --elsx-bg: #09090b; --elsx-surface: rgba(24,24,27,.86); --elsx-text: #fafafa; --elsx-muted: #d4d4d8; --elsx-border: rgba(250,250,250,.16); background: radial-gradient(circle at 50% -10%, rgba(245,158,11,.26), transparent 35%), linear-gradient(135deg, #050505, #18181b); color: var(--elsx-text); }
+.elsx-theme-graphite { --elsx-primary: #64748b; --elsx-secondary: #0f172a; --elsx-accent: #22c55e; --elsx-bg: #f1f5f9; background: linear-gradient(135deg, #f8fafc, #e2e8f0); color: var(--elsx-text); }
+.elsx-theme-luxe .text-muted, .elsx-theme-dark .text-muted, .elsx-theme-gradient .text-muted { color: var(--elsx-muted) !important; }
+
+.elsx-psych-trust { --elsx-primary: #0f766e; --elsx-secondary: #2563eb; }
+.elsx-psych-urgency { --elsx-primary: #dc2626; --elsx-secondary: #f97316; --elsx-accent: #facc15; }
+.elsx-psych-premium { --elsx-primary: #7c3aed; --elsx-secondary: #111827; --elsx-accent: #f59e0b; }
+.elsx-psych-calm { --elsx-primary: #0891b2; --elsx-secondary: #65a30d; --elsx-accent: #a7f3d0; }
+
+.elsx-density-compact { padding-top: 2rem !important; padding-bottom: 2rem !important; }
+.elsx-density-balanced { padding-top: 4rem !important; padding-bottom: 4rem !important; }
+.elsx-density-airy { padding-top: 6rem !important; padding-bottom: 6rem !important; }
+.elsx-density-cinematic { padding-top: clamp(6rem, 10vw, 10rem) !important; padding-bottom: clamp(6rem, 10vw, 10rem) !important; }
+
+.elsx-radius-none { --elsx-radius: 0; }
+.elsx-radius-soft { --elsx-radius: .75rem; }
+.elsx-radius-round { --elsx-radius: 1.5rem; }
+.elsx-radius-organic { --elsx-radius: 2.2rem .8rem 2.2rem .8rem; }
+
+.elsx-depth-flat { --elsx-shadow: none; }
+.elsx-depth-soft { --elsx-shadow: 0 18px 46px rgba(15,23,42,.1); }
+.elsx-depth-float { --elsx-shadow: 0 28px 80px rgba(15,23,42,.18); }
+.elsx-depth-glow { --elsx-shadow: 0 18px 70px color-mix(in srgb, var(--elsx-primary), transparent 65%); }
+
+.elsx-logo-card,
+.elsx-logo-slide,
+.elsx-card,
+.elsx-project-card,
+.elsx-tile,
+.elsx-step,
+.elsx-badge,
+.elsx-table-wrap {
+    border-color: var(--elsx-border);
+    border-radius: var(--elsx-radius);
+    background: var(--elsx-surface);
+    box-shadow: var(--elsx-shadow);
+}
+
+.elsx-step b,
+.elsx-chip { background: color-mix(in srgb, var(--elsx-primary), transparent 88%); color: var(--elsx-primary); }
+.elsx-project-media { background: linear-gradient(135deg, var(--elsx-primary), var(--elsx-secondary)); }
+.elsx-cta-box { background: radial-gradient(circle at top left, rgba(255,255,255,.24), transparent 34%), linear-gradient(135deg, var(--elsx-secondary), var(--elsx-primary)); }
+
+.elsx-motion-none *, .elsx-motion-none *::before, .elsx-motion-none *::after { animation: none !important; transition: none !important; }
+.elsx-motion-lift .elsx-logo-card, .elsx-motion-lift .elsx-logo-slide, .elsx-motion-lift .elsx-card, .elsx-motion-lift .elsx-project-card, .elsx-motion-lift .elsx-tile, .elsx-motion-lift .elsx-step, .elsx-motion-lift .elsx-badge { transition: transform .22s ease, box-shadow .22s ease; }
+.elsx-motion-lift .elsx-logo-card:hover, .elsx-motion-lift .elsx-logo-slide:hover, .elsx-motion-lift .elsx-card:hover, .elsx-motion-lift .elsx-project-card:hover, .elsx-motion-lift .elsx-tile:hover, .elsx-motion-lift .elsx-step:hover, .elsx-motion-lift .elsx-badge:hover { transform: translateY(-7px); box-shadow: 0 30px 80px rgba(15,23,42,.18); }
+.elsx-motion-glow .elsx-logo-card:hover, .elsx-motion-glow .elsx-logo-slide:hover, .elsx-motion-glow .elsx-card:hover, .elsx-motion-glow .elsx-project-card:hover, .elsx-motion-glow .elsx-tile:hover, .elsx-motion-glow .elsx-step:hover, .elsx-motion-glow .elsx-badge:hover { box-shadow: 0 0 0 1px color-mix(in srgb, var(--elsx-primary), transparent 35%), 0 24px 80px color-mix(in srgb, var(--elsx-primary), transparent 68%); }
+.elsx-motion-tilt .elsx-logo-card:hover, .elsx-motion-tilt .elsx-logo-slide:hover, .elsx-motion-tilt .elsx-card:hover, .elsx-motion-tilt .elsx-project-card:hover, .elsx-motion-tilt .elsx-tile:hover, .elsx-motion-tilt .elsx-step:hover, .elsx-motion-tilt .elsx-badge:hover { transform: perspective(900px) rotateX(2deg) rotateY(-2deg) translateY(-4px); }
+
+.elsx-marquee-left .elsx-logo-track { animation-direction: normal; animation-duration: var(--elsx-logo-speed); }
+.elsx-marquee-right .elsx-logo-track { animation-direction: reverse; animation-duration: var(--elsx-logo-speed); }
+.elsx-marquee-static .elsx-logo-slider { mask-image: none; }
+.elsx-marquee-static .elsx-logo-track { animation: none; width: auto; flex-wrap: wrap; justify-content: center; }
+.elsx-logo-outline .elsx-logo-slide { background: transparent; border-style: dashed; box-shadow: none; }
+.elsx-logo-glass .elsx-logo-slide { background: rgba(255,255,255,.48); backdrop-filter: blur(18px); }
+.elsx-logo-minimal .elsx-logo-slide { background: transparent; border-color: transparent; box-shadow: none; }
+.elsx-logo-size-sm .elsx-logo-slide { width: clamp(120px, 12vw, 170px); min-height: 74px; }
+.elsx-logo-size-md .elsx-logo-slide { width: clamp(150px, 16vw, 220px); min-height: 96px; }
+.elsx-logo-size-lg .elsx-logo-slide { width: clamp(190px, 20vw, 280px); min-height: 124px; }
+
+.elsx-dev-outline :where(h1,h2,h3,p,a,.elsx-logo-slide,.elsx-logo-card,.elsx-card,.elsx-project-card,.elsx-tile,.elsx-step,.elsx-badge) { outline: 1px dashed rgba(20,184,166,.55); outline-offset: 3px; }
+.elsx-dev-outline::before { content: "ELSX editable section"; position: absolute; top: .75rem; right: .75rem; z-index: 2; padding: .25rem .55rem; border-radius: 999px; font: 700 11px/1 system-ui, sans-serif; letter-spacing: .04em; text-transform: uppercase; color: #0f766e; background: rgba(204,251,241,.92); }
+
+@supports not (color: color-mix(in srgb, red, white)) {
+    .elsx-depth-glow { --elsx-shadow: 0 18px 70px rgba(15,118,110,.2); }
+    .elsx-motion-glow .elsx-logo-card:hover, .elsx-motion-glow .elsx-logo-slide:hover, .elsx-motion-glow .elsx-card:hover, .elsx-motion-glow .elsx-project-card:hover, .elsx-motion-glow .elsx-tile:hover, .elsx-motion-glow .elsx-step:hover, .elsx-motion-glow .elsx-badge:hover { box-shadow: 0 24px 80px rgba(15,118,110,.22); }
+}
