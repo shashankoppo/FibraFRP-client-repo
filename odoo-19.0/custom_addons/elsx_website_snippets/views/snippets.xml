@@ -1,0 +1,190 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="s_elsx_logo_cloud" name="Client Logo Showcase">
+        <section class="s_elsx_logo_cloud pt64 pb64" data-snippet="s_elsx_logo_cloud" data-name="Client Logo Showcase">
+            <div class="container">
+                <div class="text-center mb-5">
+                    <p class="text-uppercase text-muted fw-semibold small mb-2">Trusted By Teams Across Industries</p>
+                    <h2 class="display-6 fw-bold mb-3">Clients, partners, and project collaborators</h2>
+                    <p class="lead text-muted mx-auto" style="max-width: 720px;">Replace these placeholders with client logos, certifications, or partner marks.</p>
+                </div>
+                <div class="elsx-logo-grid">
+                    <div class="elsx-logo-card">Client Logo</div>
+                    <div class="elsx-logo-card">Partner</div>
+                    <div class="elsx-logo-card">Vendor</div>
+                    <div class="elsx-logo-card">Brand</div>
+                    <div class="elsx-logo-card">Agency</div>
+                    <div class="elsx-logo-card">Enterprise</div>
+                </div>
+            </div>
+        </section>
+    </template>
+
+
+    <template id="s_elsx_logo_slider" name="Client Partner Logo Slider">
+        <section class="s_elsx_logo_slider elsx-theme-soft pt56 pb56" data-snippet="s_elsx_logo_slider" data-name="Client Partner Logo Slider">
+            <div class="container">
+                <div class="row align-items-center g-4 mb-4">
+                    <div class="col-lg-5">
+                        <p class="text-uppercase text-muted fw-semibold small mb-2">Our Network</p>
+                        <h2 class="h1 fw-bold mb-0">Clients, partners, and trusted brands</h2>
+                    </div>
+                    <div class="col-lg-7">
+                        <p class="lead text-muted mb-0">Use this slider to showcase client logos, partner companies, certifications, vendors, media mentions, or project collaborators. Replace text blocks with logo images from the Odoo editor.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="elsx-logo-slider" aria-label="Client and partner logo showcase">
+                <div class="elsx-logo-track">
+                    <div class="elsx-logo-slide">Client Logo</div>
+                    <div class="elsx-logo-slide">Partner</div>
+                    <div class="elsx-logo-slide">Vendor</div>
+                    <div class="elsx-logo-slide">Brand</div>
+                    <div class="elsx-logo-slide">Agency</div>
+                    <div class="elsx-logo-slide">Enterprise</div>
+                    <div class="elsx-logo-slide">Group</div>
+                    <div class="elsx-logo-slide">Network</div>
+                    <div class="elsx-logo-slide">Client Logo</div>
+                    <div class="elsx-logo-slide">Partner</div>
+                    <div class="elsx-logo-slide">Vendor</div>
+                    <div class="elsx-logo-slide">Brand</div>
+                    <div class="elsx-logo-slide">Agency</div>
+                    <div class="elsx-logo-slide">Enterprise</div>
+                    <div class="elsx-logo-slide">Group</div>
+                    <div class="elsx-logo-slide">Network</div>
+                </div>
+            </div>
+            <div class="container mt-4">
+                <div class="d-flex flex-wrap gap-2 justify-content-center">
+                    <span class="elsx-chip">Editable Logos</span>
+                    <span class="elsx-chip">Pure CSS Slider</span>
+                    <span class="elsx-chip">Mobile Friendly</span>
+                </div>
+            </div>
+        </section>
+    </template>
+    <template id="s_elsx_testimonials" name="Testimonials Cards">
+        <section class="s_elsx_testimonials pt64 pb64 o_cc o_cc2" data-snippet="s_elsx_testimonials" data-name="Testimonials Cards">
+            <div class="container">
+                <div class="row align-items-end mb-4">
+                    <div class="col-lg-8">
+                        <p class="text-uppercase fw-semibold small mb-2">Customer Proof</p>
+                        <h2 class="display-6 fw-bold">What customers say after delivery</h2>
+                    </div>
+                    <div class="col-lg-4 text-lg-end"><a href="/contactus" class="btn btn-primary">Request a Quote</a></div>
+                </div>
+                <div class="row g-4">
+                    <div class="col-md-4"><div class="elsx-card h-100"><div class="elsx-stars">5 Stars</div><p>&quot;Professional execution, clear updates, and a result that matched our technical requirements.&quot;</p><strong>Client Name</strong><span>Manufacturing Lead</span></div></div>
+                    <div class="col-md-4"><div class="elsx-card h-100"><div class="elsx-stars">5 Stars</div><p>&quot;The team understood our operational problem and proposed a practical, durable solution.&quot;</p><strong>Client Name</strong><span>Project Manager</span></div></div>
+                    <div class="col-md-4"><div class="elsx-card h-100"><div class="elsx-stars">5 Stars</div><p>&quot;Fast response, reliable documentation, and support even after the project was completed.&quot;</p><strong>Client Name</strong><span>Operations Head</span></div></div>
+                </div>
+            </div>
+        </section>
+    </template>
+
+    <template id="s_elsx_case_studies" name="Case Studies Grid">
+        <section class="s_elsx_case_studies pt64 pb64" data-snippet="s_elsx_case_studies" data-name="Case Studies Grid">
+            <div class="container">
+                <div class="text-center mb-5"><p class="text-uppercase text-muted fw-semibold small mb-2">Work Showcase</p><h2 class="display-6 fw-bold">Recent project outcomes</h2></div>
+                <div class="row g-4">
+                    <div class="col-lg-4"><article class="elsx-project-card"><div class="elsx-project-media">Project Image</div><div class="p-4"><span class="badge text-bg-primary mb-3">Industrial</span><h3 class="h5">Corrosion-resistant installation</h3><p class="text-muted">Show scope, challenge, solution, and measurable result.</p><a href="#" class="stretched-link">View case study</a></div></article></div>
+                    <div class="col-lg-4"><article class="elsx-project-card"><div class="elsx-project-media">Project Image</div><div class="p-4"><span class="badge text-bg-primary mb-3">Construction</span><h3 class="h5">On-site delivery and fitment</h3><p class="text-muted">Highlight delivery speed, material quality, and safety.</p><a href="#" class="stretched-link">View case study</a></div></article></div>
+                    <div class="col-lg-4"><article class="elsx-project-card"><div class="elsx-project-media">Project Image</div><div class="p-4"><span class="badge text-bg-primary mb-3">Custom</span><h3 class="h5">Custom engineered solution</h3><p class="text-muted">Use this card for special requirements and custom work.</p><a href="#" class="stretched-link">View case study</a></div></article></div>
+                </div>
+            </div>
+        </section>
+    </template>
+
+    <template id="s_elsx_stats" name="Stats Counters">
+        <section class="s_elsx_stats pt56 pb56 o_cc o_cc3" data-snippet="s_elsx_stats" data-name="Stats Counters">
+            <div class="container">
+                <div class="row g-4 text-center">
+                    <div class="col-6 col-lg-3"><div class="elsx-stat"><strong>500+</strong><span>Projects Delivered</span></div></div>
+                    <div class="col-6 col-lg-3"><div class="elsx-stat"><strong>25+</strong><span>Industries Served</span></div></div>
+                    <div class="col-6 col-lg-3"><div class="elsx-stat"><strong>10+</strong><span>Years Experience</span></div></div>
+                    <div class="col-6 col-lg-3"><div class="elsx-stat"><strong>24/7</strong><span>Support Ready</span></div></div>
+                </div>
+            </div>
+        </section>
+    </template>
+
+    <template id="s_elsx_industries" name="Industries Served">
+        <section class="s_elsx_industries pt64 pb64" data-snippet="s_elsx_industries" data-name="Industries Served">
+            <div class="container">
+                <div class="row align-items-center mb-4"><div class="col-lg-7"><p class="text-uppercase text-muted fw-semibold small mb-2">Use Cases</p><h2 class="display-6 fw-bold">Solutions for demanding environments</h2></div><div class="col-lg-5"><p class="text-muted mb-0">Edit cards to match your target sectors, products, or service categories.</p></div></div>
+                <div class="row g-3">
+                    <div class="col-md-6 col-lg-3"><div class="elsx-tile">Chemical Plants</div></div>
+                    <div class="col-md-6 col-lg-3"><div class="elsx-tile">Construction</div></div>
+                    <div class="col-md-6 col-lg-3"><div class="elsx-tile">Water Treatment</div></div>
+                    <div class="col-md-6 col-lg-3"><div class="elsx-tile">Manufacturing</div></div>
+                </div>
+            </div>
+        </section>
+    </template>
+
+    <template id="s_elsx_faq" name="FAQ Accordion">
+        <section class="s_elsx_faq pt64 pb64" data-snippet="s_elsx_faq" data-name="FAQ Accordion">
+            <div class="container">
+                <div class="row g-5">
+                    <div class="col-lg-5"><p class="text-uppercase text-muted fw-semibold small mb-2">Questions</p><h2 class="display-6 fw-bold">Common buyer questions</h2><p class="text-muted">Use this section to reduce sales friction before enquiry.</p></div>
+                    <div class="col-lg-7">
+                        <div class="accordion" id="elsxFaqAccordion">
+                            <div class="accordion-item"><h3 class="accordion-header"><button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#elsxFaqOne">How fast can you deliver?</button></h3><div id="elsxFaqOne" class="accordion-collapse collapse show" data-bs-parent="#elsxFaqAccordion"><div class="accordion-body">Replace with realistic timelines based on product, quantity, and location.</div></div></div>
+                            <div class="accordion-item"><h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#elsxFaqTwo">Do you support custom requirements?</button></h3><div id="elsxFaqTwo" class="accordion-collapse collapse" data-bs-parent="#elsxFaqAccordion"><div class="accordion-body">Explain custom sizing, technical drawings, installation, and consultation support.</div></div></div>
+                            <div class="accordion-item"><h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#elsxFaqThree">How do we request a quote?</button></h3><div id="elsxFaqThree" class="accordion-collapse collapse" data-bs-parent="#elsxFaqAccordion"><div class="accordion-body">Add the preferred contact method, required details, and expected response time.</div></div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </template>
+
+    <template id="s_elsx_cta" name="Conversion CTA Banner">
+        <section class="s_elsx_cta pt64 pb64" data-snippet="s_elsx_cta" data-name="Conversion CTA Banner">
+            <div class="container"><div class="elsx-cta-box text-center"><p class="text-uppercase fw-semibold small mb-2">Ready To Start?</p><h2 class="display-6 fw-bold mb-3">Get a practical quote for your next requirement</h2><p class="lead mb-4">Share your project details and our team will respond with next steps.</p><div class="d-flex gap-3 justify-content-center flex-wrap"><a href="/contactus" class="btn btn-light btn-lg">Contact Us</a><a href="https://wa.me/910000000000" class="btn btn-outline-light btn-lg">WhatsApp</a></div></div></div>
+        </section>
+    </template>
+
+    <template id="s_elsx_process" name="Process Timeline">
+        <section class="s_elsx_process pt64 pb64" data-snippet="s_elsx_process" data-name="Process Timeline">
+            <div class="container"><div class="text-center mb-5"><p class="text-uppercase text-muted fw-semibold small mb-2">Process</p><h2 class="display-6 fw-bold">From enquiry to delivery</h2></div><div class="row g-4"><div class="col-md-3"><div class="elsx-step"><b>01</b><h3>Discuss</h3><p>Collect project details.</p></div></div><div class="col-md-3"><div class="elsx-step"><b>02</b><h3>Design</h3><p>Confirm scope and specs.</p></div></div><div class="col-md-3"><div class="elsx-step"><b>03</b><h3>Deliver</h3><p>Execute and dispatch.</p></div></div><div class="col-md-3"><div class="elsx-step"><b>04</b><h3>Support</h3><p>Assist after delivery.</p></div></div></div></div>
+        </section>
+    </template>
+
+    <template id="s_elsx_comparison" name="Comparison Table">
+        <section class="s_elsx_comparison pt64 pb64" data-snippet="s_elsx_comparison" data-name="Comparison Table">
+            <div class="container"><div class="text-center mb-5"><p class="text-uppercase text-muted fw-semibold small mb-2">Compare</p><h2 class="display-6 fw-bold">Why choose this solution</h2></div><div class="table-responsive elsx-table-wrap"><table class="table align-middle mb-0"><thead><tr><th>Feature</th><th>Standard Option</th><th>Our Solution</th></tr></thead><tbody><tr><td>Durability</td><td>Basic</td><td><strong>High resistance</strong></td></tr><tr><td>Customization</td><td>Limited</td><td><strong>Project-specific</strong></td></tr><tr><td>Support</td><td>Reactive</td><td><strong>Guided from enquiry</strong></td></tr></tbody></table></div></div>
+        </section>
+    </template>
+
+    <template id="s_elsx_brochure" name="Brochure Download Lead Block">
+        <section class="s_elsx_brochure pt64 pb64 o_cc o_cc2" data-snippet="s_elsx_brochure" data-name="Brochure Download Lead Block">
+            <div class="container"><div class="row align-items-center g-4"><div class="col-lg-7"><p class="text-uppercase fw-semibold small mb-2">Resource</p><h2 class="display-6 fw-bold">Download product brochure</h2><p class="lead">Use this as a lead magnet. Link the button to a PDF, contact page, or Odoo form.</p></div><div class="col-lg-5 text-lg-end"><a href="/contactus" class="btn btn-primary btn-lg">Request Brochure</a></div></div></div>
+        </section>
+    </template>
+
+    <template id="s_elsx_trust_badges" name="Trust Badges">
+        <section class="s_elsx_trust_badges pt48 pb48" data-snippet="s_elsx_trust_badges" data-name="Trust Badges">
+            <div class="container"><div class="row g-3 text-center"><div class="col-6 col-lg-3"><div class="elsx-badge">ISO Certified</div></div><div class="col-6 col-lg-3"><div class="elsx-badge">Quality Checked</div></div><div class="col-6 col-lg-3"><div class="elsx-badge">On-Time Delivery</div></div><div class="col-6 col-lg-3"><div class="elsx-badge">Expert Support</div></div></div></div>
+        </section>
+    </template>
+
+    <template id="snippets" inherit_id="website.snippets" priority="20">
+        <xpath expr="//snippets[@id='snippet_structure']" position="inside">
+            <t t-snippet="elsx_website_snippets.s_elsx_logo_cloud" string="Client Logos" group="content"/>
+            <t t-snippet="elsx_website_snippets.s_elsx_logo_slider" string="Logo Slider" group="content"/>
+            <t t-snippet="elsx_website_snippets.s_elsx_testimonials" string="Testimonials" group="content"/>
+            <t t-snippet="elsx_website_snippets.s_elsx_case_studies" string="Case Studies" group="content"/>
+            <t t-snippet="elsx_website_snippets.s_elsx_stats" string="Stats Counters" group="content"/>
+            <t t-snippet="elsx_website_snippets.s_elsx_industries" string="Industries Served" group="content"/>
+            <t t-snippet="elsx_website_snippets.s_elsx_faq" string="FAQ Accordion" group="text"/>
+            <t t-snippet="elsx_website_snippets.s_elsx_cta" string="CTA Banner" group="content"/>
+            <t t-snippet="elsx_website_snippets.s_elsx_process" string="Process Timeline" group="content"/>
+            <t t-snippet="elsx_website_snippets.s_elsx_comparison" string="Comparison Table" group="content"/>
+            <t t-snippet="elsx_website_snippets.s_elsx_brochure" string="Brochure Lead Block" group="content"/>
+            <t t-snippet="elsx_website_snippets.s_elsx_trust_badges" string="Trust Badges" group="content"/>
+        </xpath>
+    </template>
+</odoo>
+
+

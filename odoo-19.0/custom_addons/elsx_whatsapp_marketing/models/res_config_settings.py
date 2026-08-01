@@ -19,6 +19,7 @@ class ResConfigSettings(models.TransientModel):
     whatsapp_public_webhook_base_url = fields.Char(
         string='Public Webhook Base URL',
         config_parameter='whatsapp.public.webhook.base.url',
+        store=False,
         help="Public domain used in Meta webhook setup, for example https://example.com. Leave empty to use Odoo's web.base.url."
     )
     whatsapp_runtime_enabled = fields.Boolean(
