@@ -15,7 +15,7 @@
 
 .elsx-logo-grid {
     display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--elsx-logo-item-width, 240px)), 1fr));
     gap: 1rem;
 }
 
@@ -33,7 +33,8 @@
 }
 
 .elsx-logo-card {
-    min-height: 92px;
+    min-height: var(--elsx-logo-item-height, 126px);
+    padding: var(--elsx-logo-item-padding, 1rem);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -163,8 +164,8 @@
 .elsx-logo-slider { position: relative; overflow: hidden; width: 100%; mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent); }
 .elsx-logo-slider:hover .elsx-logo-track { animation-play-state: paused; }
 .elsx-logo-track { display: flex; width: max-content; gap: 1rem; animation: elsx-logo-marquee 32s linear infinite; }
-.elsx-logo-slide { width: clamp(150px, 16vw, 220px); min-height: 96px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; border: 1px solid rgba(15, 23, 42, 0.08); border-radius: 1.25rem; background: rgba(255, 255, 255, 0.88); color: #475569; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08); }
-.elsx-logo-slide img { max-width: 76%; max-height: 56px; object-fit: contain; filter: grayscale(1); opacity: 0.82; transition: filter 180ms ease, opacity 180ms ease, transform 180ms ease; }
+.elsx-logo-slide { width: var(--elsx-logo-item-width, clamp(180px, 18vw, 260px)); min-height: var(--elsx-logo-item-height, 126px); padding: var(--elsx-logo-item-padding, 1rem); display: flex; align-items: center; justify-content: center; flex: 0 0 auto; border: 1px solid rgba(15, 23, 42, 0.08); border-radius: 1.25rem; background: rgba(255, 255, 255, 0.88); color: #475569; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08); }
+.elsx-logo-slide img { max-width: 100%; max-height: calc(var(--elsx-logo-media-size, 76px) * .92); object-fit: contain; filter: grayscale(1); opacity: 0.82; transition: filter 180ms ease, opacity 180ms ease, transform 180ms ease; }
 .elsx-logo-slide:hover img { filter: grayscale(0); opacity: 1; transform: scale(1.04); }
 @keyframes elsx-logo-marquee { from { transform: translateX(0); } to { transform: translateX(calc(-50% - 0.5rem)); } }
 @media (prefers-reduced-motion: reduce) { .elsx-logo-track { animation: none; flex-wrap: wrap; justify-content: center; width: auto; } }
@@ -193,6 +194,11 @@
     --elsx-radius: 1rem;
     --elsx-shadow: 0 18px 46px rgba(15, 23, 42, 0.09);
     --elsx-logo-speed: 32s;
+    --elsx-logo-item-width: 240px;
+    --elsx-logo-item-height: 126px;
+    --elsx-logo-media-size: 76px;
+    --elsx-logo-text-size: 18px;
+    --elsx-logo-item-padding: 1rem;
     isolation: isolate;
 }
 
@@ -254,9 +260,9 @@
 .elsx-logo-outline .elsx-logo-slide { background: transparent; border-style: dashed; box-shadow: none; }
 .elsx-logo-glass .elsx-logo-slide { background: rgba(255,255,255,.48); backdrop-filter: blur(18px); }
 .elsx-logo-minimal .elsx-logo-slide { background: transparent; border-color: transparent; box-shadow: none; }
-.elsx-logo-size-sm .elsx-logo-slide { width: clamp(120px, 12vw, 170px); min-height: 74px; }
-.elsx-logo-size-md .elsx-logo-slide { width: clamp(150px, 16vw, 220px); min-height: 96px; }
-.elsx-logo-size-lg .elsx-logo-slide { width: clamp(190px, 20vw, 280px); min-height: 124px; }
+.elsx-logo-size-sm { --elsx-logo-item-width: 180px; --elsx-logo-item-height: 92px; --elsx-logo-media-size: 56px; --elsx-logo-text-size: 14px; }
+.elsx-logo-size-md { --elsx-logo-item-width: 240px; --elsx-logo-item-height: 126px; --elsx-logo-media-size: 76px; --elsx-logo-text-size: 18px; }
+.elsx-logo-size-lg { --elsx-logo-item-width: 320px; --elsx-logo-item-height: 164px; --elsx-logo-media-size: 112px; --elsx-logo-text-size: 22px; }
 
 .elsx-dev-outline :where(h1,h2,h3,p,a,.elsx-logo-slide,.elsx-logo-card,.elsx-card,.elsx-project-card,.elsx-tile,.elsx-step,.elsx-badge) { outline: 1px dashed rgba(20,184,166,.55); outline-offset: 3px; }
 .elsx-dev-outline::before { content: "ELSX editable section"; position: absolute; top: .75rem; right: .75rem; z-index: 2; padding: .25rem .55rem; border-radius: 999px; font: 700 11px/1 system-ui, sans-serif; letter-spacing: .04em; text-transform: uppercase; color: #0f766e; background: rgba(204,251,241,.92); }
@@ -275,8 +281,8 @@
     cursor: pointer;
 }
 .elsx-logo-media {
-    width: 52px;
-    height: 52px;
+    width: var(--elsx-logo-media-size, 76px);
+    height: var(--elsx-logo-media-size, 76px);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -287,7 +293,7 @@
 }
 .elsx-logo-mark {
     display: inline-flex;
-    font-size: .95rem;
+    font-size: calc(var(--elsx-logo-media-size, 76px) * .28);
     font-weight: 900;
     letter-spacing: .06em;
 }
@@ -303,6 +309,7 @@
 .elsx-logo-label {
     display: block;
     line-height: 1.2;
+    font-size: var(--elsx-logo-text-size, 18px);
 }
 .elsx-logo-show-image .elsx-logo-img {
     display: block;
@@ -315,7 +322,7 @@
 }
 .elsx-logo-pill { border-radius: 999px !important; }
 .elsx-logo-square { border-radius: .25rem !important; }
-.elsx-logo-circle { width: clamp(110px, 12vw, 150px) !important; min-height: clamp(110px, 12vw, 150px) !important; border-radius: 50% !important; }
+.elsx-logo-circle { width: var(--elsx-logo-item-height, 150px) !important; min-height: var(--elsx-logo-item-height, 150px) !important; border-radius: 50% !important; }
 .elsx-logo-freeform { border-radius: 2rem .45rem 2rem .45rem !important; }
 .elsx-logo-carded .elsx-logo-slide { border-style: solid; }
 
@@ -373,11 +380,11 @@
 .elsx-logo-kind-media .elsx-logo-label { font-size: 1.02rem; font-weight: 900; color: #0f172a; }
 .elsx-logo-kind-cert { border-style: dashed !important; background: linear-gradient(135deg, rgba(255,255,255,.95), rgba(240,253,250,.8)) !important; }
 .elsx-logo-kind-cert .elsx-logo-media { border: 1px solid rgba(20,184,166,.28); }
-.elsx-logo-kind-media .elsx-logo-media { width: 78px; height: 58px; border-radius: .85rem; background: #fff; }
+.elsx-logo-kind-media .elsx-logo-media { width: calc(var(--elsx-logo-media-size, 76px) * 1.45); height: var(--elsx-logo-media-size, 76px); border-radius: .85rem; background: #fff; }
 .elsx-logo-kind-media .elsx-logo-img { display: block; }
 .elsx-logo-kind-media .elsx-logo-mark { display: none; }
 .elsx-logo-kind-chip { width: auto !important; min-height: 48px !important; flex-direction: row !important; padding: .65rem 1rem !important; }
-.elsx-logo-kind-chip .elsx-logo-media { width: 34px; height: 34px; }
+.elsx-logo-kind-chip .elsx-logo-media { width: max(34px, calc(var(--elsx-logo-media-size, 76px) * .52)); height: max(34px, calc(var(--elsx-logo-media-size, 76px) * .52)); }
 .elsx-logo-kind-chip .elsx-logo-subtitle { display: none; }
 
 .elsx-card-media-slot img { width: 100%; max-height: 180px; object-fit: cover; }

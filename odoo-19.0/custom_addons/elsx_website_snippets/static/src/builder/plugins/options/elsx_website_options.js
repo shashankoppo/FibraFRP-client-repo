@@ -298,6 +298,9 @@ class ElsxSetLogoImageModeAction extends BuilderAction {
         const item = getActiveLogoItem(editingElement);
         return item?.classList.contains("elsx-logo-show-image") ? "image" : "initials";
     }
+    isApplied({ editingElement, value }) {
+        return this.getValue({ editingElement }) === value;
+    }
     apply({ editingElement, value }) {
         const item = getActiveLogoItem(editingElement);
         if (!item) {
@@ -328,6 +331,9 @@ class ElsxSetLogoVariantAction extends BuilderAction {
         const item = getActiveLogoItem(editingElement);
         return LOGO_VARIANT_CLASSES.find((className) => item?.classList.contains(className)) || "elsx-logo-kind-mark";
     }
+    isApplied({ editingElement, value }) {
+        return this.getValue({ editingElement }) === value;
+    }
     apply({ editingElement, value }) {
         const item = getActiveLogoItem(editingElement);
         if (!item) {
@@ -349,6 +355,9 @@ class ElsxSetLogoShapeAction extends BuilderAction {
     getValue({ editingElement }) {
         const item = getActiveLogoItem(editingElement);
         return LOGO_SHAPE_CLASSES.find((className) => item?.classList.contains(className)) || "elsx-logo-pill";
+    }
+    isApplied({ editingElement, value }) {
+        return this.getValue({ editingElement }) === value;
     }
     apply({ editingElement, value }) {
         const item = getActiveLogoItem(editingElement);
@@ -494,6 +503,9 @@ class ElsxSetCardTypeAction extends BuilderAction {
     static id = "elsxSetCardType";
     getValue({ editingElement }) {
         return CARD_TYPE_CLASSES.find((className) => editingElement.classList.contains(className)) || "elsx-card-type-standard";
+    }
+    isApplied({ editingElement, value }) {
+        return this.getValue({ editingElement }) === value;
     }
     apply({ editingElement, value }) {
         editingElement.classList.remove(...CARD_TYPE_CLASSES);

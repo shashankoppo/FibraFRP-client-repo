@@ -116,6 +116,18 @@
             <BuilderSelectItem actionValue="'elsx-logo-freeform'">Freeform</BuilderSelectItem>
         </BuilderSelect>
     </BuilderRow>
+    <BuilderRow label.translate="Card Width">
+        <BuilderRange styleAction="'--elsx-logo-item-width'" min="120" max="420" step="10" unit="'px'" displayRangeValue="true"/>
+    </BuilderRow>
+    <BuilderRow label.translate="Card Height">
+        <BuilderRange styleAction="'--elsx-logo-item-height'" min="70" max="280" step="10" unit="'px'" displayRangeValue="true"/>
+    </BuilderRow>
+    <BuilderRow label.translate="Media Size">
+        <BuilderRange styleAction="'--elsx-logo-media-size'" min="36" max="180" step="4" unit="'px'" displayRangeValue="true"/>
+    </BuilderRow>
+    <BuilderRow label.translate="Text Size">
+        <BuilderRange styleAction="'--elsx-logo-text-size'" min="11" max="30" step="1" unit="'px'" displayRangeValue="true"/>
+    </BuilderRow>
     <BuilderRow label.translate="Logo Order">
         <BuilderButton action="'elsxMoveLogoItem'" actionValue="'-1'" preview="false">Move Left</BuilderButton>
         <BuilderButton action="'elsxMoveLogoItem'" actionValue="'1'" preview="false">Move Right</BuilderButton>
@@ -189,6 +201,18 @@
             <BuilderSelectItem actionValue="'elsx-logo-circle'">Circle</BuilderSelectItem>
             <BuilderSelectItem actionValue="'elsx-logo-freeform'">Freeform</BuilderSelectItem>
         </BuilderSelect>
+    </BuilderRow>
+    <BuilderRow label.translate="Card Width">
+        <BuilderRange styleAction="'--elsx-logo-item-width'" min="120" max="420" step="10" unit="'px'" displayRangeValue="true"/>
+    </BuilderRow>
+    <BuilderRow label.translate="Card Height">
+        <BuilderRange styleAction="'--elsx-logo-item-height'" min="70" max="280" step="10" unit="'px'" displayRangeValue="true"/>
+    </BuilderRow>
+    <BuilderRow label.translate="Media Size">
+        <BuilderRange styleAction="'--elsx-logo-media-size'" min="36" max="180" step="4" unit="'px'" displayRangeValue="true"/>
+    </BuilderRow>
+    <BuilderRow label.translate="Text Size">
+        <BuilderRange styleAction="'--elsx-logo-text-size'" min="11" max="30" step="1" unit="'px'" displayRangeValue="true"/>
     </BuilderRow>
     <BuilderRow label.translate="Order">
         <BuilderButton action="'elsxMoveLogoItem'" actionValue="'-1'" preview="false">Move Left</BuilderButton>
