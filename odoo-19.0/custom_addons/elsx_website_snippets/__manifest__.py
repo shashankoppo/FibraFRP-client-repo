@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 {
     'name': 'ELSX Website Snippet Library',
     'summary': 'Reusable business website snippets for Odoo Website editor',
