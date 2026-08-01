@@ -41,27 +41,33 @@ class ResConfigSettings(models.TransientModel):
     #----------------------------------------------------------
     
     color_brand_light = fields.Char(
-        string='Brand Light Color'
+        string='Brand Light Color',
+        store=False
     )
     
     color_primary_light = fields.Char(
-        string='Primary Light Color'
+        string='Primary Light Color',
+        store=False
     )
     
     color_success_light = fields.Char(
-        string='Success Light Color'
+        string='Success Light Color',
+        store=False
     )
     
     color_info_light = fields.Char(
-        string='Info Light Color'
+        string='Info Light Color',
+        store=False
     )
     
     color_warning_light = fields.Char(
-        string='Warning Light Color'
+        string='Warning Light Color',
+        store=False
     )
     
     color_danger_light = fields.Char(
-        string='Danger Light Color'
+        string='Danger Light Color',
+        store=False
     )
 
     #----------------------------------------------------------
@@ -69,27 +75,33 @@ class ResConfigSettings(models.TransientModel):
     #----------------------------------------------------------
     
     color_brand_dark = fields.Char(
-        string='Brand Dark Color'
+        string='Brand Dark Color',
+        store=False
     )
     
     color_primary_dark = fields.Char(
-        string='Primary Dark Color'
+        string='Primary Dark Color',
+        store=False
     )
     
     color_success_dark = fields.Char(
-        string='Success Dark Color'
+        string='Success Dark Color',
+        store=False
     )
     
     color_info_dark = fields.Char(
-        string='Info Dark Color'
+        string='Info Dark Color',
+        store=False
     )
     
     color_warning_dark = fields.Char(
-        string='Warning Dark Color'
+        string='Warning Dark Color',
+        store=False
     )
     
     color_danger_dark = fields.Char(
-        string='Danger Dark Color'
+        string='Danger Dark Color',
+        store=False
     )
     
     #----------------------------------------------------------

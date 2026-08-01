@@ -1,10 +1,14 @@
 import re
 import base64
+import binascii
+import logging
 
 from odoo import models, fields, api
 from odoo.tools import misc
 
 from odoo.addons.base.models.assetsbundle import EXTENSIONS
+
+_logger = logging.getLogger(__name__)
 
 
 class ColorAssetsEditor(models.AbstractModel):
@@ -39,7 +43,7 @@ class ColorAssetsEditor(models.AbstractModel):
     def _get_colors_attachment(self, custom_url):
         return self.env['ir.attachment'].search([
             ('url', '=', custom_url)
-        ])
+        ], order='id desc', limit=1)
 
     @api.model
     def _get_colors_asset(self, custom_url):
@@ -48,15 +52,43 @@ class ColorAssetsEditor(models.AbstractModel):
         ])
 
     @api.model
+    def _decode_attachment_datas(self, attachment, custom_url):
+        datas = attachment.datas
+        if not datas:
+            return False
+        datas_bytes = datas.encode('utf-8') if isinstance(datas, str) else datas
+        try:
+            return base64.b64decode(datas_bytes, validate=True)
+        except (binascii.Error, ValueError):
+            padding = b'=' * (-len(datas_bytes) % 4)
+            try:
+                return base64.b64decode(datas_bytes + padding)
+            except (binascii.Error, ValueError):
+                if b'$mk_' in datas_bytes:
+                    _logger.warning(
+                        "Using non-base64 custom color asset %s as raw SCSS content",
+                        custom_url,
+                    )
+                    return datas_bytes
+                _logger.warning(
+                    "Ignoring invalid custom color asset %s from attachment %s; falling back to module asset",
+                    custom_url,
+                    attachment.id,
+                )
+                return False
+
+    @api.model
     def _get_colors_from_url(self, url, bundle):
         custom_url = self._get_custom_colors_url(url, bundle)
         url_info = self._get_color_info_from_url(custom_url)
-        if url_info['customized']:
+        if url_info and url_info['customized']:
             attachment = self._get_colors_attachment(
                 custom_url
             )
             if attachment:
-                return base64.b64decode(attachment.datas)
+                content = self._decode_attachment_datas(attachment, custom_url)
+                if content:
+                    return content
         with misc.file_open(url.strip('/'), 'rb', filter_ext=EXTENSIONS) as f:
             return f.read()
 
