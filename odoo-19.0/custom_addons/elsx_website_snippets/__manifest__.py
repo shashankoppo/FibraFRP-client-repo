@@ -2,7 +2,7 @@
 {
     'name': 'ELSX Website Snippet Library',
     'summary': 'Reusable business website snippets for Odoo Website editor',
-    'version': '19.0.1.1.0',
+    'version': '19.0.1.2.0',
     'category': 'Website/Website',
     'author': 'ELSX Global',
     'license': 'LGPL-3',

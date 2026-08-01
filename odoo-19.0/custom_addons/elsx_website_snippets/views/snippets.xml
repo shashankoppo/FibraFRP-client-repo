@@ -6,15 +6,15 @@
                 <div class="text-center mb-5">
                     <p class="text-uppercase text-muted fw-semibold small mb-2">Trusted By Teams Across Industries</p>
                     <h2 class="display-6 fw-bold mb-3">Clients, partners, and project collaborators</h2>
-                    <p class="lead text-muted mx-auto" style="max-width: 720px;">Replace these placeholders with client logos, certifications, or partner marks.</p>
+                    <p class="lead text-muted mx-auto" style="max-width: 720px;">Click any logo item to edit its label, initials, link, image slot, shape, and motion.</p>
                 </div>
-                <div class="elsx-logo-grid">
-                    <div class="elsx-logo-card">Client Logo</div>
-                    <div class="elsx-logo-card">Partner</div>
-                    <div class="elsx-logo-card">Vendor</div>
-                    <div class="elsx-logo-card">Brand</div>
-                    <div class="elsx-logo-card">Agency</div>
-                    <div class="elsx-logo-card">Enterprise</div>
+                <div class="elsx-logo-grid" data-name="Logo Grid">
+                    <a href="#" class="elsx-logo-card elsx-logo-pill text-decoration-none" data-name="Logo Item"><span class="elsx-logo-media"><img class="elsx-logo-img img img-fluid" src="/website/static/src/img/snippets_thumbs/s_picture.svg" alt="Client Logo" loading="lazy"/><span class="elsx-logo-mark">CL</span></span><span class="elsx-logo-label">Client Logo</span></a>
+                    <a href="#" class="elsx-logo-card elsx-logo-pill text-decoration-none" data-name="Logo Item"><span class="elsx-logo-media"><img class="elsx-logo-img img img-fluid" src="/website/static/src/img/snippets_thumbs/s_picture.svg" alt="Partner" loading="lazy"/><span class="elsx-logo-mark">PA</span></span><span class="elsx-logo-label">Partner</span></a>
+                    <a href="#" class="elsx-logo-card elsx-logo-pill text-decoration-none" data-name="Logo Item"><span class="elsx-logo-media"><img class="elsx-logo-img img img-fluid" src="/website/static/src/img/snippets_thumbs/s_picture.svg" alt="Vendor" loading="lazy"/><span class="elsx-logo-mark">VE</span></span><span class="elsx-logo-label">Vendor</span></a>
+                    <a href="#" class="elsx-logo-card elsx-logo-pill text-decoration-none" data-name="Logo Item"><span class="elsx-logo-media"><img class="elsx-logo-img img img-fluid" src="/website/static/src/img/snippets_thumbs/s_picture.svg" alt="Brand" loading="lazy"/><span class="elsx-logo-mark">BR</span></span><span class="elsx-logo-label">Brand</span></a>
+                    <a href="#" class="elsx-logo-card elsx-logo-pill text-decoration-none" data-name="Logo Item"><span class="elsx-logo-media"><img class="elsx-logo-img img img-fluid" src="/website/static/src/img/snippets_thumbs/s_picture.svg" alt="Agency" loading="lazy"/><span class="elsx-logo-mark">AG</span></span><span class="elsx-logo-label">Agency</span></a>
+                    <a href="#" class="elsx-logo-card elsx-logo-pill text-decoration-none" data-name="Logo Item"><span class="elsx-logo-media"><img class="elsx-logo-img img img-fluid" src="/website/static/src/img/snippets_thumbs/s_picture.svg" alt="Enterprise" loading="lazy"/><span class="elsx-logo-mark">EN</span></span><span class="elsx-logo-label">Enterprise</span></a>
                 </div>
             </div>
         </section>
@@ -22,7 +22,7 @@
 
 
     <template id="s_elsx_logo_slider" name="Client Partner Logo Slider">
-        <section class="s_elsx_logo_slider elsx-theme-soft pt56 pb56" data-snippet="s_elsx_logo_slider" data-name="Client Partner Logo Slider">
+        <section class="s_elsx_logo_slider elsx-theme-soft elsx-logo-size-md elsx-logo-carded elsx-marquee-left pt56 pb56" data-snippet="s_elsx_logo_slider" data-name="Client Partner Logo Slider">
             <div class="container">
                 <div class="row align-items-center g-4 mb-4">
                     <div class="col-lg-5">
@@ -30,40 +30,31 @@
                         <h2 class="h1 fw-bold mb-0">Clients, partners, and trusted brands</h2>
                     </div>
                     <div class="col-lg-7">
-                        <p class="lead text-muted mb-0">Use this slider to showcase client logos, partner companies, certifications, vendors, media mentions, or project collaborators. Replace text blocks with logo images from the Odoo editor.</p>
+                        <p class="lead text-muted mb-0">Select a logo item to edit label, initials, URL, image mode, shape, and motion. Use Add Logo to expand the slider without custom code.</p>
                     </div>
                 </div>
             </div>
             <div class="elsx-logo-slider" aria-label="Client and partner logo showcase">
-                <div class="elsx-logo-track">
-                    <div class="elsx-logo-slide">Client Logo</div>
-                    <div class="elsx-logo-slide">Partner</div>
-                    <div class="elsx-logo-slide">Vendor</div>
-                    <div class="elsx-logo-slide">Brand</div>
-                    <div class="elsx-logo-slide">Agency</div>
-                    <div class="elsx-logo-slide">Enterprise</div>
-                    <div class="elsx-logo-slide">Group</div>
-                    <div class="elsx-logo-slide">Network</div>
-                    <div class="elsx-logo-slide">Client Logo</div>
-                    <div class="elsx-logo-slide">Partner</div>
-                    <div class="elsx-logo-slide">Vendor</div>
-                    <div class="elsx-logo-slide">Brand</div>
-                    <div class="elsx-logo-slide">Agency</div>
-                    <div class="elsx-logo-slide">Enterprise</div>
-                    <div class="elsx-logo-slide">Group</div>
-                    <div class="elsx-logo-slide">Network</div>
+                <div class="elsx-logo-track" data-name="Logo Track">
+                    <a href="#" class="elsx-logo-slide elsx-logo-pill text-decoration-none" data-name="Logo Item"><span class="elsx-logo-media"><img class="elsx-logo-img img img-fluid" src="/website/static/src/img/snippets_thumbs/s_picture.svg" alt="Client Logo" loading="lazy"/><span class="elsx-logo-mark">CL</span></span><span class="elsx-logo-label">Client Logo</span></a>
+                    <a href="#" class="elsx-logo-slide elsx-logo-pill text-decoration-none" data-name="Logo Item"><span class="elsx-logo-media"><img class="elsx-logo-img img img-fluid" src="/website/static/src/img/snippets_thumbs/s_picture.svg" alt="Partner" loading="lazy"/><span class="elsx-logo-mark">PA</span></span><span class="elsx-logo-label">Partner</span></a>
+                    <a href="#" class="elsx-logo-slide elsx-logo-pill text-decoration-none" data-name="Logo Item"><span class="elsx-logo-media"><img class="elsx-logo-img img img-fluid" src="/website/static/src/img/snippets_thumbs/s_picture.svg" alt="Vendor" loading="lazy"/><span class="elsx-logo-mark">VE</span></span><span class="elsx-logo-label">Vendor</span></a>
+                    <a href="#" class="elsx-logo-slide elsx-logo-pill text-decoration-none" data-name="Logo Item"><span class="elsx-logo-media"><img class="elsx-logo-img img img-fluid" src="/website/static/src/img/snippets_thumbs/s_picture.svg" alt="Brand" loading="lazy"/><span class="elsx-logo-mark">BR</span></span><span class="elsx-logo-label">Brand</span></a>
+                    <a href="#" class="elsx-logo-slide elsx-logo-pill text-decoration-none" data-name="Logo Item"><span class="elsx-logo-media"><img class="elsx-logo-img img img-fluid" src="/website/static/src/img/snippets_thumbs/s_picture.svg" alt="Agency" loading="lazy"/><span class="elsx-logo-mark">AG</span></span><span class="elsx-logo-label">Agency</span></a>
+                    <a href="#" class="elsx-logo-slide elsx-logo-pill text-decoration-none" data-name="Logo Item"><span class="elsx-logo-media"><img class="elsx-logo-img img img-fluid" src="/website/static/src/img/snippets_thumbs/s_picture.svg" alt="Enterprise" loading="lazy"/><span class="elsx-logo-mark">EN</span></span><span class="elsx-logo-label">Enterprise</span></a>
+                    <a href="#" class="elsx-logo-slide elsx-logo-pill text-decoration-none" data-name="Logo Item"><span class="elsx-logo-media"><img class="elsx-logo-img img img-fluid" src="/website/static/src/img/snippets_thumbs/s_picture.svg" alt="Group" loading="lazy"/><span class="elsx-logo-mark">GR</span></span><span class="elsx-logo-label">Group</span></a>
+                    <a href="#" class="elsx-logo-slide elsx-logo-pill text-decoration-none" data-name="Logo Item"><span class="elsx-logo-media"><img class="elsx-logo-img img img-fluid" src="/website/static/src/img/snippets_thumbs/s_picture.svg" alt="Network" loading="lazy"/><span class="elsx-logo-mark">NE</span></span><span class="elsx-logo-label">Network</span></a>
                 </div>
             </div>
             <div class="container mt-4">
                 <div class="d-flex flex-wrap gap-2 justify-content-center">
-                    <span class="elsx-chip">Editable Logos</span>
-                    <span class="elsx-chip">Pure CSS Slider</span>
-                    <span class="elsx-chip">Mobile Friendly</span>
+                    <span class="elsx-chip">Selectable Logo Items</span>
+                    <span class="elsx-chip">Image or Text Mode</span>
+                    <span class="elsx-chip">No Custom CSS Needed</span>
                 </div>
             </div>
         </section>
-    </template>
-    <template id="s_elsx_testimonials" name="Testimonials Cards">
+    </template>`r`n`r`n    <template id="s_elsx_testimonials" name="Testimonials Cards">
         <section class="s_elsx_testimonials pt64 pb64 o_cc o_cc2" data-snippet="s_elsx_testimonials" data-name="Testimonials Cards">
             <div class="container">
                 <div class="row align-items-end mb-4">
@@ -190,5 +181,3 @@
         </xpath>
     </template>
 </odoo>
-
-

@@ -58,6 +58,60 @@
 </t>
 
 <t t-name="elsx_website_snippets.ElsxLogoSliderOption">
+    <BuilderRow label.translate="Items">
+        <BuilderButton action="'elsxUpgradeLogoItems'" preview="false">Make Editable</BuilderButton>
+        <BuilderButton action="'elsxAddLogoItem'" preview="false">Add Logo</BuilderButton>
+    </BuilderRow>
+    <BuilderRow label.translate="Active Logo">
+        <BuilderSelect action="'elsxSetLogoActive'" preview="false">
+            <BuilderSelectItem actionValue="'0'">Logo 1</BuilderSelectItem>
+            <BuilderSelectItem actionValue="'1'">Logo 2</BuilderSelectItem>
+            <BuilderSelectItem actionValue="'2'">Logo 3</BuilderSelectItem>
+            <BuilderSelectItem actionValue="'3'">Logo 4</BuilderSelectItem>
+            <BuilderSelectItem actionValue="'4'">Logo 5</BuilderSelectItem>
+            <BuilderSelectItem actionValue="'5'">Logo 6</BuilderSelectItem>
+            <BuilderSelectItem actionValue="'6'">Logo 7</BuilderSelectItem>
+            <BuilderSelectItem actionValue="'7'">Logo 8</BuilderSelectItem>
+            <BuilderSelectItem actionValue="'8'">Logo 9</BuilderSelectItem>
+            <BuilderSelectItem actionValue="'9'">Logo 10</BuilderSelectItem>
+            <BuilderSelectItem actionValue="'10'">Logo 11</BuilderSelectItem>
+            <BuilderSelectItem actionValue="'11'">Logo 12</BuilderSelectItem>
+        </BuilderSelect>
+    </BuilderRow>
+    <BuilderRow label.translate="Logo Label">
+        <BuilderTextInput action="'elsxSetLogoLabel'" default.translate="Client Logo"/>
+    </BuilderRow>
+    <BuilderRow label.translate="Initials">
+        <BuilderTextInput action="'elsxSetLogoInitials'" default.translate="CL"/>
+    </BuilderRow>
+    <BuilderRow label.translate="Logo Link">
+        <BuilderTextInput action="'elsxSetLogoHref'" default="'#'"/>
+    </BuilderRow>
+    <BuilderRow label.translate="Image URL">
+        <BuilderTextInput action="'elsxSetLogoImageSrc'" default="''"/>
+    </BuilderRow>
+    <BuilderRow label.translate="Image Mode">
+        <BuilderSelect action="'elsxSetLogoImageMode'">
+            <BuilderSelectItem actionValue="'initials'">Initials</BuilderSelectItem>
+            <BuilderSelectItem actionValue="'image'">Image</BuilderSelectItem>
+        </BuilderSelect>
+    </BuilderRow>
+    <BuilderRow label.translate="Item Shape">
+        <BuilderSelect action="'elsxSetLogoShape'">
+            <BuilderSelectItem actionValue="'elsx-logo-pill'">Pill</BuilderSelectItem>
+            <BuilderSelectItem actionValue="'elsx-logo-square'">Square</BuilderSelectItem>
+            <BuilderSelectItem actionValue="'elsx-logo-circle'">Circle</BuilderSelectItem>
+            <BuilderSelectItem actionValue="'elsx-logo-freeform'">Freeform</BuilderSelectItem>
+        </BuilderSelect>
+    </BuilderRow>
+    <BuilderRow label.translate="Logo Order">
+        <BuilderButton action="'elsxMoveLogoItem'" actionValue="'-1'" preview="false">Move Left</BuilderButton>
+        <BuilderButton action="'elsxMoveLogoItem'" actionValue="'1'" preview="false">Move Right</BuilderButton>
+    </BuilderRow>
+    <BuilderRow label.translate="Manage Logo">
+        <BuilderButton action="'elsxDuplicateLogoItem'" preview="false">Duplicate</BuilderButton>
+        <BuilderButton action="'elsxRemoveLogoItem'" preview="false">Remove</BuilderButton>
+    </BuilderRow>
     <BuilderRow label.translate="Flow">
         <BuilderSelect>
             <BuilderSelectItem classAction="'elsx-marquee-left'">Left</BuilderSelectItem>
@@ -82,6 +136,58 @@
             <BuilderSelectItem classAction="'elsx-logo-size-md'">Medium</BuilderSelectItem>
             <BuilderSelectItem classAction="'elsx-logo-size-lg'">Large</BuilderSelectItem>
         </BuilderSelect>
+    </BuilderRow>
+</t>
+
+<t t-name="elsx_website_snippets.ElsxLogoItemOption">
+    <BuilderRow label.translate="Label">
+        <BuilderTextInput action="'elsxSetLogoLabel'" default.translate="Client Logo"/>
+    </BuilderRow>
+    <BuilderRow label.translate="Initials">
+        <BuilderTextInput action="'elsxSetLogoInitials'" default.translate="CL"/>
+    </BuilderRow>
+    <BuilderRow label.translate="Link">
+        <BuilderTextInput action="'elsxSetLogoHref'" default="'#'"/>
+    </BuilderRow>
+    <BuilderRow label.translate="Image URL">
+        <BuilderTextInput action="'elsxSetLogoImageSrc'" default="''"/>
+    </BuilderRow>
+    <BuilderRow label.translate="Image Mode">
+        <BuilderSelect action="'elsxSetLogoImageMode'">
+            <BuilderSelectItem actionValue="'initials'">Initials</BuilderSelectItem>
+            <BuilderSelectItem actionValue="'image'">Image</BuilderSelectItem>
+        </BuilderSelect>
+    </BuilderRow>
+    <BuilderRow label.translate="Item Shape">
+        <BuilderSelect action="'elsxSetLogoShape'">
+            <BuilderSelectItem actionValue="'elsx-logo-pill'">Pill</BuilderSelectItem>
+            <BuilderSelectItem actionValue="'elsx-logo-square'">Square</BuilderSelectItem>
+            <BuilderSelectItem actionValue="'elsx-logo-circle'">Circle</BuilderSelectItem>
+            <BuilderSelectItem actionValue="'elsx-logo-freeform'">Freeform</BuilderSelectItem>
+        </BuilderSelect>
+    </BuilderRow>
+    <BuilderRow label.translate="Order">
+        <BuilderButton action="'elsxMoveLogoItem'" actionValue="'-1'" preview="false">Move Left</BuilderButton>
+        <BuilderButton action="'elsxMoveLogoItem'" actionValue="'1'" preview="false">Move Right</BuilderButton>
+    </BuilderRow>
+    <BuilderRow label.translate="Manage">
+        <BuilderButton action="'elsxDuplicateLogoItem'" preview="false">Duplicate</BuilderButton>
+        <BuilderButton action="'elsxRemoveLogoItem'" preview="false">Remove</BuilderButton>
+    </BuilderRow>
+</t>
+
+<t t-name="elsx_website_snippets.ElsxCardItemOption">
+    <BuilderRow label.translate="Emphasis">
+        <BuilderSelect>
+            <BuilderSelectItem classAction="'elsx-item-standard'">Standard</BuilderSelectItem>
+            <BuilderSelectItem classAction="'elsx-item-featured'">Featured</BuilderSelectItem>
+            <BuilderSelectItem classAction="'elsx-item-muted'">Muted</BuilderSelectItem>
+            <BuilderSelectItem classAction="'elsx-item-accent'">Accent</BuilderSelectItem>
+        </BuilderSelect>
+    </BuilderRow>
+    <BuilderRow label.translate="Manage">
+        <BuilderButton action="'elsxDuplicateCardItem'" preview="false">Duplicate</BuilderButton>
+        <BuilderButton action="'elsxRemoveCardItem'" preview="false">Remove</BuilderButton>
     </BuilderRow>
 </t>
 
