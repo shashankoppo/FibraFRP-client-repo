@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <template id="s_elsx_logo_cloud" name="Client Logo Showcase">
         <section class="s_elsx_logo_cloud pt64 pb64" data-snippet="s_elsx_logo_cloud" data-name="Client Logo Showcase">
@@ -170,19 +170,23 @@
     </template>
 
     <template id="snippets" inherit_id="website.snippets" priority="20">
+        <xpath expr="//snippets[@id='snippet_groups']/t[@id='installed_snippets_hook']" position="before">
+            <t snippet-group="elsx" t-snippet="website.s_snippet_group" string="ELSX Sections"
+               t-thumbnail="/website/static/src/img/snippets_thumbs/s_showcase.svg"/>
+        </xpath>
         <xpath expr="//snippets[@id='snippet_structure']" position="inside">
-            <t t-snippet="elsx_website_snippets.s_elsx_logo_cloud" string="Client Logos" group="content"/>
-            <t t-snippet="elsx_website_snippets.s_elsx_logo_slider" string="Logo Slider" group="content"/>
-            <t t-snippet="elsx_website_snippets.s_elsx_testimonials" string="Testimonials" group="content"/>
-            <t t-snippet="elsx_website_snippets.s_elsx_case_studies" string="Case Studies" group="content"/>
-            <t t-snippet="elsx_website_snippets.s_elsx_stats" string="Stats Counters" group="content"/>
-            <t t-snippet="elsx_website_snippets.s_elsx_industries" string="Industries Served" group="content"/>
-            <t t-snippet="elsx_website_snippets.s_elsx_faq" string="FAQ Accordion" group="text"/>
-            <t t-snippet="elsx_website_snippets.s_elsx_cta" string="CTA Banner" group="content"/>
-            <t t-snippet="elsx_website_snippets.s_elsx_process" string="Process Timeline" group="content"/>
-            <t t-snippet="elsx_website_snippets.s_elsx_comparison" string="Comparison Table" group="content"/>
-            <t t-snippet="elsx_website_snippets.s_elsx_brochure" string="Brochure Lead Block" group="content"/>
-            <t t-snippet="elsx_website_snippets.s_elsx_trust_badges" string="Trust Badges" group="content"/>
+            <t t-snippet="elsx_website_snippets.s_elsx_logo_cloud" string="Client Logos" group="elsx"/>
+            <t t-snippet="elsx_website_snippets.s_elsx_logo_slider" string="Logo Slider" group="elsx"/>
+            <t t-snippet="elsx_website_snippets.s_elsx_testimonials" string="Testimonials" group="elsx"/>
+            <t t-snippet="elsx_website_snippets.s_elsx_case_studies" string="Case Studies" group="elsx"/>
+            <t t-snippet="elsx_website_snippets.s_elsx_stats" string="Stats Counters" group="elsx"/>
+            <t t-snippet="elsx_website_snippets.s_elsx_industries" string="Industries Served" group="elsx"/>
+            <t t-snippet="elsx_website_snippets.s_elsx_faq" string="FAQ Accordion" group="elsx"/>
+            <t t-snippet="elsx_website_snippets.s_elsx_cta" string="CTA Banner" group="elsx"/>
+            <t t-snippet="elsx_website_snippets.s_elsx_process" string="Process Timeline" group="elsx"/>
+            <t t-snippet="elsx_website_snippets.s_elsx_comparison" string="Comparison Table" group="elsx"/>
+            <t t-snippet="elsx_website_snippets.s_elsx_brochure" string="Brochure Lead Block" group="elsx"/>
+            <t t-snippet="elsx_website_snippets.s_elsx_trust_badges" string="Trust Badges" group="elsx"/>
         </xpath>
     </template>
 </odoo>
