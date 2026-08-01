@@ -358,3 +358,33 @@
 .o_editable .elsx-marquee-right .elsx-logo-track {
     animation-play-state: paused;
 }
+
+
+/* ELSX convertible logo/card item modes. */
+.elsx-logo-subtitle { display: none; color: #64748b; font-size: .78rem; line-height: 1.25; }
+.elsx-logo-kind-partner,
+.elsx-logo-kind-cert,
+.elsx-logo-kind-media { min-height: 132px; padding: 1.15rem; }
+.elsx-logo-kind-partner .elsx-logo-subtitle,
+.elsx-logo-kind-cert .elsx-logo-subtitle,
+.elsx-logo-kind-media .elsx-logo-subtitle { display: block; }
+.elsx-logo-kind-partner .elsx-logo-label,
+.elsx-logo-kind-cert .elsx-logo-label,
+.elsx-logo-kind-media .elsx-logo-label { font-size: 1.02rem; font-weight: 900; color: #0f172a; }
+.elsx-logo-kind-cert { border-style: dashed !important; background: linear-gradient(135deg, rgba(255,255,255,.95), rgba(240,253,250,.8)) !important; }
+.elsx-logo-kind-cert .elsx-logo-media { border: 1px solid rgba(20,184,166,.28); }
+.elsx-logo-kind-media .elsx-logo-media { width: 78px; height: 58px; border-radius: .85rem; background: #fff; }
+.elsx-logo-kind-media .elsx-logo-img { display: block; }
+.elsx-logo-kind-media .elsx-logo-mark { display: none; }
+.elsx-logo-kind-chip { width: auto !important; min-height: 48px !important; flex-direction: row !important; padding: .65rem 1rem !important; }
+.elsx-logo-kind-chip .elsx-logo-media { width: 34px; height: 34px; }
+.elsx-logo-kind-chip .elsx-logo-subtitle { display: none; }
+
+.elsx-card-media-slot img { width: 100%; max-height: 180px; object-fit: cover; }
+.elsx-card-link { color: var(--elsx-primary); font-weight: 800; text-decoration: none; }
+.elsx-card-type-outline { background: transparent !important; border-style: dashed !important; box-shadow: none !important; }
+.elsx-card-type-media { overflow: hidden; }
+.elsx-card-type-metric { text-align: center; }
+.elsx-card-type-metric :where(h1,h2,h3,h4,h5,strong) { display: block; font-size: clamp(2rem, 4vw, 4rem); line-height: .95; color: var(--elsx-primary); }
+.elsx-card-type-quote { position: relative; padding-top: 2.8rem !important; }
+.elsx-quote-mark { position: absolute; top: .35rem; left: 1rem; color: color-mix(in srgb, var(--elsx-primary), transparent 40%); font-size: 4rem; font-family: Georgia, serif; line-height: 1; }

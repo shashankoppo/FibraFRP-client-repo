@@ -27,6 +27,20 @@ const LOGO_SHAPE_CLASSES = [
     "elsx-logo-circle",
     "elsx-logo-freeform",
 ];
+const LOGO_VARIANT_CLASSES = [
+    "elsx-logo-kind-mark",
+    "elsx-logo-kind-partner",
+    "elsx-logo-kind-cert",
+    "elsx-logo-kind-media",
+    "elsx-logo-kind-chip",
+];
+const CARD_TYPE_CLASSES = [
+    "elsx-card-type-standard",
+    "elsx-card-type-outline",
+    "elsx-card-type-media",
+    "elsx-card-type-metric",
+    "elsx-card-type-quote",
+];
 
 function initialsFromLabel(label) {
     const initials = (label || "Logo")
@@ -42,7 +56,7 @@ function initialsFromLabel(label) {
 function logoTemplate(document, label = "New Logo", itemClass = "elsx-logo-slide") {
     const item = document.createElement("a");
     item.href = "#";
-    item.className = `${itemClass} elsx-logo-pill text-decoration-none`;
+    item.className = `${itemClass} elsx-logo-pill elsx-logo-kind-mark text-decoration-none`;
     item.dataset.name = "Logo Item";
     item.innerHTML = `<span class="elsx-logo-media"><img class="elsx-logo-img img img-fluid" src="/website/static/src/img/snippets_thumbs/s_picture.svg" alt="${label}" loading="lazy"><span class="elsx-logo-mark">${initialsFromLabel(label)}</span></span><span class="elsx-logo-label">${label}</span>`;
     return item;
@@ -69,7 +83,75 @@ function ensureLogoStructure(item) {
     if (!LOGO_SHAPE_CLASSES.some((className) => target.classList.contains(className))) {
         target.classList.add("elsx-logo-pill");
     }
+    if (!LOGO_VARIANT_CLASSES.some((className) => target.classList.contains(className))) {
+        target.classList.add("elsx-logo-kind-mark");
+    }
     return target;
+}
+
+function ensureLogoSubtitle(item) {
+    if (!item) {
+        return null;
+    }
+    let subtitle = item.querySelector(".elsx-logo-subtitle");
+    if (!subtitle) {
+        subtitle = item.ownerDocument.createElement("span");
+        subtitle.className = "elsx-logo-subtitle";
+        subtitle.textContent = "Partner / Certification";
+        getLogoLabel(item)?.after(subtitle);
+    }
+    return subtitle;
+}
+
+function getCardTitle(item) {
+    return item?.querySelector(".elsx-card-title, h1, h2, h3, h4, h5, strong") || item;
+}
+
+function getCardText(item) {
+    if (!item) {
+        return null;
+    }
+    let text = item.querySelector(".elsx-card-text, p");
+    if (!text) {
+        text = item.ownerDocument.createElement("p");
+        text.className = "elsx-card-text text-muted mb-0";
+        text.textContent = "Add supporting detail here.";
+        item.append(text);
+    }
+    return text;
+}
+
+function ensureCardLink(item) {
+    if (!item) {
+        return null;
+    }
+    let link = item.matches("a") ? item : item.querySelector("a[href]");
+    if (!link) {
+        link = item.ownerDocument.createElement("a");
+        link.href = item.dataset.elsxHref || "#";
+        link.className = "elsx-card-link mt-3 d-inline-flex align-items-center gap-1";
+        link.textContent = "Learn more";
+        item.append(link);
+    }
+    return link;
+}
+
+function ensureCardImage(item) {
+    if (!item) {
+        return null;
+    }
+    let image = item.querySelector("img");
+    if (!image) {
+        const media = item.ownerDocument.createElement("div");
+        media.className = "elsx-card-media-slot mb-3";
+        image = item.ownerDocument.createElement("img");
+        image.className = "img img-fluid rounded";
+        image.alt = getCardTitle(item)?.textContent?.trim() || "Card image";
+        image.src = "/website/static/src/img/snippets_thumbs/s_picture.svg";
+        media.append(image);
+        item.prepend(media);
+    }
+    return image;
 }
 
 function getLogoItems(editingElement) {
@@ -225,6 +307,43 @@ class ElsxSetLogoImageModeAction extends BuilderAction {
     }
 }
 
+class ElsxSetLogoSubtitleAction extends BuilderAction {
+    static id = "elsxSetLogoSubtitle";
+    getValue({ editingElement }) {
+        const item = getActiveLogoItem(editingElement);
+        return item?.querySelector(".elsx-logo-subtitle")?.textContent?.trim() || "";
+    }
+    apply({ editingElement, value }) {
+        const item = getActiveLogoItem(editingElement);
+        if (!item) {
+            return;
+        }
+        ensureLogoSubtitle(item).textContent = value || "Partner / Certification";
+    }
+}
+
+class ElsxSetLogoVariantAction extends BuilderAction {
+    static id = "elsxSetLogoVariant";
+    getValue({ editingElement }) {
+        const item = getActiveLogoItem(editingElement);
+        return LOGO_VARIANT_CLASSES.find((className) => item?.classList.contains(className)) || "elsx-logo-kind-mark";
+    }
+    apply({ editingElement, value }) {
+        const item = getActiveLogoItem(editingElement);
+        if (!item) {
+            return;
+        }
+        item.classList.remove(...LOGO_VARIANT_CLASSES);
+        item.classList.add(value || "elsx-logo-kind-mark");
+        if (["elsx-logo-kind-partner", "elsx-logo-kind-cert", "elsx-logo-kind-media"].includes(value)) {
+            ensureLogoSubtitle(item);
+        }
+        if (value === "elsx-logo-kind-media") {
+            item.classList.add("elsx-logo-show-image");
+        }
+    }
+}
+
 class ElsxSetLogoShapeAction extends BuilderAction {
     static id = "elsxSetLogoShape";
     getValue({ editingElement }) {
@@ -312,6 +431,85 @@ class ElsxMoveLogoItemAction extends BuilderAction {
     }
 }
 
+class ElsxSetCardTitleAction extends BuilderAction {
+    static id = "elsxSetCardTitle";
+    getValue({ editingElement }) {
+        return getCardTitle(editingElement)?.textContent?.trim() || "";
+    }
+    apply({ editingElement, value }) {
+        const title = getCardTitle(editingElement);
+        if (title) {
+            title.textContent = value || "Card title";
+        }
+    }
+}
+
+class ElsxSetCardTextAction extends BuilderAction {
+    static id = "elsxSetCardText";
+    getValue({ editingElement }) {
+        return getCardText(editingElement)?.textContent?.trim() || "";
+    }
+    apply({ editingElement, value }) {
+        const text = getCardText(editingElement);
+        if (text) {
+            text.textContent = value || "Add supporting detail here.";
+        }
+    }
+}
+
+class ElsxSetCardLinkAction extends BuilderAction {
+    static id = "elsxSetCardLink";
+    getValue({ editingElement }) {
+        const link = editingElement.matches("a") ? editingElement : editingElement.querySelector("a[href]");
+        return link?.getAttribute("href") || editingElement.dataset.elsxHref || "#";
+    }
+    apply({ editingElement, value }) {
+        const href = value || "#";
+        editingElement.dataset.elsxHref = href;
+        const link = ensureCardLink(editingElement);
+        if (link) {
+            link.setAttribute("href", href);
+        }
+    }
+}
+
+class ElsxSetCardImageSrcAction extends BuilderAction {
+    static id = "elsxSetCardImageSrc";
+    getValue({ editingElement }) {
+        return editingElement.querySelector("img")?.getAttribute("src") || "";
+    }
+    apply({ editingElement, value }) {
+        if (!value) {
+            return;
+        }
+        const image = ensureCardImage(editingElement);
+        if (image) {
+            image.setAttribute("src", value);
+            editingElement.classList.add("elsx-card-type-media");
+        }
+    }
+}
+
+class ElsxSetCardTypeAction extends BuilderAction {
+    static id = "elsxSetCardType";
+    getValue({ editingElement }) {
+        return CARD_TYPE_CLASSES.find((className) => editingElement.classList.contains(className)) || "elsx-card-type-standard";
+    }
+    apply({ editingElement, value }) {
+        editingElement.classList.remove(...CARD_TYPE_CLASSES);
+        editingElement.classList.add(value || "elsx-card-type-standard");
+        if (value === "elsx-card-type-media") {
+            ensureCardImage(editingElement);
+        }
+        if (value === "elsx-card-type-quote" && !editingElement.querySelector(".elsx-quote-mark")) {
+            const mark = editingElement.ownerDocument.createElement("span");
+            mark.className = "elsx-quote-mark";
+            mark.textContent = "“";
+            editingElement.prepend(mark);
+        }
+    }
+}
+
 class ElsxDuplicateCardItemAction extends BuilderAction {
     static id = "elsxDuplicateCardItem";
     apply({ editingElement }) {
@@ -370,12 +568,19 @@ class ElsxWebsiteOptionsPlugin extends Plugin {
             ElsxSetLogoImageSrcAction,
             ElsxSetLogoActiveAction,
             ElsxSetLogoImageModeAction,
+            ElsxSetLogoSubtitleAction,
+            ElsxSetLogoVariantAction,
             ElsxSetLogoShapeAction,
             ElsxUpgradeLogoItemsAction,
             ElsxAddLogoItemAction,
             ElsxDuplicateLogoItemAction,
             ElsxRemoveLogoItemAction,
             ElsxMoveLogoItemAction,
+            ElsxSetCardTitleAction,
+            ElsxSetCardTextAction,
+            ElsxSetCardLinkAction,
+            ElsxSetCardImageSrcAction,
+            ElsxSetCardTypeAction,
             ElsxDuplicateCardItemAction,
             ElsxRemoveCardItemAction,
         },

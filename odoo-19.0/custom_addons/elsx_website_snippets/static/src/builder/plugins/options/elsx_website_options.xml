@@ -78,11 +78,23 @@
             <BuilderSelectItem actionValue="'11'">Logo 12</BuilderSelectItem>
         </BuilderSelect>
     </BuilderRow>
+    <BuilderRow label.translate="Logo Type">
+        <BuilderSelect action="'elsxSetLogoVariant'">
+            <BuilderSelectItem actionValue="'elsx-logo-kind-mark'">Simple Logo</BuilderSelectItem>
+            <BuilderSelectItem actionValue="'elsx-logo-kind-partner'">Partner Card</BuilderSelectItem>
+            <BuilderSelectItem actionValue="'elsx-logo-kind-cert'">Certificate Badge</BuilderSelectItem>
+            <BuilderSelectItem actionValue="'elsx-logo-kind-media'">Media Card</BuilderSelectItem>
+            <BuilderSelectItem actionValue="'elsx-logo-kind-chip'">Compact Chip</BuilderSelectItem>
+        </BuilderSelect>
+    </BuilderRow>
     <BuilderRow label.translate="Logo Label">
         <BuilderTextInput action="'elsxSetLogoLabel'" default.translate="Client Logo"/>
     </BuilderRow>
     <BuilderRow label.translate="Initials">
         <BuilderTextInput action="'elsxSetLogoInitials'" default.translate="CL"/>
+    </BuilderRow>
+    <BuilderRow label.translate="Subtitle">
+        <BuilderTextInput action="'elsxSetLogoSubtitle'" default.translate="Partner / Certification"/>
     </BuilderRow>
     <BuilderRow label.translate="Logo Link">
         <BuilderTextInput action="'elsxSetLogoHref'" default="'#'"/>
@@ -140,11 +152,23 @@
 </t>
 
 <t t-name="elsx_website_snippets.ElsxLogoItemOption">
+    <BuilderRow label.translate="Logo Type">
+        <BuilderSelect action="'elsxSetLogoVariant'">
+            <BuilderSelectItem actionValue="'elsx-logo-kind-mark'">Simple Logo</BuilderSelectItem>
+            <BuilderSelectItem actionValue="'elsx-logo-kind-partner'">Partner Card</BuilderSelectItem>
+            <BuilderSelectItem actionValue="'elsx-logo-kind-cert'">Certificate Badge</BuilderSelectItem>
+            <BuilderSelectItem actionValue="'elsx-logo-kind-media'">Media Card</BuilderSelectItem>
+            <BuilderSelectItem actionValue="'elsx-logo-kind-chip'">Compact Chip</BuilderSelectItem>
+        </BuilderSelect>
+    </BuilderRow>
     <BuilderRow label.translate="Label">
         <BuilderTextInput action="'elsxSetLogoLabel'" default.translate="Client Logo"/>
     </BuilderRow>
     <BuilderRow label.translate="Initials">
         <BuilderTextInput action="'elsxSetLogoInitials'" default.translate="CL"/>
+    </BuilderRow>
+    <BuilderRow label.translate="Subtitle">
+        <BuilderTextInput action="'elsxSetLogoSubtitle'" default.translate="Partner / Certification"/>
     </BuilderRow>
     <BuilderRow label.translate="Link">
         <BuilderTextInput action="'elsxSetLogoHref'" default="'#'"/>
@@ -177,6 +201,27 @@
 </t>
 
 <t t-name="elsx_website_snippets.ElsxCardItemOption">
+    <BuilderRow label.translate="Card Type">
+        <BuilderSelect action="'elsxSetCardType'">
+            <BuilderSelectItem actionValue="'elsx-card-type-standard'">Standard</BuilderSelectItem>
+            <BuilderSelectItem actionValue="'elsx-card-type-outline'">Outline</BuilderSelectItem>
+            <BuilderSelectItem actionValue="'elsx-card-type-media'">Media Card</BuilderSelectItem>
+            <BuilderSelectItem actionValue="'elsx-card-type-metric'">Metric Card</BuilderSelectItem>
+            <BuilderSelectItem actionValue="'elsx-card-type-quote'">Quote Card</BuilderSelectItem>
+        </BuilderSelect>
+    </BuilderRow>
+    <BuilderRow label.translate="Title">
+        <BuilderTextInput action="'elsxSetCardTitle'" default.translate="Card title"/>
+    </BuilderRow>
+    <BuilderRow label.translate="Body">
+        <BuilderTextInput action="'elsxSetCardText'" default.translate="Add supporting detail here."/>
+    </BuilderRow>
+    <BuilderRow label.translate="Link">
+        <BuilderTextInput action="'elsxSetCardLink'" default="'#'"/>
+    </BuilderRow>
+    <BuilderRow label.translate="Image URL">
+        <BuilderTextInput action="'elsxSetCardImageSrc'" default="''"/>
+    </BuilderRow>
     <BuilderRow label.translate="Emphasis">
         <BuilderSelect>
             <BuilderSelectItem classAction="'elsx-item-standard'">Standard</BuilderSelectItem>
