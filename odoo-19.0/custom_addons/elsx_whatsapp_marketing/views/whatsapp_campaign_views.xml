@@ -208,7 +208,7 @@
                                 <field name="preview_partner_id" domain="[('id', 'in', partner_ids)]"/>
                                 <div class="alert alert-light border" role="status" colspan="2">
                                     <div class="fw-bold text-muted text-uppercase small mb-2">Customer Preview Checklist</div>
-                                    <field name="recipient_preview_text" nolabel="1" readonly="1" class="wa-safe-preview-text"/>
+                                    <field name="recipient_preview_html" nolabel="1" readonly="1" widget="html" class="wa-preview-html-field"/>
                                 </div>
                             </group>
                         </page>
@@ -384,7 +384,7 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <div class="o_kanban_record_body">
                                 <div class="d-flex align-items-center mb-2">
                                     <span t-attf-class="badge rounded-pill me-2 #{record.campaign_type.raw_value == 'broadcast' ? 'bg-primary' : 'bg-info'}">
@@ -392,7 +392,7 @@
                                     </span>
                                     <span class="text-muted small"><i class="fa fa-users me-1" title="Recipients"/> <field name="total_recipients"/> Recipients</span>
                                 </div>
-                                
+
                                 <div class="row g-1 text-center mt-3">
                                     <div class="col-4">
                                         <div class="bg-light rounded p-1">

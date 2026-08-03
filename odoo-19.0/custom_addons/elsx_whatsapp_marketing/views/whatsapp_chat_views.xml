@@ -21,14 +21,14 @@
                     <t t-name="card">
                         <div class="oe_kanban_global_click o_whatsapp_kanban_card d-flex align-items-center p-3 border-bottom position-relative"
                              t-att-style="record.is_pinned.raw_value ? 'background: #f8fafc; border-left: 4px solid #00A884;' : 'border-left: 4px solid transparent;'">
-                            
+
                             <!-- Left: Avatar -->
                             <div class="o_whatsapp_avatar_container me-3 position-relative">
                                 <div class="o_whatsapp_avatar d-flex align-items-center justify-content-center rounded-circle shadow-sm"
                                      style="width: 48px; height: 48px; background: linear-gradient(135deg, #00A884, #008F72); color: white; font-weight: bold; font-size: 1.2rem;">
                                     <field name="display_name_initial"/>
                                 </div>
-                                <div t-if="record.state.raw_value == 'open'" class="position-absolute bg-success rounded-circle border border-2 border-white" 
+                                <div t-if="record.state.raw_value == 'open'" class="position-absolute bg-success rounded-circle border border-2 border-white"
                                      style="width: 12px; height: 12px; bottom: 0; right: 0;" title="Open Conversation"/>
                             </div>
 
@@ -43,7 +43,7 @@
                                         <t t-out="record.last_message_date_str ? record.last_message_date_str.value : ''"/>
                                     </span>
                                 </div>
-                                
+
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div class="small text-muted text-truncate d-flex align-items-center gap-1" style="font-size: 0.85rem;">
                                         <t t-if="record.last_message_direction.raw_value == 'outbound'">
@@ -113,7 +113,7 @@
 
                         <field name="partner_has_avatar" invisible="1"/>
                         <field name="session_open" invisible="1"/>
-                        
+
                         <!-- Sidebar: Real Chat List -->
                         <div class="o_whatsapp_chat_sidebar wa-left-sidebar d-none d-lg-flex flex-column border-end bg-white">
                                 <div class="p-3 o_whatsapp_panel_header bg-white border-bottom">
@@ -195,7 +195,7 @@
                                                 <span class="o_whatsapp_contact_name"><field name="display_name" readonly="1"/></span>
                                             </h5>
                                             <span class="o_whatsapp_session_badge"><field name="state" widget="badge" decoration-success="state == 'resolved'" decoration-info="state == 'open'" decoration-warning="state == 'snoozed'"/></span>
-                                            
+
                                             <!-- SLA Status Badges for Form View -->
                                             <div invisible="sla_status != 'breached'" class="badge bg-danger shadow-sm ms-2" style="font-size: 0.75rem; animation: pulse 2s infinite;">
                                                 <i class="fa fa-warning me-1" title="SLA Breach Icon"/>SLA Breach
@@ -272,7 +272,7 @@
                                         <div class="wa-template-preview-safe-title">
                                             <i class="fa fa-eye me-1" title="Preview"/> Customer preview checklist
                                         </div>
-                                        <field name="quick_template_preview_text" nolabel="1" readonly="1" class="wa-template-preview-text"/>
+                                        <field name="quick_template_preview_html" nolabel="1" readonly="1" widget="html" class="wa-preview-html-field"/>
                                     </div>
                                 </div>
 
@@ -288,7 +288,7 @@
                                             <button id="wa_quick_reply_trigger" type="button" class="wa-footer-icon-btn wa-quick-reply-trigger-btn" title="Quick Replies" data-wa-label="Replies" aria-label="Quick replies">
                                                 <i class="fa fa-bolt" title="Quick Replies"/>
                                             </button>
-                                            
+
                                             <!-- Attachment Button -->
                                             <div class="wa-attachment-wrapper wa-footer-icon-btn position-relative" title="Attach file or media" data-wa-label="Attach" aria-label="Attach file or media">
                                                 <i class="fa fa-paperclip wa-attachment-trigger-icon" title="Attach Media"/>
@@ -524,9 +524,9 @@
                                     <h6 class="text-uppercase text-muted fw-bold mb-3" style="font-size: 0.75rem; letter-spacing: 1px;">WhatsApp Labels</h6>
                                     <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" placeholder="Add labels..." class="w-100"/>
                                 </div>
-                                
+
                                 <!-- This block is redundant with Orders/Invoices above, removing to save space -->
-    
+
                                 <div class="mb-4">
                                     <h6 class="text-uppercase text-muted fw-bold mb-3" style="font-size: 0.75rem; letter-spacing: 1px;">Internal Notes</h6>
                                     <field name="note_ids" nolabel="1">
@@ -537,7 +537,7 @@
                                         </list>
                                     </field>
                                 </div>
-                                
+
                                 <button name="action_open_contact" type="object" class="btn btn-light border w-100 py-2 mt-2 fw-semibold text-dark">
                                     <i class="fa fa-external-link me-2" title="Open Contact"/> View in Odoo
                                 </button>
@@ -580,8 +580,8 @@ else:
 
 action['target'] = 'current'
 action['context'] = {'active_test': False}
-action.pop('flags', None) 
-action['view_mode'] = 'form,kanban' 
+action.pop('flags', None)
+action['view_mode'] = 'form,kanban'
 if not action.get('views'):
     action['views'] = [(False, 'form'), (False, 'kanban')]
 action = action

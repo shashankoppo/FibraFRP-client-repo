@@ -1,5 +1,5 @@
 /* ============================================================
-   ELSX WhatsApp Marketing — Premium Enterprise UI v4.0
+   ELSX WhatsApp Marketing â€” Premium Enterprise UI v4.0
    Next-Gen WhatsApp Business Console
    ============================================================ */
 
@@ -11,30 +11,30 @@
     --wa-primary-light: #E0F5EE;
     --wa-primary-glow:  rgba(0, 168, 132, 0.15);
     --wa-accent:        #25D366;
-    
+
     /* Backgrounds */
     --wa-bg:            #EFEAE2;
     --wa-sidebar-bg:    #FFFFFF;
     --wa-header-bg:     #F0F2F5;
     --wa-card-bg:       #FFFFFF;
     --wa-chat-bg:       #E5DDD5;
-    
+
     /* Messages */
     --wa-msg-out:       #D9FDD3;
     --wa-msg-in:        #FFFFFF;
     --wa-msg-time:      rgba(17, 27, 33, 0.45);
-    
+
     /* Borders & Surfaces */
     --wa-border:        #E9EDEF;
     --wa-border-light:  #F0F2F5;
     --wa-divider:       rgba(134, 150, 160, 0.15);
-    
+
     /* Typography */
     --wa-text:          #111B21;
     --wa-text-secondary:#667781;
     --wa-text-muted:    #8696A0;
     --wa-text-light:    #FFFFFF;
-    
+
     /* Interaction */
     --wa-hover:         #F5F6F6;
     --wa-active:        #D9FDD3;
@@ -42,20 +42,20 @@
     --wa-danger:        #EA0038;
     --wa-warning:       #F59E0B;
     --wa-info:          #53BDEB;
-    
+
     /* Elevation */
     --wa-shadow-sm:     0 1px 0.5px rgba(11,20,26,.13);
     --wa-shadow:        0 2px 5px rgba(11,20,26,.06);
     --wa-shadow-md:     0 4px 14px rgba(11,20,26,.08);
     --wa-shadow-lg:     0 12px 28px rgba(11,20,26,.12);
     --wa-shadow-glow:   0 0 20px rgba(0, 168, 132, 0.12);
-    
+
     /* Shapes */
     --wa-radius:        12px;
     --wa-radius-lg:     16px;
     --wa-radius-xl:     20px;
     --wa-radius-pill:   9999px;
-    
+
     /* Motion */
     --wa-font:          'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     --wa-transition:    all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -177,7 +177,7 @@
 }
 
 /* ============================================================
-   MAIN CONTAINER — 3-Panel Layout Restoration
+   MAIN CONTAINER â€” 3-Panel Layout Restoration
    ============================================================ */
 .o_whatsapp_chat_container {
     display: flex !important;
@@ -409,7 +409,7 @@
 }
 
 /* ============================================================
-   MESSAGES AREA — Alignment Fix
+   MESSAGES AREA â€” Alignment Fix
    ============================================================ */
 .o_whatsapp_chat_history {
     flex: 1 1 auto;
@@ -515,7 +515,7 @@
     box-shadow: none !important;
 }
 
-/* ---- Message Bubbles — Premium Restoration ---- */
+/* ---- Message Bubbles â€” Premium Restoration ---- */
 .wa-message-row {
     display: flex;
     width: 100%;
@@ -635,7 +635,7 @@
     white-space: pre-wrap;
 }
 
-/* Time + Status Row — WhatsApp-style bottom-right */
+/* Time + Status Row â€” WhatsApp-style bottom-right */
 .wa-msg-time {
     display: flex;
     align-items: center;
@@ -659,7 +659,7 @@
 .wa-tick-read     { color: #53BDEB; }
 .wa-tick-failed   { color: #ea0038; }
 
-/* Date separator — WhatsApp pill style */
+/* Date separator â€” WhatsApp pill style */
 .wa-date-separator {
     display: flex;
     align-items: center;
@@ -689,7 +689,7 @@
 .wa-status-failed { color: #EA0038; margin-left: 5px; font-size: 0.75rem; display: inline-flex; }
 .wa-status-pending { color: #8696A0; margin-left: 5px; font-size: 0.7rem; display: inline-flex; }
 
-/* Media Rendering — Industrial Fidelity */
+/* Media Rendering â€” Industrial Fidelity */
 .wa-msg-media {
     margin-bottom: 6px;
     border-radius: 8px;
@@ -756,7 +756,7 @@
 }
 
 /* ============================================================
-   CHAT AREA — Enterprise Grade UI/UX (AiSensy/Wati level)
+   CHAT AREA â€” Enterprise Grade UI/UX (AiSensy/Wati level)
    ============================================================ */
 :root {
     --wa-bg-chat: #efeae2;
@@ -766,7 +766,7 @@
     --wa-header-gradient: linear-gradient(90deg, #00A884, #008f71);
 }
 
-/* FOOTER & INPUT — WhatsApp-style pill container */
+/* FOOTER & INPUT â€” WhatsApp-style pill container */
 .o_whatsapp_chat_footer {
     background: #f0f2f5 !important;
     padding: 8px 16px !important;
@@ -1313,7 +1313,7 @@ textarea.wa-premium-input:focus {
 }
 
 /* ============================================================
-   RIGHT SIDEBAR — Contact Profile
+   RIGHT SIDEBAR â€” Contact Profile
    ============================================================ */
 .wa-right-sidebar,
 .o_whatsapp_chat_sidebar {
@@ -1363,7 +1363,7 @@ textarea.wa-premium-input:focus {
 }
 
 /* ============================================================
-   BADGES & CHIPS — Premium styling
+   BADGES & CHIPS â€” Premium styling
    ============================================================ */
 .o_whatsapp_chat_form_view .badge {
     font-weight: 600;
@@ -1612,7 +1612,7 @@ textarea.wa-premium-input:focus {
 .wa-fb-socket.output { top: 50%; right: -7px; transform: translateY(-50%); }
 
 /* ============================================================
-   CAMPAIGN DASHBOARD — Enterprise Analytics
+   CAMPAIGN DASHBOARD â€” Enterprise Analytics
    ============================================================ */
 .o_whatsapp_campaign_dashboard {
     padding: 24px;
@@ -1811,7 +1811,7 @@ textarea.wa-premium-input:focus {
    UI POLISH FIXES (Audit U1-U7)
    ============================================================ */
 
-/* U1: Flows button — move to its own line below "Chats" heading
+/* U1: Flows button â€” move to its own line below "Chats" heading
    so it doesn't cramp the header row */
 .o_whatsapp_panel_header .d-flex.align-items-baseline {
     flex-wrap: wrap;
@@ -1821,7 +1821,7 @@ textarea.wa-premium-input:focus {
     font-size: 1.15rem;
     letter-spacing: -0.02em;
 }
-/* Flows pill button — consistent, readable */
+/* Flows pill button â€” consistent, readable */
 .o_whatsapp_panel_header .btn.btn-outline-success.rounded-pill {
     font-size: 0.72rem !important;
     padding: 2px 10px !important;
@@ -1832,7 +1832,7 @@ textarea.wa-premium-input:focus {
     white-space: nowrap;
 }
 
-/* U2: Sidebar date — increase size and contrast */
+/* U2: Sidebar date â€” increase size and contrast */
 .o_whatsapp_sidebar_item .small.text-muted[style*="0.65rem"] {
     font-size: 0.72rem !important;
     color: #54656f !important;
@@ -1845,7 +1845,7 @@ textarea.wa-premium-input:focus {
     opacity: 0.85;
 }
 
-/* U5: Right sidebar — remove cyan/teal border, use subtle neutral */
+/* U5: Right sidebar â€” remove cyan/teal border, use subtle neutral */
 .wa-right-sidebar .bg-light.p-3.rounded-3.border {
     border-color: #e9edef !important;
     background: #f9fafb !important;
@@ -1861,7 +1861,7 @@ textarea.wa-premium-input:focus {
     letter-spacing: 1.2px;
 }
 
-/* U6: Agent badge in chat header — professional pill style */
+/* U6: Agent badge in chat header â€” professional pill style */
 .o_whatsapp_panel_header_premium .text-primary[style*="background: #E3F2FD"],
 .o_whatsapp_panel_header_premium span.small.text-primary {
     background: #E8F5E9 !important;
@@ -1881,7 +1881,7 @@ textarea.wa-premium-input:focus {
     white-space: nowrap;
 }
 
-/* U7: "Open" state badge in header — smaller, more subtle */
+/* U7: "Open" state badge in header â€” smaller, more subtle */
 .o_whatsapp_panel_header_premium .badge[class*="bg-success"],
 .o_whatsapp_panel_header_premium .o_field_badge .badge {
     font-size: 0.65rem !important;
@@ -2046,7 +2046,7 @@ textarea.wa-premium-input:focus {
 }
 
 /* ============================================================
-   MOBILE RESPONSIVE — Team Inbox
+   MOBILE RESPONSIVE â€” Team Inbox
    ============================================================ */
 @media (max-width: 991px) {
     /* On mobile, sidebar takes full width */
@@ -3631,5 +3631,254 @@ textarea.wa-premium-input:focus {
     .o_whatsapp_campaign_form .wa-kpi-grid,
     .o_whatsapp_template_form .wa-kpi-grid {
         grid-template-columns: 1fr !important;
+    }
+}
+
+/* Visual WhatsApp previews used in message, template, campaign, and send wizard forms. */
+.wa-preview-html-field,
+.wa-preview-html-field .o_field_html,
+.wa-preview-html-field .o_readonly,
+.wa-preview-html-field .note-editable {
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+.wa-preview-html-field iframe,
+.wa-preview-html-field img,
+.wa-preview-html-field video {
+    max-width: 100% !important;
+}
+
+.wa-message-preview-shell {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    padding: 10px 0;
+}
+
+.wa-message-preview-phone {
+    width: min(100%, 390px);
+    border: 1px solid rgba(17, 27, 33, 0.12);
+    border-radius: 16px;
+    overflow: hidden;
+    background: #f0f2f5;
+    box-shadow: 0 14px 34px rgba(11, 20, 26, 0.12);
+}
+
+.wa-message-preview-topbar {
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    color: #ffffff;
+    background: #008069;
+    font-size: 0.86rem;
+}
+
+.wa-message-preview-chat {
+    min-height: 210px;
+    padding: 18px 14px;
+    background-color: #efeae2;
+    background-image: radial-gradient(rgba(17, 27, 33, 0.06) 0.8px, transparent 0.8px);
+    background-size: 18px 18px;
+    display: flex;
+    align-items: flex-end;
+}
+
+.wa-preview-outbound .wa-message-preview-chat {
+    justify-content: flex-end;
+}
+
+.wa-preview-inbound .wa-message-preview-chat {
+    justify-content: flex-start;
+}
+
+.wa-message-preview-bubble {
+    width: min(100%, 310px);
+    background: #ffffff;
+    color: #111b21;
+    border-radius: 8px 8px 8px 2px;
+    padding: 8px;
+    box-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.18);
+    overflow: hidden;
+}
+
+.wa-preview-outbound .wa-message-preview-bubble {
+    background: #d9fdd3;
+    border-radius: 8px 8px 2px 8px;
+}
+
+.wa-preview-type-label,
+.wa-preview-type {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #667781;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+}
+
+.wa-preview-text,
+.wa-preview-caption {
+    color: #111b21;
+    font-size: 0.93rem;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.wa-preview-caption {
+    margin-top: 7px;
+}
+
+.wa-preview-header {
+    display: block;
+    margin-bottom: 6px;
+    color: #111b21;
+}
+
+.wa-preview-footer {
+    margin-top: 6px;
+    color: #667781;
+    font-size: 0.8rem;
+}
+
+.wa-preview-meta {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 6px;
+    color: #667781;
+    font-size: 0.72rem;
+    text-transform: capitalize;
+}
+
+.wa-preview-media,
+.wa-preview-media-placeholder {
+    width: 100%;
+    min-height: 150px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #e9edef;
+}
+
+.wa-preview-media img,
+.wa-preview-media video {
+    display: block;
+    width: 100%;
+    max-height: 240px;
+    object-fit: cover;
+}
+
+.wa-preview-media-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 18px;
+    color: #667781;
+    text-align: center;
+}
+
+.wa-preview-media-placeholder i {
+    font-size: 2rem;
+}
+
+.wa-preview-dark {
+    background: #111b21;
+    color: #ffffff;
+}
+
+.wa-preview-audio,
+.wa-preview-document {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid rgba(17, 27, 33, 0.08);
+}
+
+.wa-preview-audio audio {
+    min-width: 0;
+    width: 100%;
+    height: 34px;
+}
+
+.wa-preview-document i {
+    font-size: 1.75rem;
+}
+
+.wa-preview-document-text {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.wa-preview-document-text strong,
+.wa-preview-document-text a {
+    color: #111b21;
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.wa-preview-document-text span {
+    color: #667781;
+    font-size: 0.78rem;
+}
+
+.wa-preview-buttons {
+    margin-top: 8px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #ffffff;
+    box-shadow: 0 1px 1px rgba(11, 20, 26, 0.08);
+}
+
+.wa-preview-buttons > div {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 9px 10px;
+    border-top: 1px solid #e9edef;
+    color: #008069;
+    font-weight: 700;
+}
+
+.wa-template-preview-container,
+.wa-safe-preview-panel,
+.wa-closed-template-preview .wa-template-preview-safe {
+    max-width: 100%;
+}
+
+.wa-closed-template-preview .wa-message-preview-shell,
+.wa-closed-template-preview .wa-template-preview-shell {
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+@media (max-width: 768px) {
+    .wa-message-preview-phone {
+        width: 100%;
+        border-radius: 12px;
+    }
+
+    .wa-message-preview-chat {
+        min-height: 180px;
+        padding: 12px 10px;
+    }
+
+    .wa-message-preview-bubble {
+        width: min(100%, 92vw);
     }
 }

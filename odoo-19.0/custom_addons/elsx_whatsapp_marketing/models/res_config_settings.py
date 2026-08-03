@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import api, fields, models
+from odoo.http import request
 
 
 class ResConfigSettings(models.TransientModel):
@@ -203,7 +204,12 @@ class ResConfigSettings(models.TransientModel):
 
     def action_use_odoo_base_url_for_whatsapp_webhook(self):
         params = self.env['ir.config_parameter'].sudo()
-        base_url = (params.get_param('web.base.url') or '').strip().rstrip('/')
+        try:
+            request_base_url = request.httprequest.host_url
+        except RuntimeError:
+            request_base_url = False
+        base_url = (request_base_url or params.get_param('web.base.url') or '').strip().rstrip('/')
+        base_url = self.env['whatsapp.account']._normalize_webhook_base_url(base_url)
         params.set_param('whatsapp.public.webhook.base.url', base_url)
         self.whatsapp_public_webhook_base_url = base_url
         return {
@@ -211,7 +217,7 @@ class ResConfigSettings(models.TransientModel):
             'tag': 'display_notification',
             'params': {
                 'title': 'Webhook URL Updated',
-                'message': 'WhatsApp webhook base URL now uses the current Odoo base URL.',
+                'message': 'WhatsApp webhook base URL now uses %s.' % base_url,
                 'type': 'success',
             },
         }

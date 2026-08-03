@@ -161,12 +161,12 @@
 .elsx-hover-lift { transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease; }
 .elsx-hover-lift:hover { transform: translateY(-6px); box-shadow: 0 24px 60px rgba(15, 23, 42, 0.16); }
 .elsx-chip { display: inline-flex; align-items: center; border-radius: 999px; padding: 0.45rem 0.8rem; background: rgba(15, 118, 110, 0.1); color: #0f766e; font-size: 0.875rem; font-weight: 700; }
-.elsx-logo-slider { position: relative; overflow: hidden; width: 100%; mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent); }
+.elsx-logo-slider { position: relative; overflow: hidden; width: 100%; padding-block: .85rem; mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
 .elsx-logo-slider:hover .elsx-logo-track { animation-play-state: paused; }
-.elsx-logo-track { display: flex; width: max-content; gap: 1rem; animation: elsx-logo-marquee 32s linear infinite; }
-.elsx-logo-slide { width: var(--elsx-logo-item-width, clamp(180px, 18vw, 260px)); min-height: var(--elsx-logo-item-height, 126px); padding: var(--elsx-logo-item-padding, 1rem); display: flex; align-items: center; justify-content: center; flex: 0 0 auto; border: 1px solid rgba(15, 23, 42, 0.08); border-radius: 1.25rem; background: rgba(255, 255, 255, 0.88); color: #475569; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08); }
-.elsx-logo-slide img { max-width: 100%; max-height: calc(var(--elsx-logo-media-size, 76px) * .92); object-fit: contain; filter: grayscale(1); opacity: 0.82; transition: filter 180ms ease, opacity 180ms ease, transform 180ms ease; }
-.elsx-logo-slide:hover img { filter: grayscale(0); opacity: 1; transform: scale(1.04); }
+.elsx-logo-track { display: flex; width: max-content; gap: 1rem; animation: elsx-logo-marquee var(--elsx-logo-speed, 32s) linear infinite; will-change: transform; }
+.elsx-logo-slide { width: var(--elsx-logo-item-width, clamp(180px, 18vw, 260px)); min-height: var(--elsx-logo-item-height, 126px); padding: var(--elsx-logo-item-padding, 1rem); display: flex; align-items: center; justify-content: center; flex: 0 0 auto; border: 1px solid rgba(15, 23, 42, 0.09); border-radius: 1.25rem; background: linear-gradient(145deg, rgba(255,255,255,.96), rgba(248,250,252,.9)); color: #334155; font-weight: 800; letter-spacing: 0.02em; text-transform: uppercase; box-shadow: 0 16px 42px rgba(15, 23, 42, 0.10); position: relative; overflow: hidden; }
+.elsx-logo-slide img { max-width: 100%; max-height: calc(var(--elsx-logo-media-size, 76px) * .92); object-fit: contain; filter: none; opacity: 1; transition: filter 180ms ease, opacity 180ms ease, transform 180ms ease; }
+.elsx-logo-slide:hover img { filter: saturate(1.12) contrast(1.04); opacity: 1; transform: scale(1.06); }
 @keyframes elsx-logo-marquee { from { transform: translateX(0); } to { transform: translateX(calc(-50% - 0.5rem)); } }
 @media (prefers-reduced-motion: reduce) { .elsx-logo-track { animation: none; flex-wrap: wrap; justify-content: center; width: auto; } }
 
@@ -303,8 +303,8 @@
     height: 100%;
     object-fit: contain;
     padding: .35rem;
-    filter: grayscale(1);
-    opacity: .86;
+    filter: none;
+    opacity: 1;
 }
 .elsx-logo-label {
     display: block;
@@ -395,3 +395,68 @@
 .elsx-card-type-metric :where(h1,h2,h3,h4,h5,strong) { display: block; font-size: clamp(2rem, 4vw, 4rem); line-height: .95; color: var(--elsx-primary); }
 .elsx-card-type-quote { position: relative; padding-top: 2.8rem !important; }
 .elsx-quote-mark { position: absolute; top: .35rem; left: 1rem; color: color-mix(in srgb, var(--elsx-primary), transparent 40%); font-size: 4rem; font-family: Georgia, serif; line-height: 1; }
+
+/* Premium client and partner showcase. Logos stay full color by default. */
+.s_elsx_logo_slider.elsx-logo-showcase {
+    overflow: hidden;
+    background:
+        linear-gradient(180deg, rgba(248,250,252,.94), rgba(255,255,255,1)),
+        radial-gradient(circle at 12% 8%, color-mix(in srgb, var(--elsx-primary), transparent 82%), transparent 34%);
+}
+.s_elsx_logo_slider.elsx-logo-showcase::before,
+.s_elsx_logo_slider.elsx-logo-showcase::after {
+    content: "";
+    position: absolute;
+    inset-block: 0;
+    width: min(18vw, 220px);
+    z-index: 1;
+    pointer-events: none;
+}
+.s_elsx_logo_slider.elsx-logo-showcase::before { left: 0; background: linear-gradient(90deg, var(--elsx-bg, #f8fafc), transparent); }
+.s_elsx_logo_slider.elsx-logo-showcase::after { right: 0; background: linear-gradient(270deg, #fff, transparent); }
+.elsx-logo-showcase .elsx-logo-slider { overflow: visible; }
+.elsx-logo-showcase .elsx-logo-track { gap: clamp(.85rem, 1.5vw, 1.35rem); }
+.elsx-logo-showcase .elsx-logo-slide,
+.elsx-logo-showcase .elsx-logo-card {
+    isolation: isolate;
+    transform: translateZ(0);
+    transition: transform .24s ease, box-shadow .24s ease, border-color .24s ease, background .24s ease;
+}
+.elsx-logo-showcase .elsx-logo-slide::before,
+.elsx-logo-showcase .elsx-logo-card::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    z-index: -1;
+    opacity: 0;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--elsx-primary), white 20%), color-mix(in srgb, var(--elsx-secondary), white 30%));
+    transition: opacity .24s ease;
+}
+.elsx-logo-showcase .elsx-logo-slide:hover,
+.elsx-logo-showcase .elsx-logo-card:hover {
+    transform: translateY(-6px) scale(1.015);
+    border-color: color-mix(in srgb, var(--elsx-primary), transparent 52%);
+    box-shadow: 0 30px 90px color-mix(in srgb, var(--elsx-primary), transparent 78%);
+}
+.elsx-logo-showcase .elsx-logo-slide:hover::before,
+.elsx-logo-showcase .elsx-logo-card:hover::before { opacity: .09; }
+.elsx-logo-showcase .elsx-logo-media {
+    background: linear-gradient(145deg, rgba(255,255,255,.92), color-mix(in srgb, var(--elsx-primary), white 92%));
+    box-shadow: inset 0 0 0 1px rgba(15,23,42,.06);
+}
+.elsx-logo-showcase .elsx-logo-img {
+    filter: none !important;
+    opacity: 1 !important;
+    mix-blend-mode: normal;
+}
+.elsx-logo-showcase .elsx-logo-label { color: var(--elsx-text); letter-spacing: .01em; }
+.elsx-logo-showcase .elsx-logo-subtitle { color: var(--elsx-muted); }
+.elsx-logo-showcase .elsx-chip {
+    background: rgba(255,255,255,.78);
+    border: 1px solid rgba(15,23,42,.08);
+    box-shadow: 0 10px 28px rgba(15,23,42,.06);
+}
+@media (max-width: 767.98px) {
+    .s_elsx_logo_slider.elsx-logo-showcase::before,
+    .s_elsx_logo_slider.elsx-logo-showcase::after { width: 64px; }
+}

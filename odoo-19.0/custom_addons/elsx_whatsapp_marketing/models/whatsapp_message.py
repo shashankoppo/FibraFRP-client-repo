@@ -13,6 +13,8 @@ import threading
 import random
 import pytz
 import time
+from markupsafe import Markup, escape
+from odoo.tools import html2plaintext
 
 _logger = logging.getLogger(__name__)
 
@@ -26,7 +28,7 @@ def _safe_int(value):
         return False
 
 def notify_sidecar_background(env, message_id, event_type='new_message'):
-    """Fire-and-forget notification to the sidecar — non-blocking thread."""
+    """Fire-and-forget notification to the sidecar â€” non-blocking thread."""
     # Capture db_name from the current cursor before spawning a thread
     try:
         db_name = env.cr.dbname
@@ -147,7 +149,7 @@ class WhatsAppMessage(models.Model):
     chat_id_ref = fields.Many2one('whatsapp.chat', string='Conversation', ondelete='cascade')
     raw_data = fields.Text('Raw Meta Data', help='Complete JSON payload from Meta')
 
-    # Template fields — stored explicitly so action_send can build the correct Meta payload
+    # Template fields â€” stored explicitly so action_send can build the correct Meta payload
     template_id = fields.Many2one('whatsapp.template', string='Template', ondelete='set null')
     template_name = fields.Char('Template Name', help='Approved Meta template name (e.g. hello_world)')
     template_language = fields.Char('Template Language', default='en_US', help='BCP-47 language code (e.g. en_US, hi)')
@@ -201,9 +203,188 @@ class WhatsAppMessage(models.Model):
 
     # Media handling
     attachment_ids = fields.Many2many('ir.attachment', string='Attachments')
+    preview_html = fields.Html('WhatsApp Preview', compute='_compute_preview')
+    preview_text = fields.Text('Preview Text', compute='_compute_preview')
 
     # E-Commerce Integration
     sale_order_id = fields.Many2one('sale.order', string='Created Order', ondelete='set null')
+
+    def _preview_media_url(self, media_type=None):
+        self.ensure_one()
+        message_type = media_type or self.message_type
+        if self.media_file and self.id:
+            route = 'image' if message_type == 'image' else 'content'
+            return f"/web/{route}/whatsapp.message/{self.id}/media_file"
+        if self.media_url and str(self.media_url).startswith(('http://', 'https://')):
+            return self.media_url
+        return False
+
+    def _preview_document_icon_class(self):
+        self.ensure_one()
+        name = (self.media_filename or '').lower()
+        if name.endswith(('.doc', '.docx')):
+            return 'fa-file-word-o text-primary'
+        if name.endswith(('.xls', '.xlsx')):
+            return 'fa-file-excel-o text-success'
+        if name.endswith(('.ppt', '.pptx')):
+            return 'fa-file-powerpoint-o text-warning'
+        if name.endswith('.pdf'):
+            return 'fa-file-pdf-o text-danger'
+        return 'fa-file-text-o text-muted'
+
+    def _preview_plain_body(self):
+        self.ensure_one()
+        if self.caption:
+            return self.caption
+        if self.body:
+            return self.body
+        if self.button_text or self.list_item_title:
+            return self.button_text or self.list_item_title
+        if self.media_filename:
+            return self.media_filename
+        return ''
+
+    def _render_media_preview_html(self):
+        self.ensure_one()
+        media_type = self.message_type
+        media_url = self._preview_media_url(media_type)
+        filename = self.media_filename or self.media_url or 'Attachment'
+        caption = self.caption or self.body or ''
+        caption_html = (
+            "<div class='wa-preview-caption'>%s</div>" % escape(caption)
+            if caption else ''
+        )
+        if media_type == 'image':
+            if media_url:
+                return Markup(
+                    "<div class='wa-preview-media wa-preview-image'>"
+                    "<img src='%s' alt='Image preview' loading='lazy'/></div>%s"
+                ) % (escape(media_url), Markup(caption_html))
+            return Markup(
+                "<div class='wa-preview-media-placeholder'><i class='fa fa-image'></i>"
+                "<span>%s</span></div>%s"
+            ) % (escape(filename), Markup(caption_html))
+        if media_type == 'video':
+            if media_url:
+                return Markup(
+                    "<div class='wa-preview-media wa-preview-video'>"
+                    "<video src='%s' controls preload='metadata'></video></div>%s"
+                ) % (escape(media_url), Markup(caption_html))
+            return Markup(
+                "<div class='wa-preview-media-placeholder wa-preview-dark'><i class='fa fa-play-circle'></i>"
+                "<span>%s</span></div>%s"
+            ) % (escape(filename), Markup(caption_html))
+        if media_type == 'audio':
+            if media_url:
+                return Markup(
+                    "<div class='wa-preview-audio'><i class='fa fa-microphone'></i>"
+                    "<audio src='%s' controls preload='metadata'></audio></div>%s"
+                ) % (escape(media_url), Markup(caption_html))
+            return Markup(
+                "<div class='wa-preview-audio'><i class='fa fa-microphone'></i>"
+                "<span>%s</span></div>%s"
+            ) % (escape(filename), Markup(caption_html))
+        icon = self._preview_document_icon_class()
+        label = escape(filename)
+        if media_url:
+            title = Markup("<a href='%s' target='_blank'>%s</a>") % (escape(media_url), label)
+        else:
+            title = label
+        return Markup(
+            "<div class='wa-preview-document'><i class='fa %s'></i>"
+            "<div class='wa-preview-document-text'><strong>%s</strong>"
+            "<span>%s</span></div></div>%s"
+        ) % (icon, title, escape(self.media_mime_type or 'Document'), Markup(caption_html))
+
+    def _render_interactive_preview_html(self):
+        self.ensure_one()
+        try:
+            raw = json.loads(self.raw_data or '{}')
+        except Exception:
+            raw = {}
+        payload = raw.get('interactive') if isinstance(raw, dict) else {}
+        payload = payload if isinstance(payload, dict) else {}
+        itype = self.interactive_type or payload.get('type') or 'interactive'
+        body = ((payload.get('body') or {}).get('text') if isinstance(payload.get('body'), dict) else False) or self.body or ''
+        header = payload.get('header') or {}
+        footer = payload.get('footer') or {}
+        pieces = [
+            "<div class='wa-preview-type'><i class='fa fa-hand-pointer-o'></i>%s</div>"
+            % escape(itype.replace('_', ' ').title())
+        ]
+        if isinstance(header, dict) and header.get('text'):
+            pieces.append("<strong class='wa-preview-header'>%s</strong>" % escape(header['text']))
+        if body:
+            pieces.append("<div class='wa-preview-text'>%s</div>" % escape(body))
+        if isinstance(footer, dict) and footer.get('text'):
+            pieces.append("<div class='wa-preview-footer'>%s</div>" % escape(footer['text']))
+        if self.button_text or self.list_item_title:
+            pieces.append(
+                "<div class='wa-preview-buttons'><div><i class='fa fa-reply'></i>%s</div></div>"
+                % escape(self.button_text or self.list_item_title)
+            )
+        elif self.button_url:
+            pieces.append(
+                "<div class='wa-preview-buttons'><div><i class='fa fa-external-link'></i>%s</div></div>"
+                % escape(self.button_text or 'Open link')
+            )
+        return Markup(''.join(pieces))
+
+    def _render_preview_html(self):
+        self.ensure_one()
+        direction_class = 'wa-preview-outbound' if self.direction == 'outbound' else 'wa-preview-inbound'
+        type_label = dict(self._fields['message_type'].selection).get(self.message_type, self.message_type or 'Message')
+        if self.message_type == 'template' and self.template_id:
+            body = self.template_id._render_customer_preview_html(
+                partner=self.partner_id,
+                message=self,
+                body_override=self.body or False,
+                shell=False,
+                compact=True,
+                include_template_name=True,
+            )
+        elif self.message_type in ('image', 'video', 'document', 'audio'):
+            body = self._render_media_preview_html()
+        elif self.message_type == 'interactive' or self.button_text or self.button_payload or self.list_item_title:
+            body = self._render_interactive_preview_html()
+        else:
+            body = Markup("<div class='wa-preview-text'>%s</div>") % escape(self.body or 'Type a message...')
+        status = escape(self.status or 'draft')
+        time_label = 'Now'
+        if self.create_date:
+            local_dt = fields.Datetime.context_timestamp(self, self.create_date)
+            time_label = local_dt.strftime('%I:%M %p').lstrip('0').lower()
+        return Markup(
+            "<div class='wa-message-preview-shell %s'>"
+            "<div class='wa-message-preview-phone'>"
+            "<div class='wa-message-preview-topbar'><span></span><strong>WhatsApp Preview</strong><span></span></div>"
+            "<div class='wa-message-preview-chat'>"
+            "<div class='wa-message-preview-bubble'>"
+            "<div class='wa-preview-type-label'>%s</div>%s"
+            "<div class='wa-preview-meta'><span>%s</span><span>%s</span></div>"
+            "</div></div></div></div>"
+        ) % (direction_class, escape(type_label), body, escape(time_label), status)
+
+    @api.depends(
+        'body', 'caption', 'message_type', 'direction', 'status', 'create_date',
+        'media_file', 'media_url', 'media_filename', 'media_mime_type',
+        'template_id', 'template_id.preview_html', 'template_name', 'template_language',
+        'raw_data', 'button_text', 'button_payload', 'list_item_title', 'list_item_id',
+        'interactive_type', 'button_url',
+    )
+    def _compute_preview(self):
+        for record in self:
+            try:
+                preview = record._render_preview_html()
+                record.preview_html = preview
+                record.preview_text = html2plaintext(str(preview or '')).strip() or record._preview_plain_body()
+            except Exception as exc:
+                _logger.warning("WhatsApp message preview failed for %s: %s", record.id, exc)
+                safe_error = escape(str(exc) or 'Preview not ready.')
+                record.preview_html = Markup(
+                    "<div class='alert alert-warning mb-0'>Preview not ready.<br/>%s</div>"
+                ) % safe_error
+                record.preview_text = "Preview not ready. %s" % safe_error
 
     @api.model
     def _is_non_retryable_meta_error_code(self, code):
@@ -265,7 +446,7 @@ class WhatsAppMessage(models.Model):
                 account = self.env['whatsapp.account'].sudo().browse(vals.get('account_id')) if vals.get('account_id') else False
                 vals['phone_number'] = self._normalize_phone(vals['phone_number'], account=account, strict=False)
 
-            # Skip chat creation for campaign/bulk messages — they are marketing blasts,
+            # Skip chat creation for campaign/bulk messages â€” they are marketing blasts,
             # not conversations. A chat will be created when the customer replies.
             is_campaign = bool(vals.get('campaign_id'))
             if not is_campaign and not vals.get('chat_id_ref') and vals.get('phone_number') and vals.get('account_id'):
@@ -1029,7 +1210,7 @@ class WhatsAppMessage(models.Model):
                 elif record.message_type in ['image', 'video', 'document', 'audio']:
                     payload[record.message_type] = {'id': record.media_url}
 
-            # Build explicit kwargs per message type (NO **payload splat — causes TypeError)
+            # Build explicit kwargs per message type (NO **payload splat â€” causes TypeError)
             send_kwargs = {
                 'existing_message': record,
                 'partner_id': record.partner_id.id if record.partner_id else False,

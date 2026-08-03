@@ -23,11 +23,11 @@
                             <field name="message_body" widget="text" placeholder="Type message or optional media/voice caption..." invisible="template_id != False"/>
                         </group>
                     </div>
-                    
+
                     <!-- Right Column: safe customer preview -->
                     <div class="col-lg-5 ps-4">
                         <div class="text-muted small mb-3 text-uppercase fw-bold" style="letter-spacing: 1px;">Customer Preview</div>
-                        
+
                         <div invisible="template_id != False" class="d-flex flex-column align-items-center justify-content-center h-100 text-center" style="background: #F8F9FA; border-radius: 12px; border: 2px dashed #E9EDEF; min-height: 250px;">
                             <div class="mb-3">
                                 <i class="fa fa-magic fa-3x" style="color: #00A884; opacity: 0.5;" title="Preview Icon"/>
@@ -35,10 +35,10 @@
                             <h6 class="text-muted fw-bold">No Template Selected</h6>
                             <p class="small text-muted px-4">Select an approved Meta template on the left to see exactly how it will appear to your customers.</p>
                         </div>
-                        
+
                         <div invisible="template_id == False" class="wa-template-preview-container wa-safe-preview-panel">
                             <div class="fw-bold text-muted text-uppercase small mb-2">Before Send Checklist</div>
-                            <field name="template_preview_text" nolabel="1" readonly="1" class="wa-safe-preview-text"/>
+                            <field name="template_preview_html" nolabel="1" readonly="1" widget="html" class="wa-preview-html-field"/>
                         </div>
                     </div>
                 </div>

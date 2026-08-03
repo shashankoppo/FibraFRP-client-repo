@@ -19,7 +19,7 @@ const ELSX_SECTION_SELECTOR = [
     ".s_elsx_brochure",
     ".s_elsx_trust_badges",
 ].join(", ");
-const LOGO_ITEM_SELECTOR = ".elsx-logo-slide, .elsx-logo-card";
+const LOGO_ITEM_SELECTOR = ".elsx-logo-slide:not(.elsx-logo-clone), .elsx-logo-card";
 const CARD_ITEM_SELECTOR = ".elsx-card, .elsx-project-card, .elsx-tile, .elsx-step, .elsx-badge";
 const LOGO_SHAPE_CLASSES = [
     "elsx-logo-pill",

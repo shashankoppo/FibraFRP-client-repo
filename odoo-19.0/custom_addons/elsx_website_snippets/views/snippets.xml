@@ -22,15 +22,15 @@
 
 
     <template id="s_elsx_logo_slider" name="Client Partner Logo Slider">
-        <section class="s_elsx_logo_slider elsx-theme-soft elsx-logo-size-md elsx-logo-carded elsx-marquee-left pt56 pb56" data-snippet="s_elsx_logo_slider" data-name="Client Partner Logo Slider">
+        <section class="s_elsx_logo_slider elsx-theme-soft elsx-logo-size-md elsx-logo-carded elsx-logo-showcase elsx-marquee-left pt56 pb56" data-snippet="s_elsx_logo_slider" data-name="Client Partner Logo Slider">
             <div class="container">
                 <div class="row align-items-center g-4 mb-4">
                     <div class="col-lg-5">
                         <p class="text-uppercase text-muted fw-semibold small mb-2">Our Network</p>
-                        <h2 class="h1 fw-bold mb-0">Clients, partners, and trusted brands</h2>
+                        <h2 class="h1 fw-bold mb-0">Clients, partners, certifications, and growth allies</h2>
                     </div>
                     <div class="col-lg-7">
-                        <p class="lead text-muted mb-0">Select a logo item to edit label, initials, URL, image mode, shape, and motion. Use Add Logo to expand the slider without custom code.</p>
+                        <p class="lead text-muted mb-0">A premium, full-color moving showcase for client logos, channel partners, certifications, distributors, and strategic alliances.</p>
                     </div>
                 </div>
             </div>
@@ -48,9 +48,9 @@
             </div>
             <div class="container mt-4">
                 <div class="d-flex flex-wrap gap-2 justify-content-center">
-                    <span class="elsx-chip">Selectable Logo Items</span>
-                    <span class="elsx-chip">Image or Text Mode</span>
-                    <span class="elsx-chip">No Custom CSS Needed</span>
+                    <span class="elsx-chip">Full-color Logos</span>
+                    <span class="elsx-chip">Pause on Hover</span>
+                    <span class="elsx-chip">Editor Ready</span>
                 </div>
             </div>
         </section>

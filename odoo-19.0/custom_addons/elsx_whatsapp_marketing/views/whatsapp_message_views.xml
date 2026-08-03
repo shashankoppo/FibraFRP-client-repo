@@ -14,6 +14,7 @@
                 <field name="message_type"/>
                 <field name="interactive_type" optional="hide"/>
                 <field name="body"/>
+                <field name="preview_text" optional="hide"/>
                 <field name="button_text" optional="hide"/>
                 <field name="list_item_title" optional="hide"/>
                 <field name="media_filename" optional="hide"/>
@@ -45,6 +46,9 @@
                         </group>
                         <group>
                             <field name="message_type"/>
+                            <field name="template_id" invisible="message_type != 'template'"/>
+                            <field name="template_name" invisible="message_type != 'template'"/>
+                            <field name="template_language" invisible="message_type != 'template'"/>
                             <field name="campaign_id"/>
                             <field name="is_automated"/>
                             <field name="trigger_event" invisible="not is_automated"/>
@@ -56,6 +60,9 @@
                         <field name="media_filename" invisible="message_type == 'text'"/>
                         <field name="media_mime_type" invisible="message_type == 'text'"/>
                         <field name="caption" invisible="message_type == 'text'"/>
+                    </group>
+                    <group string="Customer Preview">
+                        <field name="preview_html" nolabel="1" readonly="1" widget="html" class="wa-preview-html-field"/>
                     </group>
                     <group string="Interactive / Commerce" invisible="message_type != 'interactive'">
                         <field name="interactive_type"/>

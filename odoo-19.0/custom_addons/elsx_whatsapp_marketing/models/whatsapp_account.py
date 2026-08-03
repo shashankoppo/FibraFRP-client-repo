@@ -15,6 +15,13 @@ from datetime import timedelta
 _logger = logging.getLogger(__name__)
 
 
+LEGACY_WEBHOOK_BASE_URLS = {
+    'http://fibera.elsxglobal.com',
+    'https://fibera.elsxglobal.com',
+}
+FIBERAFRP_WEBHOOK_BASE_URL = 'https://fiberafrp.com'
+
+
 MEDIA_SIZE_LIMITS = {
     'image': 5 * 1024 * 1024,
     'video': 16 * 1024 * 1024,
@@ -258,6 +265,13 @@ class WhatsAppAccount(models.Model):
             record.campaign_count = len(record.campaign_ids)
     
     @api.model
+    def _normalize_webhook_base_url(self, base_url):
+        base_url = (base_url or '').strip().rstrip('/')
+        if base_url in LEGACY_WEBHOOK_BASE_URLS:
+            return FIBERAFRP_WEBHOOK_BASE_URL
+        return base_url
+
+    @api.model
     def _get_webhook_base_url(self):
         params = self.env['ir.config_parameter'].sudo()
         base_url = (
@@ -265,7 +279,7 @@ class WhatsAppAccount(models.Model):
             or params.get_param('web.base.url')
             or ''
         )
-        return base_url.strip().rstrip('/')
+        return self._normalize_webhook_base_url(base_url)
 
     def _compute_webhook_url(self):
         base_url = self._get_webhook_base_url()

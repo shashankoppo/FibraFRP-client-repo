@@ -194,7 +194,7 @@ Meta should call the public HTTPS callback URL for the active WhatsApp account.
 For the current live database, use the database-pinned URL:
 
 ```text
-https://fibera.elsxglobal.com/whatsapp/webhook?db=FiberaFRP_DB
+https://fiberafrp.com/whatsapp/webhook?db=FiberaFRP_DB
 ```
 
 After pulling code or restoring the live database, run:
@@ -328,7 +328,7 @@ Production smoke checks after this update:
 - Campaign/template previews open.
 - Existing Attendances open and normal check-in works.
 - Attendance kiosk links use the current tenant/domain, for example
-  `localhost` locally and `fibera.elsxglobal.com` in production, with the
+  `localhost` locally and `fiberafrp.com` in production, with the
   correct `db=` query for multi-database SaaS routing.
 - Face Attendance settings are visible but disabled.
 - ELSx SaaS Admin opens for system administrators.

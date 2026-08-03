@@ -2,7 +2,7 @@
 {
     'name': 'ELSX Website Snippet Library',
     'summary': 'Reusable business website snippets for Odoo Website editor',
-    'version': '19.0.1.4.0',
+    'version': '19.0.1.5.0',
     'category': 'Website/Website',
     'author': 'ELSX Global',
     'license': 'LGPL-3',
@@ -13,9 +13,11 @@
     'assets': {
         'web.assets_frontend': [
             'elsx_website_snippets/static/src/css/snippets.css',
+            'elsx_website_snippets/static/src/js/logo_showcase.js',
         ],
         'website.assets_wysiwyg': [
             'elsx_website_snippets/static/src/css/snippets.css',
+            'elsx_website_snippets/static/src/js/logo_showcase.js',
         ],
         'website.website_builder_assets': [
             'elsx_website_snippets/static/src/builder/plugins/options/elsx_website_options.xml',
