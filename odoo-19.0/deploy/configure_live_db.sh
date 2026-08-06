@@ -69,7 +69,7 @@ DECLARE
   updated_count integer;
   safe_arch text := $body$<data>
     <xpath expr="//t[@t-out]" position="replace">
-        <span>Powered by <span>ELSxGlobal</span></span>
+        <t/>
     </xpath>
 </data>$body$;
 BEGIN
