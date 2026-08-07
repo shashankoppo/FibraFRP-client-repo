@@ -7,8 +7,8 @@ DB_USER="${POSTGRES_USER:-odoo}"
 
 # Keep this list focused on the apps that disappear when Invoicing/WhatsApp
 # are accidentally uninstalled. Operators can override it if they need more.
-RECOVERY_MODULES="${RECOVERY_MODULES:-account,crm,contacts,sale,elsx_whatsapp_marketing,elsx_tally_integration,elsx_client_restrictions,elsx_attendance_tracking}"
-UPGRADE_MODULES="${UPGRADE_MODULES:-elsx_client_restrictions,elsx_whatsapp_marketing,elsx_tally_integration,elsx_attendance_tracking}"
+RECOVERY_MODULES="${RECOVERY_MODULES:-account,crm,contacts,sale,elsx_whatsapp_marketing,elsx_tally_integration,elsx_client_restrictions,elsx_rebrand,elsx_attendance_tracking}"
+UPGRADE_MODULES="${UPGRADE_MODULES:-elsx_client_restrictions,elsx_rebrand,elsx_whatsapp_marketing,elsx_tally_integration,elsx_attendance_tracking}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -71,7 +71,7 @@ docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
     WHERE name IN (
       'account', 'crm', 'contacts', 'sale',
       'elsx_whatsapp_marketing', 'elsx_tally_integration',
-      'elsx_client_restrictions', 'elsx_attendance_tracking'
+      'elsx_client_restrictions', 'elsx_rebrand', 'elsx_attendance_tracking'
     )
     ORDER BY name;"
 
@@ -131,7 +131,7 @@ docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
     WHERE name IN (
       'account', 'crm', 'contacts', 'sale',
       'elsx_whatsapp_marketing', 'elsx_tally_integration',
-      'elsx_client_restrictions', 'elsx_attendance_tracking'
+      'elsx_client_restrictions', 'elsx_rebrand', 'elsx_attendance_tracking'
     )
     ORDER BY name;"
 

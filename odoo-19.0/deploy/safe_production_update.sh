@@ -5,8 +5,8 @@ LIVE_DB_NAME="${1:-${LIVE_DB_NAME:-}}"
 DB_USER="${POSTGRES_USER:-odoo}"
 CONFIG="${ODOO_CONFIG:-/etc/odoo/odoo.conf}"
 OUTPUT_DIR="${OUTPUT_DIR:-secure_backups}"
-INSTALL_MODULES="${INSTALL_MODULES:-elsx_client_restrictions,elsx_attendance_tracking,elsx_face_attendance,elsx_saas}"
-UPGRADE_MODULES="${UPGRADE_MODULES:-elsx_client_restrictions,elsx_attendance_tracking,elsx_face_attendance,elsx_saas}"
+INSTALL_MODULES="${INSTALL_MODULES:-elsx_client_restrictions,elsx_rebrand,elsx_attendance_tracking,elsx_face_attendance,elsx_saas}"
+UPGRADE_MODULES="${UPGRADE_MODULES:-elsx_client_restrictions,elsx_rebrand,elsx_attendance_tracking,elsx_face_attendance,elsx_saas}"
 EXTRA_INSTALL_MODULES="${EXTRA_INSTALL_MODULES:-}"
 EXTRA_UPGRADE_MODULES="${EXTRA_UPGRADE_MODULES:-}"
 
@@ -106,7 +106,7 @@ echo "==> Module state check"
 docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
   "SELECT name, state, latest_version
      FROM ir_module_module
-    WHERE name IN ('elsx_client_restrictions','elsx_attendance_tracking','elsx_face_attendance','elsx_saas','elsx_whatsapp_marketing','elsx_tally_integration','crm','account','hr_attendance')
+    WHERE name IN ('elsx_client_restrictions','elsx_rebrand','elsx_attendance_tracking','elsx_face_attendance','elsx_saas','elsx_whatsapp_marketing','elsx_tally_integration','crm','account','hr_attendance')
     ORDER BY name;"
 
 echo "==> Container status"
