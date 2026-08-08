@@ -79,6 +79,11 @@ SYSTEM_VIEW_CLEANUP_MODULES = (
     "point_of_sale",
 )
 
+STALE_INHERITED_VIEW_XMLIDS = (
+    "elsx_rebrand.brand_promotion_message_rebrand",
+    "elsx_rebrand.login_footer_rebrand",
+)
+
 OPTIONAL_CLEANUP_VIEWS = (
     (
         "portal",
@@ -177,8 +182,13 @@ class IrConfigParameter(models.Model):
     def _elsx_remove_optional_branding_cleanup_views(self):
         """Remove older fragile inherited cleanup views before direct arch cleanup."""
         View = self.env["ir.ui.view"].sudo()
+        stale_views = View.browse()
+        for xmlid in STALE_INHERITED_VIEW_XMLIDS:
+            view = self.env.ref(xmlid, raise_if_not_found=False)
+            if view:
+                stale_views |= view.sudo()
         cleanup_names = [view_name for _, _, view_name, _ in OPTIONAL_CLEANUP_VIEWS]
-        stale_views = View.search([("name", "in", cleanup_names)])
+        stale_views |= View.search([("name", "in", cleanup_names)])
         if stale_views:
             stale_views.unlink()
 

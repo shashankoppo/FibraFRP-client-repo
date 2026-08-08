@@ -9,23 +9,7 @@
         </xpath>
     </template>
 
-    <template id="brand_promotion_message_rebrand" inherit_id="web.brand_promotion_message">
-        <xpath expr="//t[@t-set='odoo_logo']" position="replace">
-            <t t-set="odoo_logo"></t>
-        </xpath>
-        <xpath expr="//t[@t-set='final_message']" position="replace">
-            <t t-set="final_message"></t>
-        </xpath>
-        <xpath expr="//t[@t-out]" position="replace">
-            <t/>
-        </xpath>
-    </template>
 
-    <template id="login_footer_rebrand" inherit_id="web.login_layout">
-        <xpath expr="//a[contains(@href, 'odoo.com')]" position="replace">
-            <t/>
-        </xpath>
-    </template>
 
     <template id="login_logo_rebrand" inherit_id="web.login_layout">
         <xpath expr="//div[hasclass('text-center') and hasclass('pb-3')]" position="replace">
