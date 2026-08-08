@@ -219,6 +219,8 @@ class IrConfigParameter(models.Model):
         if not view_ids:
             return
         for view in View.browse(view_ids).exists():
+            if view.model or view.type != "qweb":
+                continue
             arch = view.arch_db or ""
             if not isinstance(arch, str):
                 continue
