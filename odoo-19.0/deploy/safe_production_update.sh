@@ -111,7 +111,7 @@ echo "==> Module state check"
 docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
   "SELECT name, state, latest_version
      FROM ir_module_module
-    WHERE name IN ('elsx_client_restrictions','elsx_rebrand','elsx_attendance_tracking','elsx_face_attendance','elsx_saas','elsx_whatsapp_marketing','elsx_tally_integration','crm','account','hr_attendance')
+    WHERE name IN ('elsx_client_restrictions','elsx_rebrand','elsx_attendance_tracking','elsx_face_attendance','elsx_whatsapp_marketing','elsx_tally_integration','crm','account','hr_attendance')
     ORDER BY name;"
 
 echo "==> Container status"

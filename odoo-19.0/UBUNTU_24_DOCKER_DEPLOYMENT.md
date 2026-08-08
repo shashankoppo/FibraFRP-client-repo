@@ -314,11 +314,6 @@ profile. Start it only after testing on a staging copy:
 docker compose --profile face up -d face_sidecar
 ```
 
-The SaaS admin console is installed as `elsx_saas` by the same safe update. It
-appears only for system administrators under **ELSx SaaS Admin > Tenants**. It
-records tenant lifecycle, enabled apps, limits, safety checklist, and deployment
-plan. It does not create/drop databases from the browser.
-
 Production smoke checks after this update:
 
 - Login works.
