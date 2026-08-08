@@ -114,7 +114,7 @@ class IrConfigParameter(models.Model):
         """Apply visible UI branding metadata without touching business data."""
         sudo = self.sudo()
         sudo.set_param("web.web_app_name", BRAND_NAME)
-        self._elsx_ensure_optional_branding_cleanup_views()
+        self._elsx_remove_optional_branding_cleanup_views()
         self._elsx_cleanup_visible_branding_views()
         self._elsx_cleanup_system_branding_views()
         self._elsx_cleanup_visible_branding_email_templates()
@@ -174,37 +174,13 @@ class IrConfigParameter(models.Model):
         return cleaned
 
     @api.model
-    def _elsx_ensure_optional_branding_cleanup_views(self):
-        """Install optional cleanup views only when their parent modules exist."""
+    def _elsx_remove_optional_branding_cleanup_views(self):
+        """Remove older fragile inherited cleanup views before direct arch cleanup."""
         View = self.env["ir.ui.view"].sudo()
-        Data = self.env["ir.model.data"].sudo()
-        for module, xmlid_name, view_name, arch in OPTIONAL_CLEANUP_VIEWS:
-            view_data = Data.search([
-                ("module", "=", module),
-                ("name", "=", xmlid_name),
-                ("model", "=", "ir.ui.view"),
-            ], limit=1)
-            if not view_data:
-                continue
-            parent = View.browse(view_data.res_id).exists()
-            if not parent:
-                continue
-            values = {
-                "name": view_name,
-                "type": "qweb",
-                "mode": "extension",
-                "inherit_id": parent.id,
-                "arch_db": arch,
-                "active": True,
-            }
-            cleanup_view = View.search([
-                ("name", "=", view_name),
-                ("inherit_id", "=", parent.id),
-            ], limit=1)
-            if cleanup_view:
-                cleanup_view.write(values)
-            else:
-                View.create(values)
+        cleanup_names = [view_name for _, _, view_name, _ in OPTIONAL_CLEANUP_VIEWS]
+        stale_views = View.search([("name", "in", cleanup_names)])
+        if stale_views:
+            stale_views.unlink()
 
     @api.model
     def _elsx_cleanup_visible_branding_views(self):
