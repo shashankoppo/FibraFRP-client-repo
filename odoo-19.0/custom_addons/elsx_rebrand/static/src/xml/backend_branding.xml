@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="elsx_rebrand.SessionExpiredDialog" t-inherit="web.SessionExpiredDialog" t-inherit-mode="extension" owl="1">
+        <xpath expr="//Dialog" position="attributes">
+            <attribute name="title.translate">Session Expired</attribute>
+        </xpath>
+        <xpath expr="//p" position="replace">
+            <p class="text-prewrap">Your session expired. The current page is about to be refreshed.</p>
+        </xpath>
+    </t>
+
+    <t t-name="elsx_rebrand.UpgradeDialog" t-inherit="web.UpgradeDialog" t-inherit-mode="extension" owl="1">
+        <xpath expr="//Dialog" position="attributes">
+            <attribute name="title.translate">Additional Module Required</attribute>
+        </xpath>
+        <xpath expr="//div[@role='status']" position="replace">
+            <div role="status" class="d-flex flex-column gap-2">
+                <p class="mb-0">This feature is not enabled in this environment.</p>
+                <p class="text-muted mb-0">Contact your administrator if your workflow needs this capability.</p>
+            </div>
+        </xpath>
+        <xpath expr="//button[hasclass('btn-primary')]" position="replace">
+            <t/>
+        </xpath>
+    </t>
+
+    <t t-name="elsx_rebrand.ResConfigEdition" t-inherit="res_config_edition" t-inherit-mode="extension" owl="1">
+        <xpath expr="//h3" position="replace">
+            <h3 class="px-0">ELSxGlobal <t t-esc="serverVersion"/> (Community Edition)</h3>
+        </xpath>
+        <xpath expr="//small" position="replace">
+            <small><a id="license" target="_blank" href="http://www.gnu.org/licenses/lgpl.html" style="text-decoration: underline;">GNU LGPL Licensed</a></small>
+        </xpath>
+    </t>
+</templates>

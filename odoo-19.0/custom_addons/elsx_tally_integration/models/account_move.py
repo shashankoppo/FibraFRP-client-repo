@@ -136,7 +136,7 @@ class AccountMove(models.Model):
         company_name = config['company_name'] or self.company_id.name
         voucher_type = self._tally_voucher_type()
         remote_id = f'ODOO-{self.company_id.id}-{self._name}-{self.id}'
-        narration = _('Odoo %s exported from invoice %s') % (voucher_type, self.name)
+        narration = _('ERP %s exported from invoice %s') % (voucher_type, self.name)
         return (
             '<ENVELOPE>'
             '<HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER>'

@@ -67,7 +67,7 @@ class WhatsAppChat(models.Model):
     partner_id = fields.Many2one('res.partner', string='Contact')
     # No default — new chats start as "Unassigned" and appear in the Unassigned pane.
     # The _auto_assign_agent() method handles real agent routing.
-    # Previously defaulted to self.env.user, which was OdooBot for webhook-created chats.
+    # Previously defaulted to self.env.user, which was the bot user for webhook-created chats.
     assigned_user_id = fields.Many2one('res.users', string='Assigned Agent', index=True)
     phone_number = fields.Char('Phone Number', required=True)
     whatsapp_profile_name = fields.Char('WA Profile Name', readonly=True)
@@ -1201,7 +1201,7 @@ class WhatsAppChat(models.Model):
         }
 
     def action_touch_agent_presence(self, is_active=True):
-        """Let the inbox tab refresh Odoo presence so routing can avoid inactive agents."""
+        """Let the inbox tab refresh ERP presence so routing can avoid inactive agents."""
         inactivity_ms = 0 if is_active else (31 * 60 * 1000)
         try:
             with self.env.cr.savepoint():

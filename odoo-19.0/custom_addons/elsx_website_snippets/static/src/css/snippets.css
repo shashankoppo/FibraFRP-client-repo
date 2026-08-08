@@ -152,7 +152,7 @@
     }
 }
 
-/* FreeFrontend-inspired, original CSS utilities for richer Odoo website editing. */
+/* FreeFrontend-inspired, original CSS utilities for richer website editing. */
 .elsx-theme-soft { --elsx-surface: #ffffff; --elsx-surface-alt: #f8fafc; --elsx-text: #0f172a; --elsx-muted: #64748b; --elsx-accent: #0f766e; --elsx-accent-2: #2563eb; background: linear-gradient(180deg, var(--elsx-surface-alt), var(--elsx-surface)); color: var(--elsx-text); }
 .elsx-theme-dark { --elsx-surface: #111827; --elsx-surface-alt: #020617; --elsx-text: #f8fafc; --elsx-muted: #cbd5e1; --elsx-accent: #2dd4bf; --elsx-accent-2: #60a5fa; background: radial-gradient(circle at top left, rgba(45, 212, 191, 0.2), transparent 32%), linear-gradient(135deg, var(--elsx-surface-alt), var(--elsx-surface)); color: var(--elsx-text); }
 .elsx-theme-gradient { --elsx-text: #ffffff; --elsx-muted: rgba(255, 255, 255, 0.78); background: linear-gradient(135deg, #0f172a, #0f766e 52%, #2563eb); color: var(--elsx-text); }
@@ -170,7 +170,7 @@
 @keyframes elsx-logo-marquee { from { transform: translateX(0); } to { transform: translateX(calc(-50% - 0.5rem)); } }
 @media (prefers-reduced-motion: reduce) { .elsx-logo-track { animation: none; flex-wrap: wrap; justify-content: center; width: auto; } }
 
-/* ELSX visual builder presets: class-based, editable in Odoo, no page data mutation. */
+/* ELSX visual builder presets: class-based, editable in the website builder, no page data mutation. */
 .s_elsx_logo_cloud,
 .s_elsx_logo_slider,
 .s_elsx_testimonials,

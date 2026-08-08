@@ -29,7 +29,7 @@ class WebhookSerializationRetry(Exception):
 
 
 def _get_env(db_name=None, payload=None):
-    """Get a fresh Odoo environment for webhook context (no request session)"""
+    """Get a fresh server environment for webhook context (no request session)"""
     db_name = (
         db_name
         or request.params.get('db')
@@ -231,7 +231,7 @@ class WhatsAppWebhook(http.Controller):
             env, cr, _ = _get_env()
             if not env or not cr:
                 _logger.error(
-                    '[WH-VERIFY] Could not resolve an Odoo database for webhook verification. '
+                    '[WH-VERIFY] Could not resolve an ERP database for webhook verification. '
                     'Check ?db=DB_NAME, dbfilter, and installed module state.'
                 )
                 return request.make_response('Database Not Found', status=503)
@@ -852,7 +852,7 @@ class WhatsAppWebhook(http.Controller):
     def _process_status_update(self, env, account, status_data):
         """Run each Meta status update in a small retryable transaction.
 
-        Meta can deliver duplicate status webhooks within milliseconds. Odoo runs
+        Meta can deliver duplicate status webhooks within milliseconds. the server runs
         PostgreSQL in a strict isolation mode, so two background webhook threads
         updating the same message row can raise SerializationFailure. Retrying in
         a fresh cursor preserves delivered/read updates instead of crashing the
@@ -1008,7 +1008,7 @@ class WhatsAppWebhook(http.Controller):
             _logger.error(f'[WH-STATUS] Bus notification failed: {e}')
 
     def _parse_meta_timestamp(self, timestamp):
-        """Convert Meta's UNIX timestamp string to a naive UTC datetime for Odoo."""
+        """Convert Meta's UNIX timestamp string to a naive UTC datetime for the ERP."""
         if not timestamp:
             return False
         try:
@@ -1125,7 +1125,7 @@ class WhatsAppWebhook(http.Controller):
 
         _logger.info(f'[WH-TPL-STATUS] Template "{template_name}" event={event} reason={reason}')
 
-        # Map Meta event to Odoo template status
+        # Map Meta event to ERP template status
         status_map = {
             'APPROVED': 'approved',
             'REJECTED': 'rejected',
@@ -1274,7 +1274,7 @@ class WhatsAppWebhook(http.Controller):
             pass
 
     # =========================================================
-    # MEDIA PROXY — Serves Meta media via Odoo
+    # MEDIA PROXY — Serves Meta media via the ERP
     # =========================================================
     @http.route('/whatsapp/media/<string:media_id>', type='http', auth='user')
     def whatsapp_media_proxy(self, media_id, **kwargs):
@@ -1321,7 +1321,7 @@ class WhatsAppWebhook(http.Controller):
     def sidecar_receive(self, **kwargs):
         """
         Industrial Callback from Sidecar.
-        Used when Sidecar receives Meta Webhook FIRST and forwards to Odoo.
+        Used when Sidecar receives Meta Webhook FIRST and forwards to the ERP.
         """
         secret = request.httprequest.headers.get('x-sidecar-key')
         raw_body = request.httprequest.data or b''

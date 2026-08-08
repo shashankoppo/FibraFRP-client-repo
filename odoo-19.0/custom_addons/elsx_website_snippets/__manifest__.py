@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'ELSX Website Snippet Library',
-    'summary': 'Reusable business website snippets for Odoo Website editor',
+    'summary': 'Reusable business website snippets for the Website editor',
     'version': '19.0.1.5.0',
     'category': 'Website/Website',
     'author': 'ELSX Global',
@@ -28,4 +28,3 @@
     'application': False,
     'auto_install': True,
 }
-

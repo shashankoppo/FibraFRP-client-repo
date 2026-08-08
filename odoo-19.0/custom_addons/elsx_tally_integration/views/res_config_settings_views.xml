@@ -18,7 +18,7 @@
                                 class="btn-secondary mt-2"
                                 invisible="not elsx_tally_gateway_url"/>
                     </setting>
-                    <setting id="elsx_tally_company_setting" help="Exact company name open in Tally. Leave blank to use the Odoo company name.">
+                    <setting id="elsx_tally_company_setting" help="Exact company name open in Tally. Leave blank to use the ERP company name.">
                         <field name="elsx_tally_company_name" placeholder="Company name in Tally"/>
                     </setting>
                     <setting id="elsx_tally_ledgers_setting" help="These ledger names must exist in Tally, or Tally will reject the voucher import.">

@@ -923,7 +923,7 @@ export class WhatsAppDashboard extends Component {
         });
 
         onMounted(() => {
-            // Fix for stuck Odoo default tour: forcefully dismiss it when Dashboard loads
+            // Fix for stuck default tour: forcefully dismiss it when Dashboard loads
             try {
                 if (this.env && this.env.services && this.env.services.tour) {
                     const tourService = this.env.services.tour;
@@ -1113,8 +1113,8 @@ export class WhatsAppDashboard extends Component {
         } catch (error) {
             console.error("Failed to load dashboard data:", error);
             this.state.data.meta.sync_state = "Error";
-            this.state.data.meta.warnings = ["Dashboard refresh failed. Check Odoo logs and analytics access rights."];
-            this.state.lastRefreshNote = "Refresh failed. Check Odoo logs and analytics access rights.";
+            this.state.data.meta.warnings = ["Dashboard refresh failed. Check ERP logs and analytics access rights."];
+            this.state.lastRefreshNote = "Refresh failed. Check ERP logs and analytics access rights.";
         } finally {
             this.state.loading = false;
             this.state.refreshing = false;

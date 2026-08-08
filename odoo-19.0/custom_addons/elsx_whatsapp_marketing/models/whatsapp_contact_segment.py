@@ -93,7 +93,7 @@ class WhatsAppContactSegment(models.Model):
     
     # Custom domain filter
     domain_filter = fields.Text('Custom Domain Filter', 
-                               help='Advanced: Use Odoo domain syntax. e.g. [("name", "ilike", "John")]')
+                               help='Advanced: Use ERP domain syntax. e.g. [("name", "ilike", "John")]')
     
     # Statistics
     contact_count = fields.Integer('Contact Count', compute='_compute_contact_count', store=True)

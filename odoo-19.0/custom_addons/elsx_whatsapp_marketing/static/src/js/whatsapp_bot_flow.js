@@ -244,7 +244,7 @@ const PALETTE_ITEMS = [
         type: "action",
         subtype: "send_payment_link",
         label: "Payment Link",
-        description: "Send manual or Odoo invoice payment link",
+        description: "Send manual or ERP invoice payment link",
         icon: "fa-credit-card",
         color: "#22c55e",
         defaults: {
@@ -457,7 +457,7 @@ export class WhatsAppBotFlowAction extends Component {
                             </t>
 
                             <label class="wa-flow-field">
-                                <span>Label <i class="fa fa-question-circle wa-flow-help" title="Canvas name for this step. This is also used as the generated Odoo step name."></i></span>
+                                <span>Label <i class="fa fa-question-circle wa-flow-help" title="Canvas name for this step. This is also used as the generated ERP step name."></i></span>
                                 <input type="text" t-att-value="selectedNode.label" t-on-input="(ev) => this.updateNode('label', ev.target.value)"/>
                             </label>
 
@@ -1005,7 +1005,7 @@ export class WhatsAppBotFlowAction extends Component {
                                         <span>Footer Text</span>
                                         <input type="text" t-att-value="selectedNode.config.button_footer_text || ''" t-on-input="(ev) => this.updateConfig('button_footer_text', ev.target.value)"/>
                                     </label>
-                                    <div class="wa-flow-hint">Catalog ID can come from the WhatsApp Account. Product Retailer ID is the Meta catalog content ID/SKU, not an Odoo product database ID.</div>
+                                    <div class="wa-flow-hint">Catalog ID can come from the WhatsApp Account. Product Retailer ID is the Meta catalog content ID/SKU, not an ERP product database ID.</div>
                                 </t>
                                 <t t-if="(selectedNode.config.action_kind || selectedNode.subtype) === 'send_form_link'">
                                     <label class="wa-flow-field">

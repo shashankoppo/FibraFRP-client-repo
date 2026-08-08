@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'ELSX Tally Invoice Bridge',
-    'summary': 'Export and push Odoo invoices to Tally XML gateway',
+    'summary': 'Export and push ERP invoices to Tally XML gateway',
     'version': '19.0.1.0.0',
     'category': 'Accounting/Accounting',
     'author': 'ELSX Global',

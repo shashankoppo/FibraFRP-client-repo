@@ -152,7 +152,7 @@
 
     <template id="s_elsx_brochure" name="Brochure Download Lead Block">
         <section class="s_elsx_brochure pt64 pb64 o_cc o_cc2" data-snippet="s_elsx_brochure" data-name="Brochure Download Lead Block">
-            <div class="container"><div class="row align-items-center g-4"><div class="col-lg-7"><p class="text-uppercase fw-semibold small mb-2">Resource</p><h2 class="display-6 fw-bold">Download product brochure</h2><p class="lead">Use this as a lead magnet. Link the button to a PDF, contact page, or Odoo form.</p></div><div class="col-lg-5 text-lg-end"><a href="/contactus" class="btn btn-primary btn-lg">Request Brochure</a></div></div></div>
+            <div class="container"><div class="row align-items-center g-4"><div class="col-lg-7"><p class="text-uppercase fw-semibold small mb-2">Resource</p><h2 class="display-6 fw-bold">Download product brochure</h2><p class="lead">Use this as a lead magnet. Link the button to a PDF, contact page, or form.</p></div><div class="col-lg-5 text-lg-end"><a href="/contactus" class="btn btn-primary btn-lg">Request Brochure</a></div></div></div>
         </section>
     </template>
 

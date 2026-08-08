@@ -3,13 +3,13 @@
     "name": "ELSX Native Administration Cleanup",
     "version": "2.8.6",
     "category": "Administration",
-    "summary": "Removes legacy restrictions and restores native Odoo administration",
+    "summary": "Removes legacy restrictions and restores native administration",
     "description": """
 ELSX Native Administration Cleanup
 ==================================
 
 This technical compatibility addon removes retired ELSX access restrictions
-and restores native Odoo Community Settings, Users, Companies, Apps, groups,
+and restores native Community Settings, Users, Companies, Apps, groups,
 access-rights, and record-rule administration.
     """,
     "author": "ELSX",

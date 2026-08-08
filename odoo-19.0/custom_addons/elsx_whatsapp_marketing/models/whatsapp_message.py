@@ -37,7 +37,7 @@ def notify_sidecar_background(env, message_id, event_type='new_message'):
 
     def _do_request():
         try:
-            # Use the correct Odoo 19 registry access pattern
+            # Use the correct registry access pattern
             registry = odoo.modules.registry.Registry(db_name)
             with registry.cursor() as cr:
                 new_env = api.Environment(cr, odoo.SUPERUSER_ID, {})

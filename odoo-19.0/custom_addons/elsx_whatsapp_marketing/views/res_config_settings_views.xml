@@ -10,19 +10,19 @@
             <xpath expr="//form" position="inside">
                 <app data-string="WhatsApp Marketing" string="WhatsApp Marketing" name="elsx_whatsapp_marketing" groups="base.group_system">
                     <block title="Real-Time Engine (Sidecar)" id="whatsapp_sidecar_setting">
-                        <setting id="whatsapp_realtime_mode_setting" help="Use Odoo Bus for normal production. Enable Sidecar Socket only when the sidecar service is configured and healthy.">
+                        <setting id="whatsapp_realtime_mode_setting" help="Use ERP Bus for normal production. Enable Sidecar Socket only when the sidecar service is configured and healthy.">
                             <field name="whatsapp_realtime_mode"/>
                         </setting>
                         <setting id="whatsapp_sidecar_url_setting" help="URL of the Node.js WebSocket server for zero-latency messaging.">
                             <field name="whatsapp_sidecar_url" placeholder="http://node_sidecar:3000"/>
                         </setting>
-                        <setting id="whatsapp_sidecar_secret_setting" help="Security token used to authenticate webhook relays between Odoo and the Sidecar.">
+                        <setting id="whatsapp_sidecar_secret_setting" help="Security token used to authenticate webhook relays between the ERP and the Sidecar.">
                             <field name="whatsapp_sidecar_secret" password="True"/>
                         </setting>
-                        <setting id="whatsapp_public_webhook_base_url_setting" help="Public domain used in Meta webhook setup. Leave empty to use the native Odoo web.base.url.">
+                        <setting id="whatsapp_public_webhook_base_url_setting" help="Public domain used in Meta webhook setup. Leave empty to use the native ERP web.base.url.">
                             <div class="d-flex flex-column gap-2">
                                 <field name="whatsapp_public_webhook_base_url" placeholder="https://your-domain.com"/>
-                                <button name="action_use_odoo_base_url_for_whatsapp_webhook" string="Use Current Odoo URL" type="object" class="btn-secondary"/>
+                                <button name="action_use_odoo_base_url_for_whatsapp_webhook" string="Use Current ERP URL" type="object" class="btn-secondary"/>
                             </div>
                         </setting>
                     </block>
@@ -43,7 +43,7 @@
                                 <button name="action_sync_default_whatsapp_account_health" string="Sync Meta Health" type="object" class="btn-secondary mt-2" invisible="not whatsapp_default_account_id"/>
                             </div>
                         </setting>
-                        <setting id="whatsapp_contact_sync_setting" help="Synchronize all Odoo contacts (partners) with phone/mobile numbers to WhatsApp contacts.">
+                        <setting id="whatsapp_contact_sync_setting" help="Synchronize all ERP contacts with phone/mobile numbers to WhatsApp contacts.">
                             <button name="action_sync_all_whatsapp_contacts" string="Synchronize Contacts" type="object" class="oe_highlight"/>
                         </setting>
                     </block>

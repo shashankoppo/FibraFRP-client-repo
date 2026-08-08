@@ -1123,7 +1123,7 @@ class WhatsAppTemplate(models.Model):
         body_override=False,
         include_meta=True,
     ):
-        """Return a safe, readable preview for Odoo forms that should not use HtmlViewer."""
+        """Return a safe, readable preview for ERP forms that should not use HtmlViewer."""
         self.ensure_one()
         lines = []
         if include_meta:
@@ -1817,7 +1817,7 @@ class WhatsAppTemplateAudit(models.Model):
 
 
 class WhatsAppTemplateVariable(models.Model):
-    """Maps {{1}}, {{2}} to specific Odoo fields or data types for dynamic personalization"""
+    """Maps {{1}}, {{2}} to specific ERP fields or data types for dynamic personalization"""
     _name = 'whatsapp.template.variable'
     _description = 'Template Attribute Mapping'
     _order = 'sequence'
@@ -1836,9 +1836,9 @@ class WhatsAppTemplateVariable(models.Model):
         ('document', 'Document URL'),
     ], string='Attribute Type', default='text', required=True)
     
-    odoo_field = fields.Char('Map to Odoo Field', help='Optional: Automatically pull data (e.g. partner_id.name)')
+    odoo_field = fields.Char('Map to ERP Field', help='Optional: Automatically pull data (e.g. partner_id.name)')
     
-    fallback_value = fields.Char('Fallback Value', help='Used if mapped Odoo field is empty')
+    fallback_value = fields.Char('Fallback Value', help='Used if mapped ERP field is empty')
 
 
 class WhatsAppTemplateCard(models.Model):
@@ -1898,4 +1898,3 @@ class WhatsAppTemplateCard(models.Model):
             filename = f"{filename}{extension}"
 
         return account._upload_template_sample_media_handle(self.header_media_file, filename, self.header_type)
-

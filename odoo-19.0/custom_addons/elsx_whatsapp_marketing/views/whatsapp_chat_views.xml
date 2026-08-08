@@ -427,7 +427,7 @@
                                         </div>
                                     </div>
                                     <button name="action_view_partner" type="object" class="btn btn-sm btn-outline-primary w-100 mt-2 wa-view-partner-btn">
-                                        <i class="fa fa-external-link me-1" title="View in Odoo"/> View Partner
+                                        <i class="fa fa-external-link me-1" title="View Partner"/> View Partner
                                     </button>
                                     <div class="d-flex gap-2 mt-2">
                                         <button name="action_create_opportunity" type="object" class="btn btn-sm btn-outline-success flex-fill fw-semibold">
@@ -539,7 +539,7 @@
                                 </div>
 
                                 <button name="action_open_contact" type="object" class="btn btn-light border w-100 py-2 mt-2 fw-semibold text-dark">
-                                    <i class="fa fa-external-link me-2" title="Open Contact"/> View in Odoo
+                                    <i class="fa fa-external-link me-2" title="Open Contact"/> View Contact
                                 </button>
                             </div>
                         </div>

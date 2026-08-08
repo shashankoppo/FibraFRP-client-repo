@@ -162,7 +162,7 @@ async function dequeueWebhook() {
     return item;
 }
 
-async function forwardToOdoo(item) {
+async function forwardToErp(item) {
     const body = item.rawBodyBase64
         ? Buffer.from(item.rawBodyBase64, 'base64')
         : Buffer.from(JSON.stringify(item.payload || {}));
@@ -212,8 +212,8 @@ async function processQueue() {
     }
 
     try {
-        await forwardToOdoo(item);
-        console.log(`[SIDECAR] Webhook forwarded to Odoo item=${item.id} attempts=${item.attempts + 1}`);
+        await forwardToErp(item);
+        console.log(`[SIDECAR] Webhook forwarded to ERP item=${item.id} attempts=${item.attempts + 1}`);
     } catch (err) {
         item.attempts += 1;
         item.lastError = err.message;

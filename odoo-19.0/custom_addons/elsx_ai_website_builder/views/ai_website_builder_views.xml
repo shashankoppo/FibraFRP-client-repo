@@ -102,14 +102,14 @@
                     </div>
 
                     <div class="alert alert-info o_elsx_ai_safety_note" role="alert">
-                        ELSx AI Studio works like a safe website builder: command it, generate a draft, create or update an unpublished copy, edit in the standard Odoo Website editor, then publish manually only after review.
+                        ELSx AI Studio works like a safe website builder: command it, generate a draft, create or update an unpublished copy, edit in the standard Website editor, then publish manually only after review.
                     </div>
 
                     <div class="o_elsx_ai_studio_landing">
                         <div>
-                            <p class="o_elsx_ai_eyebrow">Draft-first Odoo CE website studio</p>
+                            <p class="o_elsx_ai_eyebrow">Draft-first Community Edition website studio</p>
                             <h2>Build, redesign, polish, and prepare pages without touching the live website.</h2>
-                            <p>Use the presets, describe the business outcome, let AI create a reviewed draft, and finish in Odoo's visual editor.</p>
+                            <p>Use the presets, describe the business outcome, let AI create a reviewed draft, and finish in the visual editor.</p>
                         </div>
                         <div class="o_elsx_ai_studio_steps">
                             <span>1. Command</span>
@@ -192,7 +192,7 @@
                             <group>
                                 <field name="asset_strategy"/>
                                 <field name="asset_intents" nolabel="1" placeholder="Image intents appear after generation."/>
-                                <field name="asset_candidates" nolabel="1" placeholder="Odoo media/product/brand image candidates appear after generation."/>
+                                <field name="asset_candidates" nolabel="1" placeholder="platform media/product/brand image candidates appear after generation."/>
                             </group>
                         </page>
                         <page string="Draft HTML">
@@ -319,7 +319,7 @@
                     </div>
 
                     <div class="alert alert-warning" role="alert">
-                        ELSx CE AI Command Center is draft-first. It generates plans, copy, specs, and website handoffs only. It does not edit live data, publish pages, run SQL, or bypass Odoo licensing.
+                        ELSx CE AI Command Center is draft-first. It generates plans, copy, specs, and website handoffs only. It does not edit live data, publish pages, run SQL, or bypass platform licensing.
                     </div>
 
                     <group>
@@ -373,7 +373,7 @@
         <field name="view_mode">list,form</field>
         <field name="context">{'default_execution_mode': 'draft'}</field>
         <field name="help" type="html">
-            <p class="o_view_nocontent_smiling_face">Run safe AI commands for Odoo CE</p>
+            <p class="o_view_nocontent_smiling_face">Run safe AI commands for Community Edition</p>
             <p>Generate website, CRM, WhatsApp, campaign, SEO, UX, workflow, and module planning artifacts without touching production records.</p>
         </field>
     </record>

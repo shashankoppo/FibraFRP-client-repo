@@ -5,7 +5,7 @@ import { playTone } from "@elsx_whatsapp_marketing/js/notification_tones";
 import { animateInboxRefresh } from "@elsx_whatsapp_marketing/js/elsx_ui_motion";
 
 // ============================================================
-// WhatsApp Real-time Handler — Odoo 19 Compatible (v7.5)
+// WhatsApp Real-time Handler — ERP Compatible (v7.5)
 // ============================================================
 
 const WA_NOTIFICATION_TYPES = [
@@ -143,7 +143,7 @@ export class WhatsAppChatHandler {
             actionObj.views = [[false, 'form']];
         }
 
-        // Force native Odoo Modal
+        // Force native modal
         actionObj.target = 'new';
         actionObj.context = { ...(actionObj.context || {}), wa_floating_mode: true };
 
@@ -459,7 +459,7 @@ export class WhatsAppChatHandler {
 
         // We silently fall back to 8-second polling if the socket disconnects.
         // Displaying a persistent "Computer not connected" banner causes user confusion
-        // because the application still functions correctly via Odoo RPC polling.
+        // because the application still functions correctly via ERP RPC polling.
         const banner = document.getElementById('wa-connection-banner');
         if (banner) banner.remove();
     }
@@ -467,10 +467,10 @@ export class WhatsAppChatHandler {
     // ── Initialization ─────────────────────────────────────────────
     init() {
         try {
-            // Subscribe to channels using modern Odoo 19 Bus API
+            // Subscribe to channels using modern Bus API
             this.bus.addChannel('elsx_whatsapp_channel');
             
-            // Subscribe directly to modern Odoo 19 Bus notification types
+            // Subscribe directly to modern Bus notification types
             this._busSubscriptions = [];
 
             WA_NOTIFICATION_TYPES.forEach(type => {
@@ -491,7 +491,7 @@ export class WhatsAppChatHandler {
             console.error('[WhatsApp] Bus subscription error:', e);
         }
 
-        // Initial load of history — wait for Odoo form DOM to settle then fetch
+        // Initial load of history — wait for form DOM to settle then fetch
         setTimeout(() => {
             this._attachScrollListener();
             this._injectScrollFAB();
@@ -510,7 +510,7 @@ export class WhatsAppChatHandler {
             }
         }, 600);
 
-        // FALLBACK: MutationObserver — if Odoo's form renders the mount div AFTER our timeout,
+        // FALLBACK: MutationObserver — if the form renders the mount div AFTER our timeout,
         // we catch it here and trigger the first load. Prevents blank chat on slow machines.
         this._historyMountObserver = new MutationObserver(() => {
             const mount = document.getElementById('wa-custom-history-mount');
@@ -837,7 +837,7 @@ export class WhatsAppChatHandler {
 
         // 1. Check pane matching
         let paneMatch = false;
-        // BUG 6 FIX: Reliable user ID resolution — Odoo 19 env.user may not have .id
+        // BUG 6 FIX: Reliable user ID resolution — env.user may not have .id
         // Note: `odoo` is NOT a global in ES module scope, so we use try-catch
         let currentUserId = null;
         try {
@@ -1118,7 +1118,7 @@ export class WhatsAppChatHandler {
     }
 
     _scrollToBottom(force = false, options = {}) {
-        // Find the visible scroll container (Odoo might keep old form views hidden in DOM)
+        // Find the visible scroll container (the framework might keep old form views hidden in DOM)
         const historyWrappers = document.querySelectorAll('.o_whatsapp_chat_history');
         let activeWrapper = null;
         for (let i = 0; i < historyWrappers.length; i++) {
@@ -1132,7 +1132,7 @@ export class WhatsAppChatHandler {
         // The actual scrollable element based on whatsapp.css
         const historyDiv = activeWrapper.querySelector('.wa-chat-history-content-container') || activeWrapper;
         
-        // Odoo native scroll wrapper
+        // native scroll wrapper
         const oContent = activeWrapper.closest('.o_content');
         const scrollTargets = [historyDiv];
         if (oContent) {
@@ -2020,7 +2020,7 @@ export class WhatsAppChatHandler {
         }
 
 
-        // AI draft generation: keep this in-place. Letting the native Odoo object
+        // AI draft generation: keep this in-place. Letting the native form object
         // button reload the form can wipe the custom chat-history mount.
         const generateAiBtn = e.target.closest('button[name="action_generate_ai_reply"]');
         if (generateAiBtn) {
@@ -2137,7 +2137,7 @@ export class WhatsAppChatHandler {
             const formRoot = sendBtn.closest('.o_form_view') || document;
             const mediaPreview = formRoot.querySelector('.wa-floating-attachment-preview');
             if (mediaPreview && !mediaPreview.parentElement.hasAttribute('invisible') && mediaPreview.offsetParent !== null) {
-                return; // Let Odoo native form handle file upload
+                return; // Let the native form handle file upload
             }
             
             const input = this._getComposerTextarea(formRoot);
@@ -2486,7 +2486,7 @@ export class WhatsAppChatHandler {
             `;
         }
 
-        // 5. Switch Odoo active form view record natively
+        // 5. Switch active form view record natively
         try {
             await this.actionService.doAction(this._normalizeActionViews({
                 type: 'ir.actions.act_window',
@@ -2671,7 +2671,7 @@ export class WhatsAppChatHandler {
         const prevScrollHeight = historyDiv.scrollHeight;
 
         try {
-            // Use a timestamp in context to bust Odoo's compute field cache (history_html)
+            // Use a timestamp in context to bust the compute field cache (history_html)
             const res_array = await this._rpc('whatsapp.chat', 'read', 
                 [[chatId], ['history_html', 'unread_count', 'display_name', 'session_open']], 
                 { context: { wa_history_limit: this._historyLimit, wa_ts: Date.now() } }
@@ -3238,7 +3238,7 @@ export class WhatsAppChatHandler {
         }
 
         // In the Team Inbox hybrid view, the active sidebar row is the
-        // freshest selection. Odoo can briefly keep the previous form res_id
+        // freshest selection. the framework can briefly keep the previous form res_id
         // while replacing records, so this prevents wrong-chat actions.
         const sidebarId = this._getSidebarActiveChatId();
         if (sidebarId) {
@@ -3247,7 +3247,7 @@ export class WhatsAppChatHandler {
             return sidebarId;
         }
 
-        // 1. Strict Odoo 19 URL path checks. If the router accidentally stacked
+        // 1. Strict URL path checks. If the router accidentally stacked
         // paths, use the last chat id because it reflects the latest click.
         const pathMatches = Array.from(
             window.location.pathname.matchAll(/(?:\/odoo)?\/(?:whatsapp\.chat|whatsapp-chats)\/(\d+)/g)
@@ -3261,7 +3261,7 @@ export class WhatsAppChatHandler {
             }
         }
 
-        // 2. Strict Odoo legacy hash check (only if model is whatsapp.chat)
+        // 2. Strict legacy hash check (only if model is whatsapp.chat)
         const hash = window.location.hash.slice(1);
         if (hash) {
             const params = new URLSearchParams(hash);
@@ -3279,7 +3279,7 @@ export class WhatsAppChatHandler {
             }
         }
 
-        // 3. Odoo form view hidden input (only for whatsapp.chat model)
+        // 3. form view hidden input (only for whatsapp.chat model)
         const hiddenResId = document.querySelector('.o_form_view[data-model="whatsapp.chat"] input[name="id"]');
         if (hiddenResId) {
             const id = parseInt(hiddenResId.value);
@@ -3290,7 +3290,7 @@ export class WhatsAppChatHandler {
             }
         }
 
-        // 4. Read from the data attribute Odoo sets on .o_form_view (whatsapp.chat only)
+        // 4. Read from the data attribute the framework sets on .o_form_view (whatsapp.chat only)
         const formView = document.querySelector('.o_form_view[data-model="whatsapp.chat"][data-res-id]');
         if (formView) {
             const id = parseInt(formView.getAttribute('data-res-id'));

@@ -42,7 +42,7 @@ def _sync_cron_records(env):
 
 
 def post_init_hook(env):
-    """Odoo 19 passes an Environment object to post-init hooks."""
+    """The server passes an Environment object to post-init hooks."""
     env['whatsapp.sample.template'].sudo()._seed_sample_templates()
     env['whatsapp.form'].sudo()._seed_fiberafrp_production_forms()
     env['whatsapp.bot.flow'].sudo()._seed_fiberafrp_assistant_flow()

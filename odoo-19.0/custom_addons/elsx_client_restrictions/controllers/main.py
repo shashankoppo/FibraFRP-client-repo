@@ -119,7 +119,7 @@ class ElsxAppsLockController(http.Controller):
     def unlock_apps_submit(self, **post):
         self._clear_unlock()
         if not request.env.user.has_group("base.group_system"):
-            return self._render_unlock_form("Only Odoo administrators can unlock Apps.")
+            return self._render_unlock_form("Only system administrators can unlock Apps.")
 
         password = post.get("apps_password") or ""
         if not request.env["ir.config_parameter"].sudo()._elsx_apps_password_matches(password):

@@ -12,7 +12,7 @@ class IrUiMenu(models.Model):
 
     @api.model
     def _elsx_clear_broken_action_pointers(self):
-        """Remove stale menu action refs before Odoo serializes menus."""
+        """Remove stale menu action refs before the framework serializes menus."""
         if self.env.context.get("elsx_skip_menu_action_repair"):
             return 0
         removed = 0

@@ -1036,7 +1036,7 @@ class WhatsAppCampaign(models.Model):
                 _logger.exception("Campaign %s queued but automatic queue dispatch did not start.", self.id)
                 launch_message += _(
                     " Queue was created, but automatic dispatch could not start: %s. "
-                    "Use Process Queue or check Odoo logs."
+                    "Use Process Queue or check ERP logs."
                 ) % (str(e) or e.__class__.__name__)
 
         return {

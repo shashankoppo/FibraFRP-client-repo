@@ -62,7 +62,22 @@ SYSTEM_VIEW_XMLIDS = (
     ("website", "show_website_info"),
 )
 
-SYSTEM_TEMPLATE_MODULES = ("auth_signup", "portal", "web", "website")
+SYSTEM_TEMPLATE_MODULES = ("auth_signup", "portal", "web", "website", "mail", "digest", "mass_mailing", "mass_mailing_sale", "website_profile", "lunch")
+
+SYSTEM_VIEW_CLEANUP_MODULES = (
+    "web",
+    "website",
+    "portal",
+    "sale",
+    "mail",
+    "digest",
+    "mass_mailing",
+    "mass_mailing_sale",
+    "website_profile",
+    "lunch",
+    "payment",
+    "point_of_sale",
+)
 
 OPTIONAL_CLEANUP_VIEWS = (
     (
@@ -101,6 +116,7 @@ class IrConfigParameter(models.Model):
         sudo.set_param("web.web_app_name", BRAND_NAME)
         self._elsx_ensure_optional_branding_cleanup_views()
         self._elsx_cleanup_visible_branding_views()
+        self._elsx_cleanup_system_branding_views()
         self._elsx_cleanup_visible_branding_email_templates()
 
         action_values = {
@@ -208,6 +224,29 @@ class IrConfigParameter(models.Model):
                 continue
             arch = view.arch_db or ""
             if not isinstance(arch, str):
+                continue
+            cleaned = self._elsx_clean_text(arch)
+            cleaned = cleaned.replace('<meta name="generator" content="Odoo"/>', "")
+            cleaned = cleaned.replace('<meta name="generator" content="ELSxGlobal"/>', "")
+            if cleaned != arch:
+                view.write({"arch_db": cleaned})
+
+    @api.model
+    def _elsx_cleanup_system_branding_views(self):
+        """Clean visible platform branding from installed system QWeb views."""
+        View = self.env["ir.ui.view"].sudo()
+        Data = self.env["ir.model.data"].sudo()
+        view_ids = Data.search([
+            ("model", "=", "ir.ui.view"),
+            ("module", "in", SYSTEM_VIEW_CLEANUP_MODULES),
+        ]).mapped("res_id")
+        if not view_ids:
+            return
+        for view in View.browse(view_ids).exists():
+            arch = view.arch_db or ""
+            if not isinstance(arch, str):
+                continue
+            if not any(token in arch for token in ("Odoo", "odoo.com", "Powered by", "Website made with")):
                 continue
             cleaned = self._elsx_clean_text(arch)
             cleaned = cleaned.replace('<meta name="generator" content="Odoo"/>', "")

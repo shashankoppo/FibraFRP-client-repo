@@ -15,13 +15,13 @@ class ResConfigSettings(models.TransientModel):
     whatsapp_sidecar_secret = fields.Char(
         string='Sidecar Secret Key',
         config_parameter='whatsapp.sidecar.secret',
-        help="Secret key used to authenticate requests between Odoo and the Node sidecar"
+        help="Secret key used to authenticate requests between the ERP and the Node sidecar"
     )
     whatsapp_public_webhook_base_url = fields.Char(
         string='Public Webhook Base URL',
         config_parameter='whatsapp.public.webhook.base.url',
         store=False,
-        help="Public domain used in Meta webhook setup, for example https://example.com. Leave empty to use Odoo's web.base.url."
+        help="Public domain used in Meta webhook setup, for example https://example.com. Leave empty to use the ERP web.base.url."
     )
     whatsapp_runtime_enabled = fields.Boolean(
         string='Enable WhatsApp Runtime',
@@ -39,11 +39,11 @@ class ResConfigSettings(models.TransientModel):
         help="Compatibility setting for databases that still have older WhatsApp V2 settings metadata. Keep Legacy for this rolled-back UI.",
     )
     whatsapp_realtime_mode = fields.Selection([
-        ('bus', 'Odoo Bus'),
+        ('bus', 'ERP Bus'),
         ('socket', 'Sidecar Socket'),
         ('polling_fallback', 'Polling Fallback Only'),
     ], string='Realtime Mode', default='bus', config_parameter='whatsapp.realtime.mode',
-        help="Use Odoo Bus by default. Sidecar Socket is optional and only used when explicitly enabled.")
+        help="Use ERP Bus by default. Sidecar Socket is optional and only used when explicitly enabled.")
     whatsapp_history_initial_limit = fields.Integer(
         string='Initial Chat History Limit',
         default=50,

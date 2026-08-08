@@ -46,7 +46,7 @@ class IrConfigParameter(models.Model):
 
     @api.model
     def _elsx_restore_native_administration(self):
-        """Restore official Odoo CE metadata without changing business data."""
+        """Restore native CE metadata without changing business data."""
         self._restore_administrator_groups()
         self._restore_settings()
         self._restore_apps()
@@ -58,7 +58,7 @@ class IrConfigParameter(models.Model):
         self.sudo().search([("key", "in", LEGACY_PARAMETER_KEYS)]).unlink()
         if not self._native_administration_is_ready():
             raise UserError(
-                "Native Odoo administration metadata did not pass verification."
+                "Native administration metadata did not pass verification."
             )
 
         generated_assets = self.env["ir.attachment"].sudo().search(

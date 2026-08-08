@@ -82,7 +82,7 @@
                     </group>
                     <div class="alert alert-warning" role="alert">
                         <i class="fa fa-info-circle me-1"/>
-                        Product Retailer ID is the Content ID/SKU from Meta Commerce Manager. It is not the Odoo product database ID.
+                        Product Retailer ID is the Content ID/SKU from Meta Commerce Manager. It is not the ERP product database ID.
                     </div>
                 </sheet>
             </form>
@@ -193,7 +193,7 @@
                             </group>
                             <div class="alert alert-info" role="alert">
                                 <i class="fa fa-shopping-bag me-1"/>
-                                Use these defaults in bot flow Catalog/Product, Form Link, Payment Link, and URL Button steps. Product Retailer ID is the Content ID/SKU from Meta Commerce Manager, not the Odoo product ID.
+                                Use these defaults in bot flow Catalog/Product, Form Link, Payment Link, and URL Button steps. Product Retailer ID is the Content ID/SKU from Meta Commerce Manager, not the ERP product ID.
                             </div>
                         </page>
                         <page string="Automation &amp; AI" name="automation_ai">

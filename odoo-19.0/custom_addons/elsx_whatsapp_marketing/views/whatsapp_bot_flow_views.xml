@@ -216,7 +216,7 @@
                                     <field name="message_text" placeholder="Here is your payment link: {{payment_url}}"/>
                                     <field name="payment_mode"/>
                                     <div class="alert alert-warning" role="alert" colspan="2">
-                                        Payment links use the WhatsApp Account payment mode. Enable Manual URL or Odoo Invoice / Quote Link on the account first.
+                                        Payment links use the WhatsApp Account payment mode. Enable Manual URL or ERP Invoice / Quote Link on the account first.
                                     </div>
                                 </group>
                                 <group string="Catalog / URL / Commerce" invisible="action_type in ['send_cta_url', 'send_catalog', 'send_form_link', 'send_payment_link']">
@@ -715,7 +715,7 @@
                                                         <field name="message_text" placeholder="Here is your payment link: {{payment_url}}"/>
                                                         <field name="payment_mode"/>
                                                         <div class="alert alert-warning" role="alert" colspan="2">
-                                                            Payment links use the WhatsApp Account payment mode. Enable Manual URL or Odoo Invoice / Quote Link on the account first.
+                                                            Payment links use the WhatsApp Account payment mode. Enable Manual URL or ERP Invoice / Quote Link on the account first.
                                                         </div>
                                                     </group>
                                                     <group string="Catalog / URL / Commerce" invisible="action_type in ['send_cta_url', 'send_catalog', 'send_form_link', 'send_payment_link']">

@@ -179,7 +179,7 @@ class WhatsAppAccount(models.Model):
     payment_link_mode = fields.Selection([
         ('disabled', 'Disabled'),
         ('manual_url', 'Manual Payment URL'),
-        ('odoo_invoice_link', 'Odoo Invoice / Quote Link'),
+        ('odoo_invoice_link', 'ERP Invoice / Quote Link'),
     ], string='Payment Link Mode', default='disabled',
         help='Controls whether Inbox, Campaign, and Flow shortcuts may send payment links.')
     payment_manual_url = fields.Char(
@@ -1467,7 +1467,7 @@ class WhatsAppAccount(models.Model):
         return self.action_test_connection()
 
     def action_test_sidecar(self):
-        """Check whether the Node.js sidecar is reachable from Odoo."""
+        """Check whether the Node.js sidecar is reachable from ERP."""
         self.ensure_one()
         sidecar_url = self.env['ir.config_parameter'].sudo().get_param('whatsapp.sidecar.url')
         if not sidecar_url:

@@ -23,7 +23,7 @@ class ResConfigSettings(models.TransientModel):
     elsx_tally_company_name = fields.Char(
         string='Tally Company Name',
         config_parameter='elsx_tally.company_name',
-        help='Exact company name open in Tally. Leave empty to use the Odoo company name.',
+        help='Exact company name open in Tally. Leave empty to use the ERP company name.',
     )
     elsx_tally_sales_ledger = fields.Char(
         string='Sales Ledger',

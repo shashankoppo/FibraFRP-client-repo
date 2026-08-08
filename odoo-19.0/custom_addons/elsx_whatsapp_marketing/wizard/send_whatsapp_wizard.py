@@ -326,7 +326,7 @@ class WhatsAppSendWizard(models.TransientModel):
 
         # Send to each partner
         for partner in self.partner_ids:
-            # Odoo 19 uses 'phone'; older versions had 'mobile' — handle gracefully
+            # Current versions use 'phone'; older versions had 'mobile' - handle gracefully
             phone = getattr(partner, 'mobile', None) or getattr(partner, 'phone', None)
             if not phone:
                 errors.append(f"{partner.name}: No phone number on record")

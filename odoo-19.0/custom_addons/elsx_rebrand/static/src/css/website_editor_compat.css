@@ -1,5 +1,5 @@
 /* Website editor snippet picker compatibility.
-   Scoped to Odoo's native "Insert a block" dialog so backend forms, website
+   Scoped to the native "Insert a block" dialog so backend forms, website
    pages, and client content stay untouched. */
 
 .o_add_snippet_dialog {

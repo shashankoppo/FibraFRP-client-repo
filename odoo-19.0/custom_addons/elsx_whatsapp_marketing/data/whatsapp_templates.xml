@@ -8,7 +8,7 @@
         <field name="header_type">image</field>
         <field name="header_media_url">https://dummyimage.com/600x400/000/fff.jpg</field>
         <field name="body">Hello {{1}}! Welcome to our premium community! We're excited to have you on board. Check out our latest products.</field>
-        <field name="footer">Powered by ELSX</field>
+        <field name="footer"></field>
         <field name="has_buttons" eval="True"/>
         <field name="button_type">call_to_action</field>
         <field name="cta_url_text">Visit Website</field>

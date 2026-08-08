@@ -106,7 +106,7 @@ class IrModuleModule(models.Model):
         if not self._elsx_has_http_request():
             return True
         if not self.env.user.has_group("base.group_system"):
-            raise AccessError("Only Odoo administrators can access Apps.")
+            raise AccessError("Only system administrators can access Apps.")
         try:
             unlocked_until = float(request.session.get(APPS_UNLOCK_SESSION_KEY) or 0)
         except (TypeError, ValueError):

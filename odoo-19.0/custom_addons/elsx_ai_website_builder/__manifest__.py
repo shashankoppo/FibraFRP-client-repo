@@ -10,7 +10,7 @@ ELSx AI Studio
 
 Adds a production-safe AI studio inside the core Website workflow and a wider
 ELSx CE AI Command Center. It reuses the existing ELSx AI provider records,
-including NVIDIA NIM, and creates Odoo snippet-friendly unpublished page
+including NVIDIA NIM, and creates website-editor-friendly unpublished pages
 copies that Website Managers can edit with the standard Website editor before
 publishing. Includes page blueprints, quality checks, section plans, studio
 presets, and draft-first AI workspaces for website, CRM, WhatsApp, campaign,

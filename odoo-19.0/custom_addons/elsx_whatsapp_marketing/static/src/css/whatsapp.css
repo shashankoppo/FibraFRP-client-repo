@@ -154,7 +154,7 @@
     box-shadow: none !important;
 }
 
-/* ---- Hide Odoo Form Chrome ---- */
+/* ---- Hide Form Chrome ---- */
 .o_whatsapp_chat_form_view .o_form_sheet_bg,
 .o_whatsapp_chat_form_view .o_form_sheet {
     padding: 0 !important;
@@ -191,7 +191,7 @@
     width: 100% !important;
 }
 
-/* Fix Odoo 19 Sheet Padding */
+/* Fix Sheet Padding */
 .o_whatsapp_chat_form_view .o_form_sheet {
     padding: 0 !important;
     margin: 0 !important;
@@ -607,7 +607,7 @@
     100% { transform: scale(1) translateY(0); opacity: 1; }
 }
 
-/* Override Odoo field widgets inside bubbles */
+/* Override field widgets inside bubbles */
 .o_whatsapp_msg_outbound .o_field_widget,
 .o_whatsapp_msg_inbound .o_field_widget {
     background: transparent !important;
