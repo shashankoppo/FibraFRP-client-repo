@@ -64,6 +64,32 @@ SYSTEM_VIEW_XMLIDS = (
 
 SYSTEM_TEMPLATE_MODULES = ("auth_signup", "portal", "web", "website")
 
+OPTIONAL_CLEANUP_VIEWS = (
+    (
+        "portal",
+        "portal_record_sidebar",
+        "ELSxGlobal Portal Powered Branding Cleanup",
+        """<data>
+            <xpath expr="//div[hasclass('text-muted') and .//a[contains(@href, 'odoo.com')]]" position="replace">
+                <t/>
+            </xpath>
+        </data>""",
+    ),
+    (
+        "sale",
+        "sale_order_portal_content",
+        "ELSxGlobal Sale Portal Software Branding Cleanup",
+        """<data>
+            <xpath expr="//button[@id='portal_connect_software_modal_btn']/.." position="replace">
+                <t/>
+            </xpath>
+            <xpath expr="//div[@id='sale_portal_connect_software_modal']" position="replace">
+                <t/>
+            </xpath>
+        </data>""",
+    ),
+)
+
 
 class IrConfigParameter(models.Model):
     _inherit = "ir.config_parameter"
@@ -73,6 +99,7 @@ class IrConfigParameter(models.Model):
         """Apply visible UI branding metadata without touching business data."""
         sudo = self.sudo()
         sudo.set_param("web.web_app_name", BRAND_NAME)
+        self._elsx_ensure_optional_branding_cleanup_views()
         self._elsx_cleanup_visible_branding_views()
         self._elsx_cleanup_visible_branding_email_templates()
 
@@ -129,6 +156,39 @@ class IrConfigParameter(models.Model):
             cleaned = cleaned.replace(needle, replacement)
         cleaned = cleaned.replace('<t t-set="final_message">Powered by %s%s</t>', '<t t-set="final_message"></t>')
         return cleaned
+
+    @api.model
+    def _elsx_ensure_optional_branding_cleanup_views(self):
+        """Install optional cleanup views only when their parent modules exist."""
+        View = self.env["ir.ui.view"].sudo()
+        Data = self.env["ir.model.data"].sudo()
+        for module, xmlid_name, view_name, arch in OPTIONAL_CLEANUP_VIEWS:
+            view_data = Data.search([
+                ("module", "=", module),
+                ("name", "=", xmlid_name),
+                ("model", "=", "ir.ui.view"),
+            ], limit=1)
+            if not view_data:
+                continue
+            parent = View.browse(view_data.res_id).exists()
+            if not parent:
+                continue
+            values = {
+                "name": view_name,
+                "type": "qweb",
+                "mode": "extension",
+                "inherit_id": parent.id,
+                "arch_db": arch,
+                "active": True,
+            }
+            cleanup_view = View.search([
+                ("name", "=", view_name),
+                ("inherit_id", "=", parent.id),
+            ], limit=1)
+            if cleanup_view:
+                cleanup_view.write(values)
+            else:
+                View.create(values)
 
     @api.model
     def _elsx_cleanup_visible_branding_views(self):

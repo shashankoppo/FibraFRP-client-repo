@@ -1,0 +1,5 @@
+.o_portal_sidebar_content .text-muted:has(a[href*="odoo.com"]),
+#portal_connect_software_modal_btn,
+#sale_portal_connect_software_modal {
+    display: none !important;
+}
