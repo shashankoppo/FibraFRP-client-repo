@@ -53,10 +53,15 @@ if [ -z "${BACKUP_PASSPHRASE:-}" ]; then
 fi
 
 if [ "${ALLOW_DIRTY_CODE:-NO}" != "YES" ]; then
-  if [ -n "$(git status --short --untracked-files=no)" ]; then
+  DIRTY_STATUS="$(git status --short --untracked-files=no)"
+  BLOCKING_DIRTY_STATUS="$(printf '%s\n' "${DIRTY_STATUS}" | grep -vE '^ M custom_addons/elsx_whatsapp_marketing/sidecar/package-lock\.json$' || true)"
+  if [ -n "${BLOCKING_DIRTY_STATUS}" ]; then
     echo "ERROR: tracked Git files are modified. Commit/stash or rerun with ALLOW_DIRTY_CODE=YES after review." >&2
-    git status --short --untracked-files=no >&2
+    printf '%s\n' "${BLOCKING_DIRTY_STATUS}" >&2
     exit 1
+  fi
+  if [ -n "${DIRTY_STATUS}" ]; then
+    echo "==> Ignoring generated sidecar package-lock.json dirty state"
   fi
 fi
 
