@@ -89,9 +89,32 @@ Security:
 EOF
 
 echo "==> Encrypting archive"
-tar -C "${WORK_DIR}" -czf - . | openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 \
-  -pass env:BACKUP_PASSPHRASE \
-  -out "${ARCHIVE_PATH}"
+if command -v openssl >/dev/null 2>&1; then
+  tar -C "${WORK_DIR}" -czf - . | openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 \
+    -pass env:BACKUP_PASSPHRASE \
+    -out "${ARCHIVE_PATH}"
+else
+  echo "---- Host openssl not found; using openssl from the Odoo container."
+  TEMP_TAR="${OUTPUT_DIR}/${SAFE_DB_NAME}_${TIMESTAMP}_portable.tar.gz.tmp"
+  TEMP_TAR_BASENAME="$(basename "${TEMP_TAR}")"
+  ARCHIVE_BASENAME="$(basename "${ARCHIVE_PATH}")"
+  tar -C "${WORK_DIR}" -czf "${TEMP_TAR}" .
+  if ! docker compose run --rm -T --no-deps --entrypoint openssl odoo version >/dev/null 2>&1; then
+    rm -f "${TEMP_TAR}"
+    echo "ERROR: openssl is not available on the host or inside the Odoo image." >&2
+    echo "Install openssl on the host, or add it to the Odoo image, then rerun." >&2
+    exit 1
+  fi
+  docker compose run --rm -T --no-deps \
+    -e BACKUP_PASSPHRASE \
+    -v "${OUTPUT_DIR}:/backup" \
+    --entrypoint openssl \
+    odoo enc -aes-256-cbc -salt -pbkdf2 -iter 200000 \
+      -pass env:BACKUP_PASSPHRASE \
+      -in "/backup/${TEMP_TAR_BASENAME}" \
+      -out "/backup/${ARCHIVE_BASENAME}"
+  rm -f "${TEMP_TAR}"
+fi
 chmod 600 "${ARCHIVE_PATH}" >/dev/null 2>&1 || true
 
 echo

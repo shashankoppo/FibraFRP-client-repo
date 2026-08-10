@@ -18,6 +18,9 @@ if [ ! -f "${ARCHIVE_PATH}" ]; then
   echo "ERROR: Archive not found: ${ARCHIVE_PATH}" >&2
   exit 1
 fi
+ARCHIVE_DIR="$(cd "$(dirname "${ARCHIVE_PATH}")" && pwd -P)"
+ARCHIVE_BASENAME="$(basename "${ARCHIVE_PATH}")"
+ARCHIVE_PATH="${ARCHIVE_DIR}/${ARCHIVE_BASENAME}"
 if [ -z "${BACKUP_PASSPHRASE:-}" ]; then
   echo "ERROR: Set BACKUP_PASSPHRASE before restoring." >&2
   exit 1
@@ -62,9 +65,25 @@ if [ "${DB_EXISTS}" = "1" ]; then
 fi
 
 echo "==> Decrypting archive"
-openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
-  -pass env:BACKUP_PASSPHRASE \
-  -in "${ARCHIVE_PATH}" | tar -C "${WORK_DIR}" -xzf -
+if command -v openssl >/dev/null 2>&1; then
+  openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
+    -pass env:BACKUP_PASSPHRASE \
+    -in "${ARCHIVE_PATH}" | tar -C "${WORK_DIR}" -xzf -
+else
+  echo "---- Host openssl not found; using openssl from the Odoo container."
+  if ! docker compose run --rm -T --no-deps --entrypoint openssl odoo version >/dev/null 2>&1; then
+    echo "ERROR: openssl is not available on the host or inside the Odoo image." >&2
+    echo "Install openssl on the host, or add it to the Odoo image, then rerun." >&2
+    exit 1
+  fi
+  docker compose run --rm -T --no-deps \
+    -e BACKUP_PASSPHRASE \
+    -v "${ARCHIVE_DIR}:/backup:ro" \
+    --entrypoint openssl \
+    odoo enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
+      -pass env:BACKUP_PASSPHRASE \
+      -in "/backup/${ARCHIVE_BASENAME}" | tar -C "${WORK_DIR}" -xzf -
+fi
 
 DUMP_FILE="$(find "${WORK_DIR}" -maxdepth 1 -type f -name '*.pg_dump' | head -n 1)"
 FILESTORE_FILE="$(find "${WORK_DIR}" -maxdepth 1 -type f -name '*_filestore.tgz' | head -n 1 || true)"
