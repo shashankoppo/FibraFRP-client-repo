@@ -3,3 +3,11 @@
 #sale_portal_connect_software_modal {
     display: none !important;
 }
+.o_website_loader_odoo_logo {
+    display: none !important;
+}
+
+.o_frontend_to_backend_apps_btn[title*="Odoo"],
+a[href*="odoo.com"] img[alt*="Odoo"] {
+    display: none !important;
+}

@@ -18,25 +18,28 @@ TEXT_REPLACEMENTS = (
     ("https://www.odoo.com", BRAND_URL),
     ("https://odoo.com", BRAND_URL),
     ("http://www.odoo.com", BRAND_URL),
-    ("Odoo Community Edition", "ELSxGlobal Community Edition"),
-    ("Odoo Enterprise", "ELSxGlobal Enterprise"),
-    ("Odoo Community", "ELSxGlobal Community"),
+    ("Odoo Community Edition", BRAND_NAME),
+    ("Odoo Enterprise", "Additional Module"),
+    ("Odoo Community", BRAND_NAME),
     ("Odoo S.A.", BRAND_NAME),
     ("Odoo SA", BRAND_NAME),
+    ("OdooBot", "System Bot"),
+    ("Odoo.com", BRAND_NAME),
     ("Odoo Mates", "ELSxGlobal Partners"),
     ("Odoo Community Association (OCA)", "ELSxGlobal Community"),
     ("Odoo", BRAND_NAME),
 )
 
 POWERED_BY_REPLACEMENTS = (
-    ("Powered by ELSxGlobal", ""),
     ("Powered by Odoo", ""),
+    ("Powered by ELSxGlobal", ""),
     ("Website made with Odoo", ""),
     ("Website made with ELSxGlobal", ""),
     ("Create a free website", ""),
+    ("Never heard of Odoo? It's an all-in-one business software loved by 12+ million users. It will considerably improve your experience at work and increase your productivity.", ""),
     ("Never heard of Odoo? It\u2019s an all-in-one business software loved by 12+ million users. It will considerably improve your experience at work and increase your productivity.", ""),
     ("Have a look at the Odoo Tour to discover the tool.", ""),
-    ("Enjoy Odoo!", ""),
+    ("Enjoy Odoo!", "Enjoy!"),
     ("Welcome to Odoo", "Welcome"),
     ("connect to Odoo", "connect"),
     ("connect on Odoo", "connect"),
@@ -62,7 +65,19 @@ SYSTEM_VIEW_XMLIDS = (
     ("website", "show_website_info"),
 )
 
-SYSTEM_TEMPLATE_MODULES = ("auth_signup", "portal", "web", "website", "mail", "digest", "mass_mailing", "mass_mailing_sale", "website_profile", "lunch")
+SYSTEM_TEMPLATE_MODULES = (
+    "auth_signup",
+    "portal",
+    "web",
+    "website",
+    "mail",
+    "digest",
+    "mass_mailing",
+    "mass_mailing_sale",
+    "website_profile",
+    "lunch",
+    "im_livechat",
+)
 
 SYSTEM_VIEW_CLEANUP_MODULES = (
     "web",
@@ -108,8 +123,80 @@ OPTIONAL_CLEANUP_VIEWS = (
             </xpath>
         </data>""",
     ),
+    (
+        "website",
+        "layout",
+        "ELSxGlobal Website Generator Meta Cleanup",
+        """<data>
+            <xpath expr="//meta[@name='generator']" position="replace">
+                <t/>
+            </xpath>
+        </data>""",
+    ),
+    (
+        "website",
+        "website_info",
+        "ELSxGlobal Website Info Cleanup",
+        """<data>
+            <xpath expr="//section[hasclass('container')]" position="replace">
+                <section class="container">
+                    <h1><t t-out="res_company.name"/></h1>
+                    <p>Information about <t t-out="res_company.name"/>.</p>
+                </section>
+            </xpath>
+        </data>""",
+    ),
+    (
+        "mail",
+        "mail_notification_layout",
+        "ELSxGlobal Mail Notification Footer Cleanup",
+        """<data>
+            <xpath expr="//div[contains(., 'Powered by') and .//a[contains(@href, 'odoo.com')]]" position="replace">
+                <t/>
+            </xpath>
+        </data>""",
+    ),
+    (
+        "mail",
+        "mail_notification_light",
+        "ELSxGlobal Mail Notification Light Footer Cleanup",
+        """<data>
+            <xpath expr="//tr[.//a[contains(@href, 'odoo.com') and contains(., 'Odoo')]]" position="replace">
+                <t/>
+            </xpath>
+        </data>""",
+    ),
+    (
+        "auth_signup",
+        "reset_password_email",
+        "ELSxGlobal Signup Email Footer Cleanup",
+        """<data>
+            <xpath expr="//tr[.//a[contains(@href, 'odoo.com') and contains(., 'Odoo')]]" position="replace">
+                <t/>
+            </xpath>
+        </data>""",
+    ),
+    (
+        "im_livechat",
+        "support_page",
+        "ELSxGlobal Livechat Support Page Cleanup",
+        """<data>
+            <xpath expr="//div[contains(., 'Website Live Chat Powered by')]" position="replace">
+                <t/>
+            </xpath>
+        </data>""",
+    ),
+    (
+        "point_of_sale",
+        "point_of_sale.index",
+        "ELSxGlobal POS Title Cleanup",
+        """<data>
+            <xpath expr="//title" position="replace">
+                <title>Point of Sale</title>
+            </xpath>
+        </data>""",
+    ),
 )
-
 
 CE_BRAND_PROMOTION_MESSAGE_ARCH = """<t name="Brand Promotion Message">
     <t t-set="odoo_logo">
@@ -137,6 +224,11 @@ class IrConfigParameter(models.Model):
         sudo.set_param("web.web_app_name", BRAND_NAME)
         sudo._elsx_remove_optional_branding_cleanup_views()
         sudo._elsx_restore_ce_brand_promotion_views()
+        sudo._elsx_ensure_optional_branding_cleanup_views()
+        sudo._elsx_cleanup_visible_branding_email_templates()
+        sudo._elsx_cleanup_module_metadata()
+        sudo._elsx_cleanup_public_branding_records()
+        sudo._elsx_clear_generated_assets()
         self.env.registry.clear_cache()
         return True
 
@@ -159,15 +251,13 @@ class IrConfigParameter(models.Model):
         cleaned = re.sub(r"Powered by\s*<a\b[^>]*>.*?</a>", "", cleaned, flags=re.IGNORECASE | re.DOTALL)
         cleaned = re.sub(r"<div[^>]*class=['\"][^'\"]*text-muted[^'\"]*['\"][^>]*>\s*Powered by\s*<a\b[^>]*>.*?</a>\s*</div>", "", cleaned, flags=re.IGNORECASE | re.DOTALL)
         cleaned = re.sub(r"<a\b[^>]*odoo\.com[^>]*>Powered by\s*<span>.*?</span></a>", "", cleaned, flags=re.IGNORECASE | re.DOTALL)
-        cleaned = re.sub(r"<t\s+t-out=['\"]final_message[^'\"]*['\"]\s*/>", "<t/>", cleaned, flags=re.IGNORECASE | re.DOTALL)
         for needle, replacement in POWERED_BY_REPLACEMENTS + TEXT_REPLACEMENTS:
             cleaned = cleaned.replace(needle, replacement)
-        cleaned = cleaned.replace('<t t-set="final_message">Powered by %s%s</t>', '<t t-set="final_message"></t>')
         return cleaned
 
     @api.model
     def _elsx_remove_optional_branding_cleanup_views(self):
-        """Remove older fragile inherited cleanup views before direct arch cleanup."""
+        """Remove stale inherited cleanup views so this module recreates the latest safe arch."""
         View = self.env["ir.ui.view"].sudo()
         stale_views = View.browse()
         for xmlid in STALE_INHERITED_VIEW_XMLIDS:
@@ -178,6 +268,33 @@ class IrConfigParameter(models.Model):
         stale_views |= View.search([("name", "in", cleanup_names)])
         if stale_views:
             stale_views.unlink()
+
+    @api.model
+    def _elsx_ensure_optional_branding_cleanup_views(self):
+        """Create optional inherited cleanups only when their parent module/view exists."""
+        View = self.env["ir.ui.view"].sudo()
+        for module, xmlid_name, view_name, arch in OPTIONAL_CLEANUP_VIEWS:
+            inherit_view = self.env.ref(f"{module}.{xmlid_name}", raise_if_not_found=False)
+            if not inherit_view:
+                continue
+            try:
+                with self.env.cr.savepoint():
+                    existing = View.search([("name", "=", view_name)], limit=1)
+                    values = {
+                        "name": view_name,
+                        "type": "qweb",
+                        "mode": "extension",
+                        "inherit_id": inherit_view.id,
+                        "arch_db": arch,
+                        "priority": 1000,
+                        "active": True,
+                    }
+                    if existing:
+                        existing.write(values)
+                    else:
+                        View.create(values)
+            except Exception:
+                _logger.warning("Skipped optional branding cleanup view %s.%s", module, xmlid_name, exc_info=True)
 
     @api.model
     def _elsx_cleanup_visible_branding_views(self):
@@ -253,3 +370,41 @@ class IrConfigParameter(models.Model):
                     values[field_name] = cleaned
             if values:
                 template.write(values)
+
+    @api.model
+    def _elsx_cleanup_module_metadata(self):
+        """Clean Apps metadata records shown in the UI without changing manifest files."""
+        if "ir.module.module" not in getattr(self.env.registry, "models", {}):
+            return
+        Module = self.env["ir.module.module"].sudo()
+        modules = Module.search([("state", "in", ("installed", "to install", "to upgrade"))])
+        for module in modules:
+            values = {}
+            for field_name in MODULE_METADATA_FIELDS:
+                if field_name not in module._fields:
+                    continue
+                current = module[field_name] or ""
+                cleaned = self._elsx_clean_text(current)
+                if cleaned != current:
+                    values[field_name] = cleaned
+            if values:
+                module.write(values)
+
+    @api.model
+    def _elsx_cleanup_public_branding_records(self):
+        partner = self.env.ref("base.partner_root", raise_if_not_found=False)
+        if partner and partner.sudo().name == "OdooBot":
+            partner.sudo().write({"name": "System Bot"})
+
+        message = self.env.ref("mail.module_install_notification", raise_if_not_found=False)
+        if message and "subject" in message._fields and message.sudo().subject == "Welcome to Odoo!":
+            message.sudo().write({"subject": "Welcome!"})
+
+    @api.model
+    def _elsx_clear_generated_assets(self):
+        if "ir.attachment" not in getattr(self.env.registry, "models", {}):
+            return
+        self.env["ir.attachment"].sudo().search([
+            ("url", "like", "/web/assets/"),
+            ("type", "=", "binary"),
+        ]).unlink()

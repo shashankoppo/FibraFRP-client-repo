@@ -1,6 +1,6 @@
 {
     'name': 'ELSxGlobal Rebrand',
-    'version': '1.2.11',
+    'version': '1.2.12',
     'category': 'Tools',
     'summary': 'Remove visible platform branding from the UI',
     'description': 'Removes visible platform branding from backend, frontend, login, footer, title, browser, PWA, report, email template, and Apps metadata strings without touching business data.',
@@ -23,6 +23,7 @@
         ],
         'point_of_sale._assets_pos': [
             'elsx_rebrand/static/src/xml/pos_branding.xml',
+            'elsx_rebrand/static/src/js/pos_branding.js',
         ],
         'point_of_sale.customer_display_assets': [
             'elsx_rebrand/static/src/xml/pos_branding.xml',
