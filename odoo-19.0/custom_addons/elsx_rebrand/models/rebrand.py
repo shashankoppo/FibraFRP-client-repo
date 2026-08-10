@@ -97,6 +97,7 @@ SYSTEM_VIEW_CLEANUP_MODULES = (
 STALE_INHERITED_VIEW_XMLIDS = (
     "elsx_rebrand.brand_promotion_message_rebrand",
     "elsx_rebrand.login_footer_rebrand",
+    "elsx_rebrand.login_footer_branding_hide",
 )
 
 OPTIONAL_CLEANUP_VIEWS = (
