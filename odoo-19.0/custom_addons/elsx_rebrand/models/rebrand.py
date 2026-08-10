@@ -111,58 +111,42 @@ OPTIONAL_CLEANUP_VIEWS = (
 )
 
 
+CE_BRAND_PROMOTION_MESSAGE_ARCH = """<t name="Brand Promotion Message">
+    <t t-set="odoo_logo">
+        <a target="_blank"
+            t-attf-href="http://www.odoo.com?utm_source=db&amp;utm_medium=#{_utm_medium}"
+            class="badge text-bg-light">
+            <img alt="Odoo"
+                src="/web/static/img/odoo_logo_tiny.png"
+                width="62" height="20"
+                style="width: auto; height: 1em; vertical-align: baseline;"/>
+        </a>
+    </t>
+    <t t-set="final_message">Powered by %s%s</t>
+    <t t-out="final_message % (odoo_logo, _message and ('- ' + _message) or '')"/>
+</t>"""
+
+
 class IrConfigParameter(models.Model):
     _inherit = "ir.config_parameter"
 
     @api.model
     def _elsx_apply_ui_rebrand(self):
-        """Apply visible UI branding metadata without touching business data."""
-        sudo = self.sudo()
-        sudo.set_param("web.web_app_name", BRAND_NAME)
-        self._elsx_remove_optional_branding_cleanup_views()
-        self._elsx_cleanup_visible_branding_views()
-        self._elsx_cleanup_system_branding_views()
-        self._elsx_cleanup_visible_branding_email_templates()
-
-        action_values = {
-            "base.action_third_party": {"name": "Third-Party Apps", "url": APP_MODULES_URL},
-            "base.action_theme_store": {"name": "Theme Store", "url": THEME_STORE_URL},
-        }
-        for xmlid, values in action_values.items():
-            action = self.env.ref(xmlid, raise_if_not_found=False)
-            if action:
-                action.sudo().write(values)
-
-        modules = self.env["ir.module.module"].sudo().search([
-            "|", "|", "|",
-            ("author", "ilike", "Odoo"),
-            ("website", "ilike", "odoo"),
-            ("summary", "ilike", "Odoo"),
-            ("shortdesc", "ilike", "Odoo"),
-        ])
-        for module in modules:
-            values = {}
-            for field_name in MODULE_METADATA_FIELDS:
-                if field_name not in module._fields:
-                    continue
-                current = module[field_name] or ""
-                if not isinstance(current, str):
-                    continue
-                branded = self._elsx_clean_text(current)
-                if branded != current:
-                    values[field_name] = branded
-            if values:
-                module.write(values)
-
-        generated_assets = self.env["ir.attachment"].sudo().search([
-            ("url", "=like", "/web/assets/%")
-        ])
-        if generated_assets:
-            count = len(generated_assets)
-            generated_assets.unlink()
-            _logger.info("Cleared %s generated assets after ELSxGlobal rebrand.", count)
+        """Repair core Odoo CE templates without mutating installed system views."""
+        self.sudo()._elsx_restore_ce_brand_promotion_views()
         self.env.registry.clear_cache()
         return True
+
+    @api.model
+    def _elsx_restore_ce_brand_promotion_views(self):
+        view = self.env.ref("web.brand_promotion_message", raise_if_not_found=False)
+        if not view:
+            return
+        arch = view.sudo().arch_db or ""
+        if "Powered by %s%s" in arch and "final_message % (odoo_logo" in arch:
+            return
+        view.sudo().write({"arch_db": CE_BRAND_PROMOTION_MESSAGE_ARCH})
+        _logger.info("Restored Odoo CE web.brand_promotion_message template.")
 
     @api.model
     def _elsx_clean_text(self, value):
