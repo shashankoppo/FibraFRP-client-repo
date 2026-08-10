@@ -5,7 +5,7 @@
         <xpath expr="//link[@rel='shortcut icon']" position="before">
             <t
                 t-set="x_icon"
-                t-value="x_icon or '/web/image/res.company/%s/favicon' % (request.env.company.id,)"
+                t-value="x_icon or '/web/image/res.company/' + str(request.env.company.id) + '/favicon'"
             />
         </xpath>
     </template>
