@@ -16,8 +16,8 @@ cd "${PROJECT_DIR}"
 
 if [ -z "${LIVE_DB_NAME}" ]; then
   echo "ERROR: database name is required. This script will not guess a production database." >&2
-  echo "Usage: bash deploy/safe_production_update.sh <database_name>" >&2
-  echo "Example: EXTRA_UPGRADE_MODULES=muk_web_theme bash deploy/safe_production_update.sh FiberaFRP_DB" >&2
+  echo "Usage: BACKUP_PASSPHRASE=... bash deploy/safe_production_update.sh <database_name>" >&2
+  echo "Example: read -s -p 'Backup passphrase: ' BACKUP_PASSPHRASE && echo && export BACKUP_PASSPHRASE && bash deploy/safe_production_update.sh FiberaFRP_DB" >&2
   exit 2
 fi
 
@@ -47,28 +47,9 @@ echo "==> Install modules if missing: ${ALL_INSTALL_MODULES}"
 echo "==> Upgrade modules: ${ALL_UPGRADE_MODULES}"
 
 if [ -z "${BACKUP_PASSPHRASE:-}" ]; then
-  if [ -r /dev/tty ]; then
-    TTY_STATE="$(stty -g < /dev/tty 2>/dev/null || true)"
-    restore_tty() {
-      if [ -n "${TTY_STATE:-}" ]; then
-        stty "${TTY_STATE}" < /dev/tty 2>/dev/null || true
-      fi
-    }
-    trap restore_tty INT TERM EXIT
-    printf "Backup passphrase: " > /dev/tty
-    stty -echo < /dev/tty 2>/dev/null || true
-    IFS= read -r BACKUP_PASSPHRASE < /dev/tty || true
-    restore_tty
-    trap - INT TERM EXIT
-    printf "\n" > /dev/tty
-    export BACKUP_PASSPHRASE
-  fi
-
-  if [ -z "${BACKUP_PASSPHRASE:-}" ]; then
-    echo "ERROR: BACKUP_PASSPHRASE is required. Refusing to upgrade without an encrypted backup." >&2
-    echo "Run interactively so the script can prompt, or set BACKUP_PASSPHRASE before running." >&2
-    exit 1
-  fi
+  echo "ERROR: BACKUP_PASSPHRASE is required. Refusing to upgrade without an encrypted backup." >&2
+  echo "Example: read -s -p 'Backup passphrase: ' BACKUP_PASSPHRASE && echo && export BACKUP_PASSPHRASE && bash deploy/safe_production_update.sh ${LIVE_DB_NAME}" >&2
+  exit 1
 fi
 
 if [ "${ALLOW_DIRTY_CODE:-NO}" != "YES" ]; then
