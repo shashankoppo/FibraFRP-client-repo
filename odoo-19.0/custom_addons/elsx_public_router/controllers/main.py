@@ -7,8 +7,7 @@ from odoo.addons.web.controllers.home import Home
 from odoo.http import request
 from odoo.service import db as db_service
 
-DEFAULT_PUBLIC_DB = (os.environ.get('ODOO_DEFAULT_PUBLIC_DB') or os.environ.get('LIVE_DB_NAME') or '').strip()
-PUBLIC_DB_MAP = os.environ.get('ODOO_PUBLIC_DB_MAP') or os.environ.get('ODOO_DEFAULT_PUBLIC_DB_MAP') or ''
+DEFAULT_PUBLIC_DB = os.environ.get('ODOO_DEFAULT_PUBLIC_DB') or os.environ.get('LIVE_DB_NAME') or 'FiberaFRP_DB'
 
 
 def _add_query_params(url, **params):
@@ -24,82 +23,18 @@ def _current_url_without_empty_query():
     return request.httprequest.path or '/'
 
 
-def _normalise_host(host):
-    host = (host or '').strip().lower().partition(':')[0]
-    return host[4:] if host.startswith('www.') else host
-
-
-def _request_host():
-    return _normalise_host(request.httprequest.environ.get('HTTP_HOST') or request.httprequest.host)
-
-
-def _parse_public_db_map():
-    mapping = {}
-    for item in PUBLIC_DB_MAP.replace(';', ',').split(','):
-        item = item.strip()
-        if not item:
-            continue
-        separator = '=' if '=' in item else ':' if ':' in item else None
-        if not separator:
-            continue
-        host, db_name = [part.strip() for part in item.split(separator, 1)]
-        host = _normalise_host(host)
-        if host and db_name:
-            mapping[host] = db_name
-    return mapping
-
-
-def _mapped_db_for_host():
-    host = _request_host()
-    if not host:
-        return False
-
-    mapping = _parse_public_db_map()
-    if host in mapping:
-        return mapping[host]
-
-    for pattern, db_name in mapping.items():
-        if pattern.startswith('*.') and host.endswith(pattern[1:]):
-            return db_name
-        if pattern.startswith('.') and host.endswith(pattern):
-            return db_name
-    return False
-
-
-def _single_available_db():
-    dbs = http.db_list(force=True, host=request.httprequest.environ.get('HTTP_HOST'))
-    return dbs[0] if len(dbs) == 1 else False
-
-
-def _is_allowed_db(db_name):
-    return bool(db_name and db_service.exp_db_exist(db_name) and http.db_filter([db_name]))
-
-
-def _select_public_db(db=False):
-    candidates = (
-        db,
-        request.params.get('db'),
-        _mapped_db_for_host(),
-        DEFAULT_PUBLIC_DB,
-        _single_available_db(),
-    )
-    for candidate in candidates:
-        db_name = (candidate or '').strip()
-        if _is_allowed_db(db_name):
-            return db_name
-    return False
-
-
 def _pin_default_public_db(db=False):
     if request.db or request.session.db:
         return False
 
-    db_name = _select_public_db(db=db)
+    db_name = (db or request.params.get('db') or DEFAULT_PUBLIC_DB or '').strip()
     if not db_name:
         return False
 
-    request.session.db = db_name
-    return True
+    if db_service.exp_db_exist(db_name):
+        request.session.db = db_name
+        return True
+    return False
 
 
 class ElsxPublicHome(Home):

@@ -34,9 +34,6 @@ services:
       - DB_PORT=5432
       - DB_USER=${POSTGRES_USER:-odoo}
       - DB_PASSWORD=${POSTGRES_PASSWORD:-odoo}
-      - ODOO_DEFAULT_PUBLIC_DB=${ODOO_DEFAULT_PUBLIC_DB:-}
-      - LIVE_DB_NAME=${LIVE_DB_NAME:-}
-      - ODOO_PUBLIC_DB_MAP=${ODOO_PUBLIC_DB_MAP:-}
     volumes:
       - .:/opt/odoo
       - ./odoo.docker.conf:/etc/odoo/odoo.conf
