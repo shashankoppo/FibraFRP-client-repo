@@ -132,8 +132,11 @@ class IrConfigParameter(models.Model):
 
     @api.model
     def _elsx_apply_ui_rebrand(self):
-        """Repair core Odoo CE templates without mutating installed system views."""
-        self.sudo()._elsx_restore_ce_brand_promotion_views()
+        """Repair core Odoo CE templates, then apply safe inherited branding overrides."""
+        sudo = self.sudo()
+        sudo.set_param("web.web_app_name", BRAND_NAME)
+        sudo._elsx_remove_optional_branding_cleanup_views()
+        sudo._elsx_restore_ce_brand_promotion_views()
         self.env.registry.clear_cache()
         return True
 

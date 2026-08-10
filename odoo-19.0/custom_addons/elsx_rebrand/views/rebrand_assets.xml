@@ -47,4 +47,15 @@
             <title><t t-esc="title or 'ELSxGlobal Report'"/></title>
         </xpath>
     </template>
+    <template id="brand_promotion_message_hide" inherit_id="web.brand_promotion_message" priority="1000">
+        <xpath expr="//t[contains(@t-out, 'final_message')]" position="replace">
+            <t/>
+        </xpath>
+    </template>
+
+    <template id="login_footer_branding_hide" inherit_id="web.login_layout" priority="1000">
+        <xpath expr="//a[contains(@href, 'odoo.com') and .//span[contains(., 'Odoo')]]" position="replace">
+            <t/>
+        </xpath>
+    </template>
 </odoo>
