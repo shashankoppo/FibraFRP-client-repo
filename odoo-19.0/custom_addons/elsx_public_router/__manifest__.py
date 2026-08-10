@@ -11,7 +11,7 @@ reaching normal Odoo controllers, such as attendance kiosk URLs.
     'author': 'ELSxGlobal',
     'website': 'https://elsxglobal.com',
     'license': 'LGPL-3',
-    'depends': ['base'],
+    'depends': ['base', 'web'],
     'data': [],
     'installable': True,
     'application': False,
