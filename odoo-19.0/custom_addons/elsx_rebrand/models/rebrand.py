@@ -224,7 +224,6 @@ class IrConfigParameter(models.Model):
         sudo.set_param("web.web_app_name", BRAND_NAME)
         sudo._elsx_remove_optional_branding_cleanup_views()
         sudo._elsx_restore_ce_brand_promotion_views()
-        sudo._elsx_ensure_optional_branding_cleanup_views()
         sudo._elsx_cleanup_visible_branding_email_templates()
         sudo._elsx_cleanup_module_metadata()
         sudo._elsx_cleanup_public_branding_records()
@@ -396,6 +395,8 @@ class IrConfigParameter(models.Model):
         if partner and partner.sudo().name == "OdooBot":
             partner.sudo().write({"name": "System Bot"})
 
+        if "mail.message" not in getattr(self.env.registry, "models", {}):
+            return
         message = self.env.ref("mail.module_install_notification", raise_if_not_found=False)
         if message and "subject" in message._fields and message.sudo().subject == "Welcome to Odoo!":
             message.sudo().write({"subject": "Welcome!"})
