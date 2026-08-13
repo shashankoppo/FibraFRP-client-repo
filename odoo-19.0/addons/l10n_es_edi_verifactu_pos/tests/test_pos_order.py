@@ -248,3 +248,44 @@ class TestL10nEsEdiVerifactuPosOrder(TestL10nEsEdiVerifactuPosCommon):
             'state': 'accepted',
             'errors': False,
         }])
+
+    def test_consolidated_invoice_for_multiple_orders(self):
+        with self.with_pos_session():
+            data = {
+                'is_invoiced': False,
+                'customer': self.partner_b,
+                'pos_order_lines_ui_args': [(self.product, 1.0)],
+                'payments': [(self.bank_pm1, 121.0)],
+            }
+            orders = self.env['pos.order']
+            for _ in range(2):
+                with self._mock_zeep_registration_operation_single_accept_no_wait():
+                    orders |= self._create_order(data)
+
+        wizard = self.env['pos.make.invoice'] \
+            .create({'consolidated_billing': True}) \
+            .with_context({'active_ids': orders.ids})
+        with self.assertRaises(UserError, msg="With Veri*Factu enabled, POS orders cannot be consolidated into one invoice."):
+            wizard.action_create_invoices()
+
+    def test_invoice_later_sent(self):
+        with self.with_pos_session():
+            with self._mock_zeep_registration_operation('l10n_es_edi_verifactu/tests/responses/batch_single_accepted_registration.json'):
+                order = self._create_order({
+                    'pos_order_lines_ui_args': [
+                        (self.product, 1.0),
+                    ],
+                    'customer': self.partner_b,
+                    'payments': [(self.bank_pm1, 121.0)],
+                    # Adjust the fields relevant for the record identifier to match the ones in the response
+                    'name': 'INV/2019/00026',
+                    'date_order': '2024-12-30 00:00:00',
+                })
+                order.l10n_es_edi_verifactu_document_ids.sudo().write({'state': 'accepted'})
+            with self._mock_zeep_registration_operation_certificate_issue():
+                order._generate_pos_order_invoice()
+                self.assertEqual(len(order.l10n_es_edi_verifactu_document_ids), 2)
+                self.assertRecordValues(order.l10n_es_edi_verifactu_document_ids[1], [{
+                    'document_type': 'cancellation',
+                    'errors': False,
+                }])

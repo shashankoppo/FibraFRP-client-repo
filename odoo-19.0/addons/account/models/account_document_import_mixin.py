@@ -167,7 +167,11 @@ class AccountDocumentImportMixin(models.AbstractModel):
 
         # Call _extend_with_attachments at the end, because it commits the transaction.
         for record, file_data_group in zip(records, file_data_groups):
-            record._extend_with_attachments(file_data_group, new=True)
+            record_extended = record._extend_with_attachments(file_data_group, new=True)
+            if not record_extended:
+                record.message_post(
+                    body=self.env._("There was an error while importing the bill, you can find attached the incoming XML"),
+                )
 
         return records
 
@@ -379,6 +383,11 @@ class AccountDocumentImportMixin(models.AbstractModel):
     # Helpers to consistently attach/unattach attachments to records
     # --------------------------------------------------------------
 
+    def _attachment_fields_to_clear(self):
+        """ Return a list of fields that should be cleared when an attachment is unattached from the record. """
+        return []
+
+    # Deprecated, removed in master
     def _fix_attachments_on_record(self, attachments):
         """ Ensure that only attachments of certain types appear in `self`'s attachments.
 
@@ -396,10 +405,19 @@ class AccountDocumentImportMixin(models.AbstractModel):
             })
         attachments_to_unattach = (attachments - attachments_to_attach).filtered(lambda a: a.res_model == self._name and not a.res_field)
         if attachments_to_unattach:
+            for fname in self._attachment_fields_to_clear():
+                self[fname] -= attachments_to_unattach
             attachments_to_unattach.write({
                 'res_model': False,
                 'res_id': 0,
             })
+
+    def _fix_attachments_on_record_from_files_data(self, valid_files_data, extra_files_data):
+        self.ensure_one()
+        valid_attachments = self._from_files_data(valid_files_data).filtered(lambda a: a.res_model != self._name or a.res_id != self.id)
+        extra_attachments = self._from_files_data(extra_files_data).filtered(lambda a: a.res_model == self._name and not a.res_field)
+        valid_attachments.write({'res_model': self._name, 'res_id': self.id})
+        extra_attachments.write({'res_model': False, 'res_id': 0})
 
     def _should_attach_to_record(self, attachment):
         """ Indicate whether a given attachment should be displayed in the record's attachments. """
@@ -431,7 +449,7 @@ class AccountDocumentImportMixin(models.AbstractModel):
         for attachment in attachments:
             file_data = {
                 'name': attachment.name,
-                'raw': attachment.raw,
+                'raw': attachment.raw or b'',
                 'mimetype': attachment.mimetype,
                 'origin_attachment': attachment,
                 'attachment': attachment,
@@ -471,7 +489,7 @@ class AccountDocumentImportMixin(models.AbstractModel):
             or file_data['mimetype'].endswith('/xml')
         ):
             try:
-                return etree.fromstring(file_data['raw'])
+                return etree.fromstring(file_data['raw'], parser=etree.XMLParser(remove_comments=True, resolve_entities=False))
             except etree.ParseError as e:
                 _logger.info('Error when reading the xml file "%s": %s', file_data['name'], e)
 
@@ -497,7 +515,7 @@ class AccountDocumentImportMixin(models.AbstractModel):
         :return: a `files_data` list representation of the embedded attachements.
         """
         embedded = []
-        if file_data['import_file_type'] == 'pdf':
+        if file_data['import_file_type'] == 'pdf' and file_data['raw']:
             for filename, content in extract_pdf_embedded_files(file_data['name'], file_data['raw']):
                 embedded_file_data = {
                     'name': filename,

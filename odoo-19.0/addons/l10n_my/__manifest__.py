@@ -25,4 +25,5 @@ This is the base module to manage the accounting chart for Malaysia in Odoo.
     'demo': [
         'demo/demo_company.xml',
     ],
+    'license': 'LGPL-3',
 }

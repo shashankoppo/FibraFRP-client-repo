@@ -1,4 +1,5 @@
 import uuid
+from base64 import b64decode
 from dateutil.relativedelta import relativedelta
 from markupsafe import Markup
 from urllib.parse import quote, urlencode, urlparse
@@ -82,12 +83,12 @@ class AccountMove(models.Model):
 
     def button_draft(self):
         # EXTENDS account
-        for move in self.filtered('l10n_tr_nilvera_uuid'):
+        for move in self.filtered(lambda move: move.l10n_tr_nilvera_uuid and move.move_type == 'out_invoice'):
             if move.l10n_tr_nilvera_send_status == 'error':
                 move.message_post(body=_("To preserve accounting integrity and comply with legal requirements, invoices cannot be reused once an error occurs. Please create a new invoice to continue."))
             elif move.l10n_tr_nilvera_send_status != 'not_sent':
                 raise UserError(_("You cannot reset to draft an entry that has been sent to Nilvera."))
-        super().button_draft()
+        return super().button_draft()
 
     def _post(self, soft=True):
         for move in self:
@@ -225,7 +226,7 @@ class AccountMove(models.Model):
         with _get_nilvera_client(self.env.company) as client:
             endpoint = f"/{invoice_channel}/{quote(document_category)}"
             start_date = self._get_nilvera_last_fetch_date(invoice_channel, journal_type)
-            end_date = fields.Datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+            end_date = fields.Datetime.context_timestamp(self.with_context(tz='Europe/Istanbul'), fields.Datetime.now()).strftime("%Y-%m-%dT%H:%M:%S")
             page = 1
 
             # We filter documents by their CreatedDate on Nilvera, which represents when the document was created on
@@ -363,7 +364,7 @@ class AccountMove(models.Model):
             'name': filename,
             'res_id': invoice.id,
             'res_model': 'account.move',
-            'datas': response,
+            'raw': b64decode(response),
             'type': 'binary',
             'mimetype': 'application/pdf',
         })
@@ -384,7 +385,7 @@ class AccountMove(models.Model):
                     client,
                     invoice,
                     invoice.l10n_tr_nilvera_uuid,
-                    document_category="Sale",
+                    document_category=invoice._l10n_tr_get_document_category(invoice.l10n_tr_nilvera_customer_status),
                     invoice_channel=invoice.l10n_tr_nilvera_customer_status,
                 )
 
@@ -455,7 +456,7 @@ class AccountMove(models.Model):
 
     def _cron_nilvera_get_invoice_status(self):
         invoices_to_update = self.env['account.move'].search([
-            ('l10n_tr_nilvera_send_status', 'in', ['waiting', 'sent']),
+            ('l10n_tr_nilvera_send_status', 'in', ['waiting', 'sent', 'unknown']),
             ('move_type', 'in', self._l10n_tr_types_to_update_status()),
         ])
         invoices_to_update._l10n_tr_nilvera_get_submitted_document_status()
@@ -490,6 +491,6 @@ class AccountMove(models.Model):
                         client,
                         invoice,
                         invoice.l10n_tr_nilvera_uuid,
-                        document_category="Sale",
+                        document_category=invoice._l10n_tr_get_document_category(invoice.l10n_tr_nilvera_customer_status),
                         invoice_channel=invoice.l10n_tr_nilvera_customer_status,
                     )

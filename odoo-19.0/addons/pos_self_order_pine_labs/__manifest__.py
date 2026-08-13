@@ -13,4 +13,5 @@
         ],
     },
     "author": "Odoo IN Pvt Ltd",
+    "license": "LGPL-3",
 }

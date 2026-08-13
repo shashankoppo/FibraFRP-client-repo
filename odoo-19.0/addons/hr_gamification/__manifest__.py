@@ -25,4 +25,5 @@ Badge received are displayed on the user profile.
         ],
     },
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

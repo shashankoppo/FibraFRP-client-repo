@@ -34,4 +34,5 @@ Using this application you can manage Sales Teams with CRM and/or Sales
         ],
     },
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

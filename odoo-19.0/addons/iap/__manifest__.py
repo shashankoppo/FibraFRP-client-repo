@@ -28,4 +28,5 @@ to support In-App purchases inside Odoo. """,
         ],
     },
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

@@ -32,4 +32,5 @@ Enable management of UTM trackers: campaign, medium, source.
         ],
     },
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

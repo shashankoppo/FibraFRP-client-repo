@@ -26,5 +26,6 @@ This module implements Cloudflare Turnstile so that you can prevent bot spam on 
         ],
     },
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
     'installable': True,
 }

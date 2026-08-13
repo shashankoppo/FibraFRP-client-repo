@@ -22,4 +22,5 @@ It is primarily used for EDIs that might need a special city code.
     ],
     'depends': ['base', 'contacts'],
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

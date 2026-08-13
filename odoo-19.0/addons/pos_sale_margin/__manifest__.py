@@ -15,4 +15,5 @@ This module adds enable you to view the margin of your Point of Sale orders in t
     'installable': True,
     'auto_install': True,
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

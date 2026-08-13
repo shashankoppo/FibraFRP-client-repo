@@ -11,4 +11,5 @@
     'installable': True,
     'author': 'Odoo S.A.',
     'uninstall_hook': 'uninstall_hook',
+    'license': 'LGPL-3'
 }

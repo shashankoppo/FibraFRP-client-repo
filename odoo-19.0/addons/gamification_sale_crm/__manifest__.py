@@ -10,4 +10,5 @@
     'demo': ['data/gamification_sale_crm_demo.xml'],
     'auto_install': True,
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

@@ -52,4 +52,5 @@ The service is provided by the In App Purchase Odoo platform.
         ],
     },
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

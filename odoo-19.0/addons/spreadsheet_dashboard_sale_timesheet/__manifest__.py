@@ -12,4 +12,5 @@
     'installable': True,
     'auto_install': ['sale_timesheet'],
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

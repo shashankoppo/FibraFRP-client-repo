@@ -33,6 +33,10 @@ import { CompositeAction } from "@html_builder/core/composite_action_plugin";
  * @property { CustomizeWebsitePlugin['setViewsOnSave'] } setViewsOnSave
  */
 
+/**
+ * @typedef {((colors: string[]) => void)[]} on_website_color_updated_handlers
+ */
+
 export const NO_IMAGE_SELECTION = Symbol.for("NoImageSelection");
 
 export class CustomizeWebsitePlugin extends Plugin {
@@ -843,12 +847,7 @@ class TemplatePreviewableWebsiteConfigAction extends WebsiteConfigAction {
         // The promise ensures this completes before continuing, avoiding a race
         // that could mark the element o_dirty and trigger an unnecessary save.
         if (params.previewClass) {
-            await new Promise((resolve) => {
-                requestAnimationFrame(() => {
-                    params.previewClass.split(/\s+/).forEach((cls) => el.classList.add(cls));
-                    resolve();
-                });
-            });
+            params.previewClass.split(/\s+/).forEach((cls) => el.classList.add(cls));
         }
     }
 }
@@ -962,6 +961,9 @@ export class CustomizeWebsiteColorAction extends BuilderAction {
             );
         }
         setBuilderCSSVariables(getHtmlStyle(this.document));
+        await Promise.allSettled(
+            this.getResource("on_website_color_updated_handlers").map((handler) => handler([color]))
+        );
     }
 }
 

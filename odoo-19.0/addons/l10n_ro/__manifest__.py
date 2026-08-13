@@ -6,7 +6,7 @@
     'icon': '/account/static/description/l10n.png',
     'countries': ['ro'],
     'category': 'Accounting/Localizations/Account Charts',
-    'version': '1.0',
+    'version': '1.1',
     'depends': [
         'account',
         'base_vat',
@@ -28,4 +28,5 @@ Romanian accounting chart and localization.
     'demo': [
         'demo/demo_company.xml',
     ],
+    'license': 'LGPL-3',
 }

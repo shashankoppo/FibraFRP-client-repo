@@ -10,4 +10,5 @@
     'depends': ['mass_mailing_crm', 'mass_mailing_sms'],
     'auto_install': True,
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

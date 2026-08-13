@@ -8,6 +8,7 @@ Saudi Arabia POS Localization
 ===========================================================
     """,
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
     'depends': [
         'l10n_gcc_pos',
         'l10n_sa',
@@ -21,6 +22,7 @@ Saudi Arabia POS Localization
             'l10n_sa_pos/static/tests/tours/**/*',
         ],
         'web.assets_unit_tests': [
+            'web/static/lib/zxing-library/zxing-library.js',
             'l10n_sa_pos/static/src/app/utils/qr.js',
             'l10n_sa_pos/static/tests/unit/**/*',
         ]

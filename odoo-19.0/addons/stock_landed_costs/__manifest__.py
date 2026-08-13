@@ -24,4 +24,5 @@ This module allows you to easily add extra costs on pickings and decide the spli
     ],
     'installable': True,
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

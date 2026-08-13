@@ -39,4 +39,5 @@ inclusion of rating directly within the customer portal discuss widget.
         ]
     },
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

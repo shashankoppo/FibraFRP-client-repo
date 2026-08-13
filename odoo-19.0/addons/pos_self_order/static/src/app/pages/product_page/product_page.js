@@ -8,6 +8,7 @@ import {
     getAttributeValues,
     getAttributeValuesExtraPrice,
 } from "@pos_self_order/app/services/card_utils";
+import { shouldShowMissingDetails } from "../../utils";
 
 export class ProductPage extends Component {
     static template = "pos_self_order.ProductPage";
@@ -68,12 +69,10 @@ export class ProductPage extends Component {
     }
 
     shouldShowMissingDetails() {
-        const el = this.scrollContainerRef?.el;
-        if (!el) {
-            return false;
-        }
-        return (
-            el.scrollHeight > el.clientHeight && this.productTemplate.attribute_line_ids.length > 1
+        return shouldShowMissingDetails(
+            this.productTemplate,
+            this.state.selectedValues,
+            this.scrollContainerRef
         );
     }
 
@@ -138,15 +137,23 @@ export class ProductPage extends Component {
             getAttributeValues(attributeIds, this.selfOrder.models)
         );
 
+        const order = this.selfOrder.currentOrder;
+        const pricelist = order.pricelist_id;
         const price = this.props.productTemplate.getPrice(
-            this.selfOrder.currentOrder.pricelist_id,
+            pricelist,
             1,
             priceExtra,
             false,
             productVariant
         );
-        const taxDetails = this.props.productTemplate.getTaxDetails({
-            overridedValues: { price_unit: price, quantity: this.state.qty },
+        const product = productVariant || this.props.productTemplate;
+        const fiscalPosition = order.fiscal_position_id;
+        const taxDetails = product.getTaxDetails({
+            overridedValues: {
+                price,
+                fiscalPosition,
+                quantity: this.state.qty,
+            },
         });
         return this.selfOrder.isTaxesIncludedInPrice()
             ? taxDetails.total_included

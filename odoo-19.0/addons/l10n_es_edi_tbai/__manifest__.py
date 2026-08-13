@@ -46,4 +46,5 @@ You need to configure your certificate and the tax agency.
         'demo/demo_company.xml',
     ],
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

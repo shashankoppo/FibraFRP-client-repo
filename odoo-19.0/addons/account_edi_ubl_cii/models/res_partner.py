@@ -6,12 +6,14 @@ from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError
 from odoo.addons.account_edi_ubl_cii.models.account_edi_common import EAS_MAPPING
 from odoo.addons.account.models.company import PEPPOL_DEFAULT_COUNTRIES
+from odoo.tools import single_email_re
 
 
 PEPPOL_ENDPOINT_INVALIDCHARS_RE = re.compile(r'[^a-zA-Z\d\-._~]')
 PEPPOL_ENDPOINT_INVALID_CHARS_RE_BY_EAS = {
     '0208': re.compile(r'[^0-9]'),
     '9925': re.compile(r'[^beBE0-9]'),
+    'EM': re.compile(r'[^a-zA-Z\d\-._@]'),
 }
 
 
@@ -29,6 +31,7 @@ class ResPartner(models.Model):
         selection_add=[
             ('facturx', "France (FacturX)"),
             ('ubl_bis3', "EU Standard (Peppol Bis 3.0)"),
+            ('zugferd', "Germany (ZUGFeRD)"),
             ('xrechnung', "Germany (XRechnung)"),
             ('nlcius', "Netherlands (NLCIUS)"),
             ('ubl_a_nz', "Australia (BIS Billing 3.0 A-NZ)"),
@@ -79,6 +82,7 @@ class ResPartner(models.Model):
             ('9957', "France VAT"),
             ('0225', "France FRCTC Electronic Address"),
             ('0240', "France Register of legal persons"),
+            ('0246', "German Electronic Business Address"),
             ('0204', "Germany Leitweg-ID"),
             ('9930', "Germany VAT"),
             ('9933', "Greece VAT"),
@@ -103,12 +107,14 @@ class ResPartner(models.Model):
             ('0106', "Netherlands KvK"),
             ('0190', "Netherlands OIN"),
             ('9944', "Netherlands VAT"),
+            ('0244', "Nigeria Tax Identification"),
             ('0192', "Norway Org.nr."),
             ('9945', "Poland VAT"),
             ('9946', "Portugal VAT"),
             ('9947', "Romania VAT"),
             ('9948', "Serbia VAT"),
             ('0195', "Singapore UEN"),
+            ('0245', "SK Tax identification number (DIČ)"),
             ('9949', "Slovenia VAT"),
             ('9950', "Slovakia VAT"),
             ('9920', "Spain VAT"),
@@ -166,11 +172,12 @@ class ResPartner(models.Model):
                 'sequence': 200,
                 'embed_attachments': True,
             },
-            'xrechnung': {'countries': ['DE'], 'on_peppol': True},
+            'xrechnung': {'countries': ['DE'], 'sequence': 200, 'on_peppol': True},
             'ubl_a_nz': {'countries': ['NZ', 'AU'], 'on_peppol': False},  # Not yet available through Odoo's Access Point, although it's a Peppol valid format
             'nlcius': {'countries': ['NL'], 'on_peppol': True},
             'ubl_sg': {'countries': ['SG'], 'on_peppol': False},  # Same.
             'facturx': {'countries': ['FR'], 'on_peppol': False},
+            'zugferd': {'countries': ['DE'], 'on_peppol': False},
         }
 
     @api.model
@@ -195,9 +202,15 @@ class ResPartner(models.Model):
             if len(formats_by_country) == 1:
                 return formats_by_country[0]
             else:
+                if self.peppol_eas == '0204':
+                    return 'xrechnung'
                 formats_info = self._get_ubl_cii_formats_info()
                 return min(formats_by_country, key=lambda e: formats_info[e].get('sequence', 100))  # we use a sequence of 100 by default
         return False
+
+    def _get_ubl_cii_edi_format(self):
+        self.ensure_one()
+        return self.invoice_edi_format or self._get_suggested_ubl_cii_edi_format()
 
     def _get_suggested_peppol_edi_format(self):
         self.ensure_one()
@@ -232,6 +245,10 @@ class ResPartner(models.Model):
 
     def _get_peppol_endpoint_value(self, country_code, field, eas):
         self.ensure_one()
+        # Field `peppol_endpoint` can be used as placeholer for custom logic (by extending this function)
+        if field == 'peppol_endpoint':
+            return None
+
         value = field in self._fields and self[field]
 
         if (
@@ -246,7 +263,7 @@ class ResPartner(models.Model):
 
         return sanitize_peppol_endpoint(value, eas)
 
-    @api.depends(lambda self: self._peppol_eas_endpoint_depends() + ['peppol_eas'])
+    @api.depends('peppol_eas')
     def _compute_peppol_endpoint(self):
         """ If the EAS changes and a valid endpoint is available, set it. Otherwise, keep the existing value."""
         for partner in self:
@@ -296,14 +313,18 @@ class ResPartner(models.Model):
             return _("The Peppol endpoint is not valid. "
                      "It should contain exactly 10 digits (Company Registry number)."
                      "The expected format is: 1234567890")
-        if PEPPOL_ENDPOINT_INVALIDCHARS_RE.search(endpoint) or not 1 <= len(endpoint) <= 50:
+        if eas == 'EM' and not single_email_re.match(endpoint):
+            return _("The Peppol endpoint is not valid. A valid email is required")
+        invalid_chars_re = PEPPOL_ENDPOINT_INVALID_CHARS_RE_BY_EAS.get(eas, PEPPOL_ENDPOINT_INVALIDCHARS_RE)
+        if invalid_chars_re.search(endpoint) or not 1 <= len(endpoint) <= 50:
             return _("The Peppol endpoint (%s) is not valid. It should contain only letters and digit.", endpoint)
 
     @api.model
     def _get_edi_builder(self, invoice_edi_format):
         if invoice_edi_format == 'xrechnung':
             return self.env['account.edi.xml.ubl_de']
-        if invoice_edi_format == 'facturx':
+        # Same template for the two formats (France and Germany)
+        if invoice_edi_format in ('facturx', 'zugferd'):
             return self.env['account.edi.xml.cii']
         if invoice_edi_format == 'ubl_a_nz':
             return self.env['account.edi.xml.ubl_a_nz']
@@ -313,3 +334,16 @@ class ResPartner(models.Model):
             return self.env['account.edi.xml.ubl_bis3']
         if invoice_edi_format == 'ubl_sg':
             return self.env['account.edi.xml.ubl_sg']
+
+    @api.model
+    def _import_retrieve_customer_from_eas_endpoint(self, customer_values):
+        peppol_eas = customer_values.get('peppol_eas')
+        peppol_endpoint = customer_values.get('peppol_endpoint')
+        if not peppol_eas or not peppol_endpoint:
+            return
+
+        return {
+            'criteria': [{
+                'domain': [('peppol_eas', '=', peppol_eas), ('peppol_endpoint', '=', peppol_endpoint)],
+            }],
+        }

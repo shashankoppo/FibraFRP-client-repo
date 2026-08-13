@@ -17,4 +17,5 @@ Report ledger for Bulgaria
     ],
     'auto_install': True,
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

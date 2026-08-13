@@ -64,4 +64,5 @@ This module is compatible with base_vat module in order to be able to validate V
     },
     'installable': True,
     'post_init_hook': '_set_default_identification_type',
+    'license': 'LGPL-3',
 }

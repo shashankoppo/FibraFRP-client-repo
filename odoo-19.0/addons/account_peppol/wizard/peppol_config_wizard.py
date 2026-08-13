@@ -153,7 +153,7 @@ class PeppolConfigWizard(models.TransientModel):
                 }
             }
             self.account_peppol_edi_user._call_peppol_proxy(
-                endpoint='/api/peppol/1/update_user',
+                endpoint=self.account_peppol_edi_user._get_peppol_proxy_endpoint('1/update_user'),
                 params=params,
             )
 
@@ -165,6 +165,8 @@ class PeppolConfigWizard(models.TransientModel):
 
         if self.account_peppol_edi_user:
             self.account_peppol_edi_user._peppol_deregister_participant()
+        else:
+            self.company_id._reset_peppol_configuration()
         return True
 
     def button_peppol_reset_to_sender(self):

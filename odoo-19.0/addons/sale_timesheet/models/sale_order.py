@@ -16,7 +16,7 @@ class SaleOrder(models.Model):
     timesheet_total_duration = fields.Integer("Timesheet Total Duration", compute='_compute_timesheet_total_duration',
         help="Total recorded duration, expressed in the encoding UoM, and rounded to the unit", compute_sudo=True,
         groups="hr_timesheet.group_hr_timesheet_user", export_string_translation=False)
-    show_hours_recorded_button = fields.Boolean(compute="_compute_show_hours_recorded_button", groups="hr_timesheet.group_hr_timesheet_user", export_string_translation=False)
+    show_hours_recorded_button = fields.Boolean(compute="_compute_show_hours_recorded_button", groups="hr_timesheet.group_hr_timesheet_user", export_string_translation=False, compute_sudo=True)
 
 
     def _compute_timesheet_count(self):
@@ -69,7 +69,7 @@ class SaleOrder(models.Model):
 
     def _compute_show_hours_recorded_button(self):
         show_button_ids = self._get_order_with_valid_service_product()
-        for order in self:
+        for order in self.sudo():
             order.show_hours_recorded_button = order.timesheet_count or order.project_count and order.id in show_button_ids
 
     @api.model_create_multi
@@ -122,7 +122,6 @@ class SaleOrder(models.Model):
         default_sale_line = next((sale_line for sale_line in self.order_line if sale_line.is_service and sale_line.product_id.service_policy in ['ordered_prepaid', 'delivered_timesheet']), self.env['sale.order.line'])
         context = {
             'search_default_billable_timesheet': True,
-            'default_is_so_line_edited': True,
             'default_so_line': default_sale_line.id,
         }  # erase default filters
 

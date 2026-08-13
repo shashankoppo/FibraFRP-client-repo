@@ -26,4 +26,5 @@ Source: https://www.paragraf.rs/propisi/pravilnik-o-kontnom-okviru-sadrzini-racu
     'demo': [
         'demo/demo_company.xml',
     ],
+    'license': 'LGPL-3',
 }

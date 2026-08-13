@@ -958,9 +958,16 @@ export const accountTaxHelpers = {
             let current_mode = mode;
             if (current_mode === "mixed") {
                 current_mode = "included";
-                for (const base_line_taxes_data of values.base_line_x_taxes_data) {
-                    const taxes_data = base_line_taxes_data[1];
-                    if (taxes_data.some((tax_data) => !tax_data.price_include)) {
+                for (const [base_line, taxes_data] of values.base_line_x_taxes_data) {
+                    const not_zero_taxes_data = taxes_data.filter(
+                        (tax_data) =>
+                            !floatIsZero(
+                                tax_data.tax_amount_currency,
+                                base_line.currency_id.decimal_places
+                            ) &&
+                            !floatIsZero(tax_data.tax_amount, company.currency_id.decimal_places)
+                    );
+                    if (not_zero_taxes_data.some((tax_data) => !tax_data.price_include)) {
                         current_mode = "excluded";
                         break;
                     }
@@ -1334,9 +1341,15 @@ export const accountTaxHelpers = {
             const strategy = cash_rounding.strategy;
             const cash_rounding_pd = cash_rounding.rounding;
             const cash_rounding_method = cash_rounding.rounding_method;
-            const total_amount_currency =
-                tax_totals_summary.base_amount_currency + tax_totals_summary.tax_amount_currency;
-            const total_amount = tax_totals_summary.base_amount + tax_totals_summary.tax_amount;
+            // Round first so cash rounding doesn't inflate a sub-unit float residue.
+            const total_amount_currency = roundPrecision(
+                tax_totals_summary.base_amount_currency + tax_totals_summary.tax_amount_currency,
+                currency.rounding
+            );
+            const total_amount = roundPrecision(
+                tax_totals_summary.base_amount + tax_totals_summary.tax_amount,
+                company_pd
+            );
             const expected_total_amount_currency = roundPrecision(
                 total_amount_currency,
                 cash_rounding_pd,
@@ -2522,14 +2535,10 @@ export const accountTaxHelpers = {
                 (exclude_function && exclude_function(base_line, tax_data))
             );
         }
-
-        const new_base_lines = this.dispatch_taxes_into_new_base_lines(
+        return this.dispatch_taxes_into_new_base_lines(
             base_lines,
             company,
             dispatch_exclude_function.bind(this)
-        );
-        return new_base_lines.concat(
-            this.turn_removed_taxes_into_new_base_lines(new_base_lines, company)
         );
     },
 

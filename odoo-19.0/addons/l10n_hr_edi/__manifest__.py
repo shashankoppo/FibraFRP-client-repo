@@ -32,4 +32,5 @@ e-invoicing for Croatia
     'post_init_hook': 'post_init',
     'website': 'https://www.odoo.com/app/accounting',
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

@@ -16,24 +16,26 @@
 # dominikkertys <dominik.kertys@26house.com>, 2023
 # Rastislav Brencic <rastislav.brencic@azet.sk>, 2023
 # Martin Trigaux, 2023
-# Weblate <noreply-mt-weblate@weblate.org>, 2025.
+# Weblate <noreply-mt-weblate@weblate.org>, 2025, 2026.
 # Tomáš Píšek <Tomas.Pisek@seznam.cz>, 2025, 2026.
+# Odoo Translation Bot <c3p@odoo.com>, 2026.
+# "Marta (wacm)" <wacm@odoo.com>, 2026.
 msgid ""
 msgstr ""
 "Project-Id-Version: Odoo Server 16.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-01-22 18:35+0000\n"
-"PO-Revision-Date: 2026-01-23 18:27+0000\n"
-"Last-Translator: Tomáš Píšek <Tomas.Pisek@seznam.cz>\n"
+"POT-Creation-Date: 2026-07-17 17:37+0000\n"
+"PO-Revision-Date: 2026-08-07 04:58+0000\n"
+"Last-Translator: \"Marta (wacm)\" <wacm@odoo.com>\n"
 "Language-Team: Slovak <https://translate.odoo.com/projects/odoo-19/account/"
 "sk/>\n"
 "Language: sk\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: \n"
-"Plural-Forms: nplurals=4; plural=(n % 1 == 0 && n == 1 ? 0 : n % 1 == 0 && n "
-">= 2 && n <= 4 ? 1 : n % 1 != 0 ? 2: 3);\n"
-"X-Generator: Weblate 5.14.3\n"
+"Plural-Forms: nplurals=4; plural=(n % 1 == 0 && n == 1 ? 0 : n % 1 == 0 && "
+"n >= 2 && n <= 4 ? 1 : n % 1 != 0 ? 2: 3);\n"
+"X-Generator: Weblate 2026.6.1\n"
 
 #. module: account
 #: model:ir.model.fields,help:account.field_account_journal__type
@@ -79,6 +81,16 @@ msgstr ""
 "        napr. 180 / (1 - 10%) = 200 (nezahrnutá v cene)\n"
 "        napr. 200 * (1 - 10%) = 180 (zahrnutá v cene)\n"
 "        "
+
+#. module: account
+#. odoo-python
+#: code:addons/account/models/account_move_send.py:0
+msgid ""
+"\n"
+"Please contact your administrator."
+msgstr ""
+"\n"
+"Obráťte sa, prosím, na svojho správcu."
 
 #. module: account
 #. odoo-python
@@ -171,6 +183,18 @@ msgstr "%(exception)s pre %(user)s%(end_datetime_string)s%(reason)s."
 
 #. module: account
 #. odoo-python
+#: code:addons/account/models/account_move.py:0
+msgid "%(label)s at %(currency_amount)s"
+msgstr "%(label)s na %(currency_amount)s"
+
+#. module: account
+#. odoo-python
+#: code:addons/account/models/account_move.py:0
+msgid "%(label)s at %(currency_amount)s (Draft)"
+msgstr "%(label)s na %(currency_amount)s (Návrh)"
+
+#. module: account
+#. odoo-python
 #: code:addons/account/models/account_bank_statement_line.py:0
 msgid ""
 "%(move)s reached an invalid state regarding its related statement line.\n"
@@ -184,12 +208,6 @@ msgstr ""
 
 #. module: account
 #. odoo-python
-#: code:addons/account/models/account_move.py:0
-msgid "%(name)s - Draft at (%(currency_amount)s)"
-msgstr ""
-
-#. module: account
-#. odoo-python
 #: code:addons/account/models/account_move_line.py:0
 msgid "%(name)s installment #%(number)s"
 msgstr "%(name)s splátka #%(number)s"
@@ -198,7 +216,17 @@ msgstr "%(name)s splátka #%(number)s"
 #. odoo-python
 #: code:addons/account/models/account_move.py:0
 msgid "%(name)s%(ref)s at %(currency_amount)s"
+msgstr "%(name)s%(ref)s v hodnote %(currency_amount)s"
+
+#. module: account
+#. odoo-python
+#: code:addons/account/wizard/accrued_orders.py:0
+msgid ""
+"%(order)s - %(order_line)s; %(qty_invoiced)s invoiced, %(qty_delivered)s "
+"delivered at %(unit_price)s"
 msgstr ""
+"%(order)s - %(order_line)s; %(qty_invoiced)s fakturované, %(qty_delivered)s "
+"dodané za %(unit_price)s"
 
 #. module: account
 #. odoo-python
@@ -219,6 +247,12 @@ msgid ""
 msgstr ""
 "%(order)s - %(order_line)s; %(quantity_invoiced)s fakturované, %"
 "(quantity_delivered)s dodané v jednotkovej cene %(unit_price)s"
+
+#. module: account
+#. odoo-python
+#: code:addons/account/wizard/accrued_orders.py:0
+msgid "%(order)s - %(order_line)s; price difference for %(product)s"
+msgstr "%(order)s - %(order_line)s; cenový rozdiel pre %(product)s"
 
 #. module: account
 #. odoo-python
@@ -285,18 +319,6 @@ msgstr "%s dane"
 
 #. module: account
 #. odoo-python
-#: code:addons/account/models/company.py:0
-msgid "%s, or / if not applicable"
-msgstr "%s, alebo / ak nie je aplikovateľné"
-
-#. module: account
-#. odoo-python
-#: code:addons/account/models/partner.py:0
-msgid "%s, or not applicable"
-msgstr "%s, alebo nie je aplikovateľné"
-
-#. module: account
-#. odoo-python
 #: code:addons/account/models/account_document_import_mixin.py:0
 msgid "'%(filename)s' (extracted from '%(root_filename)s', type=%(type)s)"
 msgstr "'%(filename)s' (extrahované z '%(root_filename)s', type=%(type)s)"
@@ -306,18 +328,6 @@ msgstr "'%(filename)s' (extrahované z '%(root_filename)s', type=%(type)s)"
 #: code:addons/account/models/account_document_import_mixin.py:0
 msgid "'%(filename)s' (type=%(type)s)"
 msgstr "'%(filename)s' (typ=%(type)s)"
-
-#. module: account
-#. odoo-python
-#: code:addons/account/wizard/accrued_orders.py:0
-msgid "(*) Goods Delivered not Invoiced (perpetual valuation)"
-msgstr "(*) Tovar dodaný ale nefakturovaný (priebežné oceňovanie)"
-
-#. module: account
-#. odoo-python
-#: code:addons/account/wizard/accrued_orders.py:0
-msgid "(*) Goods Invoiced not Delivered (perpetual valuation)"
-msgstr "(*) Tovar fakturovaný, nedodaný (priebežné oceňovanie)"
 
 #. module: account
 #: model:ir.actions.server,name:account.action_move_block_payment
@@ -422,12 +432,6 @@ msgid "... (View all)"
 msgstr "... (Zobraziť všetko)"
 
 #. module: account
-#. odoo-python
-#: code:addons/account/models/company.py:0
-msgid "/ if not applicable"
-msgstr "/ ak nie je aplikovateľné"
-
-#. module: account
 #: model:account.tax,name:account.1_sale_export_tax_template
 msgid "0% Exports"
 msgstr "0% export"
@@ -438,24 +442,9 @@ msgid "0% Imports"
 msgstr "0% import"
 
 #. module: account
-#: model_terms:ir.ui.view,arch_db:account.report_invoice_document
-msgid "1.00"
-msgstr "1,00"
-
-#. module: account
-#: model_terms:ir.ui.view,arch_db:account.document_tax_totals_template
-msgid "1.05"
-msgstr "1,05"
-
-#. module: account
 #: model:account.payment.term,name:account.account_payment_term_30_days_end_month_the_10
 msgid "10 Days after End of Next Month"
 msgstr "10 dní po konci nasledujúceho mesiaca"
-
-#. module: account
-#: model_terms:ir.ui.view,arch_db:account.report_statement
-msgid "100.0"
-msgstr "100,0"
 
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.report_payment_receipt_document
@@ -463,103 +452,14 @@ msgid "100.00 USD"
 msgstr "100,00 USD"
 
 #. module: account
-#: model_terms:ir.ui.view,arch_db:account.report_statement
-msgid "1000.0"
-msgstr "1 000,0"
-
-#. module: account
-#: model_terms:ir.ui.view,arch_db:account.report_invoice_document
-msgid "11.05"
-msgstr "11,05"
-
-#. module: account
-#: model_terms:ir.ui.view,arch_db:account.report_statement
-msgid "12345"
-msgstr "12345"
-
-#. module: account
 #: model:account.payment.term,name:account.account_payment_term_15days
 msgid "15 Days"
 msgstr "15 dní"
 
 #. module: account
-#: model:account.tax,name:account.1_purchase_tax_template
-#: model:account.tax,name:account.1_sale_tax_template
-msgid "15%"
-msgstr "15 %"
-
-#. module: account
-#: model_terms:ir.ui.view,arch_db:account.report_statement
-msgid "1500.0"
-msgstr "1 500,0"
-
-#. module: account
-#: model:account.tax,invoice_label:account.2_account_tax_us_purchase_2_9
-#: model:account.tax,invoice_label:account.2_account_tax_us_sale_2_9
-#: model:account.tax,name:account.2_account_tax_us_purchase_2_9
-#: model:account.tax,name:account.2_account_tax_us_sale_2_9
-msgid "2.9%"
-msgstr "2,9 %"
-
-#. module: account
 #: model:account.payment.term,name:account.account_payment_term_30days_early_discount
 msgid "2/7 Net 30"
 msgstr "2/7 Net 30"
-
-#. module: account
-#: model_terms:ir.ui.view,arch_db:account.report_invoice_document
-msgid "20.00"
-msgstr "20,00"
-
-#. module: account
-#: model_terms:ir.ui.view,arch_db:account.report_invoice_document
-msgid "2021-09-19"
-msgstr "19. 9. 2021"
-
-#. module: account
-#: model_terms:ir.ui.view,arch_db:account.report_payment_receipt_document
-msgid "2023-01-01"
-msgstr "1. 1. 2023"
-
-#. module: account
-#: model_terms:ir.ui.view,arch_db:account.report_payment_receipt_document
-msgid "2023-01-05"
-msgstr "5. 1. 2023"
-
-#. module: account
-#: model_terms:ir.ui.view,arch_db:account.report_statement
-msgid "2023-08-11"
-msgstr "11. 8. 2023"
-
-#. module: account
-#: model_terms:ir.ui.view,arch_db:account.report_statement
-msgid "2023-08-15"
-msgstr "15. 8. 2023"
-
-#. module: account
-#: model_terms:ir.ui.view,arch_db:account.report_statement
-msgid "2023-08-31"
-msgstr "31. 8. 2023"
-
-#. module: account
-#: model_terms:ir.ui.view,arch_db:account.report_invoice_document
-msgid "2023-09-12"
-msgstr "12. 9. 2023"
-
-#. module: account
-#: model_terms:ir.ui.view,arch_db:account.report_invoice_document
-msgid "2023-09-25"
-msgstr "25. 9. 2023"
-
-#. module: account
-#: model_terms:ir.ui.view,arch_db:account.report_invoice_document
-msgid "2023-10-31"
-msgstr "31. 10. 2023"
-
-#. module: account
-#: model_terms:ir.ui.view,arch_db:account.report_invoice_document
-msgid "2024-01-01"
-msgstr "1. 1. 2024"
 
 #. module: account
 #: model:account.payment.term,name:account.account_payment_term_21days
@@ -577,18 +477,6 @@ msgid "25.00 USD"
 msgstr "25,00 USD"
 
 #. module: account
-#: model_terms:ir.ui.view,arch_db:account.document_tax_totals_company_currency_template
-#: model_terms:ir.ui.view,arch_db:account.document_tax_totals_template
-#: model_terms:ir.ui.view,arch_db:account.report_invoice_document
-msgid "27.00"
-msgstr "27,00"
-
-#. module: account
-#: model_terms:ir.ui.view,arch_db:account.report_invoice_document
-msgid "3.00"
-msgstr "3,00"
-
-#. module: account
 #: model:account.payment.term,name:account.account_payment_term_30days
 msgid "30 Days"
 msgstr "30 dní"
@@ -604,99 +492,9 @@ msgid "30% Now, Balance 60 Days"
 msgstr "30 % teraz, zostatok 60 dní"
 
 #. module: account
-#: model_terms:ir.ui.view,arch_db:account.report_invoice_document
-msgid "30.00"
-msgstr "30,00"
-
-#. module: account
-#: model_terms:ir.ui.view,arch_db:account.document_tax_totals_company_currency_template
-#: model_terms:ir.ui.view,arch_db:account.document_tax_totals_template
-#: model_terms:ir.ui.view,arch_db:account.report_invoice_document
-msgid "31.05"
-msgstr "31,05"
-
-#. module: account
-#: model_terms:ir.ui.view,arch_db:account.document_tax_totals_company_currency_template
-#: model_terms:ir.ui.view,arch_db:account.document_tax_totals_template
-msgid "4.05"
-msgstr "4,05"
-
-#. module: account
-#: model:account.tax,invoice_label:account.2_account_tax_us_purchase_4_2
-#: model:account.tax,invoice_label:account.2_account_tax_us_sale_4_2
-#: model:account.tax,name:account.2_account_tax_us_purchase_4_2
-#: model:account.tax,name:account.2_account_tax_us_sale_4_2
-msgid "4.2%"
-msgstr "4,2 %"
-
-#. module: account
-#: model:account.tax,invoice_label:account.2_account_tax_us_purchase_4_225
-#: model:account.tax,invoice_label:account.2_account_tax_us_sale_4_225
-#: model:account.tax,name:account.2_account_tax_us_purchase_4_225
-#: model:account.tax,name:account.2_account_tax_us_sale_4_225
-msgid "4.225%"
-msgstr "4,225 %"
-
-#. module: account
-#: model:account.tax,invoice_label:account.2_account_tax_us_purchase_4_5
-#: model:account.tax,invoice_label:account.2_account_tax_us_sale_4_5
-#: model:account.tax,name:account.2_account_tax_us_purchase_4_5
-#: model:account.tax,name:account.2_account_tax_us_sale_4_5
-msgid "4.5%"
-msgstr "4,5 %"
-
-#. module: account
-#: model:account.tax,invoice_label:account.2_account_tax_us_purchase_4_75
-#: model:account.tax,invoice_label:account.2_account_tax_us_sale_4_75
-#: model:account.tax,name:account.2_account_tax_us_purchase_4_75
-#: model:account.tax,name:account.2_account_tax_us_sale_4_75
-msgid "4.75%"
-msgstr "4,75 %"
-
-#. module: account
-#: model:account.tax,invoice_label:account.2_account_tax_us_purchase_4_875
-#: model:account.tax,invoice_label:account.2_account_tax_us_sale_4_875
-#: model:account.tax,name:account.2_account_tax_us_purchase_4_875
-#: model:account.tax,name:account.2_account_tax_us_sale_4_875
-msgid "4.875%"
-msgstr "4,875 %"
-
-#. module: account
 #: model:account.payment.term,name:account.account_payment_term_45days
 msgid "45 Days"
 msgstr "45 dní"
-
-#. module: account
-#: model:account.tax,invoice_label:account.2_account_tax_us_purchase_5_3
-#: model:account.tax,invoice_label:account.2_account_tax_us_sale_5_3
-#: model:account.tax,name:account.2_account_tax_us_purchase_5_3
-#: model:account.tax,name:account.2_account_tax_us_sale_5_3
-msgid "5.3%"
-msgstr "5,3 %"
-
-#. module: account
-#: model:account.tax,invoice_label:account.2_account_tax_us_purchase_5_5
-#: model:account.tax,invoice_label:account.2_account_tax_us_sale_5_5
-#: model:account.tax,name:account.2_account_tax_us_purchase_5_5
-#: model:account.tax,name:account.2_account_tax_us_sale_5_5
-msgid "5.5%"
-msgstr "5,5 %"
-
-#. module: account
-#: model:account.tax,invoice_label:account.2_account_tax_us_purchase_5_6
-#: model:account.tax,invoice_label:account.2_account_tax_us_sale_5_6
-#: model:account.tax,name:account.2_account_tax_us_purchase_5_6
-#: model:account.tax,name:account.2_account_tax_us_sale_5_6
-msgid "5.6%"
-msgstr "5,6 %"
-
-#. module: account
-#: model:account.tax,invoice_label:account.2_account_tax_us_purchase_5_75
-#: model:account.tax,invoice_label:account.2_account_tax_us_sale_5_75
-#: model:account.tax,name:account.2_account_tax_us_purchase_5_75
-#: model:account.tax,name:account.2_account_tax_us_sale_5_75
-msgid "5.75%"
-msgstr "5,75 %"
 
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.report_payment_receipt_document
@@ -707,80 +505,6 @@ msgstr "50 USD"
 #: model_terms:ir.ui.view,arch_db:account.report_payment_receipt_document
 msgid "50.00 EUR"
 msgstr "50,00 EUR"
-
-#. module: account
-#: model_terms:ir.ui.view,arch_db:account.report_statement
-msgid "534677881234"
-msgstr "534677881234"
-
-#. module: account
-#: model:account.tax,invoice_label:account.2_account_tax_us_purchase_6_1
-#: model:account.tax,invoice_label:account.2_account_tax_us_sale_6_1
-#: model:account.tax,name:account.2_account_tax_us_purchase_6_1
-#: model:account.tax,name:account.2_account_tax_us_sale_6_1
-msgid "6.1%"
-msgstr "6,1 %"
-
-#. module: account
-#: model:account.tax,invoice_label:account.2_account_tax_us_purchase_6_25
-#: model:account.tax,invoice_label:account.2_account_tax_us_sale_6_25
-#: model:account.tax,name:account.2_account_tax_us_purchase_6_25
-#: model:account.tax,name:account.2_account_tax_us_sale_6_25
-msgid "6.25%"
-msgstr "6,25 %"
-
-#. module: account
-#: model:account.tax,invoice_label:account.2_account_tax_us_purchase_6_35
-#: model:account.tax,invoice_label:account.2_account_tax_us_sale_6_35
-#: model:account.tax,name:account.2_account_tax_us_purchase_6_35
-#: model:account.tax,name:account.2_account_tax_us_sale_6_35
-msgid "6.35%"
-msgstr "6,35 %"
-
-#. module: account
-#: model:account.tax,invoice_label:account.2_account_tax_us_purchase_6_5
-#: model:account.tax,invoice_label:account.2_account_tax_us_sale_6_5
-#: model:account.tax,name:account.2_account_tax_us_purchase_6_5
-#: model:account.tax,name:account.2_account_tax_us_sale_6_5
-msgid "6.5%"
-msgstr "6,5 %"
-
-#. module: account
-#: model:account.tax,invoice_label:account.2_account_tax_us_purchase_6_625
-#: model:account.tax,invoice_label:account.2_account_tax_us_sale_6_625
-#: model:account.tax,name:account.2_account_tax_us_purchase_6_625
-#: model:account.tax,name:account.2_account_tax_us_sale_6_625
-msgid "6.625%"
-msgstr "6,625 %"
-
-#. module: account
-#: model:account.tax,invoice_label:account.2_account_tax_us_purchase_6_85
-#: model:account.tax,invoice_label:account.2_account_tax_us_sale_6_85
-#: model:account.tax,name:account.2_account_tax_us_purchase_6_85
-#: model:account.tax,name:account.2_account_tax_us_sale_6_85
-msgid "6.85%"
-msgstr "6,85 %"
-
-#. module: account
-#: model:account.tax,invoice_label:account.2_account_tax_us_purchase_6_875
-#: model:account.tax,invoice_label:account.2_account_tax_us_sale_6_875
-#: model:account.tax,name:account.2_account_tax_us_purchase_6_875
-#: model:account.tax,name:account.2_account_tax_us_sale_6_875
-msgid "6.875%"
-msgstr "6,875 %"
-
-#. module: account
-#: model:account.tax,invoice_label:account.2_account_tax_us_purchase_7_25
-#: model:account.tax,invoice_label:account.2_account_tax_us_sale_7_25
-#: model:account.tax,name:account.2_account_tax_us_purchase_7_25
-#: model:account.tax,name:account.2_account_tax_us_sale_7_25
-msgid "7.25%"
-msgstr "7,25 %"
-
-#. module: account
-#: model_terms:ir.ui.view,arch_db:account.report_invoice_document
-msgid "9.00"
-msgstr "9,00"
 
 #. module: account
 #: model:account.payment.term,name:account.account_payment_term_90days_on_the_10th
@@ -796,17 +520,6 @@ msgid ""
 msgstr ""
 "<b>%(count)s#</b> Splátka<b>%(amount)s</b> splatná k <b style='color: "
 "#704A66;'>%(date)s</b>"
-
-#. module: account
-#: model_terms:ir.ui.view,arch_db:account.view_partner_property_form
-msgid ""
-"<br/>\n"
-"                        <span>Please make sure that this is a wanted "
-"behavior.</span>"
-msgstr ""
-"<br/>\n"
-"                        <span>Prosím uistite sa, že ide o požadované "
-"správanie..</span>"
 
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.report_invoice_document
@@ -863,7 +576,7 @@ msgid ""
 msgstr ""
 "<div style=\"margin: 0px; padding: 0px;\">\n"
 "            <p style=\"margin: 0px; padding: 0px; font-size: 13px;\">\n"
-"                Vážený(á)\n"
+"                Vážený klient\n"
 "                <t t-if=\"object.partner_id.parent_id\">\n"
 "                    <t t-out=\"object.partner_id.name or ''\">Brandon "
 "Freeman</t> (<t t-out=\"object.partner_id.parent_id.name or ''\">Azure "
@@ -883,14 +596,14 @@ msgstr ""
 "                    self-billing dobropis\n"
 "                </t>\n"
 "                <t t-if=\"object.invoice_origin\">\n"
-"                    (s referenciou: <t t-out=\"object.invoice_origin or "
-"''\">SUB003</t>)\n"
+"                    (s referenciou: <t t-out=\"object.invoice_origin or ''\">"
+"SUB003</t>)\n"
 "                </t>\n"
 "                na čiastku <span style=\"font-weight:bold;\" t-"
 "out=\"format_amount(object.amount_total, object.currency_id) or ''\">$ 143 "
 "750,00</span>\n"
-"                od <t t-out=\"object.company_id.name or ''\">YourCompany</"
-"t>.\n"
+"                od <t t-out=\"object.company_id.name or ''\">YourCompany</t>"
+".\n"
 "                <br/><br/>\n"
 "                V prípade akýchkoľvek otázok nás neváhajte kontaktovať..\n"
 "                <t t-if=\"not is_html_empty(object.invoice_user_id.signature)"
@@ -978,7 +691,7 @@ msgid ""
 msgstr ""
 "<div style=\"margin: 0px; padding: 0px;\">\n"
 "    <p style=\"margin: 0px; padding: 0px; font-size: 13px;\">\n"
-"        Vážený zákazník\n"
+"        Vážený klient\n"
 "        <t t-if=\"object.partner_id.parent_id\">\n"
 "            <t t-if=\"object.partner_id.name\">\n"
 "                <t t-out=\"object.partner_id.name\">Brandon Freeman</t> (<t "
@@ -1002,12 +715,11 @@ msgstr ""
 "            faktúru \n"
 "        </t>\n"
 "        <t t-if=\"object.invoice_origin\">\n"
-"            (vaša referencia: <t t-out=\"object.invoice_origin or "
-"''\">SUB003</t>)\n"
+"            (vaša referencia: <t t-out=\"object.invoice_origin or ''\">"
+"SUB003</t>)\n"
 "        </t>\n"
-"        na čiastku <span style=\"font-weight:bold;\" t-"
-"out=\"format_amount(object.amount_total, object.currency_id) or ''\">$ 143 "
-"750,00</span>\n"
+"        na čiastku <span style=\"font-weight:bold;\" t-out=\"format_amount"
+"(object.amount_total, object.currency_id) or ''\">$ 143 750,00</span>\n"
 "        od <t t-out=\"object.company_id.name or ''\">YourCompany</t>.\n"
 "        <t t-if=\"object.payment_state in ('paid', 'in_payment')\">\n"
 "            Faktúra je už uhradená.\n"
@@ -1017,8 +729,8 @@ msgstr ""
 "            <t t-if=\"object.payment_reference\">\n"
 "                <br/><br/>\n"
 "                Pri platbe použite nasledujúce údaje (variabilný symbol/"
-"referencia): <strong t-out=\"object.payment_reference or ''\">INV/"
-"2021/05/0005</strong>\n"
+"referencia): <strong t-out=\"object.payment_reference or ''\">INV/2021/05/"
+"0005</strong>\n"
 "                <t t-if=\"object.partner_bank_id\">\n"
 "                    na účet <strong t-"
 "out=\"object.partner_bank_id.acc_number\"/>\n"
@@ -1038,8 +750,8 @@ msgstr ""
 "o-mail-quote-container=\"1\">\n"
 "            <br/><br/>\n"
 "            <div data-o-mail-quote=\"1\">--<br data-o-mail-quote=\"1\"/><t t-"
-"out=\"object.invoice_user_id.signature or ''\" data-o-mail-"
-"quote=\"1\">Mitchell Admin</t></div>\n"
+"out=\"object.invoice_user_id.signature or ''\" data-o-mail-quote=\"1\">"
+"Mitchell Admin</t></div>\n"
 "        </t>\n"
 "    </p>\n"
 "</div>\n"
@@ -1106,7 +818,7 @@ msgid ""
 msgstr ""
 "<div style=\"margin: 0px; padding: 0px;\">\n"
 "    <p style=\"margin: 0px; padding: 0px; font-size: 13px;\">\n"
-"        Vážený zákazník\n"
+"        Vážený klient\n"
 "        <t t-if=\"object.partner_id.parent_id\">\n"
 "            <t t-if=\"object.partner_id.name\">\n"
 "                <t t-out=\"object.partner_id.name\">Brandon Freeman</t> (<t "
@@ -1130,12 +842,11 @@ msgstr ""
 "            self-billing faktúru\n"
 "        </t>\n"
 "        <t t-if=\"object.invoice_origin\">\n"
-"            (referencia: <t t-out=\"object.invoice_origin or ''\">SUB003</"
-"t>)\n"
+"            (referencia: <t t-out=\"object.invoice_origin or ''\">SUB003</t>)"
+"\n"
 "        </t>\n"
-"        na čiastku <span style=\"font-weight:bold;\" t-"
-"out=\"format_amount(object.amount_total, object.currency_id) or ''\">$ 143 "
-"750,00</span>\n"
+"        na čiastku <span style=\"font-weight:bold;\" t-out=\"format_amount"
+"(object.amount_total, object.currency_id) or ''\">$ 143 750,00</span>\n"
 "        od <t t-out=\"object.company_id.name or ''\">YourCompany</t>.\n"
 "        <t t-if=\"object.payment_state in ('paid', 'in_payment')\">\n"
 "            Táto self-billing faktúra už bola zaplatená.\n"
@@ -1152,8 +863,8 @@ msgstr ""
 "o-mail-quote-container=\"1\">\n"
 "            <br/><br/>\n"
 "            <div data-o-mail-quote=\"1\">--<br data-o-mail-quote=\"1\"/><t t-"
-"out=\"object.invoice_user_id.signature or ''\" data-o-mail-"
-"quote=\"1\">Mitchell Admin</t></div>\n"
+"out=\"object.invoice_user_id.signature or ''\" data-o-mail-quote=\"1\">"
+"Mitchell Admin</t></div>\n"
 "        </t>\n"
 "    </p>\n"
 "</div>\n"
@@ -1204,7 +915,7 @@ msgid ""
 msgstr ""
 "<div style=\"margin: 0px; padding: 0px;\">\n"
 "    <p style=\"margin: 0px; padding: 0px; font-size: 13px;\">\n"
-"        Dear\n"
+"        Vážený klient\n"
 "        <t t-if=\"object.partner_id.parent_id\">\n"
 "            <t t-out=\"object.partner_id.name or ''\">Brandon Freeman</t> "
 "(<t t-out=\"object.partner_id.parent_id.name or ''\">Azure Interior</t>),\n"
@@ -1222,12 +933,11 @@ msgstr ""
 "            dobropis\n"
 "        </t>\n"
 "        <t t-if=\"object.invoice_origin\">\n"
-"            (vaše reference: <t t-out=\"object.invoice_origin or "
-"''\">SUB003</t>)\n"
+"            (vaše reference: <t t-out=\"object.invoice_origin or ''\">"
+"SUB003</t>)\n"
 "        </t>\n"
-"        na čiastku<span style=\"font-weight:bold;\" t-"
-"out=\"format_amount(object.amount_total, object.currency_id) or ''\">$ 143 "
-"750,00</span>\n"
+"        na čiastku<span style=\"font-weight:bold;\" t-out=\"format_amount"
+"(object.amount_total, object.currency_id) or ''\">$ 143 750,00</span>\n"
 "        from <t t-out=\"object.company_id.name or ''\">YourCompany</t>.\n"
 "        <br/><br/>\n"
 "        V prípade akýchkoľvek otázok nás neváhajte kontaktovať.\n"
@@ -1235,8 +945,8 @@ msgstr ""
 "o-mail-quote-container=\"1\">\n"
 "            <br/><br/>\n"
 "            <div data-o-mail-quote=\"1\">--<br data-o-mail-quote=\"1\"/><t t-"
-"out=\"object.invoice_user_id.signature or ''\" data-o-mail-"
-"quote=\"1\">Mitchell Admin</t></div>\n"
+"out=\"object.invoice_user_id.signature or ''\" data-o-mail-quote=\"1\">"
+"Mitchell Admin</t></div>\n"
 "        </t>\n"
 "    </p>\n"
 "</div>\n"
@@ -1272,15 +982,15 @@ msgid ""
 msgstr ""
 "<div style=\"margin: 0px; padding: 0px;\">\n"
 "    <p style=\"margin: 0px; padding: 0px; font-size: 13px;\">\n"
-"        Vážený(á)<t t-out=\"object.partner_id.name or ''\">Azure Interior</"
-"t><br/><br/>\n"
+"        Vážený klient<t t-out=\"object.partner_id.name or ''\">Azure "
+"Interior</t><br/><br/>\n"
 "        Ďakujeme za vašu platbu.\n"
 "        V prílohe posielame potvrdení o prijatej platbe <span style=\"font-"
-"weight:bold;\" t-out=\"(object.name or '').replace('/','-') or "
-"''\">BNK1-2021-05-0002</span> na čiastku\n"
-"         <span style=\"font-weight:bold;\" t-"
-"out=\"format_amount(object.amount, object.currency_id) or ''\">$ 10,00</"
-"span> from <t t-out=\"object.company_id.name or ''\">YourCompany</t>.\n"
+"weight:bold;\" t-out=\"(object.name or '').replace('/','-') or ''\">BNK1-"
+"2021-05-0002</span> na čiastku\n"
+"         <span style=\"font-weight:bold;\" t-out=\"format_amount"
+"(object.amount, object.currency_id) or ''\">$ 10,00</span> from <t t-"
+"out=\"object.company_id.name or ''\">YourCompany</t>.\n"
 "        <br/><br/>\n"
 "        V prípade akýchkoľvek otázok nás neváhajte kontaktovať.\n"
 "        <br/><br/>\n"
@@ -1289,8 +999,8 @@ msgstr ""
 "container=\"1\">\n"
 "            <br/><br/>\n"
 "            <div data-o-mail-quote=\"1\">--<br data-o-mail-quote=\"1\"/><t t-"
-"out=\"user.signature or ''\" data-o-mail-quote=\"1\">Mitchell Admin</t></"
-"div>\n"
+"out=\"user.signature or ''\" data-o-mail-quote=\"1\">Mitchell Admin</t></div>"
+"\n"
 "        </t>\n"
 "    </p>\n"
 "</div>\n"
@@ -1388,6 +1098,11 @@ msgid ""
 "                            <span class=\"text-danger\" "
 "invisible=\"duplicated_ref_ids.length &gt; 1\">Delete duplicate</span>"
 msgstr ""
+"<i class=\"fa fa-trash text-danger\"/>\n"
+"                            <span class=\"text-danger\" "
+"invisible=\"duplicated_ref_ids.length == 1\">Zmazať všetky duplicity</span>\n"
+"                            <span class=\"text-danger\" "
+"invisible=\"duplicated_ref_ids.length &gt; 1\">Zmazať duplikát</span>"
 
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.account_terms_conditions_setting_banner
@@ -1493,8 +1208,8 @@ msgid ""
 "<span class=\"o_form_label oe_inline\" invisible=\"amount_type == "
 "'fixed'\">%</span>"
 msgstr ""
-"<span class=\"o_form_label oe_inline\" invisible=\"amount_type == "
-"'fixed'\">%</span>"
+"<span class=\"o_form_label oe_inline\" invisible=\"amount_type == 'fixed'\">"
+"%</span>"
 
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.view_account_reconcile_model_form
@@ -1758,14 +1473,8 @@ msgstr "<span>$ <span class=\"oe_currency_value\">19 250,00</span></span>"
 
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.report_invoice_document
-msgid ""
-"<span>1.00</span>\n"
-"                                                        <span "
-"groups=\"uom.group_uom\">Units</span>"
-msgstr ""
-"<span>1,00</span>\n"
-"                                                        <span "
-"groups=\"uom.group_uom\">Jednotky</span>"
+msgid "<span>1.00</span>"
+msgstr "<span>1,00</span>"
 
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.view_move_form
@@ -2169,8 +1878,8 @@ msgstr ""
 "<div style=\"margin: 0px; padding: 0px; font-family:Verdana, Arial,sans-"
 "serif; color: #454748;\">\n"
 "    <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" style=\"padding-"
-"top: 16px; background-color: #F1F1F1; width: 100%; border-collapse:separate;"
-"\">\n"
+"top: 16px; background-color: #F1F1F1; width: 100%; border-"
+"collapse:separate;\">\n"
 "        <tr>\n"
 "            <td align=\"center\">\n"
 "                <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" "
@@ -2185,14 +1894,14 @@ msgstr ""
 "                                    <td align=\"left\" style=\"padding-left: "
 "16px;\">\n"
 "                                        Práve ste obdržali <t t-"
-"if=\"invoice_count &gt; 1\">nové elektronické faktúry!</t><t t-"
-"else=\"\">novú elektronickú faktúru!</t>\n"
+"if=\"invoice_count &gt; 1\">nové elektronické faktúry!</t><t t-else=\"\">"
+"novú elektronickú faktúru!</t>\n"
 "                                    </td>\n"
 "                                    <td align=\"right\" style=\"padding-"
 "right: 16px;\">\n"
 "                                        <img alt=\"Odoo\" src=\"/web/static/"
-"img/logo_inverse_white_206px.png\" style=\"height: 2em; object-fit: contain;"
-"\" class=\"align-baseline w-auto\"/>\n"
+"img/logo_inverse_white_206px.png\" style=\"height: 2em; object-fit: "
+"contain;\" class=\"align-baseline w-auto\"/>\n"
 "                                    </td>\n"
 "                                </tr>\n"
 "                            </table>\n"
@@ -2242,11 +1951,11 @@ msgstr ""
 "                                                    <span style=\"font-"
 "weight:bold;\">Vendor:</span> <t t-out=\"inv.partner_id.name\"/><br/>\n"
 "                                                </t>\n"
-"                                                <t t-"
-"if=\"inv.amount_total\">\n"
+"                                                <t t-if=\"inv.amount_total\">"
+"\n"
 "                                                    <span style=\"font-"
-"weight:bold;\">Amount:</span> <t t-out=\"inv.amount_total\" t-"
-"options=\"{'widget': 'monetary', 'display_currency': inv.currency_id or "
+"weight:bold;\">Amount:</span> <t t-out=\"inv.amount_total\" t-options=\""
+"{'widget': 'monetary', 'display_currency': inv.currency_id or "
 "object.company_id.currency_id}\"/><br/>\n"
 "                                                </t>\n"
 "                                                <t t-"
@@ -2261,11 +1970,11 @@ msgstr ""
 "padding-top: 24px;\">\n"
 "                                            <a t-if=\"invoice_count != 1\" t-"
 "attf-href=\"/odoo/accounting/action-"
-"account.action_account_moves_email_preview?"
-"active_ids={{ invoice_preview_ids }}\" target=\"_blank\" t-attf-"
-"style=\"padding: 12px 24px; font-size: 14px; font-weight: bold; color: "
-"#FFFFFF; text-decoration: none !important; background-color: #008384; border-"
-"radius:3px; display: inline-block;\">\n"
+"account.action_account_moves_email_preview?active_ids={{ "
+"invoice_preview_ids }}\" target=\"_blank\" t-attf-style=\"padding: 12px "
+"24px; font-size: 14px; font-weight: bold; color: #FFFFFF; text-decoration: "
+"none !important; background-color: #008384; border-radius:3px; display: "
+"inline-block;\">\n"
 "                                               Konzultovať faktúry\n"
 "                                            </a>\n"
 "                                            <a t-else=\"\" t-attf-href=\"/"
@@ -2531,8 +2240,8 @@ msgid ""
 "            "
 msgstr ""
 "<t t-set=\"portal_url\" t-value=\"object.get_portal_url()\"/>\n"
-"<t t-set=\"unsubscribe_url\" t-value=\"ctx.get('unsubscribe_url', False)\"/"
-">\n"
+"<t t-set=\"unsubscribe_url\" t-value=\"ctx.get('unsubscribe_url', False)\"/>"
+"\n"
 "\n"
 "<div style=\"margin:0; padding:0; color:#2c2431;\">\n"
 "    <table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" "
@@ -2544,17 +2253,16 @@ msgstr ""
 "border-radius:16px; overflow:hidden; box-shadow:0 20px 45px rgba(56, 37, 60, "
 "0.12);\">\n"
 "                    <tr>\n"
-"                        <td colspan=\"2\" style=\"background:linear-"
-"gradient(140deg,#714B67 0%,#8a6381 55%,#bfa8c2 100%); color:#ffffff; "
-"padding:38px;\">\n"
+"                        <td colspan=\"2\" style=\"background:linear-gradient"
+"(140deg,#714B67 0%,#8a6381 55%,#bfa8c2 100%); color:#ffffff; padding:38px;\">"
+"\n"
 "                            <table cellpadding=\"0\" cellspacing=\"0\" "
 "border=\"0\" style=\"width:100%;\">\n"
 "                                <tr>\n"
 "                                    <td style=\"font-size:13px; letter-"
 "spacing:0.3px; text-transform:uppercase; opacity:0.78;\">\n"
-"                                        <t t-"
-"if=\"object.is_sale_document(include_receipts=True)\">Odchádzajúca faktúra</"
-"t>\n"
+"                                        <t t-if=\"object.is_sale_document"
+"(include_receipts=True)\">Odchádzajúca faktúra</t>\n"
 "                                        <t t-else=\"\">Prijatá faktúra</t>\n"
 "                                    </td>\n"
 "                                    <td align=\"right\">\n"
@@ -2565,8 +2273,8 @@ msgstr ""
 "                                </tr>\n"
 "                                <tr>\n"
 "                                    <td colspan=\"2\" style=\"padding-"
-"top:22px; font-size:26px; line-height:1.45; font-weight:600; color:#ffffff;"
-"\">\n"
+"top:22px; font-size:26px; line-height:1.45; font-weight:600; "
+"color:#ffffff;\">\n"
 "                                        Nová faktúra v <t t-"
 "out=\"object.journal_id.display_name\"/>\n"
 "                                    </td>\n"
@@ -2596,8 +2304,8 @@ msgstr ""
 "                                                <td style=\"padding:24px "
 "26px;\">\n"
 "                                                    <div style=\"font-"
-"size:12px; color:#8d7a92; text-transform:uppercase; letter-spacing:0.45px;"
-"\">Document</div>\n"
+"size:12px; color:#8d7a92; text-transform:uppercase; letter-spacing:0.45px;\">"
+"Document</div>\n"
 "                                                    <div style=\"margin-"
 "top:8px; font-size:20px; font-weight:600; color:#2c2431; word-break:break-"
 "word;\">\n"
@@ -2614,8 +2322,8 @@ msgstr ""
 "                                                    <td style=\"padding:24px "
 "26px; border-left:1px solid #efe6f3;\" align=\"right\">\n"
 "                                                        <div style=\"font-"
-"size:12px; color:#8d7a92; text-transform:uppercase; letter-spacing:0.45px;"
-"\">Celkom</div>\n"
+"size:12px; color:#8d7a92; text-transform:uppercase; letter-spacing:0.45px;\">"
+"Celkom</div>\n"
 "                                                        <div style=\"margin-"
 "top:8px; font-size:22px; font-weight:600; color:#2c2431;\">\n"
 "                                                            <t t-"
@@ -2634,8 +2342,8 @@ msgstr ""
 "                                            <tr>\n"
 "                                                <td style=\"padding:0;\">\n"
 "                                                    <div "
-"style=\"display:flex; flex-wrap:wrap; gap:12px; justify-content:flex-start;"
-"\">\n"
+"style=\"display:flex; flex-wrap:wrap; gap:12px; justify-content:flex-"
+"start;\">\n"
 "                                                        <t t-"
 "if=\"object.partner_id\">\n"
 "                                                            <div "
@@ -2725,14 +2433,13 @@ msgstr ""
 "súbory:</strong> pre vaše pohodlie sú priložené originálne dokumenty.\n"
 "                            </div>\n"
 "\n"
-"                            <div style=\"margin-top:32px; text-align:center;"
-"\" t-if=\"object.move_type != 'in_invoice'\">\n"
-"                                <a t-if=\"portal_url\" t-attf-"
-"href=\"{{ portal_url }}\" style=\"display:inline-block; margin:0 10px 14px; "
-"padding:13px 30px; min-width:210px; background:linear-"
-"gradient(135deg,#714B67 0%,#9b77a3 100%); color:#FFFFFF; text-"
-"decoration:none; border-radius:12px; font-weight:600; font-size:14px;\" "
-"target=\"_blank\">\n"
+"                            <div style=\"margin-top:32px; text-"
+"align:center;\" t-if=\"object.move_type != 'in_invoice'\">\n"
+"                                <a t-if=\"portal_url\" t-attf-href=\"{{ "
+"portal_url }}\" style=\"display:inline-block; margin:0 10px 14px; "
+"padding:13px 30px; min-width:210px; background:linear-gradient"
+"(135deg,#714B67 0%,#9b77a3 100%); color:#FFFFFF; text-decoration:none; "
+"border-radius:12px; font-weight:600; font-size:14px;\" target=\"_blank\">\n"
 "                                    Zobraziť na portáli\n"
 "                                </a>\n"
 "                            </div>\n"
@@ -2932,8 +2639,7 @@ msgstr "Výpis by mal obsahovať riadky len z toho istého denníka."
 #: model:ir.model.constraint,message:account.constraint_account_account_tag_name_uniq
 msgid ""
 "A tag with the same name and applicability already exists in this country."
-msgstr ""
-"Značka s rovnakým názvom a použiteľnosťou pre tuto krajinu už existuje."
+msgstr "Štítok s rovnakým názvom a použiteľnosťou pre tuto krajinu už existuje."
 
 #. module: account
 #. odoo-python
@@ -3245,13 +2951,13 @@ msgstr "Štatistiky účtu"
 #. module: account
 #: model:ir.model,name:account.model_account_account_tag
 msgid "Account Tag"
-msgstr "Tag účtu"
+msgstr "Štítok účtu"
 
 #. module: account
 #: model:ir.model.fields,field_description:account.field_product_product__account_tag_ids
 #: model:ir.model.fields,field_description:account.field_product_template__account_tag_ids
 msgid "Account Tags"
-msgstr "Tagy účtu"
+msgstr "Štítky účtov"
 
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.account_tax_view_tree
@@ -3576,7 +3282,7 @@ msgstr ""
 #. odoo-python
 #: code:addons/account/wizard/accrued_orders.py:0
 msgid "Accrued %(entry_type)s entry as of %(date)s"
-msgstr "Dohadná položka %(entry_type)s od %(date)s"
+msgstr "Dohadná položka %(entry_type)s k %(date)s"
 
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.account_automatic_entry_wizard_form
@@ -3598,6 +3304,12 @@ msgstr "Dohadné položky celkom"
 #: model:account.account,name:account.2_account_account_us_acc_depreciation
 msgid "Accumulated Depreciation"
 msgstr "Akumulované odpisy"
+
+#. module: account
+#: model:account.account,name:account.1_retained_earnings
+#: model:account.account,name:account.2_account_account_us_retained_earnings
+msgid "Accumulated Retained Earnings"
+msgstr "Akumulované nerozdelené zisky"
 
 #. module: account
 #: model:ir.model.fields,field_description:account.field_account_automatic_entry_wizard__action
@@ -3632,7 +3344,7 @@ msgstr "Aktivovať automatické účtovanie"
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.res_config_settings_view_form
 msgid "Activate to create sale receipt"
-msgstr "Aktiváciou vytvoríte potvrdenie o predaji"
+msgstr "Aktiváciou vytvoríte predajné účtenky"
 
 #. module: account
 #: model:ir.model.fields,field_description:account.field_account_account__active
@@ -4520,6 +4232,11 @@ msgstr ""
 "kritériá zhody (DPH/krajina)."
 
 #. module: account
+#: model:account.account,description:account.2_account_account_us_profit_or_loss_appropriation
+msgid "Appropriation of the profit or loss"
+msgstr "Pridelenie zisku alebo straty"
+
+#. module: account
 #: model:ir.model.fields.selection,name:account.selection__res_company__fiscalyear_last_month__4
 msgid "April"
 msgstr "Apríl"
@@ -4881,8 +4598,8 @@ msgstr "Percento zostatku nemôže byť 0"
 #. odoo-python
 #: code:addons/account/models/account_journal.py:0
 #: code:addons/account/models/chart_template.py:0
-#: model:account.account,name:account.1_bank_journal_default_account_45
-#: model:account.account,name:account.2_bank_journal_default_account_150
+#: model:account.account,name:account.1_bank_journal_default_account_47
+#: model:account.account,name:account.2_bank_journal_default_account_153
 #: model:account.journal,name:account.1_bank
 #: model:account.journal,name:account.2_bank
 #: model:ir.model.fields,field_description:account.field_account_journal__bank_id
@@ -5092,6 +4809,12 @@ msgid "Bank of odoo"
 msgstr "Odoo banka"
 
 #. module: account
+#. odoo-python
+#: code:addons/account/models/account_move.py:0
+msgid "Bank settings"
+msgstr "Nastavenia banky"
+
+#. module: account
 #: model:ir.model,name:account.model_account_setup_bank_manual_config
 msgid "Bank setup manual config"
 msgstr "Manuálna konfigurácia nastavenia banky"
@@ -5182,7 +4905,7 @@ msgstr "Na základe platby"
 #. module: account
 #: model:res.groups,name:account.group_account_basic
 msgid "Basic"
-msgstr "modul: účtovnictvo"
+msgstr "Fakturácia a banky"
 
 #. module: account
 #: model:ir.model.fields,field_description:account.field_res_company__batch_payment_sequence_id
@@ -5431,6 +5154,12 @@ msgstr ""
 
 #. module: account
 #. odoo-python
+#: code:addons/account/wizard/account_automatic_entry_wizard.py:0
+msgid "C"
+msgstr "C"
+
+#. module: account
+#. odoo-python
 #: code:addons/account/models/chart_template.py:0
 msgid "CABA"
 msgstr "CABA"
@@ -5504,7 +5233,7 @@ msgstr ""
 #: model_terms:ir.ui.view,arch_db:account.view_account_payment_form
 #: model_terms:ir.ui.view,arch_db:account.view_move_form
 msgid "Cancel"
-msgstr "Zrušené"
+msgstr "Zrušiť"
 
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.view_move_form
@@ -5639,7 +5368,7 @@ msgstr "Preniesť do"
 #. module: account
 #. odoo-python
 #: code:addons/account/models/account_journal.py:0
-#: model:account.account,name:account.1_cash_journal_default_account_161
+#: model:account.account,name:account.1_cash_journal_default_account_163
 #: model:ir.model.fields.selection,name:account.selection__account_journal__type__cash
 #: model_terms:ir.ui.view,arch_db:account.view_account_move_filter
 #: model_terms:ir.ui.view,arch_db:account.view_account_move_line_filter
@@ -5652,12 +5381,12 @@ msgid "Cash Account"
 msgstr "Peňažný účet"
 
 #. module: account
-#: model:account.account,name:account.1_cash_journal_default_account_158
+#: model:account.account,name:account.1_cash_journal_default_account_160
 msgid "Cash Bakery"
 msgstr "Hotovosť - pekáreň"
 
 #. module: account
-#: model:account.account,name:account.1_cash_journal_default_account_160
+#: model:account.account,name:account.1_cash_journal_default_account_162
 msgid "Cash Bar"
 msgstr "Hotovosť - bar"
 
@@ -5699,7 +5428,7 @@ msgid "Cash Basis Transition Account"
 msgstr "Prechodný účet hotovostného princípu"
 
 #. module: account
-#: model:account.account,name:account.1_cash_journal_default_account_157
+#: model:account.account,name:account.1_cash_journal_default_account_159
 msgid "Cash Clothes Shop"
 msgstr "Hotovosť - obchod s oblečením"
 
@@ -5761,7 +5490,7 @@ msgid "Cash Discount Write-Off Loss Account"
 msgstr "Účet straty z odpísania hotovostnej zľavy"
 
 #. module: account
-#: model:account.account,name:account.1_cash_journal_default_account_156
+#: model:account.account,name:account.1_cash_journal_default_account_158
 msgid "Cash Furn. Shop"
 msgstr "Hotovosť - obchod s nábytkom"
 
@@ -5772,7 +5501,7 @@ msgid "Cash Registers"
 msgstr "Registračné pokladne"
 
 #. module: account
-#: model:account.account,name:account.1_cash_journal_default_account_159
+#: model:account.account,name:account.1_cash_journal_default_account_161
 msgid "Cash Restaurant"
 msgstr "Hotovosť - reštaurácia"
 
@@ -5896,6 +5625,8 @@ msgid "Chart of accounts set!"
 msgstr "Účtovná osnova nastavená!"
 
 #. module: account
+#. odoo-python
+#: code:addons/account/models/account_move_send.py:0
 #: model_terms:ir.ui.view,arch_db:account.report_hash_integrity
 msgid "Check"
 msgstr "Kontrola"
@@ -6049,7 +5780,7 @@ msgstr "Štart prefixu kódu"
 #. module: account
 #: model:ir.model.fields,field_description:account.field_account_account__code_store
 msgid "Code Store"
-msgstr ""
+msgstr "Obchod s kódom"
 
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.res_config_settings_view_form
@@ -6447,6 +6178,11 @@ msgid "Cost of office furniture, fixtures, and business equipment"
 msgstr "Náklady na kancelársky nábytok, zariadenie a obchodné vybavenie"
 
 #. module: account
+#: model_terms:ir.ui.view,arch_db:account.view_account_search
+msgid "Cost of revenue"
+msgstr "Náklady tržieb"
+
+#. module: account
 #: model:account.account,description:account.2_account_account_us_postage
 msgid ""
 "Costs for shipping products or materials to customers or receiving inventory."
@@ -6489,6 +6225,16 @@ msgstr "Pre výraz %s nebolo možné automaticky určiť cieľ prenesenia."
 #: code:addons/account/static/src/components/upload_drop_zone/upload_drop_zone.js:0
 msgid "Could not upload files"
 msgstr "Nepodarilo sa nahrať súbory"
+
+#. module: account
+#: model:ir.model.fields,field_description:account.field_account_move_line__count_reconciled_lines
+msgid "Count Reconciled Lines"
+msgstr ""
+
+#. module: account
+#: model:ir.model.fields,field_description:account.field_account_move_line__count_reconciled_lines_excluding_exchange_diff
+msgid "Count Reconciled Lines Excluding Exchange Diff"
+msgstr ""
 
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.view_account_reconcile_model_form
@@ -6549,7 +6295,7 @@ msgstr "Názov krajiny"
 #: model:ir.model.fields,help:account.field_account_account_tag__country_id
 msgid "Country for which this tag is available, when applied on taxes."
 msgstr ""
-"Krajina, pre ktorú je tento tag k dispozícii, keď je použitá pri daniach."
+"Krajina, pre ktorú je tento štítok k dispozícii, keď je použitá na dane."
 
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.setup_bank_account_wizard
@@ -6994,6 +6740,11 @@ msgstr ""
 "Kumulovaný zostatok v závislosti od domény a poradia zvoleného v zobrazení."
 
 #. module: account
+#: model:account.account,description:account.2_account_account_us_retained_earnings
+msgid "Cumulative undistributed profits and losses"
+msgstr "Kumulované nerozdelené zisky a straty"
+
+#. module: account
 #: model:ir.ui.menu,name:account.menu_action_currency_form
 #: model_terms:ir.ui.view,arch_db:account.res_config_settings_view_form
 msgid "Currencies"
@@ -7272,6 +7023,12 @@ msgid "Cut-off {label} {percent}%"
 msgstr "Rozdeliť {label} {percent}%"
 
 #. module: account
+#. odoo-python
+#: code:addons/account/wizard/account_automatic_entry_wizard.py:0
+msgid "D"
+msgstr "D"
+
+#. module: account
 #: model:account.incoterms,name:account.incoterm_DAP
 msgid "DELIVERED AT PLACE"
 msgstr "S DODANÍM NA MIESTO"
@@ -7514,8 +7271,7 @@ msgstr "Predvolené Incoterm"
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.res_config_settings_view_form
 msgid "Default Incoterm of your company"
-msgstr ""
-"Predvolený Incoterm (medzinárodné obchodné podmienky) vašej spoločnosti"
+msgstr "Predvolený Incoterm (medzinárodné obchodné podmienky) vašej spoločnosti"
 
 #. module: account
 #: model:ir.model.fields,field_description:account.field_account_report__default_opening_date_filter
@@ -8343,13 +8099,13 @@ msgstr "Návrh proforma faktúry"
 #. odoo-python
 #: code:addons/account/models/account_move.py:0
 msgid "Draft Purchase Receipt"
-msgstr "Návrh dokladu o kúpe"
+msgstr "Návrh nákupnej účtenky"
 
 #. module: account
 #. odoo-python
 #: code:addons/account/models/account_move.py:0
 msgid "Draft Sales Receipt"
-msgstr "Návrh predajného dokladu"
+msgstr "Návrh predajnej účtenky"
 
 #. module: account
 #. odoo-python
@@ -8482,7 +8238,7 @@ msgstr "Dynamické reporty"
 #. module: account
 #: model:ir.model.fields,help:account.field_account_tax_repartition_line__tag_ids_domain
 msgid "Dynamic domain used for the tag that can be set on tax"
-msgstr "Dynamická doména používaná pre značku, ktorú je možné nastaviť na daň"
+msgstr "Dynamická doména používaná pre tag, ktorý je možné nastaviť na daň"
 
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.res_partner_view_tree
@@ -8562,8 +8318,8 @@ msgstr "Zľava za včasnú platbu vo výške"
 msgid ""
 "Early Payment Discount: <b>%(amount)s</b> if paid before <b>%(date)s</b>"
 msgstr ""
-"Zľava za včasnú platbu: <b>%(amount)s</b> ak bude zaplatené pred <b>%"
-"(date)s</b>"
+"Zľava za včasnú platbu: <b>%(amount)s</b> ak bude zaplatené pred <b>%(date)"
+"s</b>"
 
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.res_config_settings_view_form
@@ -8591,6 +8347,11 @@ msgstr "Poplatky za vzdelávanie a školenia bez stravy a nápojov"
 #: model_terms:ir.ui.view,arch_db:account.view_account_journal_form
 msgid "Electronic Data Interchange"
 msgstr "Elektronická výmena dát"
+
+#. module: account
+#: model_terms:ir.ui.view,arch_db:account.res_config_settings_view_form
+msgid "Electronic Invoicing"
+msgstr ""
 
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.portal_my_details
@@ -8928,6 +8689,7 @@ msgid "Exchange Gain or Loss Journal"
 msgstr "Účtovná kniha kurzových ziskov alebo strát"
 
 #. module: account
+#: model:ir.model.fields,field_description:account.field_account_move_line__exchange_move_ids
 #: model:ir.model.fields,field_description:account.field_account_partial_reconcile__exchange_move_id
 msgid "Exchange Move"
 msgstr "Doklad zmeny kurzu"
@@ -9235,6 +8997,16 @@ msgid "First New Sequence"
 msgstr "Prvá nová sekvencia"
 
 #. module: account
+#: model:ir.model.fields,field_description:account.field_account_move_line__first_reconciled_lines_id
+msgid "First Reconciled Lines"
+msgstr ""
+
+#. module: account
+#: model:ir.model.fields,field_description:account.field_account_move_line__first_reconciled_lines_excluding_exchange_diff_id
+msgid "First Reconciled Lines Excluding Exchange Diff"
+msgstr ""
+
+#. module: account
 #: model:ir.model.fields,field_description:account.field_account_bank_statement_line__auto_post_origin_id
 #: model:ir.model.fields,field_description:account.field_account_move__auto_post_origin_id
 msgid "First recurring entry"
@@ -9357,7 +9129,7 @@ msgstr "Dlhodobý majetok"
 #: model:ir.model.fields.selection,name:account.selection__account_account__account_type__asset_fixed
 #: model_terms:ir.ui.view,arch_db:account.view_account_search
 msgid "Fixed Assets"
-msgstr "Dlhodobý majetok"
+msgstr "Hmotný majetok"
 
 #. module: account
 #: model:account.account,description:account.2_account_account_us_airfare
@@ -9807,6 +9579,18 @@ msgid "Goods"
 msgstr "Tovar"
 
 #. module: account
+#. odoo-python
+#: code:addons/account/wizard/accrued_orders.py:0
+msgid "Goods Delivered not Invoiced (perpetual valuation)"
+msgstr "Dodaný tovar, nefakturovaný (priebežné oceňovanie)"
+
+#. module: account
+#. odoo-python
+#: code:addons/account/wizard/accrued_orders.py:0
+msgid "Goods Invoiced not Delivered (perpetual valuation)"
+msgstr "Fakturovaný tovar, nedodaný (priebežné oceňovanie)"
+
+#. module: account
 #: model:account.account,name:account.2_account_account_us_ground_transportation
 msgid "Ground Transportation"
 msgstr "Pozemná doprava"
@@ -10090,7 +9874,7 @@ msgstr "Ako je počítaná celková suma dane na objednávkach a faktúrach"
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.report_invoice_document
 msgid "ICE:"
-msgstr ""
+msgstr "ICE:"
 
 #. module: account
 #: model:ir.model.fields,field_description:account.field_account_account__id
@@ -10419,8 +10203,7 @@ msgstr ""
 #: model_terms:ir.actions.act_window,help:account.open_account_journal_dashboard_kanban
 msgid ""
 "If you have not installed a chart of account, please install one first.<br>"
-msgstr ""
-"Ak ste ešte nenainštalovali účtovnú osnovu, najprv ju nainštalujte.<br>"
+msgstr "Ak ste ešte nenainštalovali účtovnú osnovu, najprv ju nainštalujte.<br>"
 
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.res_config_settings_view_form
@@ -10586,8 +10369,8 @@ msgid ""
 "(label)s',\n"
 "Failed to parse the cross report id or xml_id.\n"
 msgstr ""
-"Vo výkaze „%(report_name)s“, v riadku „%(line_name)s“, s označením „%"
-"(label)s“,\n"
+"Vo výkaze „%(report_name)s“, v riadku „%(line_name)s“, s označením „%(label)s"
+"“,\n"
 "sa nepodarilo analyzovať id krížového výkazu alebo xml_id.\n"
 
 #. module: account
@@ -10600,11 +10383,11 @@ msgid ""
 "Expected: cross_report(<report_id>|<xml_id>)Example:  "
 "cross_report(my_module.my_report) or cross_report(123)"
 msgstr ""
-"Vo výkaze „%(report_name)s“, v riadku „%(line_name)s“, s označením „%"
-"(label)s“,\n"
+"Vo výkaze „%(report_name)s“, v riadku „%(line_name)s“, s označením „%(label)s"
+"“,\n"
 "Formát výrazu krížového výkazu je neplatný. \n"
-"Očakávané: cross_report(<report_id>|<xml_id>). Príklad:  "
-"cross_report(my_module.my_report) alebo cross_report(123)"
+"Očakávané: cross_report(<report_id>|<xml_id>). Príklad:  cross_report"
+"(my_module.my_report) alebo cross_report(123)"
 
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.view_account_tax_search
@@ -10664,7 +10447,7 @@ msgstr "Príjem"
 #: model:ir.model.fields,field_description:account.field_res_company__income_account_id
 #: model:ir.model.fields,field_description:account.field_res_config_settings__income_account_id
 msgid "Income Account"
-msgstr "Príjmový účet"
+msgstr "Účet výnosov"
 
 #. module: account
 #: model:account.account,description:account.2_account_account_us_state_income_tax
@@ -11002,7 +10785,7 @@ msgstr "Faktúra č."
 #. module: account
 #: model:ir.ui.menu,name:account.menu_action_account_invoice_report_all
 msgid "Invoice Analysis"
-msgstr "Analýza faktúry"
+msgstr "Analýza faktúr"
 
 #. module: account
 #: model:ir.model.fields,field_description:account.field_account_analytic_account__invoice_count
@@ -11419,6 +11202,12 @@ msgid "Is Entries"
 msgstr "Je záznamom"
 
 #. module: account
+#: model:ir.model.fields,field_description:account.field_account_bank_statement_line__is_exact_move_duplicate
+#: model:ir.model.fields,field_description:account.field_account_move__is_exact_move_duplicate
+msgid "Is Exact Move Duplicate"
+msgstr ""
+
+#. module: account
 #: model:ir.model.fields,field_description:account.field_account_account__message_is_follower
 #: model:ir.model.fields,field_description:account.field_account_bank_statement_line__message_is_follower
 #: model:ir.model.fields,field_description:account.field_account_journal__message_is_follower
@@ -11785,6 +11574,7 @@ msgstr "Denník:"
 #: model:ir.model.fields,field_description:account.field_account_reconcile_model__match_journal_ids
 #: model:ir.model.fields,field_description:account.field_account_report__filter_journals
 #: model:ir.ui.menu,name:account.menu_action_account_journal_form
+#: model_terms:ir.ui.view,arch_db:account.view_account_move_line_filter
 msgid "Journals"
 msgstr "Účtovné denníky"
 
@@ -12076,8 +11866,7 @@ msgstr "Skupina účtovných kníh"
 #. module: account
 #: model_terms:ir.actions.act_window,help:account.action_account_journal_group_list
 msgid "Ledger group allows managing multiple accounting standards."
-msgstr ""
-"Skupina účtovných kníh umožňuje spravovať viacero účtovných štandardov."
+msgstr "Skupina účtovných kníh umožňuje spravovať viacero účtovných štandardov."
 
 #. module: account
 #: model:ir.model.fields.selection,name:account.selection__account_report_line__horizontal_split_side__left
@@ -12297,6 +12086,7 @@ msgid "Looks great!"
 msgstr "Vyzerá výborne!"
 
 #. module: account
+#: model:ir.model.fields.selection,name:account.selection__account_analytic_line__analytic_profitability__loss
 #: model_terms:ir.ui.view,arch_db:account.res_config_settings_view_form
 msgid "Loss"
 msgstr "Strata"
@@ -12989,6 +12779,12 @@ msgid "Need Cancel Request"
 msgstr "Potreba zrušiť žiadosť"
 
 #. module: account
+#. odoo-python
+#: code:addons/account/models/chart_template.py:0
+msgid "Need to update"
+msgstr "Potreba aktualizácie"
+
+#. module: account
 #: model:ir.model.fields,field_description:account.field_account_bank_statement_line__needed_terms
 #: model:ir.model.fields,field_description:account.field_account_move__needed_terms
 msgid "Needed Terms"
@@ -13003,8 +12799,7 @@ msgstr ""
 #. module: account
 #: model:ir.model.fields,help:account.field_account_payment__amount_signed
 msgid "Negative value of amount field if payment_type is outbound"
-msgstr ""
-"Záporná hodnota poľa sumy, ak je typ platby (payment_type) odchádzajúci"
+msgstr "Záporná hodnota poľa sumy, ak je typ platby (payment_type) odchádzajúci"
 
 #. module: account
 #. odoo-python
@@ -13290,7 +13085,7 @@ msgstr "Neobsahuje"
 #. odoo-python
 #: code:addons/account/models/account_journal_dashboard.py:0
 msgid "Not Due"
-msgstr "Nie je splatné"
+msgstr "Neskôr"
 
 #. module: account
 #: model:ir.model.fields,field_description:account.field_account_secure_entries_wizard__not_hashable_unlocked_move_ids
@@ -13582,16 +13377,6 @@ msgid "Onboarding Step"
 msgstr "Kroky úvodného nastavenia"
 
 #. module: account
-#. odoo-python
-#: code:addons/account/models/account_move.py:0
-msgid ""
-"Once a document has been posted once, its type is set in stone and you can't "
-"change it anymore."
-msgstr ""
-"Po prvom zaúčtovaní dokumentu je jeho typ definitívne stanovený a už ho "
-"nemožno zmeniť."
-
-#. module: account
 #. odoo-javascript
 #: code:addons/account/static/src/js/tours/account.js:0
 msgid ""
@@ -13607,9 +13392,8 @@ msgid ""
 "Once installed, set 'Bank Feeds' to 'File Import' in bank account "
 "settings.This adds a button to import from the Accounting dashboard."
 msgstr ""
-"Po inštalácii nastavte v nastaveniach bankového účtu položku „Bankové "
-"výpisy“ na „Import súboru“. Tým sa pridá tlačidlo na import z účtovného "
-"panela."
+"Po inštalácii nastavte v nastaveniach bankového účtu položku „Bankové výpisy"
+"“ na „Import súboru“. Tým sa pridá tlačidlo na import z účtovného panela."
 
 #. module: account
 #. odoo-javascript
@@ -13679,8 +13463,7 @@ msgstr ""
 #. odoo-python
 #: code:addons/account/models/account_move.py:0
 msgid "Only posted/cancelled journal entries can be reset to draft."
-msgstr ""
-"Iba zaúčtované/zrušené účtovné zápisy môžu byť vrátené do stavu návrhu."
+msgstr "Iba zaúčtované/zrušené účtovné zápisy môžu byť vrátené do stavu návrhu."
 
 #. module: account
 #. odoo-python
@@ -13798,7 +13581,7 @@ msgstr "Voliteľné"
 #. module: account
 #: model:ir.model.fields,help:account.field_account_account__tag_ids
 msgid "Optional tags you may want to assign for custom reporting"
-msgstr "Voliteľné tagy, ktoré môžete chcieť priradiť pre vlastné prehľady"
+msgstr "Voliteľné štítky, ktoré môžete chcieť priradiť pre vlastné prehľady"
 
 #. module: account
 #: model:ir.model.fields,help:account.field_account_move_send_wizard__lang
@@ -13810,8 +13593,8 @@ msgid ""
 msgstr ""
 "Voliteľný jazyk prekladu (kód ISO), ktorý sa vyberie pri odosielaní e-mailu. "
 "Ak nie je nastavený, použije sa jazyk hlavného partnera. Zvyčajne by to mal "
-"byť zástupný výraz, ktorý poskytuje príslušný jazyk, napr. "
-"{{ object.partner_id.lang }}."
+"byť zástupný výraz, ktorý poskytuje príslušný jazyk, napr. {{ "
+"object.partner_id.lang }}."
 
 #. module: account
 #: model:ir.model.fields,field_description:account.field_account_resequence_wizard__ordering
@@ -14036,6 +13819,7 @@ msgid "Owner's Current Account"
 msgstr "Bežný účet vlastníka"
 
 #. module: account
+#: model_terms:ir.ui.view,arch_db:account.view_account_analytic_line_filter_inherit_account
 #: model_terms:ir.ui.view,arch_db:account.view_account_move_line_filter
 msgid "P&L Accounts"
 msgstr "Účty ziskov a strát"
@@ -14066,11 +13850,6 @@ msgstr "Súbor PDF"
 #: model:ir.actions.report,name:account.account_invoices_without_payment
 msgid "PDF without Payment"
 msgstr "PDF bez platby"
-
-#. module: account
-#: model_terms:ir.ui.view,arch_db:account.res_config_settings_view_form
-msgid "PEPPOL Electronic Invoicing"
-msgstr "Elektronická fakturácia PEPPOL"
 
 #. module: account
 #: model:ir.model.fields,field_description:account.field_res_config_settings__module_account_peppol
@@ -14260,8 +14039,7 @@ msgstr "Partneri bez bankového účtu"
 #. odoo-python
 #: code:addons/account/models/partner.py:0
 msgid "Partners that are used in hashed entries cannot be merged."
-msgstr ""
-"Partneri, ktorí sú použití v hashovaných záznamoch, nemôžu byť zlúčení."
+msgstr "Partneri, ktorí sú použití v hashovaných záznamoch, nemôžu byť zlúčení."
 
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.view_partner_bank_form_inherit_account
@@ -14724,7 +14502,7 @@ msgstr "Pri platbe použite nasledujúce údaje:"
 #. module: account
 #: model:ir.model.fields,field_description:account.field_account_tax_group__pos_receipt_label
 msgid "PoS receipt label"
-msgstr "PoS potvrdenka"
+msgstr "PoS účtenka"
 
 #. module: account
 #: model:ir.model.fields,field_description:account.field_account_bank_statement_line__access_url
@@ -14951,7 +14729,7 @@ msgstr "Tlač a reprodukcia"
 #. module: account
 #: model:ir.model.fields,field_description:account.field_account_journal__non_deductible_account_id
 msgid "Private Share Account"
-msgstr "Súkromný akciový účet"
+msgstr "Súkromný zdieľaný účet"
 
 #. module: account
 #: model:ir.model.fields,field_description:account.field_account_bank_statement__problem_description
@@ -14989,6 +14767,7 @@ msgstr "Kategórie produktu"
 #: model:ir.model,name:account.model_product_category
 #: model:ir.model.fields,field_description:account.field_account_analytic_applicability__product_categ_id
 #: model:ir.model.fields,field_description:account.field_account_analytic_distribution_model__product_categ_id
+#: model:ir.model.fields,field_description:account.field_account_analytic_line__product_category
 #: model:ir.model.fields,field_description:account.field_account_invoice_report__product_categ_id
 #: model:ir.model.fields,field_description:account.field_account_move_line__product_category_id
 #: model_terms:ir.ui.view,arch_db:account.view_account_invoice_report_search
@@ -15073,6 +14852,19 @@ msgid "Profit Account"
 msgstr "Účet zisku"
 
 #. module: account
+#. odoo-python
+#: code:addons/account/models/company.py:0
+#: model:account.account,name:account.1_profit_or_loss
+#: model:account.account,name:account.2_account_account_us_profit_or_loss_appropriation
+msgid "Profit or Loss Appropriation"
+msgstr "Rozdelenie zisku alebo straty"
+
+#. module: account
+#: model:ir.model.fields,field_description:account.field_account_analytic_line__analytic_profitability
+msgid "Profitability"
+msgstr ""
+
+#. module: account
 #: model_terms:ir.ui.view,arch_db:account.report_invoice_document
 msgid "Proforma Credit Note"
 msgstr "Návrh dobropisu"
@@ -15149,7 +14941,7 @@ msgstr "Dátum uzamknutia nákupu"
 #. module: account
 #: model:ir.model.fields.selection,name:account.selection__account_move__move_type__in_receipt
 msgid "Purchase Receipt"
-msgstr "Nákupná potvrdenka"
+msgstr "Nákupná účtenka"
 
 #. module: account
 #. odoo-python
@@ -15267,12 +15059,6 @@ msgid "Quick encoding"
 msgstr "Rýchle zadávanie"
 
 #. module: account
-#. odoo-javascript
-#: code:addons/account/static/src/components/many2x_tax_tags/many2x_tax_tags.js:0
-msgid "Quick search: %s"
-msgstr "Rýchle vyhľadávanie: %s"
-
-#. module: account
 #: model:account.account,name:account.1_expense_rd
 msgid "RD Expenses"
 msgstr "Náklady na výskum a vývoj"
@@ -15316,12 +15102,12 @@ msgstr "Dôvod uvedený na dobropise"
 #: code:addons/account/static/src/components/receipt_selector/receipt_selector.js:0
 #: model_terms:ir.ui.view,arch_db:account.view_account_bill_filter
 msgid "Receipt"
-msgstr "Príjem"
+msgstr "Nákupná účtenka"
 
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.view_account_invoice_filter
 msgid "Receipts"
-msgstr "Príjemky"
+msgstr "Účtenky"
 
 #. module: account
 #: model:ir.model.fields.selection,name:account.selection__account_account__account_type__asset_receivable
@@ -15755,11 +15541,6 @@ msgid "Responsible User"
 msgstr "Zodpovedný užívateľ"
 
 #. module: account
-#: model:ir.model.fields,help:account.field_account_tax__tax_scope
-msgid "Restrict the use of taxes to a type of product."
-msgstr "Obmedzte použitie daní na typ produktu."
-
-#. module: account
 #: model_terms:ir.ui.view,arch_db:account.report_hash_integrity
 #: model_terms:ir.ui.view,arch_db:account.view_message_tree_audit_log_search
 msgid "Restricted"
@@ -15786,9 +15567,10 @@ msgstr "Náklady na dôchodkové plány (súhlas so 401K)"
 #: code:addons/account/wizard/accrued_orders.py:0
 #: model:account.group,name:account.2_us_group_4
 #: model:ir.model.fields,field_description:account.field_digest_digest__kpi_account_total_revenue
+#: model:ir.model.fields.selection,name:account.selection__account_analytic_line__analytic_profitability__revenue
 #: model:ir.model.fields.selection,name:account.selection__account_automatic_entry_wizard__account_type__income
 msgid "Revenue"
-msgstr "Príjem"
+msgstr "Výnosy"
 
 #. module: account
 #: model:ir.model.fields,field_description:account.field_account_automatic_entry_wizard__revenue_accrual_account
@@ -15956,7 +15738,7 @@ msgstr "Zaokrúhľovanie za riadok"
 #. module: account
 #: model:ir.model.fields.selection,name:account.selection__res_company__tax_calculation_rounding_method__round_globally
 msgid "Round per Tax"
-msgstr "Zaokrúhliť na daň"
+msgstr "Zaokrúhľovanie za daň"
 
 #. module: account
 #. odoo-javascript
@@ -16060,7 +15842,7 @@ msgstr "Predaj"
 #. module: account
 #: model:ir.model.fields,field_description:account.field_res_config_settings__show_sale_receipts
 msgid "Sale Receipt"
-msgstr "Potvrdenie o predaji"
+msgstr "Predajná účtenka"
 
 #. module: account
 #. odoo-python
@@ -16097,7 +15879,7 @@ msgstr "Dátum uzamknutia predaja"
 #. module: account
 #: model:ir.model.fields.selection,name:account.selection__account_move__move_type__out_receipt
 msgid "Sales Receipt"
-msgstr "Predajná potvrdenka"
+msgstr "Predajná účtenka"
 
 #. module: account
 #. odoo-python
@@ -16251,6 +16033,7 @@ msgstr "Vyhľadajte meno alebo identifikačné číslo DPH..."
 
 #. module: account
 #. odoo-javascript
+#: code:addons/account/static/src/components/many2one_account_account/many2one_account_account.js:0
 #: code:addons/account/static/src/components/many2x_tax_tags/many2x_tax_tags.js:0
 msgid "Search: %s"
 msgstr "Hľadať: %s"
@@ -16786,7 +16569,7 @@ msgstr ""
 #. module: account
 #: model:res.groups,name:account.group_account_readonly
 msgid "Show Accounting Features - Readonly"
-msgstr "Zobraziť účtovné funkcie - iba na čítanie"
+msgstr "Účtovníctvo - Iba čítanie"
 
 #. module: account
 #. odoo-javascript
@@ -16825,7 +16608,7 @@ msgstr "Zobraziť tlačidlá stavu e-faktúry"
 #. module: account
 #: model:res.groups,name:account.group_account_user
 msgid "Show Full Accounting Features"
-msgstr "Zobraziť všetky účtovné funkcie"
+msgstr "Účtovníctvo"
 
 #. module: account
 #: model:res.groups,name:account.group_account_secured
@@ -17292,7 +17075,7 @@ msgstr "Zmeniť na faktúru/dobropis"
 #. module: account
 #: model:ir.model.fields,field_description:account.field_account_account_tag__name
 msgid "Tag Name"
-msgstr "Názov tagu"
+msgstr "Názov štítku"
 
 #. module: account
 #: model:ir.model.fields,field_description:account.field_account_account__tag_ids
@@ -17300,7 +17083,7 @@ msgstr "Názov tagu"
 #: model_terms:ir.ui.view,arch_db:account.account_tag_view_form
 #: model_terms:ir.ui.view,arch_db:account.account_tag_view_tree
 msgid "Tags"
-msgstr "Tagy"
+msgstr "Štítky"
 
 #. module: account
 #: model:ir.model.fields,help:account.field_account_move_line__tax_tag_ids
@@ -17308,7 +17091,7 @@ msgid ""
 "Tags assigned to this line by the tax creating it, if any. It determines its "
 "impact on financial reports."
 msgstr ""
-"Značky priradené k tomuto riadku daňou, ktorá ho vytvára, ak existuje. "
+"Štítky priradené k tomuto riadku daňou, ktorá ho vytvára, ak existuje. "
 "Určuje jeho vplyv na finančné reporty."
 
 #. module: account
@@ -17317,7 +17100,7 @@ msgstr ""
 msgid ""
 "Tags to be set on the base and tax journal items created for this product."
 msgstr ""
-"Tagy, ktoré sa majú nastaviť na základ dane a na položky dane vytvorených "
+"Štítky, ktoré sa majú nastaviť na základ dane a na položky dane vytvorených "
 "pre tento produkt."
 
 #. module: account
@@ -17703,7 +17486,7 @@ msgstr "Daňový reťazec"
 #. module: account
 #: model:ir.model.fields.selection,name:account.selection__account_report_expression__engine__tax_tags
 msgid "Tax Tags"
-msgstr "Daňový tag"
+msgstr "Daňový štítok"
 
 #. module: account
 #: model:ir.model.fields,field_description:account.field_account_report_line__tax_tags_formula
@@ -17825,7 +17608,7 @@ msgid ""
 "item if they share some tag."
 msgstr ""
 "Dane splatné pri platbe a na faktúre nemožno zmiešať v tej istej položke "
-"denníka, ak majú spoločnú značku (tag)."
+"denníka, ak majú spoločný štítok (tag)."
 
 #. module: account
 #: model:ir.model.fields,field_description:account.field_res_company__display_invoice_tax_company_currency
@@ -17915,8 +17698,8 @@ msgstr ""
 "skupiny: prefix1, year, prefix2, month, prefix3, seq, suffix.\n"
 "Skupiny prefix* sú oddeľovače medzi rokom, mesiacom a skutočným vzostupným "
 "poradovým číslom (seq).\n"
-"Napr.: ^(?P<prefix1>.*?)(?P<year>\\d{4})(?P<prefix2>\\D*?)(?P<month>\\d{2})(?"
-"P<prefix3>\\D+?)(?P<seq>\\d+)(?P<suffix>\\D*?)$"
+"Napr.: ^(?P<prefix1>.*?)(?P<year>\\d{4})(?P<prefix2>\\D*?)(?P<month>\\d{2})"
+"(?P<prefix3>\\D+?)(?P<seq>\\d+)(?P<suffix>\\D*?)$"
 
 #. module: account
 #: model:account.account,description:account.2_account_account_us_technology
@@ -18132,16 +17915,6 @@ msgstr ""
 "percent musí byť 100."
 
 #. module: account
-#: model:ir.model.fields,help:account.field_base_document_layout__vat
-msgid ""
-"The Tax Identification Number. Values here will be validated based on the "
-"country format. You can use '/' to indicate that the partner is not subject "
-"to tax."
-msgstr ""
-"Identifikačné číslo DPH. Hodnoty tu budú overené na základe formátu krajiny. "
-"Pomocou znaku „/“ môžete označiť, že partner nie je povinný platiť dane."
-
-#. module: account
 #. odoo-python
 #: code:addons/account/models/account_move_line.py:0
 msgid "The account %(name)s (%(code)s) is archived."
@@ -18245,6 +18018,16 @@ msgstr ""
 "Bankový účet bankovej účtovnej knihy musí patriť rovnakej spoločnosti (%s)."
 
 #. module: account
+#. odoo-python
+#: code:addons/account/models/account_move.py:0
+msgid ""
+"The bank account of your company is not trusted. Please ask an admin or "
+"someone with approval rights to check it."
+msgstr ""
+"Bankový účet vašej spoločnosti nie je dôveryhodný. Požiadajte správcu alebo "
+"osobu s oprávnením na schvaľovanie, aby ho skontrolovala."
+
+#. module: account
 #: model:ir.model.fields,help:account.field_account_move_line__statement_id
 msgid "The bank statement used for bank reconciliation"
 msgstr "Bankový výpis používaný pre bankové párovanie"
@@ -18322,6 +18105,18 @@ msgstr ""
 "Obchodný partner bol aktualizovaný pre všetky súvisiace účtovné záznamy."
 
 #. module: account
+#. odoo-python
+#: code:addons/account/models/account_move.py:0
+msgid ""
+"The company bank account (%(account_number)s) linked to this invoice is not "
+"trusted. Go to the Bank Settings, double-check that it is yours or correct "
+"the number, and click on Send Money to trust it."
+msgstr ""
+"Bankový účet spoločnosti (%(account_number)s) spojený s touto faktúrou nie "
+"je overený. Prejdite do nastavení banky, skontrolujte, či ide o váš účet, "
+"alebo opravte číslo, a kliknutím na tlačidlo „Poslať peniaze“ ho overte."
+
+#. module: account
 #: model:ir.model.fields,help:account.field_account_tax_repartition_line__company_id
 msgid "The company this distribution line belongs to."
 msgstr "Spoločnosť, ku ktorej tento riadok rozdelenia patrí."
@@ -18377,9 +18172,9 @@ msgid ""
 "(expected_total)s. In order to post the invoice/bill, you can adjust its "
 "lines or the expected Total (tax inc.)."
 msgstr ""
-"Aktuálna suma je %(current_total)s, ale očakávaná suma je %"
-"(expected_total)s. Ak chcete faktúru zaúčtovať, môžete upraviť jej riadky "
-"alebo očakávanú sumu (vrátane dane)."
+"Aktuálna suma je %(current_total)s, ale očakávaná suma je %(expected_total)"
+"s. Ak chcete faktúru zaúčtovať, môžete upraviť jej riadky alebo očakávanú "
+"sumu (vrátane dane)."
 
 #. module: account
 #. odoo-python
@@ -18481,6 +18276,14 @@ msgstr "Záznam nie je vyrovnaný."
 #: model:ir.model.fields,help:account.field_account_move__secured
 msgid "The entry is secured with an inalterable hash."
 msgstr "Záznam je zabezpečený nezmeniteľným hash kódom."
+
+#. module: account
+#. odoo-python
+#: code:addons/account/models/account_move.py:0
+msgid ""
+"The entry is using accounts (%(accounts_codes_names)s) from a different "
+"company."
+msgstr "Záznam používa účty (%(accounts_codes_names)s) z inej spoločnosti."
 
 #. module: account
 #: model:ir.model.fields,help:account.field_product_category__property_account_expense_categ_id
@@ -18836,6 +18639,16 @@ msgstr "Priebežný zostatok (%s) nezodpovedá zadanému konečnému zostatku."
 
 #. module: account
 #. odoo-python
+#: code:addons/account/models/account_move_send.py:0
+msgid ""
+"The scheduled action 'Send Invoices automatically' is archived. You won't be "
+"able to send invoices in batch."
+msgstr ""
+"Naplánovaná akcia „Automatické odosielanie faktúr“ bola archivovaná. "
+"Hromadné odosielanie faktúr nebude možné."
+
+#. module: account
+#. odoo-python
 #: code:addons/account/models/account_report.py:0
 msgid "The sections defined on a report cannot have sections themselves."
 msgstr "Oddiely definované vo výkaze nemôžu mať vlastné oddiely."
@@ -19038,8 +18851,8 @@ msgid ""
 "The type of the journal's default credit/debit account shouldn't be "
 "'receivable' or 'payable'."
 msgstr ""
-"Typ predvoleného kreditného / debetného účtu denníka by nemal byť "
-"„pohľadávka“ alebo „záväzok“."
+"Typ predvoleného kreditného / debetného účtu denníka by nemal byť „pohľadávka"
+"“ alebo „záväzok“."
 
 #. module: account
 #: model:ir.model.fields,help:account.field_res_currency__display_rounding_warning
@@ -19103,8 +18916,8 @@ msgid ""
 "(prefix_info)s"
 msgstr ""
 "Pred vybraným dátumom existujú nespárované riadky bankového výpisu. Záznamy "
-"podľa predpôn denníka, ktoré ich obsahujú, nebudú zabezpečené: %"
-"(prefix_info)s"
+"podľa predpôn denníka, ktoré ich obsahujú, nebudú zabezpečené: %(prefix_info)"
+"s"
 
 #. module: account
 #. odoo-python
@@ -19174,6 +18987,15 @@ msgstr ""
 
 #. module: account
 #. odoo-python
+#: code:addons/account/models/account_document_import_mixin.py:0
+msgid ""
+"There was an error while importing the bill, you can find attached the "
+"incoming XML"
+msgstr ""
+"Pri importe faktúry došlo k chybe, v prílohe nájdete prichádzajúci XML súbor"
+
+#. module: account
+#. odoo-python
 #: code:addons/account/wizard/account_payment_register.py:0
 msgid ""
 "There's nothing left to pay for the selected journal items, so no payment "
@@ -19214,18 +19036,6 @@ msgstr "Tento týždeň"
 #: model:ir.model.fields.selection,name:account.selection__account_report__default_opening_date_filter__this_year
 msgid "This Year"
 msgstr "Tento rok"
-
-#. module: account
-#. odoo-python
-#: code:addons/account/models/account_account.py:0
-msgid ""
-"This account is configured in %(journal_names)s journal(s) (ids %"
-"(journal_ids)s) as payment debit or credit account. This means that this "
-"account's type should be reconcilable."
-msgstr ""
-"Tento účet je nakonfigurovaný v denníkoch %(journal_names)s (ids %"
-"(journal_ids)s) ako debetný alebo kreditný účet. To znamená, že typ tohto "
-"účtu by mal byť párovateľný."
 
 #. module: account
 #. odoo-python
@@ -19587,8 +19397,8 @@ msgstr "Na zaúčtovanie"
 msgid ""
 "To add information to a previously sent invoice, reply to your \"sent\" email"
 msgstr ""
-"Ak chcete pridať informácie k predtým odoslanej faktúre, odpovedzte na svoj "
-"„odoslaný“ e-mail"
+"Ak chcete pridať informácie k predtým odoslanej faktúre, odpovedzte na svoj „"
+"odoslaný“ e-mail"
 
 #. module: account
 #. odoo-python
@@ -19898,6 +19708,11 @@ msgid "Transfer to %s"
 msgstr "Prevod na %s"
 
 #. module: account
+#: model:ir.model.fields,field_description:account.field_account_move_line__translated_product_name
+msgid "Translated Product Name"
+msgstr "Preložený názov produktu"
+
+#. module: account
 #: model:account.group,name:account.2_us_group_661
 msgid "Travel Expenses"
 msgstr "Cestovné výdavky"
@@ -20001,18 +19816,15 @@ msgstr ""
 "odporúčame preusporiadať transakcie."
 
 #. module: account
+#: model:ir.model.fields.selection,name:account.selection__account_analytic_line__analytic_profitability__uncategorized
+msgid "Uncategorized"
+msgstr ""
+
+#. module: account
 #. odoo-python
 #: code:addons/account/models/account_journal.py:0
 msgid "Undefined Yet"
 msgstr "Zatiaľ nedefinované"
-
-#. module: account
-#. odoo-python
-#: code:addons/account/models/company.py:0
-#: model:account.account,name:account.1_unaffected_earnings_account
-#: model:account.account,name:account.2_unaffected_earnings_account
-msgid "Undistributed Profits/Losses"
-msgstr "Nerozdelené Zisky/Straty"
 
 #. module: account
 #: model:account.account,name:account.2_account_account_us_unemployment_insurance
@@ -20055,6 +19867,11 @@ msgstr "Jednotková cena"
 #: model_terms:ir.ui.view,arch_db:account.view_move_form
 msgid "Unit Price:"
 msgstr "Jednotková cena:"
+
+#. module: account
+#: model_terms:ir.ui.view,arch_db:account.report_invoice_document
+msgid "Units"
+msgstr "Jednotky"
 
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.res_config_settings_view_form
@@ -20209,6 +20026,12 @@ msgstr "Aktualizovať podmienky"
 #: code:addons/account/models/res_config_settings.py:0
 msgid "Update Terms & Conditions"
 msgstr "Aktualizovať zmluvné podmienky"
+
+#. module: account
+#. odoo-python
+#: code:addons/account/models/chart_template.py:0
+msgid "Update app"
+msgstr "Aktualizovať aplikáciu"
 
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.res_config_settings_view_form
@@ -20501,17 +20324,34 @@ msgid ""
 "needed. For instance if you want to extract the amount from\n"
 "R:9672938 10/07 AX 9415126318 T:5L:NA BRT: 3358,07 C:\n"
 "You could enter\n"
-"BRT: ([\\d,]+)"
+"BRT: ([\\d,]+)\n"
+"    If the label is \"01870912 0009065 00115\" and you need the amount in "
+"decimal\n"
+"    format (e.g. 90.65), you can use a regex with capturing groups, for "
+"example:\n"
+"        \\s+0*(\\d+?)(\\d{2})(?=\\s)\n"
+"    In this case:\n"
+"    • the first group captures the integer part\n"
+"    • the second group captures the decimal part (last two digits)\n"
+"    "
 msgstr ""
-"Hodnota pre riadok s výškou odpisu\n"
-"    * Percento: Percento zostatku, od 0 do 100.\n"
-"    * Fixná: Pevná hodnota odpisu. Suma sa započíta ako debet, ak je "
-"záporná, ako kredit, ak je kladná.\n"
-"    * Zo štítku: Nie je potrebný oddeľovač regex výrazu, potrebný je len "
-"regex výraz. Napríklad ak chcete získať sumu z\n"
+"Hodnota sumy v riadku odpisu zostatku\n"
+"    * Percento: Percento zostatku v rozmedzí od 0 do 100.\n"
+"    * Pevná suma: Pevná hodnota odpisu zostatku. Ak je suma záporná, bude sa "
+"považovať za debet, ak je kladná, za kredit.\n"
+"    * Z popisu: Nie je potrebný oddeľovač regex, stačí len regex. Napríklad "
+"ak chcete extrahovať sumu z\n"
 "R:9672938 10/07 AX 9415126318 T:5L:NA BRT: 3358,07 C:\n"
-"Mohli by ste zadať\n"
-"BRT: ([\\d,]+)"
+"môžete zadať\n"
+"BRT: ([\\d,]+)\n"
+"    Ak je popisok „01870912 0009065 00115“ a potrebujete sumu v desatinnom\n"
+"    formáte (napr. 90,65), môžete použiť regulárny výraz so zachytávacími "
+"skupinami, napríklad:\n"
+"        \\s+0*(\\d+?)(\\d{2})(?=\\s)\n"
+"    V tomto prípade:\n"
+"    • prvá skupina zachytáva celú časť\n"
+"    • druhá skupina zachytáva desatinnú časť (posledné dve číslice)\n"
+"    "
 
 #. module: account
 #: model:ir.model.fields,field_description:account.field_account_partial_reconcile__draft_caba_move_vals
@@ -20990,9 +20830,9 @@ msgid ""
 "invoices, once validated, to help the customer to refer to that particular "
 "invoice when making the payment."
 msgstr ""
-"Tu môžete nastaviť predvolenú formát platobnej referencie (variabilný "
-"symbol), ktorá sa po zaúčtovaní zobrazí na vystavených faktúrach, aby "
-"zákazník mohol pri platbe odkazovať na konkrétnu faktúru."
+"Tu môžete nastaviť predvolenú formát platobnej referencie (variabilný symbol)"
+", ktorá sa po zaúčtovaní zobrazí na vystavených faktúrach, aby zákazník "
+"mohol pri platbe odkazovať na konkrétnu faktúru."
 
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.portal_my_journal_mail_notifications
@@ -21002,6 +20842,11 @@ msgid ""
 msgstr ""
 "Tu sa môžete odhlásiť z odberu e-mailov, ktoré dostávate po odoslaní a "
 "prijatí faktúry."
+
+#. module: account
+#: model:ir.model.fields,help:account.field_base_document_layout__vat
+msgid "You can use '/' to indicate that the customer has no Tax ID."
+msgstr ""
 
 #. module: account
 #. odoo-python
@@ -21159,8 +21004,15 @@ msgstr ""
 #: code:addons/account/models/account_move.py:0
 msgid ""
 "You cannot add/modify entries prior to and inclusive of: %(lock_date_info)s."
+msgstr "Nemôžete pridávať/upravovať záznamy pred a vrátane: %(lock_date_info)s."
+
+#. module: account
+#. odoo-python
+#: code:addons/account/models/account_payment.py:0
+msgid ""
+"You cannot change the amount of a payment with multiple liquidity lines."
 msgstr ""
-"Nemôžete pridávať/upravovať záznamy pred a vrátane: %(lock_date_info)s."
+"Nie je možné zmeniť výšku platby v prípade viacerých likvidných riadkov."
 
 #. module: account
 #. odoo-python
@@ -21242,12 +21094,22 @@ msgstr "Nemôžete odstrániť riadky účtovného záznamu, ktorý je uzamknut�
 
 #. module: account
 #. odoo-python
+#: code:addons/account/models/account_tax.py:0
+msgid ""
+"You cannot delete taxes that are currently in use. Consider archiving them "
+"instead."
+msgstr ""
+"Dane, ktoré sa momentálne používajú, nemôžete odstrániť. Zvážte namiesto "
+"toho ich archiváciu."
+
+#. module: account
+#. odoo-python
 #: code:addons/account/models/account_account_tag.py:0
 msgid ""
 "You cannot delete this account tag (%s), it is used on the chart of account "
 "definition."
 msgstr ""
-"Nemôžete odstrániť túto značku (tag) účtu (%s), pretože sa používa v "
+"Nemôžete odstrániť tento štítok (tag) účtu (%s), pretože sa používa v "
 "definícii účtovnej osnovy."
 
 #. module: account
@@ -21428,6 +21290,12 @@ msgstr "Nemôžete pridať záznam do archivovaného denníka (%(journal)s)"
 
 #. module: account
 #. odoo-python
+#: code:addons/account/models/account_move.py:0
+msgid "You cannot post an entry with an archived analytic account: %s"
+msgstr "Nie je možné zaúčtovať záznam s archivovaným analytickým účtom: %s"
+
+#. module: account
+#. odoo-python
 #: code:addons/account/models/res_currency.py:0
 msgid ""
 "You cannot reduce the number of decimal places of a currency which has "
@@ -21435,6 +21303,13 @@ msgid ""
 msgstr ""
 "Nemôžete znížiť počet desatinných miest meny, ktorá už bola použitá na "
 "vykonanie účtovných zápisov."
+
+#. module: account
+#. odoo-python
+#: code:addons/account/models/account_move.py:0
+#: code:addons/account/wizard/account_payment_register.py:0
+msgid "You cannot register payments for blocked invoices."
+msgstr ""
 
 #. module: account
 #. odoo-python
@@ -21503,8 +21378,8 @@ msgstr "Účtovný záznam kurzového rozdielu nie je možné obnoviť do stavu 
 msgid ""
 "You cannot revoke Lock Date Exceptions. Ask someone with the 'Adviser' role."
 msgstr ""
-"Výnimky z dátumu uzamknutia nemožno zrušiť. Požiadajte niekoho s rolou "
-"„poradca“."
+"Výnimky z dátumu uzamknutia nemožno zrušiť. Požiadajte niekoho s rolou „"
+"poradca“."
 
 #. module: account
 #. odoo-python
@@ -21533,6 +21408,14 @@ msgid ""
 "You cannot switch an account to prevent the reconciliation if some partial "
 "reconciliations are still pending."
 msgstr "Nemôžete zmeniť účet pokiaľ sú otvorené čiastkové párovania."
+
+#. module: account
+#. odoo-python
+#: code:addons/account/models/account_move.py:0
+msgid ""
+"You cannot switch the type of a document with an existing sequence number."
+msgstr ""
+"Nie je možné zmeniť typ dokumentu, ktorý už má pridelené poradové číslo."
 
 #. module: account
 #. odoo-python
@@ -21641,6 +21524,16 @@ msgstr ""
 "V nastaveniach vašej spoločnosti musíte nakonfigurovať „Denník kurzových "
 "ziskov a strát“, aby sa automaticky spravovalo zaúčtovanie kurzových "
 "rozdielov."
+
+#. module: account
+#. odoo-python
+#: code:addons/account/models/account_journal_dashboard.py:0
+msgid ""
+"You may only use samples in demo mode, try uploading one of your invoices "
+"instead."
+msgstr ""
+"Vzorky môžete použiť iba v demo režime, skúste namiesto toho nahrať jednu zo "
+"svojich faktúr."
 
 #. module: account
 #. odoo-python
@@ -22087,12 +21980,6 @@ msgstr ""
 "poskytnutia služieb."
 
 #. module: account
-#. odoo-python
-#: code:addons/account/models/partner.py:0
-msgid "not applicable"
-msgstr "neaplikovateľné"
-
-#. module: account
 #: model:ir.model.fields.selection,name:account.selection__account_tax_repartition_line__repartition_type__tax
 msgid "of tax"
 msgstr "dane"
@@ -22185,7 +22072,7 @@ msgstr "stornované"
 #. module: account
 #: model:ir.model.fields,field_description:account.field_account_tax_repartition_line__tag_ids_domain
 msgid "tag domain"
-msgstr "doména značky (tagu)"
+msgstr "doména štítku (tagu)"
 
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.view_partner_property_form
@@ -22300,15 +22187,14 @@ msgid ""
 "{{ object.company_id.name }} - New invoice in "
 "{{ object.journal_id.display_name or 'Invoices' }} journal"
 msgstr ""
-"{{ object.company_id.name }} - Nová faktúra v denníku "
-"{{ object.journal_id.display_name or 'Invoices' }}"
+"{{ object.company_id.name }} - Nová faktúra v denníku {{ "
+"object.journal_id.display_name or 'Invoices' }}"
 
 #. module: account
 #: model:mail.template,subject:account.email_template_edi_credit_note
 msgid ""
 "{{ object.company_id.name }} Credit Note (Ref {{ object.name or 'n/a' }})"
-msgstr ""
-"{{ object.company_id.name }} Dobropis (Ref. {{ object.name or 'n/a' }})"
+msgstr "{{ object.company_id.name }} Dobropis (Ref. {{ object.name or 'n/a' }})"
 
 #. module: account
 #: model:mail.template,subject:account.email_template_edi_invoice
@@ -22340,6 +22226,235 @@ msgid ""
 msgstr ""
 "{{ object.company_id.name }} Selfbilling faktúra (Ref. {{ object.name or 'n/"
 "a' }})"
+
+#~ msgid "PEPPOL Electronic Invoicing"
+#~ msgstr "Elektronická fakturácia PEPPOL"
+
+#~ msgid "%s, or / if not applicable"
+#~ msgstr "%s, alebo / ak nie je aplikovateľné"
+
+#~ msgid "%s, or not applicable"
+#~ msgstr "%s, alebo nie je aplikovateľné"
+
+#~ msgid "/ if not applicable"
+#~ msgstr "/ ak nie je aplikovateľné"
+
+#~ msgid ""
+#~ "The Tax Identification Number. Values here will be validated based on the "
+#~ "country format. You can use '/' to indicate that the partner is not "
+#~ "subject to tax."
+#~ msgstr ""
+#~ "Identifikačné číslo DPH. Hodnoty tu budú overené na základe formátu "
+#~ "krajiny. Pomocou znaku „/“ môžete označiť, že partner nie je povinný "
+#~ "platiť dane."
+
+#~ msgid "not applicable"
+#~ msgstr "neaplikovateľné"
+
+#~ msgid "Quick search: %s"
+#~ msgstr "Rýchle vyhľadávanie: %s"
+
+#~ msgid "%(name)s - Draft at (%(currency_amount)s)"
+#~ msgstr "%(name)s - Návrh v hodnote (%(currency_amount)s)"
+
+#~ msgid "Undistributed Profits/Losses"
+#~ msgstr "Nerozdelené Zisky/Straty"
+
+#~ msgid "1.00"
+#~ msgstr "1,00"
+
+#~ msgid "1.05"
+#~ msgstr "1,05"
+
+#~ msgid "100.0"
+#~ msgstr "100,0"
+
+#~ msgid "1000.0"
+#~ msgstr "1 000,0"
+
+#~ msgid "11.05"
+#~ msgstr "11,05"
+
+#~ msgid "12345"
+#~ msgstr "12345"
+
+#~ msgid "15%"
+#~ msgstr "15 %"
+
+#~ msgid "1500.0"
+#~ msgstr "1 500,0"
+
+#~ msgid "2.9%"
+#~ msgstr "2,9 %"
+
+#~ msgid "20.00"
+#~ msgstr "20,00"
+
+#~ msgid "2021-09-19"
+#~ msgstr "19. 9. 2021"
+
+#~ msgid "2023-01-01"
+#~ msgstr "1. 1. 2023"
+
+#~ msgid "2023-01-05"
+#~ msgstr "5. 1. 2023"
+
+#~ msgid "2023-08-11"
+#~ msgstr "11. 8. 2023"
+
+#~ msgid "2023-08-15"
+#~ msgstr "15. 8. 2023"
+
+#~ msgid "2023-08-31"
+#~ msgstr "31. 8. 2023"
+
+#~ msgid "2023-09-12"
+#~ msgstr "12. 9. 2023"
+
+#~ msgid "2023-09-25"
+#~ msgstr "25. 9. 2023"
+
+#~ msgid "2023-10-31"
+#~ msgstr "31. 10. 2023"
+
+#~ msgid "2024-01-01"
+#~ msgstr "1. 1. 2024"
+
+#~ msgid "27.00"
+#~ msgstr "27,00"
+
+#~ msgid "3.00"
+#~ msgstr "3,00"
+
+#~ msgid "30.00"
+#~ msgstr "30,00"
+
+#~ msgid "31.05"
+#~ msgstr "31,05"
+
+#~ msgid "4.05"
+#~ msgstr "4,05"
+
+#~ msgid "4.2%"
+#~ msgstr "4,2 %"
+
+#~ msgid "4.225%"
+#~ msgstr "4,225 %"
+
+#~ msgid "4.5%"
+#~ msgstr "4,5 %"
+
+#~ msgid "4.75%"
+#~ msgstr "4,75 %"
+
+#~ msgid "4.875%"
+#~ msgstr "4,875 %"
+
+#~ msgid "5.3%"
+#~ msgstr "5,3 %"
+
+#~ msgid "5.5%"
+#~ msgstr "5,5 %"
+
+#~ msgid "5.6%"
+#~ msgstr "5,6 %"
+
+#~ msgid "5.75%"
+#~ msgstr "5,75 %"
+
+#~ msgid "534677881234"
+#~ msgstr "534677881234"
+
+#~ msgid "6.1%"
+#~ msgstr "6,1 %"
+
+#~ msgid "6.25%"
+#~ msgstr "6,25 %"
+
+#~ msgid "6.35%"
+#~ msgstr "6,35 %"
+
+#~ msgid "6.5%"
+#~ msgstr "6,5 %"
+
+#~ msgid "6.625%"
+#~ msgstr "6,625 %"
+
+#~ msgid "6.85%"
+#~ msgstr "6,85 %"
+
+#~ msgid "6.875%"
+#~ msgstr "6,875 %"
+
+#~ msgid "7.25%"
+#~ msgstr "7,25 %"
+
+#~ msgid "9.00"
+#~ msgstr "9,00"
+
+#~ msgid "Restrict the use of taxes to a type of product."
+#~ msgstr "Obmedzte použitie daní na typ produktu."
+
+#~ msgid "(*) Goods Delivered not Invoiced (perpetual valuation)"
+#~ msgstr "(*) Tovar dodaný ale nefakturovaný (priebežné oceňovanie)"
+
+#~ msgid "(*) Goods Invoiced not Delivered (perpetual valuation)"
+#~ msgstr "(*) Tovar fakturovaný, nedodaný (priebežné oceňovanie)"
+
+#~ msgid ""
+#~ "Value for the amount of the writeoff line\n"
+#~ "    * Percentage: Percentage of the balance, between 0 and 100.\n"
+#~ "    * Fixed: The fixed value of the writeoff. The amount will count as a "
+#~ "debit if it is negative, as a credit if it is positive.\n"
+#~ "    * From Label: There is no need for regex delimiter, only the regex is "
+#~ "needed. For instance if you want to extract the amount from\n"
+#~ "R:9672938 10/07 AX 9415126318 T:5L:NA BRT: 3358,07 C:\n"
+#~ "You could enter\n"
+#~ "BRT: ([\\d,]+)"
+#~ msgstr ""
+#~ "Hodnota pre riadok s výškou odpisu\n"
+#~ "    * Percento: Percento zostatku, od 0 do 100.\n"
+#~ "    * Fixná: Pevná hodnota odpisu. Suma sa započíta ako debet, ak je "
+#~ "záporná, ako kredit, ak je kladná.\n"
+#~ "    * Zo štítku: Nie je potrebný oddeľovač regex výrazu, potrebný je len "
+#~ "regex výraz. Napríklad ak chcete získať sumu z\n"
+#~ "R:9672938 10/07 AX 9415126318 T:5L:NA BRT: 3358,07 C:\n"
+#~ "Mohli by ste zadať\n"
+#~ "BRT: ([\\d,]+)"
+
+#~ msgid ""
+#~ "<span>1.00</span>\n"
+#~ "                                                        <span "
+#~ "groups=\"uom.group_uom\">Units</span>"
+#~ msgstr ""
+#~ "<span>1,00</span>\n"
+#~ "                                                        <span "
+#~ "groups=\"uom.group_uom\">Jednotky</span>"
+
+#~ msgid ""
+#~ "<br/>\n"
+#~ "                        <span>Please make sure that this is a wanted "
+#~ "behavior.</span>"
+#~ msgstr ""
+#~ "<br/>\n"
+#~ "                        <span>Prosím uistite sa, že ide o požadované "
+#~ "správanie..</span>"
+
+#~ msgid ""
+#~ "Once a document has been posted once, its type is set in stone and you "
+#~ "can't change it anymore."
+#~ msgstr ""
+#~ "Po prvom zaúčtovaní dokumentu je jeho typ definitívne stanovený a už ho "
+#~ "nemožno zmeniť."
+
+#~ msgid ""
+#~ "This account is configured in %(journal_names)s journal(s) (ids %"
+#~ "(journal_ids)s) as payment debit or credit account. This means that this "
+#~ "account's type should be reconcilable."
+#~ msgstr ""
+#~ "Tento účet je nakonfigurovaný v denníkoch %(journal_names)s (ids %"
+#~ "(journal_ids)s) ako debetný alebo kreditný účet. To znamená, že typ tohto "
+#~ "účtu by mal byť párovateľný."
 
 #~ msgid "%(ref)s (%(currency_amount)s)"
 #~ msgstr "%(ref)s (%(currency_amount)s)"

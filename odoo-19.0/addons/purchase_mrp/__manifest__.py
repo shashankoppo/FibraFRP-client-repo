@@ -32,4 +32,5 @@ from purchase order.
         ],
     },
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

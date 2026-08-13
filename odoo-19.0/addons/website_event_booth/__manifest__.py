@@ -30,4 +30,5 @@ Display your booths on your website for the users to register.
         ],
     },
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

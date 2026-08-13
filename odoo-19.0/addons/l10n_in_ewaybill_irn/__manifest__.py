@@ -18,4 +18,5 @@ This module enables to generate E-waybill through IRN.
     ],
     'auto_install': True,
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

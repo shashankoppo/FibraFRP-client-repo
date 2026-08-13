@@ -16,7 +16,7 @@ class TestDiscussFullPerformance(HttpCase, MailCommon):
     # Queries for _query_count_init_store (in order):
     #   1: search res_partner (odooot ref exists)
     #   1: search res_groups (internalUserGroupId ref exists)
-    #   8: odoobot format:
+    #   10: odoobot format:
     #       - fetch res_partner (_read_format)
     #       - search res_users (_compute_im_status)
     #       - search presence (_compute_im_status)
@@ -26,7 +26,8 @@ class TestDiscussFullPerformance(HttpCase, MailCommon):
     #       - fetch employee (_compute_im_status hr_homeworking override)
     #       - fetch res_users (_read_format)
     #       - fetch hr_employee (res.users _to_store)
-    #   5: settings:
+    #       - search hr_employee (res.partner _to_store)
+    #   6: settings:
     #       - search res_users_settings (_find_or_create_for_user)
     #       - fetch res_users_settings (_format_settings)
     #       - search res_users_settings_volumes (_format_settings)
@@ -36,7 +37,7 @@ class TestDiscussFullPerformance(HttpCase, MailCommon):
     #   2: hasCannedResponses
     #       - fetch res_groups_users_rel
     #       - search mail_canned_response
-    _query_count_init_store = 19
+    _query_count_init_store = 20
     # Queries for _query_count_init_messaging (in order):
     #   1: insert res_device_log
     #   3: _search_is_member (for current user, first occurence _search_is_member for chathub given channel ids)
@@ -390,13 +391,15 @@ class TestDiscussFullPerformance(HttpCase, MailCommon):
         The point of having a separate getter is to allow it to be overriden.
         """
         xmlid_to_res_id = self.env["ir.model.data"]._xmlid_to_res_id
-        partner_0 = self.users[0].partner_id
+        user_0 = self.users[0]
+        partner_0 = user_0.partner_id
         return {
             "res.partner": self._filter_partners_fields(
                 {
                     "active": False,
                     "avatar_128_access_token": self.user_root.partner_id._get_avatar_128_access_token(),
                     "email": "odoobot@example.com",
+                    "employee_ids": [],
                     "id": self.user_root.partner_id.id,
                     "im_status": "bot",
                     "im_status_access_token": self.user_root.partner_id._get_im_status_access_token(),
@@ -408,27 +411,29 @@ class TestDiscussFullPerformance(HttpCase, MailCommon):
                 {
                     "active": True,
                     "avatar_128_access_token": partner_0._get_avatar_128_access_token(),
-                    "id": self.users[0].partner_id.id,
-                    "im_status": 'online',
-                    "im_status_access_token": self.users[0].partner_id._get_im_status_access_token(),
-                    "main_user_id": self.users[0].id,
+                    "id": partner_0.id,
+                    "im_status": "online",
+                    "im_status_access_token": partner_0._get_im_status_access_token(),
+                    "main_user_id": user_0.id,
                     "name": "Ernest Employee",
-                    "write_date": fields.Datetime.to_string(self.users[0].partner_id.write_date),
+                    "write_date": fields.Datetime.to_string(partner_0.write_date),
                 },
             ),
             "res.users": self._filter_users_fields(
                 {
-                    "id": self.user_root.id,
-                    "share": False,
                     "employee_ids": [],
+                    "id": self.user_root.id,
+                    "partner_id": self.partner_root.id,
+                    "share": False,
                 },
                 {
-                    "id": self.users[0].id,
+                    "id": user_0.id,
                     "is_admin": False,
                     "is_livechat_manager": False,
                     "notification_type": "inbox",
+                    "partner_id": partner_0.id,
                     "share": False,
-                    "signature": ["markup", str(self.users[0].signature)],
+                    "signature": ["markup", str(user_0.signature)],
                 },
             ),
             "Store": {
@@ -875,6 +880,7 @@ class TestDiscussFullPerformance(HttpCase, MailCommon):
                 "livechat_note": False,
                 "livechat_outcome": "no_answer",
                 "livechat_status": "in_progress",
+                "livechat_lang_id": False,
                 "livechat_visitor_id": False,
                 "livechat_expertise_ids": [],
                 "livechat_operator_id": self.users[0].partner_id.id,
@@ -905,6 +911,7 @@ class TestDiscussFullPerformance(HttpCase, MailCommon):
                 "livechat_note": False,
                 "livechat_outcome": "no_answer",
                 "livechat_status": "in_progress",
+                "livechat_lang_id": False,
                 "livechat_visitor_id": False,
                 "livechat_expertise_ids": [],
                 "livechat_operator_id": self.users[0].partner_id.id,
@@ -1609,6 +1616,7 @@ class TestDiscussFullPerformance(HttpCase, MailCommon):
                 "active": True,
                 "avatar_128_access_token": user.partner_id._get_avatar_128_access_token(),
                 "email": "e.e@example.com",
+                "employee_ids": user.employee_ids.ids,
                 "id": user.partner_id.id,
                 "im_status": "online",
                 "im_status_access_token": user.partner_id._get_im_status_access_token(),
@@ -1664,6 +1672,7 @@ class TestDiscussFullPerformance(HttpCase, MailCommon):
                 "active": True,
                 "avatar_128_access_token": user.partner_id._get_avatar_128_access_token(),
                 "email": "test2@example.com",
+                "employee_ids": user.employee_ids.ids,
                 "id": user.partner_id.id,
                 "im_status": "offline",
                 "im_status_access_token": user.partner_id._get_im_status_access_token(),
@@ -1678,6 +1687,7 @@ class TestDiscussFullPerformance(HttpCase, MailCommon):
                 "active": True,
                 "avatar_128_access_token": user.partner_id._get_avatar_128_access_token(),
                 "email": False,
+                "employee_ids": user.employee_ids.ids,
                 "id": user.partner_id.id,
                 "im_status": "offline",
                 "im_status_access_token": user.partner_id._get_im_status_access_token(),
@@ -1692,6 +1702,7 @@ class TestDiscussFullPerformance(HttpCase, MailCommon):
                 "active": True,
                 "avatar_128_access_token": user.partner_id._get_avatar_128_access_token(),
                 "email": False,
+                "employee_ids": user.employee_ids.ids,
                 "id": user.partner_id.id,
                 "im_status": "offline",
                 "im_status_access_token": user.partner_id._get_im_status_access_token(),
@@ -1706,6 +1717,7 @@ class TestDiscussFullPerformance(HttpCase, MailCommon):
                 "active": True,
                 "avatar_128_access_token": user.partner_id._get_avatar_128_access_token(),
                 "email": False,
+                "employee_ids": user.employee_ids.ids,
                 "id": user.partner_id.id,
                 "im_status": "offline",
                 "im_status_access_token": user.partner_id._get_im_status_access_token(),
@@ -1720,6 +1732,7 @@ class TestDiscussFullPerformance(HttpCase, MailCommon):
                 "active": True,
                 "avatar_128_access_token": user.partner_id._get_avatar_128_access_token(),
                 "email": False,
+                "employee_ids": user.employee_ids.ids,
                 "id": user.partner_id.id,
                 "im_status": "offline",
                 "im_status_access_token": user.partner_id._get_im_status_access_token(),
@@ -1768,6 +1781,7 @@ class TestDiscussFullPerformance(HttpCase, MailCommon):
 
     def _expected_result_for_thread(self, channel):
         common_data = {
+            "has_mail_thread": True,
             "id": channel.id,
             "model": "discuss.channel",
             "module_icon": "/mail/static/description/icon.png",
@@ -1791,26 +1805,68 @@ class TestDiscussFullPerformance(HttpCase, MailCommon):
         return {}
 
     def _res_for_user(self, user):
+        partner = user.partner_id
         if user == self.users[0]:
-            return {"id": user.id, "employee_ids": user.employee_ids.ids, "share": False}
+            return {
+                "id": user.id,
+                "employee_ids": user.employee_ids.ids,
+                "partner_id": partner.id,
+                "share": False,
+            }
         if user == self.users[1]:
-            return {"id": user.id, "share": False}
+            return {
+                "id": user.id,
+                "partner_id": partner.id,
+                "share": False,
+            }
         if user == self.users[2]:
-            return {"id": user.id, "employee_ids": user.employee_ids.ids, "share": False}
+            return {
+                "id": user.id,
+                "employee_ids": user.employee_ids.ids,
+                "partner_id": partner.id,
+                "share": False,
+            }
         if user == self.users[3]:
-            return {"id": user.id, "employee_ids": user.employee_ids.ids, "share": False}
+            return {
+                "id": user.id,
+                "employee_ids": user.employee_ids.ids,
+                "partner_id": partner.id,
+                "share": False,
+            }
         if user == self.users[12]:
-            return {"id": user.id, "employee_ids": user.employee_ids.ids, "share": False}
+            return {
+                "id": user.id,
+                "employee_ids": user.employee_ids.ids,
+                "partner_id": partner.id,
+                "share": False,
+            }
         if user == self.users[14]:
-            return {"id": user.id, "employee_ids": user.employee_ids.ids, "share": False}
+            return {
+                "id": user.id,
+                "employee_ids": user.employee_ids.ids,
+                "partner_id": partner.id,
+                "share": False,
+            }
         if user == self.users[15]:
-            return {"id": user.id, "employee_ids": user.employee_ids.ids, "share": False}
+            return {
+                "id": user.id,
+                "employee_ids": user.employee_ids.ids,
+                "partner_id": partner.id,
+                "share": False,
+            }
         if user == self.user_root:
-            return {"id": user.id, "share": False}
+            return {
+                "id": user.id,
+                "partner_id": partner.id,
+                "share": False,
+            }
         return {}
 
     def _res_for_employee(self, employee):
         return {
+            "active": employee.active,
+            "company_id": employee.company_id.id,
             "id": employee.id,
             "leave_date_to": False,
+            "user_id": employee.user_id.id,
         }

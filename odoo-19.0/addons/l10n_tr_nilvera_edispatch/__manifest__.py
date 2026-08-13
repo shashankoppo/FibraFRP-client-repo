@@ -5,6 +5,7 @@
     'version': "1.0",
     'depends': ['l10n_tr_nilvera', 'stock'],
     'installable': True,
+    'license': "LGPL-3",
     'category': 'Accounting/Localizations',
     'data': [
         'security/ir.model.access.csv',

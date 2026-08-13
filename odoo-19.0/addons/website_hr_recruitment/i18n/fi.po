@@ -14,16 +14,16 @@
 # Veikko Väätäjä <veikko.vaataja@gmail.com>, 2022
 # Mikko Salmela <salmemik@gmail.com>, 2022
 # Ossi Mantylahti <ossi.mantylahti@obs-solutions.fi>, 2023
-# "Tiffany Chang (tic)" <tic@odoo.com>, 2025.
-# Weblate <noreply-mt-weblate@weblate.org>, 2025.
+# "Tiffany Chang (tic)" <tic@odoo.com>, 2025, 2026.
+# Weblate <noreply-mt-weblate@weblate.org>, 2025, 2026.
 # Saara Hakanen <sahak@odoo.com>, 2025, 2026.
 msgid ""
 msgstr ""
 "Project-Id-Version: Odoo Server 16.0beta\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-12-30 18:36+0000\n"
-"PO-Revision-Date: 2026-01-07 15:35+0000\n"
-"Last-Translator: Saara Hakanen <sahak@odoo.com>\n"
+"POT-Creation-Date: 2026-04-10 18:38+0000\n"
+"PO-Revision-Date: 2026-08-04 22:30+0000\n"
+"Last-Translator: Weblate <noreply-mt-weblate@weblate.org>\n"
 "Language-Team: Finnish <https://translate.odoo.com/projects/odoo-19/"
 "website_hr_recruitment/fi/>\n"
 "Language: fi\n"
@@ -31,7 +31,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: \n"
 "Plural-Forms: nplurals=2; plural=n != 1;\n"
-"X-Generator: Weblate 5.14.3\n"
+"X-Generator: Weblate 2026.6.1\n"
 
 #. module: website_hr_recruitment
 #. odoo-python
@@ -70,11 +70,6 @@ msgid "'. Showing results for '"
 msgstr "'. Tulokset haulle '"
 
 #. module: website_hr_recruitment
-#: model_terms:ir.ui.view,arch_db:website_hr_recruitment.job_right_side_bar
-msgid "+1 (650) 555-0187"
-msgstr "+1 (650) 555-0187"
-
-#. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.default_website_description
 msgid "12 days / year, including <br/>6 of your choice."
 msgstr "12 päivää / vuosi, mukaan lukien <br/>6 valitsemaasi päivää."
@@ -85,8 +80,8 @@ msgid ""
 "<a href=\"/\" class=\"btn btn-primary o_translate_inline\" "
 "target=\"_blank\"><small><b>READ</b></small></a>"
 msgstr ""
-"<a href=\"/\" class=\"btn btn-primary o_translate_inline\" "
-"target=\"_blank\"><small><b>LUE</b></small></a>"
+"<a href=\"/\" class=\"btn btn-primary o_translate_inline\" target=\"_blank\">"
+"<small><b>LUE</b></small></a>"
 
 #. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.detail
@@ -172,7 +167,7 @@ msgid ""
 "                                                <span "
 "class=\"s_website_form_mark\"> *</span>"
 msgstr ""
-"<span class=\"s_website_form_label_content\">Puhelinnumero</span>\n"
+"<span class=\"s_website_form_label_content\">Puhelinnumerosi</span>\n"
 "                                                <span "
 "class=\"s_website_form_mark\"> *</span>"
 
@@ -327,8 +322,8 @@ msgid ""
 "solving problem skills."
 msgstr ""
 "Yrityksemme työntekijänä <b>teet yhteistyötä jokaisen osaston kanssa\n"
-"                        mullistavien tuotteiden luomisessa ja käyttöönotossa."
-"</b> Tule osaksi kasvavaan yritystä,\n"
+"                        mullistavien tuotteiden luomisessa ja "
+"käyttöönotossa.</b> Tule osaksi kasvavaan yritystä,\n"
 "                        joka tarjoaa loistavat edut ja mahdollisuuksia "
 "kasvaa ja oppia\n"
 "                        ansioituneiden johtajien rinnalla. Etsimme kokenutta "
@@ -405,8 +400,8 @@ msgstr "Luo sisältöä, joka auttaa käyttäjiämme päivittäin"
 msgid ""
 "Create new job pages from the <strong>+ <i>New</i></strong> top-right button."
 msgstr ""
-"Luo uusia työsivuja oikean yläkulman <strong>+ <i>Uusi</i></strong> "
-"-painikkeella."
+"Luo uusia työsivuja oikean yläkulman <strong>+ <i>Uusi</i></strong> -"
+"painikkeella."
 
 #. module: website_hr_recruitment
 #. odoo-javascript
@@ -464,8 +459,8 @@ msgstr ""
 "                           <br/>\n"
 "                            Tapahtumia järjestetään ympäri vuoden, kuten "
 "viikoittaisia\n"
-"                            urheilutilaisuuksia, tiiminrakennustapahtumia, "
-"kuukausittaisia juomailtamia ja paljon muuta."
+"                            urheilu- ja ryhmäytymistapahtumia, "
+"kuukausittaisia juomailtamia ja paljon muuta"
 
 #. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.default_website_description
@@ -496,7 +491,7 @@ msgstr "Facebook"
 #. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.job_filter_base
 msgid "Filter by country"
-msgstr "Suodata maan mukaan"
+msgstr "Suodata maittain"
 
 #. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.topbar_customizations
@@ -552,8 +547,8 @@ msgstr ""
 "                                                Seuraava vaihe on joko "
 "puhelu tai tapaaminen toimistossamme.\n"
 "                                               <br/><br/>\n"
-"                                               Ota rohkeasti "
-"<strong>yhteyttä, jos haluat nopeamman\n"
+"                                               Ota rohkeasti <strong>"
+"yhteyttä, jos haluat nopeamman\n"
 "                                                vastauksen</strong> tai jos "
 "et saa minulta vastausta\n"
 "                                                riittävän nopeasti."
@@ -689,7 +684,7 @@ msgstr "Neuvottelut ja sopimukset"
 #. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.default_website_description
 msgid "Nice to have"
-msgstr "Eduksi katsotaan"
+msgstr "Katsotaan eduksi"
 
 #. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.default_website_description
@@ -940,8 +935,8 @@ msgid ""
 "class=\"fw-bold\">contact us</span> for a spontaneous application."
 msgstr ""
 "Tällä hetkellä ei avoimia työpaikkoja,<br class=\"mb-2\"/>\n"
-"                                            mutta <span class=\"fw-"
-"bold\">ota rohkeasti yhteyttä</span> ja lähetä avoin hakemus."
+"                                            mutta <span class=\"fw-bold\">"
+"ota rohkeasti yhteyttä</span> ja lähetä avoin hakemus."
 
 #. module: website_hr_recruitment
 #. odoo-javascript
@@ -968,7 +963,7 @@ msgstr "Tyypit"
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.job_filter_base
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.job_filter_base_mobile
 msgid "Unspecified"
-msgstr "Määrittelemätön"
+msgstr "Täsmentämätön"
 
 #. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.default_website_description
@@ -1072,6 +1067,11 @@ msgid "What's great in the job?"
 msgstr "Mikä työssä on parasta?"
 
 #. module: website_hr_recruitment
+#: model_terms:ir.ui.view,arch_db:website_hr_recruitment.job_right_side_bar
+msgid "X"
+msgstr "X"
+
+#. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.thankyou_ir_ui_view
 msgid "Your <b>contact</b> information is:"
 msgstr "<b>Yhteystietosi</b> ovat:"
@@ -1119,7 +1119,7 @@ msgstr "esim. https://www.linkedin.com/in/fpodoo"
 #. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.job_right_side_bar
 msgid "info@yourcompany.example.com"
-msgstr "info@yourcompany.example.com"
+msgstr "info@yrityksesi.esimerkki.fi"
 
 #. module: website_hr_recruitment
 #: model:ir.model.fields,field_description:website_hr_recruitment.field_hr_job__full_url
@@ -1140,6 +1140,9 @@ msgstr "avoimet työpaikat"
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.index
 msgid "unpublished"
 msgstr "julkaisematon"
+
+#~ msgid "+1 (650) 555-0187"
+#~ msgstr "+1 (650) 555-0187"
 
 #~ msgid "%s's Application"
 #~ msgstr "%s:n sovellus"

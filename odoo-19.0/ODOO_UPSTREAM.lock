@@ -1,0 +1,31 @@
+{
+    "schema_version":  1,
+    "repository":  "https://github.com/odoo/odoo.git",
+    "branch":  "19.0",
+    "baseline_commit":  "8e9c2788225aa1e4b483fc082c7bd5ebd7de4b1b",
+    "baseline_local_commit":  "7e67a05371b1f01ad2f095ff1c650aa9f4927b79",
+    "target_commit":  "5b87cfa13a147dfbea2322899f64ad5c1cb837e1",
+    "target_committed_at":  "2026-08-13T11:46:02Z",
+    "owned_directories":  [
+                              "addons",
+                              "odoo",
+                              "debian",
+                              "setup"
+                          ],
+    "owned_files":  [
+                        "COPYRIGHT",
+                        "LICENSE",
+                        "MANIFEST.in",
+                        "odoo-bin",
+                        "requirements.txt",
+                        "ruff.toml",
+                        "setup.cfg",
+                        "setup.py"
+                    ],
+    "target_audit":  {
+                           "runtime_files":  47002,
+                           "normalized_transport_differences":  0,
+                           "omitted_hidden_iot_files":  0,
+                           "unexplained_product_code_differences":  0
+                       }
+}

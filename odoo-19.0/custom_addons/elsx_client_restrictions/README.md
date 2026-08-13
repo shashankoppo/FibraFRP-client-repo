@@ -8,6 +8,8 @@ It does not replace Odoo access control.
 - The built-in Administrator retains System Administration and Access Rights.
 - Legacy Apps passwords, secret URLs, module guards, safety menus, custom
   branding views, and restriction groups are removed.
+- Apps listing, installation, upgrade, and removal use native Odoo Community
+  administrator permissions without a second password gate.
 - Client users, companies, business records, attachments, and functional
   modules are not deleted or rewritten.
 

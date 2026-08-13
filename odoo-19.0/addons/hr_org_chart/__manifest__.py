@@ -38,4 +38,5 @@ This module extend the employee form with a organizational chart.
         ],
     },
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

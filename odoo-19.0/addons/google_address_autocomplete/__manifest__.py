@@ -33,4 +33,5 @@ This module Auto complete the address data.
         ]
     },
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

@@ -14,4 +14,5 @@ E-Transport implementation for Batch Pickings in Romania
     ],
     'installable': True,
     'author': 'Odoo S.A.',
+    'license': "LGPL-3",
 }

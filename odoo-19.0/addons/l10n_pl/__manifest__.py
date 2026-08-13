@@ -3,7 +3,7 @@
     'name': 'Poland - Accounting',
     'icon': '/account/static/description/l10n.png',
     'countries': ['pl'],
-    'version': '2.0',
+    'version': '2.1',
     'author': 'Odoo S.A., Grzegorz Grzelak (OpenGLOBE) (http://www.openglobe.pl)',
     'website': 'https://www.odoo.com/documentation/latest/applications/finance/fiscal_localizations.html',
     'category': 'Accounting/Localizations/Account Charts',
@@ -39,4 +39,5 @@ Wewnętrzny numer wersji OpenGLOBE 1.02
         'demo/demo_company.xml',
     ],
     'post_init_hook': '_preserve_tag_on_taxes',
+    'license': 'LGPL-3',
 }

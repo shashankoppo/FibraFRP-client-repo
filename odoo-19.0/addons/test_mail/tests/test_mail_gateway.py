@@ -26,35 +26,23 @@ from odoo.tools.mail import email_normalize, email_split_and_format, formataddr
 @tagged('mail_gateway')
 class TestEmailParsing(MailCommon):
 
-    def test_message_parse_and_replace_binary_octetstream(self):
-        """ Incoming email containing a wrong Content-Type as described in RFC2046/section-3 """
-        received_mail = self.from_string(test_mail_data.MAIL_MULTIPART_BINARY_OCTET_STREAM)
-        with self.assertLogs('odoo.addons.mail.models.mail_thread', level="WARNING") as capture:
-            extracted_mail = self.env['mail.thread']._message_parse_extract_payload(received_mail, {})
+    def test_message_parse_and_replace_bad_content_type(self):
+        """Incoming emails with unsupported attachment Content-Types should not crash parsing."""
+        for content_type in ('binary/octet-stream', '*/*', 'bin/plain'):
+            with self.subTest(content_type=content_type):
+                received_mail = self.format(test_mail_data.MAIL_PDF_MIME_TEMPLATE, pdf_mime=content_type)
+                self.assertIn(f"Content-Type: {content_type}", received_mail, f"{content_type} content-type not found")
+                with self.assertLogs("odoo.addons.mail.models.mail_thread", level="WARNING") as capture:
+                    extracted_mail = self.env['mail.thread'].message_parse(self.from_string(received_mail))
 
-        self.assertEqual(len(extracted_mail['attachments']), 1)
-        attachment = extracted_mail['attachments'][0]
-        self.assertEqual(attachment.fname, 'hello_world.dat')
-        self.assertEqual(attachment.content, b'Hello world\n')
-        self.assertEqual(capture.output, [
-            ("WARNING:odoo.addons.mail.models.mail_thread:Message containing an unexpected "
-             "Content-Type 'binary/octet-stream', assuming 'application/octet-stream'"),
-        ])
-
-    def test_message_parse_and_replace_wildcard(self):
-        """Incoming email containing a wrong Content-Type (*/*) as described in RFC2046/section-3"""
-        mail_with_wildcard_mime = self.format(test_mail_data.MAIL_PDF_MIME_TEMPLATE, pdf_mime="*/*")
-        self.assertIn("Content-Type: */*", mail_with_wildcard_mime, "Wildcard for content-type not found")
-        with self.assertLogs("odoo.addons.mail.models.mail_thread", level="WARNING") as capture:
-            extracted_mail = self.env['mail.thread'].message_parse(self.from_string(mail_with_wildcard_mime))
-
-        self.assertEqual(len(extracted_mail['attachments']), 1)
-        attachment = extracted_mail['attachments'][0]
-        self.assertEqual(attachment.fname, 'scan_soraya.lernout_1691652648.pdf')
-        self.assertEqual(capture.output, [
-            ("WARNING:odoo.addons.mail.models.mail_thread:Message containing an unexpected "
-             "Content-Type '*/*', assuming 'application/octet-stream'"),
-        ])
+                self.assertEqual(len(extracted_mail['attachments']), 1)
+                attachment = extracted_mail['attachments'][0]
+                self.assertEqual(attachment.fname, 'scan_soraya.lernout_1691652648.pdf')
+                self.assertEqual(attachment.content, test_mail_data.PDF_PARSED)
+                self.assertEqual(capture.output, [
+                    ("WARNING:odoo.addons.mail.models.mail_thread:Message containing an unexpected "
+                    f"Content-Type '{content_type}', assuming 'application/octet-stream'"),
+                ])
 
     def test_message_parse_body(self):
         # test pure plaintext
@@ -1086,6 +1074,22 @@ class TestMailgateway(MailGatewayCommon):
         self.assertNotSentEmail()
 
     @mute_logger('odoo.addons.mail.models.mail_thread', 'odoo.models')
+    def test_message_route_bounce_multi_company_alias_domain(self):
+        """Incoming emails: company-specific bounce alias from catchall"""
+        with self.mock_mail_gateway():
+            record = self.format_and_process(
+                MAIL_TEMPLATE, self.partner_1.email_formatted,
+                f'{self.alias_catchall_c2}@{self.alias_domain_c2_name}',
+                subject='Test multi-company routing alias',
+            )
+        self.assertFalse(record)
+        self.assertSentEmail(
+            f'"MAILER-DAEMON" <{self.alias_bounce_c2}@{self.alias_domain_c2_name}>',
+            ['whatever-2a840@postmaster.twitter.com'],
+            subject='Re: Test multi-company routing alias'
+        )
+
+    @mute_logger('odoo.addons.mail.models.mail_thread', 'odoo.models')
     def test_message_route_bounce_other_recipients(self):
         """Incoming email: bounce processing: bounce should be computed even if not first recipient """
         with self.mock_mail_gateway():
@@ -1558,6 +1562,15 @@ class TestMailgateway(MailGatewayCommon):
                 date=False,
                 parent_id=reply1.id,
             )
+
+        self.env.cr.execute("""
+            UPDATE mail_message
+            SET date = NULL, create_date = NULL
+            WHERE id = %s
+        """, (old_disturbing_msg.id,))
+        self.env.invalidate_all()
+
+        self.assertFalse(old_disturbing_msg.create_date)
         self.assertFalse(old_disturbing_msg.date)
 
         with self.mock_datetime_and_now(datetime(2025, 11, 19, 10, 30, 0)):
@@ -2735,6 +2748,43 @@ class TestMailGatewayReplies(MailGatewayCommon):
                 },
                 'notif': [
                     {'email_to': [email_normalize(self.email_from)], 'type': 'email'},
+                ],
+                'subtype': 'mail.mt_comment',
+            }],
+        )
+        # second internal user reply (verifies that earlier OOO record with outgoing_email_to=False
+        # does not falsely suppress OOO notification for another internal partner)
+        self.user_employee_c2.notification_type = 'email'
+        with self.mock_datetime_and_now(datetime(2025, 6, 17, 14, 17, 00)):
+            with self.mock_mail_gateway(), self.mock_mail_app():
+                self.format_and_process(
+                    MAIL_TEMPLATE_EXTRA_HTML, self.user_employee_c2.email_formatted,
+                    self.alias.alias_full_name,
+                    extra=f'In-Reply-To:{initial_msg.message_id}\nReferences:{initial_msg.message_id}\n',
+                    extra_html='Employee C2  user reply',
+                    subject='Employee C2 user reply',
+                )
+        self.assertEqual(len(self._new_msgs), 2, 'Employee C2 reply + OOO message sent to employee C2 user')
+        ooo_message_2 = self._new_msgs[1]
+        self.assertMailNotifications(
+            ooo_message_2,
+            [{
+                'content': "<p>Le numéro que vous avez composé n'est plus attribué.</p>",
+                'email_values': {
+                    'subject': 'Auto: Employee C2 user reply',
+                },
+                'message_type': 'out_of_office',
+                'message_values': {
+                    'author_id': self.partner_employee,
+                    'email_from': self.partner_employee.email_formatted,
+                    'model': record._name,
+                    'partner_ids': self.partner_employee_c2,
+                    'notified_partner_ids': self.partner_employee_c2,
+                    'res_id': record.id,
+                    'subject': 'Auto: Employee C2 user reply',
+                },
+                'notif': [
+                    {'partner': self.partner_employee_c2, 'type': 'email'},
                 ],
                 'subtype': 'mail.mt_comment',
             }],

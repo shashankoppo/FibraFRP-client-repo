@@ -33,4 +33,5 @@ Features include:
     'installable': True,
     'post_init_hook': '_l10n_tr_nilvera_einvoice_extended_post_init',
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

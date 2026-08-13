@@ -11,4 +11,5 @@
     ],
     'auto_install': ['hr_work_entry_holidays'],
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

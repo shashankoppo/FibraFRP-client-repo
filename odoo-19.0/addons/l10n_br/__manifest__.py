@@ -83,4 +83,5 @@ Create electronic sales invoices with Avatax.
             'l10n_br/static/src/interactions/**/*',
         ],
     },
+    'license': 'LGPL-3',
 }

@@ -216,8 +216,8 @@ actual arch.
             return re.sub(r'(?P<prefix>[^%])%\((?P<xmlid>.*?)\)[ds]', replacer, arch_fs)
 
         lang = self.env.lang or 'en_US'
-        env_en = self.with_context(edit_translations=None, lang='en_US').env
-        env_lang = self.with_context(lang=lang).env
+        env_en = self.with_context(edit_translations=None, lang='en_US', check_translations=True).env
+        env_lang = self.with_context(lang=lang, check_translations=True).env
         field_arch_db = self._fields['arch_db']
         for view in self:
             arch_fs = None
@@ -322,6 +322,7 @@ actual arch.
     @api.depends('arch', 'inherit_id')
     def _compute_invalid_locators(self):
         def assess_locator(source, spec):
+            node = None
             with suppress(ValidationError):  # Syntax error
                 # If locate_node returns None here:
                 # Invalid expression: Ok Syntax, but cannot be anchored to the parent view.
@@ -474,7 +475,8 @@ actual arch.
 
                 if view.type == 'qweb':
                     continue
-            except (etree.ParseError, ValueError) as e:
+            except (etree.ParseError, ValueError, TypeError) as e:
+                # Note: lxml < 5.0 raises ValueError; lxml 5.0+ / libxml2 2.12+ raises TypeError
                 err = ValidationError(_(
                     "Error while parsing or validating view:\n\n%(error)s",
                     error=e,
@@ -538,7 +540,7 @@ actual arch.
             if (view.group_ids and
                 view.inherit_id and
                 view.mode != 'primary'):
-                raise ValidationError(_("Inherited view cannot have 'Groups' define on the record. Use 'groups' attributes inside the view definition"))
+                raise ValidationError(_("Inherited view cannot have '%(attr)s' defined on the record. Use '%(attr)s' attributes inside the view definition", attr='groups'))
 
     @api.constrains('inherit_id')
     def _check_000_inheritance(self):
@@ -576,7 +578,8 @@ actual arch.
                 combined_arch = view._get_combined_arch()
                 if view.type != 'qweb':
                     view._postprocess_view(combined_arch, view.model, is_compute_warning_info=True)
-            except (etree.ParseError, ValueError) as e:
+            except (etree.ParseError, ValueError, TypeError) as e:
+                # Note: lxml < 5.0 raises ValueError; lxml 5.0+ / libxml2 2.12+ raises TypeError
                 view.warning_info = str(e)
 
     def _validate_xml_encoding(self, text):
@@ -610,7 +613,8 @@ actual arch.
                                 "Allowed types are: %(valid_types)s",
                                 view_type=values['type'], valid_types=', '.join(valid_types)
                             ))
-                    except (etree.ParseError, ValueError):
+                    except (etree.ParseError, ValueError, TypeError):
+                        # Note: lxml < 5.0 raises ValueError; lxml 5.0+ / libxml2 2.12+ raises TypeError
                         # don't raise here, the constraint that runs `self._check_xml` will
                         # do the job properly.
                         pass
@@ -1333,7 +1337,15 @@ actual arch.
         # check the read/visibility access
         for node in tree.xpath('//*[@__groups_key__]'):
             if not has_access(node.attrib.pop('__groups_key__')):
-                node.getparent().remove(node)
+                tail = node.tail
+                parent = node.getparent()
+                previous = node.getprevious()
+                parent.remove(node)
+                if tail:
+                    if previous is not None:
+                        previous.tail = (previous.tail or '') + tail
+                    elif parent is not None:
+                        parent.text = (parent.text or '') + tail
             elif node.tag == 't' and not node.attrib:
                 # Move content of <t groups=""> blocks
                 # and remove the <t> node.
@@ -3199,9 +3211,9 @@ class Base(models.AbstractModel):
         :rtype: list
         """
         return [
-            'change_default', 'context', 'currency_field', 'definition_record', 'definition_record_field', 'digits', 'domain', 'aggregator', 'groups',
-            'help', 'model_field', 'name', 'readonly', 'related', 'relation', 'relation_field', 'required', 'searchable', 'selection', 'size',
-            'sortable', 'store', 'string', 'translate', 'trim', 'type', 'groupable', 'falsy_value_label'
+            'change_default', 'context', 'currency_field', 'definition_record', 'definition_record_field', 'digits', 'min_display_digits', 'domain',
+            'aggregator', 'groups', 'help', 'model_field', 'name', 'readonly', 'related', 'relation', 'relation_field', 'required', 'searchable',
+            'selection', 'size', 'sortable', 'store', 'string', 'translate', 'trim', 'type', 'groupable', 'falsy_value_label'
         ]
 
     @api.readonly

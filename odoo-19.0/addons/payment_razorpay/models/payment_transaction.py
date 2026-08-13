@@ -5,6 +5,7 @@ import time
 from datetime import datetime
 
 from dateutil.relativedelta import relativedelta
+from werkzeug.exceptions import Forbidden
 from werkzeug.urls import url_encode
 
 from odoo import _, api, fields, models
@@ -63,7 +64,7 @@ class PaymentTransaction(models.Model):
         :rtype: dict
         """
         payload = {
-            'name': self.partner_name,
+            'name': self.partner_name.replace(',', ' ')[:50],
             'email': self.partner_email or '',
             'contact': self.partner_phone and self._validate_phone_number(self.partner_phone) or '',
             'fail_existing': '0',  # Don't throw an error if the customer already exists.
@@ -375,6 +376,10 @@ class PaymentTransaction(models.Model):
             except ValidationError as e:
                 self._set_error(str(e))
                 return
+
+        if self.reference != entity_data["description"]:
+            _logger.warning("Received payment data with incorrect reference")
+            raise Forbidden()
 
         # Update the provider reference.
         entity_id = entity_data.get('id')

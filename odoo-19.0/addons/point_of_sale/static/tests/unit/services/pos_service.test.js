@@ -158,6 +158,39 @@ describe("pos_store.js", () => {
             expect(order.lines[1].id).toBeOfType("string");
         });
 
+        test("retry sync reserializes updated order lines", async () => {
+            const store = await setupPosEnv();
+            const order = await getFilledOrder(store);
+
+            await store.syncAllOrders();
+
+            order.lines[0].qty += 1;
+
+            let syncCallCount = 0;
+            let secondPayload;
+            const originalCall = store.data.call.bind(store.data);
+            store.data.call = async (model, method, args, kwargs) => {
+                if (model === "pos.order" && method === "sync_from_ui") {
+                    syncCallCount += 1;
+                    if (syncCallCount === 1) {
+                        const firstPayload = args[0][0];
+                        expect(firstPayload.lines.length).toBeGreaterThan(0);
+                        expect(firstPayload.lines[0][0]).toBe(1);
+                        throw new Error("sync failure");
+                    }
+                    secondPayload = args[0][0];
+                }
+                return originalCall(model, method, args, kwargs);
+            };
+
+            await store.syncAllOrders({ orders: [order] });
+            await store.syncAllOrders({ orders: [order] });
+
+            expect(syncCallCount).toBe(2);
+            expect(secondPayload.lines.length).toBeGreaterThan(0);
+            expect(secondPayload.lines[0][0]).toBe(1);
+        });
+
         test("insync order should not be re-synced", async () => {
             const store = await setupPosEnv();
             const order = await getFilledOrder(store);
@@ -190,6 +223,23 @@ describe("pos_store.js", () => {
         expect(store.getOrder().lines[0].qty).toBe(1);
         await store.addLineToCurrentOrder({ product_tmpl_id: product.product_tmpl_id, qty: 3 }, {});
         expect(store.getOrder().lines[0].qty).toBe(4);
+    });
+
+    test("addLineToCurrentOrder keeps the given variant with a single-value dynamic attribute", async () => {
+        const store = await setupPosEnv();
+        store.setOrder(null);
+        const variantM = store.models["product.product"].get(61);
+
+        await store.addLineToCurrentOrder(
+            { product_id: variantM, product_tmpl_id: variantM.product_tmpl_id },
+            {},
+            variantM.needToConfigure()
+        );
+
+        const orderLines = store.getOrder().lines;
+        const addedProduct = orderLines.at(-1).product_id;
+        expect(orderLines.length).toBe(1);
+        expect(addedProduct.id).toBe(61);
     });
 
     test("changesToOrderNoPrepCateg", async () => {
@@ -287,8 +337,8 @@ describe("pos_store.js", () => {
 
         const productA = store.models["product.product"].get(5);
         const productB = store.models["product.product"].get(6);
-        productA.parentPosCategIds = [1];
-        productB.parentPosCategIds = [2];
+        productA.pos_categ_ids = [1];
+        productB.pos_categ_ids = [2];
 
         const currentOrderChange = {
             new: [
@@ -366,9 +416,9 @@ describe("pos_store.js", () => {
         const store = await setupPosEnv();
         store.selectedCategory = store.models["pos.category"].get(1);
         let products = store.productsToDisplay;
-        expect(products.length).toBe(2);
-        expect(products[0].id).toBe(17);
-        expect(products[1].id).toBe(5);
+        expect(products.length).toBe(3);
+        expect(products[1].id).toBe(17);
+        expect(products[products.length - 1].id).toBe(5);
         expect(store.selectedCategory.id).toBe(1);
         store.selectedCategory = store.models["pos.category"].get(1);
         store.searchProductWord = "TEST";
@@ -391,7 +441,7 @@ describe("pos_store.js", () => {
         let grouped = store.productToDisplayByCateg;
         expect(grouped.length).toBe(1); //Only one group
         expect(grouped[0][0]).toBe("0");
-        expect(grouped[0][1].length).toBe(14);
+        expect(grouped[0][1].length).toBe(16);
 
         // Case 2: Grouping enabled
         store.config.iface_group_by_categ = true;
@@ -425,18 +475,94 @@ describe("pos_store.js", () => {
         store.selectedCategory = store.models["pos.category"].get(1);
         grouped = store.productToDisplayByCateg;
         expect(grouped.length).toBe(1);
-        expect(grouped[0][0]).toBe("1");
-        expect(grouped[0][1][0].name).toBe("Multi Category Product");
-        expect(grouped[0][1][1].name).toBe("TEST");
+        expect(grouped[0][0]).toBe(1);
+        expect(grouped[0][1][1].name).toBe("Multi Category Product");
+        expect(grouped[0][1][2].name).toBe("TEST");
 
         // Case 5: Grouping with category 'Food' selected (parent of 'Burger' & 'Pizza')
         store.selectedCategory = store.models["pos.category"].get(3);
         grouped = store.productToDisplayByCateg;
         expect(grouped.length).toBe(3);
-        expect(grouped[0][0]).toBe("3");
+        expect(grouped[0][0]).toBe(3);
         expect(grouped[0][1][0].name).toBe("Club sandwich");
         expect(grouped[1][1][0].name).toBe("Bacon burger");
         expect(grouped[2][1][0].name).toBe("Pizza margarita");
+
+        // Case 6: Grouping with special products excluded
+        const specialProduct = store.models["product.template"].get(25);
+        store.searchProductWord = "";
+        store.selectedCategory = store.models["pos.category"].get(
+            specialProduct.pos_categ_ids[0].id
+        );
+
+        grouped = store.productToDisplayByCateg;
+        expect(grouped).toHaveLength(1);
+        expect(grouped[0][1].map((p) => p.id)).not.toInclude(specialProduct.id);
+    });
+
+    test("productToDisplayByCateg count", async () => {
+        const store = await setupPosEnv();
+        const createProductsAndCateg = (prefix, count) => {
+            const categ = store.models["pos.category"].create({
+                name: `${prefix}_categ`,
+            });
+
+            for (let i = 0; i < count; i++) {
+                store.models["product.template"].create({
+                    name: `${prefix}_${i}`,
+                    pos_categ_ids: [categ.id],
+                    active: true,
+                    available_in_pos: true,
+                });
+            }
+
+            return categ;
+        };
+
+        store.config.iface_group_by_categ = true;
+        const test1 = createProductsAndCateg("producttest1", 100);
+        const test2 = createProductsAndCateg("producttest2", 150);
+        const grouped = store.productToDisplayByCateg;
+        const byCateg = store.models["product.template"].getAllBy("pos_categ_ids");
+
+        const test1Products = byCateg[test1.id];
+        const test2Products = byCateg[test2.id];
+        const groupedTest1 = grouped.find((data) => data[0] == test1.id)[1];
+        const groupedTest2 = grouped.find((data) => data[0] == test2.id)[1];
+
+        expect(test1Products).toHaveLength(100);
+        expect(test2Products).toHaveLength(150);
+        expect(groupedTest1).toHaveLength(100);
+        expect(groupedTest2).toHaveLength(100);
+
+        store.searchProductWord = "producttest1";
+        const groupedSearchTest1 = store.productToDisplayByCateg;
+        const groupedSearchTest1Prods = groupedSearchTest1.find((data) => data[0] == test1.id)[1];
+        expect(groupedSearchTest1).toHaveLength(1);
+        expect(groupedSearchTest1Prods).toHaveLength(100);
+
+        store.searchProductWord = "producttest";
+        const groupedSearchTest = store.productToDisplayByCateg;
+        const groupedSearchTest1Prods2 = groupedSearchTest.find((data) => data[0] == test1.id)[1];
+        const groupedSearchTest2Prods2 = groupedSearchTest.find((data) => data[0] == test2.id)[1];
+        expect(groupedSearchTest).toHaveLength(2);
+        expect(groupedSearchTest1Prods2).toHaveLength(100);
+        expect(groupedSearchTest2Prods2).toHaveLength(100);
+
+        store.searchProductWord = "";
+        const productWoCategory = store.models["product.template"].readMany([15, 16]);
+        const groupedSearchTest3 = store.productToDisplayByCateg;
+        expect(groupedSearchTest3[groupedSearchTest3.length - 1][0]).toEqual("0");
+        expect(groupedSearchTest3[groupedSearchTest3.length - 1][1]).toHaveLength(2);
+        expect(groupedSearchTest3[groupedSearchTest3.length - 1][1].map((p) => p.id)).toEqual(
+            productWoCategory.map((p) => p.id)
+        );
+
+        store.selectedCategory = test1;
+        const groupedSearchTest4 = store.productToDisplayByCateg;
+        expect(groupedSearchTest4).toHaveLength(1);
+        expect(groupedSearchTest4[0][0]).toEqual(test1.id);
+        expect(groupedSearchTest4[0][1]).toHaveLength(100);
     });
 
     test("onDeleteOrder", async () => {

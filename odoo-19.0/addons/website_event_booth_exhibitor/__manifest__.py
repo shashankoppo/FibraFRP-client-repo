@@ -30,4 +30,5 @@ Automatically create a sponsor when renting a booth.
         ],
     },
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

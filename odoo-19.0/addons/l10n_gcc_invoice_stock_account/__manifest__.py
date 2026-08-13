@@ -15,4 +15,5 @@ Adds Arabic as a secondary language for the lots and serial numbers
     ],
     'auto_install': True,
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

@@ -9,6 +9,7 @@
     'depends': ['hr_holidays'],
     'auto_install': ['hr_holidays'],
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
     'data': [
         'views/res_config_settings_views.xml',
     ],

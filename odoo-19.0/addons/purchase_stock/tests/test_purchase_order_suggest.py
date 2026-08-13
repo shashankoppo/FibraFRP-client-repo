@@ -84,6 +84,21 @@ class TestPurchaseOrderSuggest(PurchaseTestCommon, HttpCase):
                 delivery.button_validate()
             return delivery
 
+    def test_purchase_order_suggest_access_error_non_admin(self):
+        """ Test that non-admin users can use the suggest feature without access errors """
+        self.env = self.env(user=self.purchase_user)
+        po = self.env['purchase.order'].create({
+            'partner_id': self.vendor.id,
+        })
+        po.with_context(
+            suggest_days=12,
+            suggest_based_on='last_year_m_plus_1',
+            suggest_percent=42,
+        ).action_purchase_order_suggest()
+        self.assertRecordValues(self.vendor, [
+            {'suggest_days': 12, 'suggest_based_on': 'last_year_m_plus_1', 'suggest_percent': 42}
+        ])
+
     def test_purchase_order_suggest_quantities(self):
         """ Checks the suggest wizard adds right products with right quantities.
         Also checks some values, like the products' quantity demand or the
@@ -646,3 +661,25 @@ class TestPurchaseOrderSuggest(PurchaseTestCommon, HttpCase):
             [(test_product, 1)], date=today - relativedelta(days=1), warehouse=other_warehouse
         )
         self.start_tour('/odoo/purchase', "test_purchase_order_suggest_search_panel_ux", login='admin')
+
+    def test_monthly_demand_interwarehouse_two_step_delivery(self):
+        """Ensure that monthly demand is correctly counted for waiting outgoing
+        moves in inter-warehouse transfers using two-step delivery routes.
+        """
+        warehouse = self.warehouse
+        warehouse.delivery_steps = 'pick_ship'
+        product = self.product_1
+        other_warehouse = self.other_warehouse
+        other_warehouse.resupply_wh_ids = [Command.set([warehouse.id])]
+
+        orderpoint = self.env['stock.warehouse.orderpoint'].create({
+            'product_id': product.id,
+            'location_id': other_warehouse.lot_stock_id.id,
+            'qty_to_order': 20,
+            'route_id': other_warehouse.resupply_route_ids.id,
+        })
+        orderpoint.action_replenish()
+
+        # Monthly demand should be 20.0 as only the outgoing move is counted with two-step delivery.
+        self.assertEqual(product.with_context(warehouse_id=warehouse.id).monthly_demand, 20.0)
+        self.assertEqual(product.monthly_demand, 20.0)

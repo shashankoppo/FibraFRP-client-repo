@@ -10,16 +10,16 @@
 # Friederike Fasterling-Nesselbosch, 2022
 # Martin Trigaux, 2023
 # Larissa Manderfeld, 2023
-# "Dylan Kiss (dyki)" <dyki@odoo.com>, 2025.
+# "Dylan Kiss (dyki)" <dyki@odoo.com>, 2025, 2026.
 # "Larissa Manderfeld (lman)" <lman@odoo.com>, 2025, 2026.
-# Weblate <noreply-mt-weblate@weblate.org>, 2025.
+# Weblate <noreply-mt-weblate@weblate.org>, 2025, 2026.
 msgid ""
 msgstr ""
 "Project-Id-Version: Odoo Server 16.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-12-30 18:36+0000\n"
-"PO-Revision-Date: 2026-01-23 09:26+0000\n"
-"Last-Translator: \"Larissa Manderfeld (lman)\" <lman@odoo.com>\n"
+"POT-Creation-Date: 2026-07-24 17:38+0000\n"
+"PO-Revision-Date: 2026-08-06 12:24+0000\n"
+"Last-Translator: Weblate <noreply-mt-weblate@weblate.org>\n"
 "Language-Team: German <https://translate.odoo.com/projects/odoo-19/project/"
 "de/>\n"
 "Language: de\n"
@@ -27,12 +27,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: \n"
 "Plural-Forms: nplurals=2; plural=n != 1;\n"
-"X-Generator: Weblate 5.14.3\n"
-
-#. module: project
-#: model:ir.model.fields.selection,name:project.selection__project_project__privacy_visibility__portal
-msgid " All internal users and invited portal users"
-msgstr " Alle internen Benutzer und eingeladenen Portalbenutzer"
+"X-Generator: Weblate 2026.6.1\n"
 
 #. module: project
 #: model:ir.model.fields,field_description:project.field_project_project__rating_count
@@ -291,19 +286,19 @@ msgid ""
 "            "
 msgstr ""
 "<div>\n"
-"    <t t-set=\"access_token\" t-value=\"object._rating_get_access_token()\"/"
-">\n"
+"    <t t-set=\"access_token\" t-value=\"object._rating_get_access_token()\"/>"
+"\n"
 "    <t t-set=\"partner\" t-value=\"object._rating_get_partner()\"/>\n"
 "    <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"590\" "
 "style=\"width:100%; margin:0px auto;\">\n"
 "    <tbody>\n"
 "        <tr><td valign=\"top\" style=\"font-size: 13px;\">\n"
 "            <t t-if=\"partner.name\">\n"
-"                Hallo <t t-out=\"partner.name or ''\">Brandon Freeman</t>,"
-"<br/><br/>\n"
+"                Guten Tag <t t-out=\"partner.name or ''\">Brandon Freeman</t>"
+",<br/><br/>\n"
 "            </t>\n"
 "            <t t-else=\"\">\n"
-"                Hallo,<br/><br/>\n"
+"                Guten Tag,<br/><br/>\n"
 "            </t>\n"
 "            bitte nehmen Sie sich einen Moment Zeit, unsere Dienstleistungen "
 "im Zusammenhang mit der Aufgabe <strong t-out=\"object.name or ''\">Planung "
@@ -375,17 +370,17 @@ msgstr ""
 "        </td></tr>\n"
 "        <tr><td><br/>Mit freundlichen Grüßen</td></tr>\n"
 "        <tr><td>\n"
-"           <t t-out=\"object.project_id.company_id.name or "
-"''\">IhrUnternehmen</t>\n"
+"           <t t-out=\"object.project_id.company_id.name or ''\">"
+"IhrUnternehmen</t>\n"
 "        </td></tr>\n"
 "        <tr><td style=\"opacity: 0.5;\">\n"
-"            <t t-out=\"object.project_id.company_id.phone or ''\">1 "
-"650-123-4567</t>\n"
+"            <t t-out=\"object.project_id.company_id.phone or ''\">1 650-123-"
+"4567</t>\n"
 "            <t t-if=\"object.project_id.company_id.email\">\n"
-"                | <a t-attf-href=\"mailto:"
-"{{ object.project_id.company_id.email }}\" style=\"text-decoration:none; "
-"color: #454748;\" t-out=\"object.project_id.company_id.email or "
-"''\">info@ihrunternehmen.com</a>\n"
+"                | <a t-attf-href=\"mailto:{{ "
+"object.project_id.company_id.email }}\" style=\"text-decoration:none; color: "
+"#454748;\" t-out=\"object.project_id.company_id.email or ''\">"
+"info@ihrunternehmen.com</a>\n"
 "            </t>\n"
 "            <t t-if=\"object.project_id.company_id.website\">\n"
 "                | <a t-attf-href=\"{{ object.project_id.company_id.website }}"
@@ -421,16 +416,16 @@ msgid ""
 "            "
 msgstr ""
 "<div>\n"
-"    Hallo <t t-out=\"object.partner_id.name or 'customer'\">Brandon Freeman</"
-"t>,<br/>\n"
+"    Guten Tag <t t-out=\"object.partner_id.name or 'customer'\">Brandon "
+"Freeman</t>,<br/>\n"
 "    es ist mir eine Freude, Ihnen mitzuteilen, dass wir das Projekt „<strong "
 "t-out=\"object.name or ''\">Renovierungen</strong>“ erfolgreich "
 "abgeschlossen haben.\n"
 "    <t t-if=\"user.signature\" data-o-mail-quote-container=\"1\">\n"
 "        <br/>\n"
 "        <div data-o-mail-quote=\"1\">--<br data-o-mail-quote=\"1\"/><t t-"
-"out=\"user.signature or ''\" data-o-mail-quote=\"1\">Mitchell Admin</t></"
-"div>\n"
+"out=\"user.signature or ''\" data-o-mail-quote=\"1\">Mitchell Admin</t></div>"
+"\n"
 "    </t>\n"
 "</div>\n"
 "<br/><span style=\"margin: 0px 0px 0px 0px; font-size: 12px; opacity: 0.5; "
@@ -463,22 +458,22 @@ msgid ""
 "        "
 msgstr ""
 "<div>\n"
-"    Hallo <t t-out=\"object.partner_id.name or 'customer'\">Brandon Freeman</"
-"t>,<br/><br/>\n"
+"    Guten Tag <t t-out=\"object.partner_id.name or 'customer'\">Brandon "
+"Freeman</t>,<br/><br/>\n"
 "    vielen Dank, dass Sie mit uns Kontakt aufgenommen haben. Wir freuen uns "
 "über Ihr Interesse an unseren Produkten/Dienstleistungen.<br/>\n"
 "    Unser Team prüft derzeit Ihre Anfrage und wird Ihre E-Mail so schnell "
 "wie möglich beantworten.<br/>\n"
 "    Sollten Sie in der Zwischenzeit weitere Fragen oder Bedenken haben, "
-"zögern Sie bitte nicht, uns diese mitzuteilen. Wir sind gerne für Sie da.<br/"
-"><br/>\n"
+"zögern Sie bitte nicht, uns diese mitzuteilen. Wir sind gerne für Sie "
+"da.<br/><br/>\n"
 "    Vielen Dank für Ihre Geduld!<br/>\n"
 "    Liebe Grüße\n"
 "    <t t-if=\"user.signature\" data-o-mail-quote-container=\"1\">\n"
 "        <br/>\n"
 "        <div data-o-mail-quote=\"1\">--<br data-o-mail-quote=\"1\"/><t t-"
-"out=\"user.signature or ''\" data-o-mail-quote=\"1\">Mitchell Admin</t></"
-"div>\n"
+"out=\"user.signature or ''\" data-o-mail-quote=\"1\">Mitchell Admin</t></div>"
+"\n"
 "    </t>\n"
 "</div>\n"
 "        "
@@ -612,8 +607,8 @@ msgid ""
 "                                        </span>"
 msgstr ""
 "<span colspan=\"2\" class=\"text-muted o_row ps-1\">\n"
-"                                            <i class=\"fa fa-lightbulb-o "
-"pe-2\"/>\n"
+"                                            <i class=\"fa fa-lightbulb-o pe-"
+"2\"/>\n"
 "                                            <span "
 "name=\"rating_status_helper\">\n"
 "                                                <span "
@@ -760,7 +755,7 @@ msgstr "Zugriffswarnung"
 #: model:ir.model.fields,field_description:project.field_project_task__message_needaction
 #: model:ir.model.fields,field_description:project.field_project_update__message_needaction
 msgid "Action Needed"
-msgstr "Aktion notwendig"
+msgstr "Aktion erforderlich"
 
 #. module: project
 #: model:ir.model.fields,field_description:project.field_project_role__active
@@ -898,8 +893,12 @@ msgstr "Administrator"
 
 #. module: project
 #: model:res.groups,comment:project.group_project_manager
-msgid "Administrator can manage the employees' schedule"
-msgstr "Der Administrator kann den Plan der Mitarbeiter verwalten"
+msgid ""
+"Administrator: Can manage projects and stages, with access to reporting and "
+"configuration."
+msgstr ""
+"Administrator: Kann Projekte und Phasen verwalten und hat Zugriff auf "
+"Berichte und Konfigurationen."
 
 #. module: project
 #. odoo-javascript
@@ -971,6 +970,11 @@ msgstr "Alle Aufgaben"
 #: model:ir.model.fields.selection,name:project.selection__project_project__privacy_visibility__employees
 msgid "All internal users"
 msgstr "Alle internen Benutzer"
+
+#. module: project
+#: model:ir.model.fields.selection,name:project.selection__project_project__privacy_visibility__portal
+msgid "All internal users and invited portal users"
+msgstr ""
 
 #. module: project
 #: model:ir.model.fields,field_description:project.field_project_task__allocated_hours
@@ -1366,8 +1370,8 @@ msgstr ""
 msgid ""
 "Choose a task <b>name</b> <i>(e.g. Website Design, Purchase Goods...)</i>"
 msgstr ""
-"Wählen Sie einen <b>Aufgabennamen</b><i> (z. B. Website-Design, "
-"Wareneinkauf ...)</i>"
+"Wählen Sie einen <b>Aufgabennamen</b><i> (z. B. Website-Design, Wareneinkauf "
+"...)</i>"
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.project_share_wizard_view_form
@@ -1616,7 +1620,7 @@ msgstr "Erstellt am"
 #. module: project
 #: model:ir.model,website_form_label:project.model_res_partner
 msgid "Create a Customer"
-msgstr "Kunden erstellen"
+msgstr "Kunde erstellen"
 
 #. module: project
 #: model:ir.actions.act_window,name:project.open_create_project
@@ -1928,7 +1932,7 @@ msgstr "Frist"
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.project_message_user_assigned
 msgid "Dear"
-msgstr "Hallo"
+msgstr "Guten Tag"
 
 #. module: project
 #: model:ir.model.fields,field_description:project.field_project_project__alias_defaults
@@ -2047,8 +2051,7 @@ msgstr "Design"
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.edit_project
 msgid "Determine the order in which to perform tasks"
-msgstr ""
-"Bestimmen Sie die Reihenfolge, in der Aufgaben bearbeitet werden sollen"
+msgstr "Bestimmen Sie die Reihenfolge, in der Aufgaben bearbeitet werden sollen"
 
 #. module: project
 #. odoo-javascript
@@ -2279,8 +2282,7 @@ msgstr "Fehler! Sie können keine rekursive Hierarchie von Aufgaben erstellen."
 #. odoo-javascript
 #: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
 msgid "Everyone can propose ideas, and the Editor marks the best ones as"
-msgstr ""
-"Jeder kann Ideen vorschlagen und der Editor kennzeichnet die besten mit"
+msgstr "Jeder kann Ideen vorschlagen und der Editor kennzeichnet die besten mit"
 
 #. module: project
 #. odoo-javascript
@@ -2482,7 +2484,7 @@ msgstr "Hat Vorlagenvorgänger"
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.task_invitation_follower
 msgid "Hello"
-msgstr "Hallo"
+msgstr "Guten Tag"
 
 #. module: project
 #. odoo-javascript
@@ -2576,8 +2578,8 @@ msgid ""
 "ID of the parent record holding the alias (example: project holding the task "
 "creation alias)"
 msgstr ""
-"ID des übergeordneten Alias-Datensatz (Beispiel: Projekt welches den Alias "
-"für die Erstellung von Aufgaben beinhaltet)."
+"ID des übergeordneten Alias-Datensatz (Beispiel: Projekt mit dem Alias für "
+"die Aufgabenerstellung)"
 
 #. module: project
 #: model:ir.model.fields,field_description:project.field_project_project__activity_exception_icon
@@ -3399,7 +3401,7 @@ msgstr "Notiz"
 #: model:ir.model.fields,field_description:project.field_project_task__message_needaction_counter
 #: model:ir.model.fields,field_description:project.field_project_update__message_needaction_counter
 msgid "Number of Actions"
-msgstr "Anzahl der Aktionen"
+msgstr "Anzahl Aktionen"
 
 #. module: project
 #: model:ir.model.fields,field_description:project.field_project_milestone__message_has_error_counter
@@ -3407,7 +3409,7 @@ msgstr "Anzahl der Aktionen"
 #: model:ir.model.fields,field_description:project.field_project_task__message_has_error_counter
 #: model:ir.model.fields,field_description:project.field_project_update__message_has_error_counter
 msgid "Number of errors"
-msgstr "Anzahl der Fehler"
+msgstr "Anzahl Fehler"
 
 #. module: project
 #: model:ir.model.fields,help:project.field_project_milestone__message_needaction_counter
@@ -3522,8 +3524,8 @@ msgid ""
 "                    Collaborate efficiently by chatting in real-time or via "
 "email."
 msgstr ""
-"Organisieren Sie Ihre Aufgaben, indem Sie sie in Ihrer Pipeline verteilen."
-"<br>\n"
+"Organisieren Sie Ihre Aufgaben, indem Sie sie in Ihrer Pipeline "
+"verteilen.<br>\n"
 "                    Arbeiten Sie effizient zusammen, indem Sie in Echtzeit "
 "oder via E-Mail chatten."
 
@@ -4488,7 +4490,7 @@ msgstr "%(left)s Aufgaben%(right)s suchen"
 #: model:ir.model.fields,field_description:project.field_project_project__access_token
 #: model:ir.model.fields,field_description:project.field_project_task__access_token
 msgid "Security Token"
-msgstr "Security-Token"
+msgstr "Sicherheitstoken"
 
 #. module: project
 #. odoo-javascript
@@ -4880,7 +4882,7 @@ msgstr "Aufgabe abgebrochen"
 #. module: project
 #: model:mail.message.subtype,name:project.mt_task_canceled
 msgid "Task Cancelled"
-msgstr "Aufgabe abgerbrochen"
+msgstr "Aufgabe abgebrochen"
 
 #. module: project
 #. odoo-python
@@ -5511,8 +5513,8 @@ msgid ""
 "To get things done, use activities and status on tasks.<br>\n"
 "                Chat in real time or by email to collaborate efficiently."
 msgstr ""
-"Um Dinge zu erledigen, verwenden Sie Aktivitäten und den Status von Aufgaben."
-"<br>\n"
+"Um Dinge zu erledigen, verwenden Sie Aktivitäten und den Status von "
+"Aufgaben.<br>\n"
 "Chatten Sie in Echtzeit oder per E-Mail, um effizient zusammenzuarbeiten."
 
 #. module: project
@@ -5558,7 +5560,7 @@ msgstr "Heutige Aktivitäten"
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_control_panel/project_task_control_panel.xml:0
 msgid "Top Menu"
-msgstr "Oberes Men"
+msgstr "Oberes Menü"
 
 #. module: project
 #. odoo-javascript
@@ -5824,8 +5826,8 @@ msgstr "Benutzereinstellungen"
 
 #. module: project
 #: model:res.groups,comment:project.group_project_user
-msgid "User can user the your employees' schedule"
-msgstr "Der Benutzer kann den Plan Ihrer Mitarbeiter verwenden"
+msgid "User: Can manage tasks in projects shared with them."
+msgstr "Benutzer: Kann Aufgaben in geteilten Projekten verwalten."
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.view_project_kanban
@@ -5835,7 +5837,7 @@ msgstr "Ansicht"
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.project_sharing_project_task_view_form
 msgid "View Task"
-msgstr "Aufgaben ansehen"
+msgstr "Aufgabe anzeigen"
 
 #. module: project
 #. odoo-javascript
@@ -5843,7 +5845,7 @@ msgstr "Aufgaben ansehen"
 #: model_terms:ir.ui.view,arch_db:project.project_milestone_view_tree
 #: model_terms:ir.ui.view,arch_db:project.view_project
 msgid "View Tasks"
-msgstr "Aufgaben ansehen"
+msgstr "Aufgaben anzeigen"
 
 #. module: project
 #: model:ir.model.fields,field_description:project.field_project_project__privacy_visibility
@@ -5873,8 +5875,8 @@ msgstr "Warteliste"
 msgid ""
 "Want a better way to <b>manage your projects</b>? <i>It starts here.</i>"
 msgstr ""
-"Suchen Sie nach einer besseren Methode, um Ihre <b>Projekte zu verwalten</"
-"b>? <i>Dann sind Sie hier richtig.</i>"
+"Suchen Sie nach einer besseren Methode, um Ihre <b>Projekte zu verwalten</b>"
+"? <i>Dann sind Sie hier richtig.</i>"
 
 #. module: project
 #: model:ir.model.fields,field_description:project.field_project_milestone__website_message_ids
@@ -6126,6 +6128,13 @@ msgid "Your managers decide which feedback is accepted"
 msgstr "Ihre Manager entscheiden, welches Feedback akzeptiert wird"
 
 #. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/views/analytic_account_form/analytic_account_form_controller.js:0
+#: code:addons/project/static/src/views/analytic_account_list/analytic_account_list_controller.js:0
+msgid "\\t- ${"
+msgstr "\\t- ${"
+
+#. module: project
 #: model_terms:ir.ui.view,arch_db:project.edit_project
 msgid "alias"
 msgstr "Alias"
@@ -6211,7 +6220,7 @@ msgstr "z. B. To-do"
 #: model_terms:ir.ui.view,arch_db:project.project_project_view_form_simplified
 #: model_terms:ir.ui.view,arch_db:project.project_project_view_form_simplified_template
 msgid "e.g. mycompany.com"
-msgstr "z. B. meinunternehmen.com"
+msgstr "z. B. meinunternehmen.de"
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.project_project_view_form_simplified
@@ -6372,6 +6381,15 @@ msgstr "👤 Nicht zugewiesen"
 #: code:addons/project/models/project_task.py:0
 msgid "🔒 Private"
 msgstr "🔒 Privat"
+
+#~ msgid " All internal users and invited portal users"
+#~ msgstr " Alle internen Benutzer und eingeladenen Portalbenutzer"
+
+#~ msgid "Administrator can manage the employees' schedule"
+#~ msgstr "Der Administrator kann den Plan der Mitarbeiter verwalten"
+
+#~ msgid "User can user the your employees' schedule"
+#~ msgstr "Der Benutzer kann den Plan Ihrer Mitarbeiter verwenden"
 
 #~ msgid "Invalid fields: "
 #~ msgstr "Ungültige Felder: "

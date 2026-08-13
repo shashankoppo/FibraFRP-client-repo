@@ -27,4 +27,5 @@ This is the latest Indonesian Odoo localisation necessary to run Odoo accounting
     'demo': [
         'demo/demo_company.xml',
     ],
+    'license': 'LGPL-3',
 }

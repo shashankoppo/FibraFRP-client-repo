@@ -21,4 +21,5 @@ Install this if you are using the Point of Sale app in Peru.
     },
     "installable": True,
     "auto_install": True,
+    "license": "LGPL-3",
 }

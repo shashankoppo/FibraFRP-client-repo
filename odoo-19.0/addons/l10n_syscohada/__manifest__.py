@@ -24,4 +24,5 @@ Countries that use OHADA are the following:
         'data/menuitem_data.xml',
     ],
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

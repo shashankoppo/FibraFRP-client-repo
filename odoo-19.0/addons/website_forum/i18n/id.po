@@ -7,15 +7,16 @@
 # Martin Trigaux, 2022
 # Abe Manyo, 2023
 #
-# "Dylan Kiss (dyki)" <dyki@odoo.com>, 2025.
-# "Abe Manyo (abem)" <abem@odoo.com>, 2025.
-# Weblate <noreply-mt-weblate@weblate.org>, 2025.
+# "Dylan Kiss (dyki)" <dyki@odoo.com>, 2025, 2026.
+# "Abe Manyo (abem)" <abem@odoo.com>, 2025, 2026.
+# Weblate <noreply-mt-weblate@weblate.org>, 2025, 2026.
+# "Nurul Aini Akrima Sabila (nuaas)" <nuaas@odoo.com>, 2026.
 msgid ""
 msgstr ""
 "Project-Id-Version: Odoo Server 16.0+e\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-12-30 18:38+0000\n"
-"PO-Revision-Date: 2025-12-05 02:29+0000\n"
+"POT-Creation-Date: 2026-02-20 18:37+0000\n"
+"PO-Revision-Date: 2026-08-02 20:19+0000\n"
 "Last-Translator: \"Abe Manyo (abem)\" <abem@odoo.com>\n"
 "Language-Team: Indonesian <https://translate.odoo.com/projects/odoo-19/"
 "website_forum/id/>\n"
@@ -24,7 +25,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: \n"
 "Plural-Forms: nplurals=1; plural=0;\n"
-"X-Generator: Weblate 5.14.3\n"
+"X-Generator: Weblate 2026.6.1\n"
 
 #. module: website_forum
 #. odoo-javascript
@@ -249,25 +250,6 @@ msgstr ""
 "web/login\">Sign up</a>"
 
 #. module: website_forum
-#: model_terms:ir.ui.view,arch_db:website_forum.404
-msgid ""
-"<a class=\"btn-link o_translate_inline\" t-attf-href=\"/forum\"><i "
-"class=\"oi oi-arrow-right display-inline-block\"/> Return to questions list</"
-"a>"
-msgstr ""
-"<a class=\"btn-link o_translate_inline\" t-attf-href=\"/forum\"><i "
-"class=\"oi oi-arrow-right display-inline-block\"/> Kembali ke daftar "
-"pertanyaan</a>"
-
-#. module: website_forum
-#: model_terms:ir.ui.view,arch_db:website_forum.forum_all_oe_structure_forum_all_top
-msgid ""
-"<a class=\"mb-2 o_translate_inline\" t-attf-href=\"/profile/users\" data-bs-"
-"original-title=\"\" title=\"\" target=\"_blank\">Meet our community members</"
-"a>"
-msgstr ""
-
-#. module: website_forum
 #: model_terms:ir.ui.view,arch_db:website_forum.post_display
 msgid ""
 "<b class=\"d-block \">This answer has been flagged</b>\n"
@@ -343,9 +325,9 @@ msgid ""
 "information."
 msgstr ""
 "<b>Jawaban seharusnya tidak hanya merujuk ke Pertanyaan lain</b>. Tambahkan "
-"komentar pertanyaan untuk menandakkan \"Ada kemungkinkan duplikat dengan..."
-"\". Namun, Anda boleh mencantumkan link ke pertanyaan atau jawaban lain yang "
-"memberikan informasi tambahan yang relevan."
+"komentar pertanyaan untuk menandakkan \"Ada kemungkinkan duplikat "
+"dengan...\". Namun, Anda boleh mencantumkan link ke pertanyaan atau jawaban "
+"lain yang memberikan informasi tambahan yang relevan."
 
 #. module: website_forum
 #: model_terms:forum.forum,faq:website_forum.forum_help
@@ -667,6 +649,13 @@ msgid "<i class=\"oi oi-arrow-right d-inline-block\"/> Go to Forums"
 msgstr "<i class=\"oi oi-arrow-right d-inline-block\"/> Pergi ke Forum"
 
 #. module: website_forum
+#: model_terms:ir.ui.view,arch_db:website_forum.404
+msgid ""
+"<i class=\"oi oi-arrow-right display-inline-block\"/> Return to questions "
+"list"
+msgstr ""
+
+#. module: website_forum
 #: model_terms:ir.ui.view,arch_db:website_forum.post_dropdown
 msgid ""
 "<i class=\"oi oi-ellipsis-h\" data-bs-toggle=\"tooltip\" data-bs-"
@@ -722,8 +711,8 @@ msgstr ""
 #: model_terms:ir.ui.view,arch_db:website_forum.default_faq
 msgid "<span class=\"flex-grow-1\">What should I avoid in my answers?</span>"
 msgstr ""
-"<span class=\"flex-grow-1\">Apa yang sebaiknya saya hindari di jawaban saya?"
-"</span>"
+"<span class=\"flex-grow-1\">Apa yang sebaiknya saya hindari di jawaban "
+"saya?</span>"
 
 #. module: website_forum
 #: model_terms:forum.forum,faq:website_forum.forum_help
@@ -2466,6 +2455,11 @@ msgid "Mark as spam"
 msgstr "Tandai sebagai spam"
 
 #. module: website_forum
+#: model_terms:ir.ui.view,arch_db:website_forum.forum_all_oe_structure_forum_all_top
+msgid "Meet our community members"
+msgstr ""
+
+#. module: website_forum
 #: model:ir.model.fields,field_description:website_forum.field_forum_forum__message_has_error
 #: model:ir.model.fields,field_description:website_forum.field_forum_post__message_has_error
 #: model:ir.model.fields,field_description:website_forum.field_forum_tag__message_has_error
@@ -3303,14 +3297,12 @@ msgstr "Maaf, kami tidak dapat menemukan hasil apapun yang <b>selesai</b>"
 #. module: website_forum
 #: model_terms:ir.ui.view,arch_db:website_forum.no_results_message
 msgid "Sorry, we could not find any <b>unanswered</b> results"
-msgstr ""
-"Maaf, kami tidak dapat menemukan hasil apapun yang <b>belum dijawab</b>"
+msgstr "Maaf, kami tidak dapat menemukan hasil apapun yang <b>belum dijawab</b>"
 
 #. module: website_forum
 #: model_terms:ir.ui.view,arch_db:website_forum.no_results_message
 msgid "Sorry, we could not find any <b>unsolved</b> results"
-msgstr ""
-"Maaf, kami tidak dapat menemukan hasil apapun yang <b>tidak selesai</b>"
+msgstr "Maaf, kami tidak dapat menemukan hasil apapun yang <b>tidak selesai</b>"
 
 #. module: website_forum
 #: model_terms:ir.ui.view,arch_db:website_forum.no_results_message
@@ -3321,8 +3313,7 @@ msgstr "Maaf, kami tidak dapat menemukan hasil apapun"
 #. odoo-javascript
 #: code:addons/website_forum/static/src/interactions/website_forum.js:0
 msgid "Sorry, you cannot select your own posts as best answer"
-msgstr ""
-"Maaf, Anda tidak dapat memilih post Anda sendiri sebagai jawaban terbai"
+msgstr "Maaf, Anda tidak dapat memilih post Anda sendiri sebagai jawaban terbai"
 
 #. module: website_forum
 #. odoo-javascript
@@ -3547,8 +3538,8 @@ msgid ""
 "<b>Reject</b> this post."
 msgstr ""
 "Post ini saat ini menunggu moderasi dan belum dipublikasikan.<br/>\n"
-"                    Sebagai moderator Anda dapat <b>Menerima</b> atau "
-"<b>Menolak</b> post ini."
+"                    Sebagai moderator Anda dapat <b>Menerima</b> atau <b>"
+"Menolak</b> post ini."
 
 #. module: website_forum
 #: model_terms:ir.ui.view,arch_db:website_forum.post_description_full
@@ -3842,7 +3833,7 @@ msgstr "URL Websi8te"
 #: model:ir.model.fields,help:website_forum.field_forum_post__website_message_ids
 #: model:ir.model.fields,help:website_forum.field_forum_tag__website_message_ids
 msgid "Website communication history"
-msgstr "Sejarah komunikasi situs"
+msgstr "Riwayat komunikasi situs"
 
 #. module: website_forum
 #: model:ir.model.fields,field_description:website_forum.field_forum_forum__website_meta_description
@@ -4301,8 +4292,7 @@ msgstr ""
 #: model_terms:forum.forum,faq:website_forum.forum_help
 #: model_terms:ir.ui.view,arch_db:website_forum.default_faq
 msgid "what's the best way to use Odoo for a specific business need,"
-msgstr ""
-"apa cara terbaik menggunakan Odoo untuk kebutuhan bisnis yang spesifik,"
+msgstr "apa cara terbaik menggunakan Odoo untuk kebutuhan bisnis yang spesifik,"
 
 #. module: website_forum
 #: model_terms:ir.ui.view,arch_db:website_forum.author_box
@@ -4329,6 +4319,15 @@ msgstr "biography Anda dapat terlihat sebagai tooltip"
 #: model_terms:ir.ui.view,arch_db:website_forum.follow
 msgid "your email..."
 msgstr "email anda..."
+
+#~ msgid ""
+#~ "<a class=\"btn-link o_translate_inline\" t-attf-href=\"/forum\"><i "
+#~ "class=\"oi oi-arrow-right display-inline-block\"/> Return to questions "
+#~ "list</a>"
+#~ msgstr ""
+#~ "<a class=\"btn-link o_translate_inline\" t-attf-href=\"/forum\"><i "
+#~ "class=\"oi oi-arrow-right display-inline-block\"/> Kembali ke daftar "
+#~ "pertanyaan</a>"
 
 #~ msgid "%d karma required to unlink a comment."
 #~ msgstr "%d karma dibutuhkan untuk unlink komentar."

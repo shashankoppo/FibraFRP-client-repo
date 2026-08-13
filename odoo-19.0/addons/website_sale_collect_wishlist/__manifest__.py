@@ -13,4 +13,5 @@ Allow users to add a product to wishlist if the product is not available for the
     ],
     'auto_install': True,
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

@@ -10,4 +10,5 @@ When hiding the timesheets in the portal, this module allows also hiding timeshe
     'installable': True,
     'auto_install': True,
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

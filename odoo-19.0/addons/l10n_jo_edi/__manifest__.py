@@ -19,5 +19,6 @@
     ],
     'installable': True,
     'auto_install': ['l10n_jo'],
+    'license': 'LGPL-3',
     'post_init_hook': '_post_init_hook',
 }

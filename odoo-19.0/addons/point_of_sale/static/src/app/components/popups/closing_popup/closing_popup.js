@@ -191,6 +191,11 @@ export class ClosePosPopup extends Component {
     canCancel() {
         return true;
     }
+    get bankPaymentMethodDiffPairs() {
+        return this.props.non_cash_payment_methods
+            .filter((pm) => pm.type == "bank")
+            .map((pm) => [pm.id, this.getDifference(pm.id)]);
+    }
     async closeSession() {
         this.pos._resetConnectedCashier();
         // If there are orders in the db left unsynced, we try to sync.
@@ -230,13 +235,10 @@ export class ClosePosPopup extends Component {
         }
 
         try {
-            const bankPaymentMethodDiffPairs = this.props.non_cash_payment_methods
-                .filter((pm) => pm.type == "bank")
-                .map((pm) => [pm.id, this.getDifference(pm.id)]);
             const response = await this.pos.data.call(
                 "pos.session",
                 "close_session_from_ui",
-                [this.pos.session.id, bankPaymentMethodDiffPairs],
+                [this.pos.session.id, this.bankPaymentMethodDiffPairs],
                 {
                     context: {
                         device_identifier: this.pos.device.identifier,
@@ -295,7 +297,7 @@ export class ClosePosPopup extends Component {
     }
     async handleClosingError(response) {
         this.dialog.add(ConfirmationDialog, {
-            title: response.title || "Error",
+            title: response.title || _t("Error"),
             body: response.message,
             confirmLabel: _t("Review Orders"),
             cancelLabel: _t("Cancel Orders"),
@@ -307,7 +309,10 @@ export class ClosePosPopup extends Component {
             },
             cancel: async () => {
                 if (!response.redirect) {
-                    const ordersDraft = this.pos.models["pos.order"].filter((o) => !o.finalized);
+                    const now = DateTime.now();
+                    const ordersDraft = this.pos.models["pos.order"].filter(
+                        (o) => !o.finalized && !(o.preset_time && o.preset_time > now)
+                    );
                     await this.pos.deleteOrders(ordersDraft, response.open_order_ids);
                     this.closeSession();
                 }

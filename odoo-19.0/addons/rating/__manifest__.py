@@ -37,4 +37,5 @@ This module allows a customer to give rating.
         ],
     },
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

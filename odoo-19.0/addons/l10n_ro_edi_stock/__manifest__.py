@@ -22,4 +22,5 @@ E-Transport implementation for Romania
     ],
     'installable': True,
     'author': 'Odoo S.A.',
+    'license': "LGPL-3",
 }

@@ -16,11 +16,11 @@ DB_PASSWORD="${DB_PASSWORD:-}"
 ODOO_CONFIG="${ODOO_RC:-/etc/odoo/odoo.conf}"
 ODOO_BIN="${ODOO_BIN:-/opt/odoo/odoo-bin}"
 TARGET_DBS="${ELSX_NATIVE_ADMIN_CLEANUP_DBS:-}"
-EXPECTED_MODULE_VERSIONS="'2.8.6','19.0.2.8.6'"
-EXPECTED_REBRAND_VERSIONS="'1.2.3','19.0.1.2.3','1.2.4','19.0.1.2.4','1.2.5','19.0.1.2.5','1.2.6','19.0.1.2.6','1.2.7','19.0.1.2.7','1.2.8','19.0.1.2.8','1.2.9','19.0.1.2.9'"
+EXPECTED_MODULE_VERSIONS="'2.9.0','19.0.2.9.0'"
+EXPECTED_REBRAND_VERSIONS="'1.2.14','19.0.1.2.14'"
 EXPECTED_DIALOG_VERSIONS="'19.0.1.0.4'"
 EXPECTED_APPSBAR_VERSIONS="'19.0.1.1.3'"
-ASSET_PURGE_MARKER="rebrand-qweb-safe-1.2.9"
+ASSET_PURGE_MARKER="rebrand-qweb-safe-1.2.14"
 
 log() {
   printf '[native-admin-cleanup] %s\n' "$*" >&2
@@ -211,7 +211,7 @@ while IFS= read -r database; do
             FROM ir_config_parameter
            WHERE key = 'elsx_client_restrictions.apps_secret_token'
         )
-        OR NOT EXISTS (
+        OR EXISTS (
           SELECT 1
             FROM ir_config_parameter
            WHERE key = 'elsx_client_restrictions.apps_password_hash'
@@ -256,7 +256,7 @@ while IFS= read -r database; do
   fi
 
   if [ "${needs_cleanup}" != 't' ]; then
-    log "${database} already has native administration metadata, Apps lock, and ELSxGlobal rebrand."
+    log "${database} already has native administration and ELSxGlobal rebrand metadata."
     continue
   fi
 
@@ -271,7 +271,7 @@ while IFS= read -r database; do
     upgrade_modules="${upgrade_modules},${optional_ui_modules}"
   fi
 
-  log "Applying native administration cleanup, Apps lock, ELSxGlobal rebrand, and installed UI compatibility fixes in ${database}."
+  log "Applying native administration cleanup, unrestricted Apps, ELSxGlobal rebrand, and installed UI compatibility fixes in ${database}."
   if ! python3 "${ODOO_BIN}" \
     -c "${ODOO_CONFIG}" \
     --db_host="${DB_HOST}" \

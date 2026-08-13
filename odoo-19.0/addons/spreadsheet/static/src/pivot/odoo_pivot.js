@@ -10,7 +10,8 @@ import { omit } from "@web/core/utils/objects";
 import { OdooPivotLoader } from "./odoo_pivot_loader";
 import { getRelationalFieldDefinition } from "./pivot_helpers";
 
-const { pivotRegistry, supportedPivotPositionalFormulaRegistry } = registries;
+const { pivotRegistry, supportedPivotPositionalFormulaRegistry, pivotNormalizationValueRegistry } =
+    registries;
 const {
     pivotTimeAdapter,
     toString,
@@ -532,6 +533,17 @@ export class OdooPivot {
         );
     }
 
+    get source() {
+        const data = this.definition;
+        return {
+            resModel: data.model,
+            type: "pivot",
+            fields: data.measures.map((m) => m.fieldName),
+            groupby: [...data.columns, ...data.rows].map((dim) => dim.nameWithGranularity),
+            domain: this.getDomainWithGlobalFilters(),
+        };
+    }
+
     //--------------------------------------------------------------------------
     // Global filters
     //--------------------------------------------------------------------------
@@ -588,6 +600,15 @@ export class OdooPivotRuntimeDefinition extends PivotRuntimeDefinition {
                 dimension.nameWithGranularity = `${dimension.fieldName}:month`;
             }
         }
+    }
+
+    createPivotDimension(fields, dimension) {
+        const dim = super.createPivotDimension(fields, dimension);
+        const field = fields[dimension.fieldName];
+        if (field?.relation) {
+            dim.relation = field.relation;
+        }
+        return dim;
     }
 
     get domain() {
@@ -660,11 +681,11 @@ pivotRegistry.add("ODOO", {
         field.name !== "id" &&
         !field.name.includes(".") && // relational field path are not supported as measures (e.g. 'company_id.partner_id')
         field.store,
-    isGroupable: (field) => field.groupable,
     canHaveCustomGroup: (field) =>
         field.groupable &&
         !field.isCustomField &&
         ["many2one", "char", "one2many", "many2many", "selection"].includes(field.type),
+    isGroupable: (field) => field.groupable && pivotNormalizationValueRegistry.contains(field.type),
 });
 
 supportedPivotPositionalFormulaRegistry.add("ODOO", true);

@@ -19,4 +19,5 @@ This bridge module adds some smart buttons between Purchase and Subcontracting
     'installable': True,
     'auto_install': True,
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

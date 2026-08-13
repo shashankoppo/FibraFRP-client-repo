@@ -36,4 +36,5 @@ Set the payment reference type from the Sales Journal.
         'demo/demo_company.xml',
     ],
     'installable': True,
+    'license': 'LGPL-3',
 }

@@ -5,4 +5,5 @@
     'description': "This module allows you to build an image for the IoT Box.",
     'installable': False,
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

@@ -31,4 +31,5 @@ This module add completed courses to resume for employees.
         ],
     },
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

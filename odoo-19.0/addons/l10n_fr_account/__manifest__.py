@@ -3,7 +3,7 @@
     'name': 'France - Accounting',
     'website': 'https://www.odoo.com/documentation/latest/applications/finance/fiscal_localizations/france.html',
     'icon': '/account/static/description/l10n.png',
-    'version': '2.2',
+    'version': '2.4',
     'countries': ['fr'],
     'category': 'Accounting/Localizations/Account Charts',
     'description': """
@@ -50,4 +50,5 @@ configuration of their taxes and fiscal positions manually.
     ],
     'post_init_hook': '_l10n_fr_post_init_hook',
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

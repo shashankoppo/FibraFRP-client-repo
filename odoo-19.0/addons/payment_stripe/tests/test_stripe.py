@@ -1,8 +1,9 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
+from werkzeug.exceptions import Forbidden
 from werkzeug.urls import url_encode
 
 from odoo.tests import tagged
@@ -167,6 +168,23 @@ class StripeTest(StripeCommon, PaymentHttpCommon):
             self.assertEqual(signature_check_mock.call_count, 1)
 
     @mute_logger('odoo.addons.payment_stripe.controllers.main')
+    def test_reject_notification_when_missing_secret(self):
+        self.stripe.stripe_webhook_secret = False
+        tx = self._create_transaction('redirect')
+        self.assertRaises(Forbidden, StripeController()._verify_signature, tx)
+
+    @mute_logger('odoo.addons.payment_stripe.controllers.main')
+    def test_reject_notification_with_missing_timestamp(self):
+        tx = self._create_transaction('redirect')
+        signature_header = 'v1=Test_Signature'
+        mock_request = MagicMock()
+        mock_request.httprequest.data = b''
+        mock_request.httprequest.headers = {'Stripe-Signature': signature_header}
+        controller = StripeController()
+        with patch('odoo.addons.payment_stripe.controllers.main.request', new=mock_request):
+            self.assertRaises(Forbidden, controller._verify_signature, tx)
+
+    @mute_logger('odoo.addons.payment_stripe.controllers.main')
     @mute_logger('odoo.addons.payment_stripe.models.payment_transaction')
     def test_webhook_notification_skips_signature_verification_for_missing_transactions(self):
         """ Test that the webhook ignores signature verification for unknown transactions (e.g. POS). """
@@ -252,18 +270,3 @@ class StripeTest(StripeCommon, PaymentHttpCommon):
             call_args = mock.call_args.kwargs['json']['params']['payload'].keys()
             for payload_param in ('account', 'return_url', 'refresh_url', 'type'):
                 self.assertIn(payload_param, call_args)
-
-    def test_stripe_validate_amount_uses_payment_minor_unit(self):
-        """
-        Test that the payment's minor unit precision is used to validate the amount, not the custom
-        currency rounding that customers may have configured.
-        """
-        self.amount = 20076
-        self.currency.rounding = 0.001
-        tx = self._create_transaction(
-            'dummy', operation='online_direct', tokenize=True, amount=200.769
-        )
-        data = self.payment_data['data']
-        data['payment_intent'] = self._mock_payment_intent_request()
-        tx._validate_amount(data)
-        self.assertNotEqual(tx.state, 'error')

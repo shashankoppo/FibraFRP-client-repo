@@ -20,5 +20,6 @@ This module allow your customer to choose a Point Relais® and use it as shippin
         ],
     },
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
     'auto_install': True,
 }

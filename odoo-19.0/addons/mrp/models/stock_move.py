@@ -54,7 +54,7 @@ class StockMove(models.Model):
     order_finished_lot_ids = fields.Many2many('stock.lot', string="Finished Lot/Serial Number", related="raw_material_production_id.lot_producing_ids")
     should_consume_qty = fields.Float('Quantity To Consume', compute='_compute_should_consume_qty', digits='Product Unit')
     cost_share = fields.Float(
-        "Cost Share (%)", digits=(5, 2),  # decimal = 2 is important for rounding calculations!!
+        "Cost Share (%)", digits=0,
         help="The percentage of the final production cost for this by-product. The total of all by-products' cost share must be smaller or equal to 100.")
     product_qty_available = fields.Float('Product On Hand Quantity', related='product_id.qty_available', depends=['product_id'])
     product_virtual_available = fields.Float('Product Forecasted Quantity', related='product_id.virtual_available', depends=['product_id'])
@@ -276,7 +276,7 @@ class StockMove(models.Model):
                 if not values.get('location_dest_id'):
                     values['location_dest_id'] = mo.location_dest_id.id
                 if not values.get('location_final_id'):
-                    values['location_final_id'] = mo.warehouse_id.lot_stock_id.id
+                    values['location_final_id'] = mo.location_dest_id.id
         return super().create(vals_list)
 
     def write(self, vals):
@@ -291,10 +291,9 @@ class StockMove(models.Model):
                 updated_product_move._action_confirm()
                 move_to_unlink.unlink()
                 self = other_move + updated_product_move
+        moves_to_update = False
         if self.env.context.get('force_manual_consumption') and 'quantity' in vals:
             moves_to_update = self.filtered(lambda move: move.product_uom_qty != vals['quantity'])
-            if moves_to_update:
-                moves_to_update.write({'manual_consumption': True, 'picked': True})
         if 'product_uom_qty' in vals and 'move_line_ids' in vals:
             # first update lines then product_uom_qty as the later will unreserve
             # so possibly unlink lines
@@ -302,6 +301,8 @@ class StockMove(models.Model):
             super().write({'move_line_ids': move_line_vals})
         old_demand = {move.id: move.product_uom_qty for move in self}
         res = super().write(vals)
+        if moves_to_update:
+            moves_to_update.write({'manual_consumption': True, 'picked': True})
         if 'product_uom_qty' in vals and not self.env.context.get('no_procurement', False):
             # when updating consumed qty need to update related pickings
             # context no_procurement means we don't want the qty update to modify stock i.e create new pickings
@@ -313,6 +314,7 @@ class StockMove(models.Model):
         procurements = []
         old_qties = old_qties or {}
         to_assign = self.env['stock.move']
+        proc_move = set()
         self._adjust_procure_method()
         for move in self:
             if move.product_uom.compare(move.product_uom_qty - old_qties.get(move.id, 0), 0) < 0\
@@ -324,9 +326,18 @@ class StockMove(models.Model):
                         or move.picking_type_id.reservation_method == 'at_confirm' \
                         or (move.reservation_date and move.reservation_date <= fields.Date.today()):
                     to_assign |= move
+            proc_move.add(move.id)
 
+        # Save quantity on each move before assignment
+        before_assign_qties = {move.id: move.quantity for move in to_assign}
+        to_assign._action_assign()
+        # Compute the delta (newly assigned quantity) per move
+        delta_qties = {move.id: (move.quantity - before_assign_qties.get(move.id, 0)) if move.product_id.is_storable else 0 for move in to_assign}
+
+        proc_move = self.browse(proc_move)
+        for move in proc_move:
             if move.procure_method == 'make_to_order' or move.rule_id.procure_method == 'mts_else_mto':
-                procurement_qty = move.product_uom_qty - old_qties.get(move.id, 0)
+                procurement_qty = move.product_uom_qty - old_qties.get(move.id, 0) - delta_qties.get(move.id, 0)
                 if move.move_orig_ids:
                     possible_reduceable_qty = -sum(move.move_orig_ids.filtered(lambda m: m.state not in ('done', 'cancel') and m.product_uom_qty).mapped('product_uom_qty'))
                     procurement_qty = max(procurement_qty, possible_reduceable_qty)
@@ -335,17 +346,8 @@ class StockMove(models.Model):
                     move.product_id, procurement_qty, move.product_uom,
                     move.location_id, move.reference, move.origin, move.company_id, values))
 
-        to_assign._action_assign()
         if procurements:
             self.env['stock.rule'].run(procurements)
-
-    def _action_assign(self, force_qty=False):
-        res = super(StockMove, self)._action_assign(force_qty=force_qty)
-        for move in self.filtered(lambda x: x.production_id or x.raw_material_production_id):
-            if move.move_line_ids:
-                move.move_line_ids.write({'production_id': move.raw_material_production_id.id,
-                                               'workorder_id': move.workorder_id.id,})
-        return res
 
     def _action_confirm(self, merge=True, merge_into=False, create_proc=True):
         moves = self.action_explode()
@@ -430,6 +432,32 @@ class StockMove(models.Model):
                 mo_to_cancel._action_cancel()
         return res
 
+    def _log_cancel_activity(self):
+        super()._log_cancel_activity()
+        if not self:
+            return
+
+        def _render_note_exception_cancel_dest(moves):
+            values = {
+                'origin_moves': moves,
+                'origin_picking': moves.picking_id[0],
+                'moves_information': ((move, (0.0, move.product_qty)) for move in moves),
+            }
+            return self.env['ir.qweb']._render('stock.exception_on_picking', values)
+
+        cancelled_ids = set(self.ids)
+        impacted_origins = self.move_orig_ids.filtered(lambda m: m.state not in ('done', 'cancel'))
+        documents = {}
+        for move in impacted_origins:
+            production = move.production_id
+            if not production:
+                continue
+            cancelled_dests = move.move_dest_ids.filtered(lambda m: m.id in cancelled_ids)
+            if not cancelled_dests.picking_id:
+                continue
+            documents[move.production_id, move.production_id.user_id or self.env.user] = cancelled_dests
+        return self.env['stock.picking']._log_activity(_render_note_exception_cancel_dest, documents)
+
     def _prepare_move_split_vals(self, qty):
         defaults = super()._prepare_move_split_vals(qty)
         defaults['workorder_id'] = False
@@ -496,7 +524,7 @@ class StockMove(models.Model):
 
     def _get_upstream_documents_and_responsibles(self, visited):
         if self.production_id and self.production_id.state not in ('done', 'cancel'):
-            return [(self.production_id, self.production_id.user_id, visited)]
+            return [(self.production_id, self.production_id.user_id or self.env.user, visited)]
         else:
             return super(StockMove, self)._get_upstream_documents_and_responsibles(visited)
 
@@ -525,7 +553,7 @@ class StockMove(models.Model):
 
     def _key_assign_picking(self):
         keys = super(StockMove, self)._key_assign_picking()
-        return keys + (self.created_production_id,)
+        return keys + (self.created_production_id, self.production_group_id)
 
     @api.model
     def _prepare_merge_moves_distinct_fields(self):
@@ -576,8 +604,13 @@ class StockMove(models.Model):
                 qty_per_kit = bom_line.product_uom_id._compute_quantity(uom_qty_per_kit / kit_bom.product_qty, bom_line.product_id.uom_id, round=False)
                 if not qty_per_kit:
                     continue
-                incoming_qty = sum(bom_line_moves.filtered(filters['incoming_moves']).mapped(get_qty))
-                outgoing_qty = sum(bom_line_moves.filtered(filters['outgoing_moves']).mapped(get_qty))
+                # Due to multi-step only the last move of each chain should be considered
+                incoming_moves = bom_line_moves.filtered(filters['incoming_moves'])
+                final_incoming_moves = incoming_moves - incoming_moves.move_orig_ids
+                incoming_qty = sum(final_incoming_moves.mapped(get_qty))
+                outgoing_moves = bom_line_moves.filtered(filters['outgoing_moves'])
+                final_outgoing_moves = outgoing_moves - outgoing_moves.move_orig_ids
+                outgoing_qty = sum(final_outgoing_moves.mapped(get_qty))
                 qty_processed = incoming_qty - outgoing_qty
                 # We compute a ratio to know how many kits we can produce with this quantity of that specific component
                 qty_ratios.append(bom_line.product_id.uom_id.round(qty_processed / qty_per_kit))
@@ -609,8 +642,11 @@ class StockMove(models.Model):
 
     def _search_picking_for_assignation_domain(self):
         domain = super()._search_picking_for_assignation_domain()
-        domain += [('production_group_id', '=', self.production_group_id.id)]
+        domain += self._get_production_assignation_domain()
         return domain
+
+    def _get_production_assignation_domain(self):
+        return [('production_group_id', '=', self.production_group_id.id)]
 
     def action_open_reference(self):
         res = super().action_open_reference()

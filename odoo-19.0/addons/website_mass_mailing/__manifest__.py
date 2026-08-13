@@ -46,4 +46,5 @@ On a simple click, your visitors can subscribe to mailing lists managed in the E
         ],
     },
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

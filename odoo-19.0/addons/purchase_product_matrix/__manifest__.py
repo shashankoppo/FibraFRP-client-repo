@@ -24,4 +24,5 @@ by choosing product variants quantity through a Grid Entry.
         ],
     },
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

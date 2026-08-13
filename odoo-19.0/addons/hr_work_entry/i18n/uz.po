@@ -14,15 +14,17 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Odoo Server 19.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-12-30 18:36+0000\n"
-"PO-Revision-Date: 2025-10-08 18:37+0000\n"
-"Last-Translator: \n"
-"Language-Team: \n"
+"POT-Creation-Date: 2026-04-10 18:38+0000\n"
+"PO-Revision-Date: 2026-08-02 23:45+0000\n"
+"Last-Translator: Anonymous <noreply@weblate.org>\n"
+"Language-Team: Uzbek <https://translate.odoo.com/projects/odoo-19/"
+"hr_work_entry/uz/>\n"
 "Language: uz\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
+"X-Generator: Weblate 2026.6.1\n"
 
 #. module: hr_work_entry
 #: model:ir.model.fields,help:hr_work_entry.field_hr_employee__work_entry_source
@@ -46,13 +48,6 @@ msgstr ""
 "yozuvlari xodimning davomatlaridan shakllantiriladi. (Davomat ilovasi talab "
 "etiladi)         Rejalashtirish: Ish yozuvlari xodimning rejasidan hosil "
 "qilinadi. (Rejalashtirish ilovasi talab etiladi)"
-
-#. module: hr_work_entry
-#. odoo-python
-#: code:addons/hr_work_entry/models/hr_work_entry.py:0
-#, fuzzy
-msgid "%(employee)s does not have a contract on %(date)s."
-msgstr "%(employee)s %(date)s sanasida shartnomaga ega emas."
 
 #. module: hr_work_entry
 #. odoo-python
@@ -86,8 +81,8 @@ msgid ""
 "                            Work Entries\n"
 "                            </span>"
 msgstr ""
-"<span class=\"o_stat_text\">                             Ish "
-"yozuvlari                             </span>"
+"<span class=\"o_stat_text\">                             Ish yozuvlari"
+"                             </span>"
 
 #. module: hr_work_entry
 #: model_terms:ir.ui.view,arch_db:hr_work_entry.hr_work_entry_regeneration_wizard
@@ -105,6 +100,11 @@ msgstr ""
 #, fuzzy
 msgid "<span>Hours</span>"
 msgstr "<span>Soatlar</span>"
+
+#. module: hr_work_entry
+#: model:hr.work.entry.type,display_code:hr_work_entry.work_entry_type_attendance
+msgid "A"
+msgstr ""
 
 #. module: hr_work_entry
 #: model:ir.model.fields,field_description:hr_work_entry.field_hr_user_work_entry_employee__active
@@ -1263,8 +1263,7 @@ msgstr "Kasallik ta'tili 4-10 kun (55% to‘lov)"
 #: model:hr.work.entry.type,name:hr_work_entry.l10n_sk_work_entry_type_sick_0
 #, fuzzy
 msgid "Sick Time Off Day up to 52 weeks (Paid at 55% by social security)"
-msgstr ""
-"Kasallik ta'tili 52 haftagacha (ijtimoiy ta'minot tomonidan 55% to‘lov)"
+msgstr "Kasallik ta'tili 52 haftagacha (ijtimoiy ta'minot tomonidan 55% to‘lov)"
 
 #. module: hr_work_entry
 #: model:hr.work.entry.type,name:hr_work_entry.l10n_eg_work_entry_type_sick_leave_75
@@ -1676,3 +1675,7 @@ msgstr "Yoshlar ta'tili"
 #, fuzzy
 msgid "hours"
 msgstr "soat"
+
+#, fuzzy
+#~ msgid "%(employee)s does not have a contract on %(date)s."
+#~ msgstr "%(employee)s %(date)s sanasida shartnomaga ega emas."

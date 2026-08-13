@@ -34,4 +34,5 @@ Activates:
         'demo/demo_partner.xml',
     ],
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

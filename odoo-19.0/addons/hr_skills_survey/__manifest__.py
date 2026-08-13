@@ -23,4 +23,5 @@ This module adds certification to resume for employees.
         'data/hr_resume_demo.xml',
     ],
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

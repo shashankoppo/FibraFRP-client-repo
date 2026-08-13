@@ -129,8 +129,11 @@ class PosOrder(models.Model):
         self.ensure_one()
         errors = []
 
-        if self.state not in ('paid', 'done'):
-            errors.append(_("Veri*Factu documents can only be generated for paid or posted Point of Sale Orders."))
+        if self.state not in ('paid', 'done', 'invoiced'):
+            errors.append(_("Veri*Factu documents can only be generated for paid, posted or invoiced Point of Sale Orders."))
+
+        if self.state == 'invoiced' and not cancellation:
+            errors.append(_("Veri*Factu documents can only be generated for invoiced Point of Sale Orders for cancellation purpose."))
 
         return errors
 
@@ -276,6 +279,8 @@ class PosOrder(models.Model):
         if not self.config_id.l10n_es_edi_verifactu_required:
             return res
 
+        if len(self) > 1:
+            raise UserError(_("With Veri*Factu enabled, POS orders cannot be consolidated into one invoice."))
         res['l10n_es_edi_verifactu_refund_reason'] = self.l10n_es_edi_verifactu_refund_reason
         # There is no reason to create a simplified invoice instead of just creating an order.
         # (Currently "simplified" basically just removes the partner information.)

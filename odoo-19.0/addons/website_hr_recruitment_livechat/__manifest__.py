@@ -15,4 +15,5 @@ A chatbot to help the user be guided through recruitment process on the website 
         'data/website_hr_recruitment_livechat_chatbot_demo.xml'
     ],
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

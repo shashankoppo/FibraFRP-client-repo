@@ -310,6 +310,14 @@ class TestMenu(common.TransactionCase):
         with self.assertRaises(UserError):
             self.main_menu.parent_id = self.another_menu.id
 
+    def test_08_top_level_menu_as_mega_menu(self):
+        top_menu = self.env.ref('website.main_menu')
+        self.assertFalse(top_menu.parent_id)
+        self.assertTrue(top_menu.child_id)
+
+        with self.assertRaises(UserError):
+            top_menu.is_mega_menu = True
+
 
 class TestMenuHttp(common.HttpCase):
     def setUp(self):
@@ -383,6 +391,23 @@ class TestMenuHttp(common.HttpCase):
         self.assertFalse(self.menu.page_id, "M2o should have been unset as this is an anchor URL.")
         self.assertEqual(self.menu.url, self.page_url + '#anchor', "Page URL should have been properly prefixed with the referer url")
         self.assertEqual(self.page.url, self.page_url, "Page URL should not have changed")
+
+    def test_menu_special_anchors(self):
+        data = {
+            'id': self.menu.id,
+            'parent_id': self.menu.parent_id.id,
+            'name': self.menu.name,
+        }
+
+        data['url'] = '#top'
+        self.simulate_rpc_save_menu(data)
+        self.assertEqual(self.menu.url, '#top', "Menu #top anchor without a page prefix")
+        self.assertEqual(self.menu._clean_url(), '#top', "Clean URL should not have a prefix for #top anchor")
+
+        data['url'] = '#bottom'
+        self.simulate_rpc_save_menu(data)
+        self.assertEqual(self.menu.url, '#bottom', "Menu #bottom anchor without a page prefix")
+        self.assertEqual(self.menu._clean_url(), '#bottom', "Clean URL should not have a prefix for #bottom anchor")
 
     def test_03_mega_menu_translate(self):
         # Setup

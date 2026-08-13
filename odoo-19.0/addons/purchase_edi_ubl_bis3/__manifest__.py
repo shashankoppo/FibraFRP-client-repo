@@ -11,4 +11,5 @@ receiver to retrieve the PDF with only the xml file.
     'installable': True,
     'auto_install': True,
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

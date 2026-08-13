@@ -33,4 +33,5 @@ internal transfer document is needed.
     'uninstall_hook': "uninstall_hook",
     'installable': True,
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

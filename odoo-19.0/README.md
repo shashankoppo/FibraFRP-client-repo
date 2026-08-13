@@ -1,4 +1,4 @@
-# FibraFRP — Odoo 19.0 Enterprise Architecture Blueprint
+# FibraFRP - Odoo 19.0 Community Edition
 
 Welcome to the central repository for the FibraFRP custom Odoo 19.0 deployment. This document outlines the technical architecture, custom module ecosystem, connection points, and workflow required to maintain and develop this system.
 
@@ -8,15 +8,33 @@ Use [UBUNTU_24_DOCKER_DEPLOYMENT.md](UBUNTU_24_DOCKER_DEPLOYMENT.md) for
 server setup, exact clone restore, fresh database setup, WhatsApp webhook checks,
 Tally routing, and post-deploy verification.
 
-For production updates with multiple databases, pull/build the code and run the
-all-database module upgrade script so every database receives the latest stored
-views, menus, and actions:
+For production updates across every client database, use the canonical refresh
+workflow below. It creates encrypted database and filestore backups, rebuilds the
+image from the pinned latest Odoo CE source, upgrades every already-installed
+official and custom module, installs the complete CE application/localization
+profile when explicitly enabled, verifies module states, and then health-checks
+Odoo:
 
 ```bash
-git pull origin main
-docker compose down
-docker compose build odoo
-bash deploy/upgrade_module_all_dbs.sh elsx_whatsapp_marketing
+git pull --ff-only origin main
+read -s -p "Backup passphrase: " BACKUP_PASSPHRASE && echo
+export BACKUP_PASSPHRASE
+CONFIRM_ALL_DBS=YES INSTALL_CE_PROFILE_ON_EXISTING=YES \
+  bash deploy/safe_ce19_refresh_all_dbs.sh
+unset BACKUP_PASSPHRASE
+```
+
+Use `INSTALL_CE_PROFILE_ON_EXISTING=NO` when an existing client database must
+keep its current application selection; all installed modules are still upgraded.
+
+For a new client database, the full official CE application profile and the
+matching country localization are installed by default:
+
+```bash
+read -s -p "New database admin password: " NEW_DB_ADMIN_PASSWORD && echo
+export NEW_DB_ADMIN_PASSWORD
+CONFIRM_CREATE_DB=YES bash deploy/create_client_database.sh Client_DB IN admin
+unset NEW_DB_ADMIN_PASSWORD
 ```
 
 For the current production/live database, use `FiberaFRP_DB` as the primary
@@ -82,7 +100,7 @@ overwrite local `.env` and `odoo.docker.conf` on the target host.
 This project is a hybrid system utilizing Odoo 19.0 as the core ERP and CRM engine, augmented by real-time microservices for high-performance communication.
 
 ### Core Technologies
-- **Backend ERP**: Odoo 19.0 Enterprise (Dockerized)
+- **Backend ERP**: Odoo 19.0 Community Edition (Dockerized)
 - **Database**: PostgreSQL 16
 - **Real-Time Engine**: Node.js Sidecar + Socket.io (Zero-latency WebSocket server)
 - **Frontend Framework**: OWL 2.0 (Odoo Web Library) & Native JS

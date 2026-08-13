@@ -1,4 +1,5 @@
 from odoo import fields, models, tools
+from odoo.tools import float_is_zero
 
 
 class StockAverageCostReport(models.AbstractModel):
@@ -44,7 +45,7 @@ SELECT
     sm.company_id,
     sm.reference,
     CASE WHEN sm.is_in THEN sm.value ELSE -sm.value END AS value,
-    CASE WHEN sm.is_in THEN sm.quantity ELSE -sm.quantity END AS quantity,
+    CASE WHEN sm.is_in THEN sm.quantity * (um.factor / up.factor) ELSE -sm.quantity * (um.factor / up.factor) END AS quantity,
     'stock.move' AS res_model_name,
     'Operation' AS description
 FROM
@@ -59,13 +60,17 @@ LEFT JOIN
     product_category pc ON pt.categ_id = pc.id
 LEFT JOIN
     res_company company ON sm.company_id = company.id
+LEFT JOIN
+    uom_uom um ON um.id = sm.product_uom
+LEFT JOIN
+    uom_uom up ON up.id = pt.uom_id
 WHERE
     sm.state = 'done'
     AND (sm.is_in = TRUE OR sm.is_out = TRUE)
     -- Ignore moves for standard cost method. Only display the list of cost updates
     AND (
         (pt.categ_id IS NOT NULL AND pc.property_cost_method ->> company.id::text IN ('fifo', 'average'))
-        OR (pt.categ_id IS NULL OR pc.property_cost_method IS NULL AND company.cost_method IN ('fifo', 'average'))
+        OR (pt.categ_id IS NULL OR (pc.property_cost_method IS NULL OR pc.property_cost_method ->> company.id::text IS NULL) AND company.cost_method IN ('fifo', 'average'))
     )
 UNION ALL
 SELECT
@@ -88,31 +93,45 @@ WHERE
         self.env.cr.execute(query)
 
     def _compute_cumulative_fields(self):
+        total_records_grouped = self.env['stock.avco.report'].search(
+            [('product_id', 'in', self.product_id.mapped('id')), ('company_id', 'in', self.company_id.mapped('id'))]
+        ).grouped(lambda m: (m.product_id, m.company_id))
         for records in self.grouped(lambda m: (m.product_id, m.company_id)).values():
-            records = records.sorted('date, id')
+            current_page_records = records.sorted('date, id')
+            total_records = total_records_grouped.get((records.product_id, records.company_id)).sorted('date, id')
             added_value = 0.0
             total_value = 0.0
             total_quantity = 0.0
             avco = 0.0
-            for record in records:
+            for record in total_records:
+                qty = record.quantity
                 if record.res_model_name == 'stock.move':
-                    if record.quantity > 0:
+                    previous_qty = total_quantity
+                    total_quantity += qty
+                    if qty > 0:
                         added_value = record.value
-                    elif record.quantity < 0:
-                        added_value = avco * record.quantity
-                    total_value += added_value
-                    total_quantity += record.quantity
+                        # Regular case, value from accumulation
+                        if previous_qty > 0:
+                            total_value += added_value
+                            avco = total_value / total_quantity if not float_is_zero(total_quantity, precision_digits=self.env['decimal.precision'].precision_get('Product Unit')) else avco
+                        # From negative quantity case, value from last_in
+                        elif previous_qty <= 0:
+                            avco = added_value / qty if qty else avco
+                            total_value = avco * total_quantity
+                    else:
+                        added_value = avco * qty
+                        total_value += added_value
 
                 elif record.res_model_name == 'product.value':
-                    added_value = (record.value * total_quantity) - total_value
-                    total_value = record.value * total_quantity
+                    avco = record.value
+                    added_value = (avco * total_quantity) - total_value
+                    total_value = avco * total_quantity
 
-                if total_quantity:
-                    avco = total_value / total_quantity
-                record.added_value = added_value
-                record.total_value = total_value
-                record.total_quantity = total_quantity
-                record.avco_value = avco
+                if record in current_page_records:
+                    record.added_value = added_value
+                    record.total_value = total_value
+                    record.total_quantity = total_quantity
+                    record.avco_value = avco
 
     def _compute_justification(self):
         self.justification = False

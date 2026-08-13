@@ -12,4 +12,5 @@ Force the installation of the Withholding Tax on Payment module
 """,
     'depends': ['l10n_account_withholding_tax', 'l10n_sa'],
     'auto_install': ['l10n_sa'],
+    'license': 'LGPL-3',
 }

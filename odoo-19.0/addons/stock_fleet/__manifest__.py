@@ -18,5 +18,6 @@
         'views/stock_location.xml',
     ],
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
     'post_init_hook': '_enable_dispatch_management',
 }

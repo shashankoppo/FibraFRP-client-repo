@@ -14,5 +14,6 @@
     """,
     'depends': ['spreadsheet'],
     'author': 'Odoo S.A.',
-    'data': ['security/ir.model.access.csv'],
+    'license': 'LGPL-3',
+    'data': ['security/spreadsheet_test_security.xml', 'security/ir.model.access.csv'],
 }

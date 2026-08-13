@@ -7,7 +7,6 @@ from odoo.exceptions import ValidationError
 from odoo.tools.urls import urljoin as url_join
 
 from odoo.addons.payment import utils as payment_utils
-from odoo.addons.payment.const import CURRENCY_MINOR_UNITS
 from odoo.addons.payment.logging import get_payment_logger
 from odoo.addons.payment_stripe import const
 from odoo.addons.payment_stripe import utils as stripe_utils
@@ -134,6 +133,8 @@ class PaymentTransaction(models.Model):
             'expand[]': 'payment_method',
             **stripe_utils.include_shipping_address(self),
         }
+        if payment_method_type == "sepa_direct_debit":
+            payment_intent_payload["statement_descriptor"] = self.reference[:22]
         if self.operation in ['online_token', 'offline']:
             if not self.token_id.stripe_payment_method:  # Pre-SCA token, migrate it.
                 self.token_id._stripe_sca_migrate_customer()
@@ -318,13 +319,10 @@ class PaymentTransaction(models.Model):
             arbitrary_decimal_number=const.CURRENCY_DECIMALS.get(self.currency_id.name),
         )
         currency_code = payment_data.get('currency', '').upper()
-        precision_digits = CURRENCY_MINOR_UNITS.get(
-            self.currency_id.name, self.currency_id.decimal_places
-        )
         return {
             'amount': amount,
             'currency_code': currency_code,
-            'precision_digits': precision_digits,
+            'precision_digits': const.CURRENCY_DECIMALS.get(self.currency_id.name),
         }
 
     def _apply_updates(self, payment_data):

@@ -20,23 +20,27 @@
 # Hamed Mohammadi <hamed@dehongi.com>, 2023
 # Mostafa Barmshory <mostafa.barmshory@gmail.com>, 2023
 # fardin mardani, 2023
-# "Tiffany Chang (tic)" <tic@odoo.com>, 2025.
-# Weblate <noreply-mt-weblate@weblate.org>, 2025.
+# "Tiffany Chang (tic)" <tic@odoo.com>, 2025, 2026.
+# Weblate <noreply-mt-weblate@weblate.org>, 2025, 2026.
+# Odoo Translation Bot <c3p@odoo.com>, 2026.
+# Heshmatkhah <maheshmatkhah.soft@gmail.com>, 2026.
+# Aliraza Habibitanha <alireza.habibitanha@gmail.com>, 2026.
+# سید سعید محمودزاده حسینی <ssmhos@gmail.com>, 2026.
 msgid ""
 msgstr ""
 "Project-Id-Version: Odoo Server 16.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-01-22 18:35+0000\n"
-"PO-Revision-Date: 2025-11-08 19:19+0000\n"
-"Last-Translator: Weblate <noreply-mt-weblate@weblate.org>\n"
-"Language-Team: Persian <https://translate.odoo.com/projects/odoo-19/mail/fa/"
-">\n"
+"POT-Creation-Date: 2026-07-17 17:37+0000\n"
+"PO-Revision-Date: 2026-08-03 19:47+0000\n"
+"Last-Translator: سید سعید محمودزاده حسینی <ssmhos@gmail.com>\n"
+"Language-Team: Persian <https://translate.odoo.com/projects/odoo-19/mail/fa/>"
+"\n"
 "Language: fa\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: \n"
 "Plural-Forms: nplurals=2; plural=n > 1;\n"
-"X-Generator: Weblate 5.12.2\n"
+"X-Generator: Weblate 2026.6.1\n"
 
 #. module: mail
 #: model:ir.model.fields,help:mail.field_ir_actions_server__followers_type
@@ -156,8 +160,8 @@ msgid ""
 "%(email)s is not recognized as a valid email. This is required to create a "
 "new customer."
 msgstr ""
-"آدرس ایمیل %(email)s به عنوان یک ایمیل معتبر شناخته نمی‌شود. ارائه این "
-"اطلاعات برای ایجاد یک مشتری جدید الزامی است."
+"آدرس ایمیل %(email)s به عنوان یک ایمیل معتبر شناخته نمی‌شود. ارائه این اطلاعات "
+"برای ایجاد یک مشتری جدید الزامی است."
 
 #. module: mail
 #. odoo-javascript
@@ -256,8 +260,8 @@ msgid ""
 "(open_em)sto %(open_save)ssave%(close_save)s%(close_em)s"
 msgstr ""
 "%(open_samp)sEscape%(close_samp)s %(open_em)sبرای %(open_cancel)sلغو%"
-"(close_cancel)s%(close_em)s, %(open_samp)sCTRL-Enter%(close_samp)s %"
-"(open_em)sبرای %(open_save)sذخیره%(close_save)s%(close_em)s"
+"(close_cancel)s%(close_em)s, %(open_samp)sCTRL-Enter%(close_samp)s %(open_em)"
+"sبرای %(open_save)sذخیره%(close_save)s%(close_em)s"
 
 #. module: mail
 #. odoo-javascript
@@ -268,8 +272,8 @@ msgid ""
 "(open_save)ssave%(close_save)s%(close_em)s"
 msgstr ""
 "%(open_samp)sEscape%(close_samp)s %(open_em)sبرای %(open_cancel)sلغو%"
-"(close_cancel)s%(close_em)s, %(open_samp)sEnter%(close_samp)s %"
-"(open_em)sبرای %(open_save)sذخیره%(close_save)s%(close_em)s"
+"(close_cancel)s%(close_em)s, %(open_samp)sEnter%(close_samp)s %(open_em)"
+"sبرای %(open_save)sذخیره%(close_save)s%(close_em)s"
 
 #. module: mail
 #. odoo-python
@@ -414,6 +418,18 @@ msgstr "&nbsp;&nbsp;"
 
 #. module: mail
 #. odoo-javascript
+#: code:addons/mail/static/src/core/common/composer.xml:0
+msgid "(Keep formatting)"
+msgstr ""
+
+#. module: mail
+#. odoo-javascript
+#: code:addons/mail/static/src/core/common/composer.xml:0
+msgid "(Remove formatting)"
+msgstr ""
+
+#. module: mail
+#. odoo-javascript
 #: code:addons/mail/static/src/core/common/message.js:0
 msgid "(Translated from: %(language)s)"
 msgstr "(ترجمه شده از: %(language)s)"
@@ -485,11 +501,6 @@ msgstr "1 پیام جدید"
 #: code:addons/mail/static/src/discuss/core/common/thread_model_patch.js:0
 msgid "1 other"
 msgstr ""
-
-#. module: mail
-#: model_terms:ir.ui.view,arch_db:mail.account_security_alert
-msgid "111.222.333.444"
-msgstr "111.222.333.444"
 
 #. module: mail
 #: model_terms:ir.actions.act_window,help:mail.action_email_server_tree
@@ -1168,24 +1179,27 @@ msgid "Add Star"
 msgstr ""
 
 #. module: mail
-#. odoo-javascript
-#: code:addons/mail/static/src/core/common/message_actions.js:0
-msgid "Add a Reaction"
-msgstr "ری‌اکشن اضافه کنید"
-
-#. module: mail
 #: model_terms:ir.ui.view,arch_db:mail.res_config_settings_view_form
-msgid "Add a Tenor GIF API key to enable GIFs support."
-msgstr "یک کلید API Tenor GIF اضافه کنید تا از پشتیبانی GIFها پشتیبانی شود."
+msgid ""
+"Add a Klipy GIF API key to enable GIFs support. If you were using a Tenor "
+"GIF API key (service shutdown on June 30, 2026), please replace it here with "
+"a Klipy GIF API key"
+msgstr ""
 
 #. module: mail
 #: model:ir.model.fields,help:mail.field_res_config_settings__tenor_api_key
 msgid ""
-"Add a Tenor GIF API key to enable GIFs support. https://"
-"developers.google.com/tenor/guides/quickstart#setup"
+"Add a Klipy GIF API key to enable GIFs support. https://docs.klipy.com/"
+"getting-started\n"
+"If you were using a Tenor GIF API key (service shutdown on June 30, 2026), "
+"please replace it here with a Klipy GIF API key"
 msgstr ""
-"یک کلید API برای Tenor GIF اضافه کنید تا پشتیبانی از GIF فعال شود. https://"
-"developers.google.com/tenor/guides/quickstart#setup"
+
+#. module: mail
+#. odoo-javascript
+#: code:addons/mail/static/src/core/common/message_actions.js:0
+msgid "Add a Reaction"
+msgstr "ری‌اکشن اضافه کنید"
 
 #. module: mail
 #. odoo-javascript
@@ -1234,7 +1248,7 @@ msgstr "افزودن یا پیوستن یک کانال"
 #. module: mail
 #: model_terms:ir.ui.view,arch_db:mail.email_compose_message_wizard_form
 msgid "Add recipients..."
-msgstr ""
+msgstr "افزودن گیرندگان..."
 
 #. module: mail
 #: model:ir.model.fields,field_description:mail.field_mail_compose_message__email_add_signature
@@ -1367,9 +1381,9 @@ msgid ""
 "(alias_model_name)s (%(matching_id)s) and used by the %(parent_name)s %"
 "(parent_model_name)s."
 msgstr ""
-"شناسه %(matching_name)s (%(current_id)s) در حال حاضر با  %"
-"(alias_model_name)s (%(matching_id)s) متصل شده و توسط %(parent_name)s %"
-"(parent_model_name)s استفاده می‌شود."
+"شناسه %(matching_name)s (%(current_id)s) در حال حاضر با  %(alias_model_name)"
+"s (%(matching_id)s) متصل شده و توسط %(parent_name)s %(parent_model_name)s "
+"استفاده می‌شود."
 
 #. module: mail
 #. odoo-python
@@ -2962,6 +2976,12 @@ msgstr "محتویات"
 
 #. module: mail
 #. odoo-javascript
+#: code:addons/mail/static/src/core/common/composer.xml:0
+msgid "Continue with Full Composer?"
+msgstr ""
+
+#. module: mail
+#. odoo-javascript
 #: code:addons/mail/static/src/core/common/search_message_input.js:0
 msgid "Conversations"
 msgstr ""
@@ -4408,8 +4428,7 @@ msgid ""
 "Error without exception. Probably due to sending an email without computed "
 "recipients."
 msgstr ""
-"خطا بدون استثنا. احتمالاً به دلیل ارسال ایمیل بدون دریافت‌کنندگان محاسبه‌شده "
-"است."
+"خطا بدون استثنا. احتمالاً به دلیل ارسال ایمیل بدون دریافت‌کنندگان محاسبه‌شده است."
 
 #. module: mail
 #: model:ir.model.constraint,message:mail.constraint_mail_followers_mail_followers_res_partner_res_model_id_uniq
@@ -4506,18 +4525,21 @@ msgstr "پیام ارسال نشد. برای امتحان مجدد کلیک کن
 #. odoo-python
 #: code:addons/mail/models/mail_render_mixin.py:0
 msgid ""
-"Failed to render QWeb template: %(template_src)s\n"
+"Failed to render QWeb template for %(template_label)s\n"
+"Target Model: %(model_name)s\n"
+"Language context: %(lang_context)s\n"
+"Error: %(error_details)s\n"
 "\n"
-"%(template_traceback)s)"
+"Template Source Snippet:\n"
+"%(template_src)s"
 msgstr ""
-"عدم موفقیت در نمایش قالب QWeb: %(template_src)s\n"
-"\n"
-"%(template_traceback)s)"
 
 #. module: mail
 #. odoo-python
 #: code:addons/mail/models/mail_render_mixin.py:0
-msgid "Failed to render inline_template template: %(template_txt)s"
+msgid ""
+"Failed to render inline_template template: %(template_txt)s\n"
+"Error details: %(error)s"
 msgstr ""
 
 #. module: mail
@@ -4543,8 +4565,8 @@ msgid ""
 "Failure reason. This is usually the exception thrown by the email server, "
 "stored to ease the debugging of mailing issues."
 msgstr ""
-"علت شکست این معمولاً استثناء‌ای است که توسط سرور ایمیل ایجاد می‌شود و برای "
-"سهولت در بررسی اشکالات مربوط به ارسال ایمیل ذخیره می‌شود."
+"علت شکست این معمولاً استثناء‌ای است که توسط سرور ایمیل ایجاد می‌شود و برای سهولت "
+"در بررسی اشکالات مربوط به ارسال ایمیل ذخیره می‌شود."
 
 #. module: mail
 #: model:ir.model.fields,field_description:mail.field_mail_mail__failure_type
@@ -4627,8 +4649,8 @@ msgid ""
 "getattr(related_document.relation_field)."
 msgstr ""
 "فیلدی که برای اتصال مدل مرتبط به مدل زیرگروه استفاده می‌شود زمانی که "
-"اشتراک‌گذاری خودکار در یک سند مرتبط انجام می‌شود. این فیلد برای محاسبه "
-"getattr(related_document.relation_field) استفاده می‌شود."
+"اشتراک‌گذاری خودکار در یک سند مرتبط انجام می‌شود. این فیلد برای محاسبه getattr"
+"(related_document.relation_field) استفاده می‌شود."
 
 #. module: mail
 #. odoo-python
@@ -4865,6 +4887,12 @@ msgstr ""
 #: model:ir.model.fields,field_description:mail.field_res_company__email_formatted
 msgid "Formatted Email"
 msgstr "ایمیل قالب بندی شده"
+
+#. module: mail
+#. odoo-javascript
+#: code:addons/mail/static/src/core/common/composer.xml:0
+msgid "Formatting can only be restored in Full Composer."
+msgstr ""
 
 #. module: mail
 #. odoo-javascript
@@ -5550,7 +5578,16 @@ msgstr ""
 #. module: mail
 #: model:ir.model.fields,help:mail.field_res_config_settings__use_twilio_rtc_servers
 msgid "If you want to use twilio as TURN/STUN server provider"
-msgstr "اگر می‌خواهید از twilio به عنوان ارائه‌دهنده سرور TURN/STUN استفاده کنید"
+msgstr ""
+"اگر می‌خواهید از twilio به عنوان ارائه‌دهنده سرور TURN/STUN استفاده کنید"
+
+#. module: mail
+#. odoo-javascript
+#: code:addons/mail/static/src/discuss/gif_picker/common/gif_picker.xml:0
+msgid ""
+"If you were using a Tenor API key, please replace it with a Klipy API key in "
+"the General Settings."
+msgstr ""
 
 #. module: mail
 #: model:ir.model.fields,field_description:mail.field_discuss_channel__image_128
@@ -5672,8 +5709,7 @@ msgstr ""
 #: model:ir.model.fields,help:mail.field_mail_activity__automated
 msgid ""
 "Indicates this activity has been created automatically and not by any user."
-msgstr ""
-"نشان دهنده این است که این فعالیت خودکار ایجاد شده و نه توسط هیچ کاربری."
+msgstr "نشان دهنده این است که این فعالیت خودکار ایجاد شده و نه توسط هیچ کاربری."
 
 #. module: mail
 #. odoo-javascript
@@ -5773,8 +5809,8 @@ msgid ""
 "Invalid expression, it must be a literal python dictionary definition e.g. "
 "\"{'field': 'value'}\""
 msgstr ""
-"عبارت نامعتبر است، باید یک تعریف لغت‌نامه‌ی واقعی پایتون باشد مانند "
-"\"{'field': 'value'}\""
+"عبارت نامعتبر است، باید یک تعریف لغت‌نامه‌ی واقعی پایتون باشد مانند \""
+"{'field': 'value'}\""
 
 #. module: mail
 #. odoo-python
@@ -6219,6 +6255,16 @@ msgstr "کلید"
 #: model_terms:ir.ui.view,arch_db:mail.message_notification_limit_email
 msgid "Kind Regards"
 msgstr "با احترام"
+
+#. module: mail
+#: model:ir.model.fields,field_description:mail.field_res_config_settings__tenor_api_key
+msgid "Klipy API key"
+msgstr ""
+
+#. module: mail
+#: model_terms:ir.ui.view,arch_db:mail.res_config_settings_view_form
+msgid "Klipy GIF API key"
+msgstr ""
 
 #. module: mail
 #. odoo-javascript
@@ -6729,6 +6775,12 @@ msgid "Mail Template Reset"
 msgstr "تنظیم مجدد قالب ایمیل"
 
 #. module: mail
+#. odoo-python
+#: code:addons/mail/models/mail_render_mixin.py:0
+msgid "Mail Template: '%(name)s' (ID: %(record_id)s)"
+msgstr ""
+
+#. module: mail
 #: model_terms:ir.ui.view,arch_db:mail.model_search_view
 msgid "Mail Thread"
 msgstr "رشته ایمیل"
@@ -6890,6 +6942,12 @@ msgid "Mark as done"
 msgstr "علامت به عنوان انجام شده"
 
 #. module: mail
+#. odoo-python
+#: code:addons/mail/models/mail_render_mixin.py:0
+msgid "Mass Mailing Template: '%(name)s' (ID: %(record_id)s)"
+msgstr ""
+
+#. module: mail
 #. odoo-javascript
 #: code:addons/mail/static/src/discuss/call/common/call_settings.js:0
 #: code:addons/mail/static/src/discuss/call/common/device_select.js:0
@@ -6911,7 +6969,7 @@ msgstr "تعداد اعضا"
 #. module: mail
 #. odoo-javascript
 #: code:addons/mail/static/src/discuss/core/common/channel_member_list.xml:0
-#: code:addons/mail/static/src/discuss/core/common/thread_actions.js:0
+#: code:addons/mail/static/src/discuss/core/public_web/thread_actions.js:0
 #: model:ir.model.fields,field_description:mail.field_discuss_channel__channel_member_ids
 #: model_terms:ir.ui.view,arch_db:mail.discuss_channel_view_form
 msgid "Members"
@@ -7091,7 +7149,7 @@ msgstr ""
 
 #. module: mail
 #. odoo-javascript
-#: code:addons/mail/static/src/core/common/composer.js:0
+#: code:addons/mail/static/src/core/common/store_service.js:0
 msgid "Message posted on \"%s\""
 msgstr "پیام ارسال شده در \"%s\""
 
@@ -7129,8 +7187,8 @@ msgstr ""
 "نوع پیام زیرمجموعه‌ای است که نوع دقیق‌تری از پیام را مشخص می‌کند، به‌ویژه برای "
 "اطلاعیه‌های سیستمی. به‌عنوان مثال، می‌تواند یک اطلاعیه مربوط به یک رکورد جدید "
 "(جدید)، یا به تغییر مرحله در یک فرایند (تغییر مرحله) باشد. زیرمجموعه‌های پیام "
-"اجازه می‌دهند اعلان‌هایی را که کاربر می‌خواهد در دیوار خود دریافت کند به‌طور "
-"دقیق تنظیم کند."
+"اجازه می‌دهند اعلان‌هایی را که کاربر می‌خواهد در دیوار خود دریافت کند به‌طور دقیق "
+"تنظیم کند."
 
 #. module: mail
 #: model:ir.model,name:mail.model_mail_message_subtype
@@ -7557,6 +7615,7 @@ msgstr "فعالیت های بعدی موجود است"
 
 #. module: mail
 #. odoo-javascript
+#: code:addons/mail/static/src/core/common/composer.xml:0
 #: code:addons/mail/static/src/core/web/message_patch.js:0
 msgid "No"
 msgstr "خیر"
@@ -7634,6 +7693,12 @@ msgstr ""
 #: code:addons/mail/static/src/core/web/thread_patch.xml:0
 msgid "No history messages"
 msgstr "بدون پیام‌های سابقه‌ای"
+
+#. module: mail
+#. odoo-python
+#: code:addons/mail/models/mail_render_mixin.py:0
+msgid "No language detected in context"
+msgstr ""
 
 #. module: mail
 #. odoo-javascript
@@ -7859,8 +7924,8 @@ msgid ""
 "Notification should receive attachments records as a list of IDs (received %"
 "(aids)s)"
 msgstr ""
-"اعلان باید سوابق پیوست‌ها را به‌صورت یک فهرست از شناسه‌ها دریافت کند (دریافت‌شده "
-"%(aids)s)"
+"اعلان باید سوابق پیوست‌ها را به‌صورت یک فهرست از شناسه‌ها دریافت کند (دریافت‌شده %"
+"(aids)s)"
 
 #. module: mail
 #. odoo-python
@@ -8214,8 +8279,11 @@ msgstr ""
 #. odoo-python
 #: code:addons/mail/models/mail_template.py:0
 msgid ""
-"Oops! We couldn't save your template due to an issue with this value: %"
-"(template_txt)s. Correct it and try again."
+"Oops! We couldn't save your template due to an issue.\n"
+"\n"
+"Error: %(error_details)s\n"
+"\n"
+"Correct it and try again."
 msgstr ""
 
 #. module: mail
@@ -8316,7 +8384,8 @@ msgstr ""
 #. module: mail
 #: model:ir.model.fields,help:mail.field_mail_notification__mail_mail_id
 msgid "Optional mail_mail ID. Used mainly to optimize searches."
-msgstr "شناسه‌ی اختیاری mail_mail. عمدتاً برای بهینه‌سازی جستجوها استفاده می‌شود."
+msgstr ""
+"شناسه‌ی اختیاری mail_mail. عمدتاً برای بهینه‌سازی جستجوها استفاده می‌شود."
 
 #. module: mail
 #: model:ir.model.fields,help:mail.field_mail_template__mail_server_id
@@ -8324,8 +8393,8 @@ msgid ""
 "Optional preferred server for outgoing mails. If not set, the highest "
 "priority one will be used."
 msgstr ""
-"سرور ترجیحی اختیاری برای ایمیل‌های خروجی. اگر تنظیم نشود، از سروری با "
-"بالاترین اولویت استفاده خواهد شد."
+"سرور ترجیحی اختیاری برای ایمیل‌های خروجی. اگر تنظیم نشود، از سروری با بالاترین "
+"اولویت استفاده خواهد شد."
 
 #. module: mail
 #: model:ir.model.fields,help:mail.field_mail_compose_message__lang
@@ -9914,6 +9983,12 @@ msgstr "جستجوی سرورهای ایمیل ورودی"
 
 #. module: mail
 #. odoo-javascript
+#: code:addons/mail/static/src/discuss/gif_picker/common/gif_picker.xml:0
+msgid "Search Klipy"
+msgstr ""
+
+#. module: mail
+#. odoo-javascript
 #: code:addons/mail/static/src/core/common/search_messages_panel.js:0
 msgid "Search Message"
 msgstr ""
@@ -9968,12 +10043,6 @@ msgstr ""
 #: code:addons/mail/static/src/core/public_web/discuss_search.xml:0
 msgid "Search conversations"
 msgstr ""
-
-#. module: mail
-#. odoo-javascript
-#: code:addons/mail/static/src/discuss/gif_picker/common/gif_picker.xml:0
-msgid "Search for a GIF"
-msgstr "جستجو برای یک GIF"
 
 #. module: mail
 #. odoo-javascript
@@ -10355,7 +10424,7 @@ msgstr "نوع سرور POP."
 #. odoo-javascript
 #: code:addons/mail/static/src/core/web/recipients_input_tags_list_popover.xml:0
 msgid "Set Email"
-msgstr ""
+msgstr "ارسال ایمیل"
 
 #. module: mail
 #. odoo-javascript
@@ -10636,7 +10705,7 @@ msgstr ""
 #: model:ir.model.fields,field_description:mail.field_mail_activity__state
 #: model_terms:ir.ui.view,arch_db:mail.discuss_channel_rtc_session_view_form
 msgid "State"
-msgstr "استان"
+msgstr "وضعیت"
 
 #. module: mail
 #: model:ir.model.fields,field_description:mail.field_fetchmail_server__state
@@ -10979,6 +11048,12 @@ msgstr "ایجاد الگو از آهنگساز نیاز به یک مدل معت
 #. module: mail
 #. odoo-python
 #: code:addons/mail/models/mail_render_mixin.py:0
+msgid "Template name not identified"
+msgstr ""
+
+#. module: mail
+#. odoo-python
+#: code:addons/mail/models/mail_render_mixin.py:0
 msgid ""
 "Template rendering should only be called with a list of IDs. Received “%"
 "(res_ids)s” instead."
@@ -11003,16 +11078,6 @@ msgstr ""
 #: model_terms:ir.ui.view,arch_db:mail.view_email_template_search
 msgid "Templates"
 msgstr "قالبها"
-
-#. module: mail
-#: model:ir.model.fields,field_description:mail.field_res_config_settings__tenor_api_key
-msgid "Tenor API key"
-msgstr "کلید API تنور"
-
-#. module: mail
-#: model_terms:ir.ui.view,arch_db:mail.res_config_settings_view_form
-msgid "Tenor GIF API key"
-msgstr "کلید API تنور GIF"
 
 #. module: mail
 #. odoo-javascript
@@ -11070,17 +11135,6 @@ msgid ""
 msgstr ""
 
 #. module: mail
-#: model:ir.model.fields,help:mail.field_res_partner__vat
-#: model:ir.model.fields,help:mail.field_res_users__vat
-msgid ""
-"The Tax Identification Number. Values here will be validated based on the "
-"country format. You can use '/' to indicate that the partner is not subject "
-"to tax."
-msgstr ""
-"شماره شناسایی مالیاتی. مقادیر اینجا بر اساس قالب کشور اعتبارسنجی خواهند شد. "
-"می‌توانید از '/' برای نشان دادن اینکه شریک مشمول مالیات نیست استفاده کنید."
-
-#. module: mail
 #. odoo-python
 #: code:addons/mail/wizard/mail_activity_schedule.py:0
 msgid "The activity can be launched, with these additional effects:"
@@ -11118,7 +11172,7 @@ msgstr "UUID کانال باید منحصر به فرد باشد"
 #. odoo-javascript
 #: code:addons/mail/static/src/core/common/thread.xml:0
 msgid "The conversation is empty."
-msgstr ""
+msgstr "گفتگو خالی است."
 
 #. module: mail
 #: model:ir.model.fields,help:mail.field_mail_template__can_write
@@ -12109,6 +12163,18 @@ msgid "Unnamed %(record_model_name)s (%(record_id)s)"
 msgstr ""
 
 #. module: mail
+#. odoo-python
+#: code:addons/mail/models/mail_render_mixin.py:0
+msgid "Unnamed Mail Template"
+msgstr ""
+
+#. module: mail
+#. odoo-python
+#: code:addons/mail/models/mail_render_mixin.py:0
+msgid "Unnamed Mailing"
+msgstr ""
+
+#. module: mail
 #. odoo-javascript
 #: code:addons/mail/static/src/core/common/message_card_list.xml:0
 #: code:addons/mail/static/src/discuss/message_pin/common/message_actions.js:0
@@ -12655,7 +12721,7 @@ msgstr "نوع نما"
 #. odoo-javascript
 #: code:addons/mail/static/src/core/web/activity_menu.xml:0
 msgid "View all activities"
-msgstr ""
+msgstr "مشاهده همه فعالیت‌ها"
 
 #. module: mail
 #. odoo-javascript
@@ -12836,7 +12902,7 @@ msgstr ""
 #. odoo-javascript
 #: code:addons/mail/static/src/core/web/recipients_input_tags_list_popover.xml:0
 msgid "What's the email address of"
-msgstr ""
+msgstr "آدرس ایمیل چیست"
 
 #. module: mail
 #. odoo-javascript
@@ -12930,6 +12996,7 @@ msgstr "بله، آن را پین کنید!"
 
 #. module: mail
 #. odoo-javascript
+#: code:addons/mail/static/src/core/common/composer.xml:0
 #: code:addons/mail/static/src/core/web/message_patch.js:0
 msgid "Yes"
 msgstr "بله"
@@ -12950,7 +13017,7 @@ msgstr "دیروز"
 #. odoo-javascript
 #: code:addons/mail/static/src/core/common/message_model.js:0
 msgid "Yesterday at %(time)s"
-msgstr ""
+msgstr "دیروز در %(time)s"
 
 #. module: mail
 #. odoo-javascript
@@ -13064,6 +13131,18 @@ msgstr "شما فقط می‌توانید با شریک‌هایی که کارب
 #. odoo-javascript
 #: code:addons/mail/static/src/discuss/call/common/call_permission_dialog.js:0
 msgid "You can still turn off your %s anytime."
+msgstr ""
+
+#. module: mail
+#: model:ir.model.fields,help:mail.field_res_partner__vat
+#: model:ir.model.fields,help:mail.field_res_users__vat
+msgid "You can use '/' to indicate that the customer has no Tax ID."
+msgstr ""
+
+#. module: mail
+#. odoo-python
+#: code:addons/mail/models/mail_alias_domain.py:0
+msgid "You cannot assign an empty domain name."
 msgstr ""
 
 #. module: mail
@@ -13359,6 +13438,12 @@ msgid "created this channel."
 msgstr "ایجاد شده توسط این کانال."
 
 #. module: mail
+#. odoo-javascript
+#: code:addons/mail/static/src/js/rotting_mixin/rotting_statusbar.xml:0
+msgid "d"
+msgstr ""
+
+#. module: mail
 #: model_terms:ir.ui.view,arch_db:mail.account_security_alert
 msgid "day, month dd, yyyy - hh:mm:ss (GMT)"
 msgstr "روز، ماه، سال، ساعت، دقیقه، ثانیه (GMT)"
@@ -13442,8 +13527,8 @@ msgstr "به عنوان مثال، \"ایمیل خوش‌آمدگویی\""
 msgid ""
 "e.g. \"Welcome to MyCompany\" or \"Nice to meet you, {{ object.name }}\""
 msgstr ""
-"به عنوان مثال، \"به شرکت من خوش آمدید\" یا \"خوشبختم از ملاقات با شما، "
-"{{ object.name }}\""
+"به عنوان مثال، \"به شرکت من خوش آمدید\" یا \"خوشبختم از ملاقات با شما، {{ "
+"object.name }}\""
 
 #. module: mail
 #: model_terms:ir.ui.view,arch_db:mail.mail_alias_domain_view_form
@@ -13906,6 +13991,43 @@ msgstr "نام مستعار شما"
 #: code:addons/mail/models/discuss/discuss_channel_member.py:0
 msgid "“%(member_name)s” in “%(channel_name)s”"
 msgstr "\"در %(channel_name)s\" %(member_name)s\"\""
+
+#. module: mail
+#. odoo-javascript
+#: code:addons/mail/static/src/core/web/activity.js:0
+msgid "“%s”"
+msgstr ""
+
+#~ msgid "Search for a GIF"
+#~ msgstr "جستجو برای یک GIF"
+
+#~ msgid ""
+#~ "The Tax Identification Number. Values here will be validated based on the "
+#~ "country format. You can use '/' to indicate that the partner is not "
+#~ "subject to tax."
+#~ msgstr ""
+#~ "شماره شناسایی مالیاتی. مقادیر اینجا بر اساس قالب کشور اعتبارسنجی خواهند "
+#~ "شد. می‌توانید از '/' برای نشان دادن اینکه شریک مشمول مالیات نیست استفاده "
+#~ "کنید."
+
+#~ msgid "Add a Tenor GIF API key to enable GIFs support."
+#~ msgstr "یک کلید API Tenor GIF اضافه کنید تا از پشتیبانی GIFها پشتیبانی شود."
+
+#~ msgid ""
+#~ "Add a Tenor GIF API key to enable GIFs support. https://"
+#~ "developers.google.com/tenor/guides/quickstart#setup"
+#~ msgstr ""
+#~ "یک کلید API برای Tenor GIF اضافه کنید تا پشتیبانی از GIF فعال شود. "
+#~ "https://developers.google.com/tenor/guides/quickstart#setup"
+
+#~ msgid "Tenor API key"
+#~ msgstr "کلید API تنور"
+
+#~ msgid "Tenor GIF API key"
+#~ msgstr "کلید API تنور GIF"
+
+#~ msgid "111.222.333.444"
+#~ msgstr "111.222.333.444"
 
 #~ msgid "%(user)s connected. This is their first connection. Wish them luck."
 #~ msgstr "%(user)s وصل. این اولین اتصال آنهاست. برایشان آرزوی موفقیت کنید."

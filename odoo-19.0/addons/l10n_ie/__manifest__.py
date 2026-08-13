@@ -23,4 +23,5 @@ This is the base module to manage the accounting chart for Republic of Ireland i
     "demo": [
         "demo/demo_company.xml",
     ],
+    "license": "LGPL-3",
 }

@@ -33,4 +33,5 @@ Generate tasks in Project app from a form published on your website. This module
         ],
     },
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

@@ -29,7 +29,7 @@ from collections import defaultdict
 from collections.abc import Iterable, Iterator, Mapping, MutableMapping, MutableSet, Reversible
 from contextlib import ContextDecorator, contextmanager
 from difflib import HtmlDiff
-from functools import reduce, wraps
+from functools import lru_cache, reduce, wraps
 from itertools import islice, groupby as itergroupby
 from operator import itemgetter
 
@@ -1089,12 +1089,22 @@ class OrderedSet(MutableSet[T], typing.Generic[T]):
     def intersection(self, *others):
         return reduce(OrderedSet.__and__, others, self)
 
+    def copy(self):
+        new_set = OrderedSet()
+        new_set._map = self._map.copy()  # Atomic dict copy
+        return new_set
+
 
 class LastOrderedSet(OrderedSet[T], typing.Generic[T]):
     """ A set collection that remembers the elements last insertion order. """
     def add(self, elem):
         self.discard(elem)
         super().add(elem)
+
+    def copy(self):
+        new_set = LastOrderedSet()
+        new_set._map = self._map.copy()  # Atomic dict copy
+        return new_set
 
 
 class Callbacks:
@@ -1316,6 +1326,7 @@ def get_lang(env: Environment, lang_code: str | None = None) -> LangData:
     return env['res.lang']._get_data(code=lang)
 
 
+@lru_cache
 def babel_locale_parse(lang_code: str | None) -> babel.Locale:
     if lang_code:
         try:
@@ -1473,7 +1484,8 @@ def format_datetime(
     :param env:
     :param str|datetime value: naive datetime to format either in string or in datetime
     :param str tz: name of the timezone  in which the given datetime should be localized
-    :param str dt_format: one of “full”, “long”, “medium”, or “short”, or a custom date/time pattern compatible with `babel` lib
+    :param str dt_format: “medium”, or “short” to use res.lang format with or without the
+        seconds. Or a custom date/time pattern compatible with `babel` lib
     :param str lang_code: ISO code of the language to use to render the given datetime
     :rtype: str
     """
@@ -1500,12 +1512,13 @@ def format_datetime(
         date_format = posix_to_ldml(lang.date_format, locale=locale)
         time_format = posix_to_ldml(lang.time_format, locale=locale)
         dt_format = '%s %s' % (date_format, time_format)
+    elif dt_format == 'short':
+        date_format = posix_to_ldml(lang.date_format, locale=locale)
+        time_format = posix_to_ldml(lang.time_format.replace(':%S', ''), locale=locale)
+        dt_format = '%s %s' % (date_format, time_format)
 
     # Babel allows to format datetime in a specific language without change locale
     # So month 1 = January in English, and janvier in French
-    # Be aware that the default value for format is 'medium', instead of 'short'
-    #     medium:  Jan 5, 2016, 10:20:31 PM |   5 janv. 2016 22:20:31
-    #     short:   1/5/16, 10:20 PM         |   5/01/16 22:20
     # Formatting available here : http://babel.pocoo.org/en/latest/dates.html#date-fields
     return babel.dates.format_datetime(localized_datetime, dt_format, locale=locale)
 
@@ -1521,9 +1534,10 @@ def format_time(
 
         :param env:
         :param value: the time to format
-        :type value: `datetime.time` instance. Could be timezoned to display tzinfo according to format (e.i.: 'full' format)
+        :type value: `datetime.time` instance. Could be timezoned to display tzinfo according to format
         :param tz: name of the timezone  in which the given datetime should be localized
-        :param time_format: one of “full”, “long”, “medium”, or “short”, or a custom time pattern
+        :param str time_format: “medium”, or “short” to use res.lang format with or without the
+            seconds. Or a custom time pattern compatible with `babel` lib
         :param lang_code: ISO
 
         :rtype str
@@ -1550,6 +1564,8 @@ def format_time(
     locale = babel_locale_parse(lang.code)
     if not time_format or time_format == 'medium':
         time_format = posix_to_ldml(lang.time_format, locale=locale)
+    elif time_format == 'short':
+        time_format = posix_to_ldml(lang.time_format.replace(':%S', ''), locale=locale)
 
     return babel.dates.format_time(localized_time, format=time_format, locale=locale)
 
@@ -1762,7 +1778,7 @@ def get_diff(data_from, data_to, custom_style=False, dark_color_scheme=False):
     return handle_style(diff, custom_style, dark_color_scheme)
 
 
-def hmac(env, scope, message, hash_function=hashlib.sha256):
+def hmac(env, scope, message, hash_function=hashlib.sha256, *, secret=None):
     """Compute HMAC with `database.secret` config parameter as key.
 
     :param env: sudo environment to use for retrieving config parameter
@@ -1770,20 +1786,30 @@ def hmac(env, scope, message, hash_function=hashlib.sha256):
     :param scope: scope of the authentication, to have different signature for the same
         message in different usage
     :param hash_function: hash function to use for HMAC (default: SHA-256)
+    :param secret: secret used for sign, falls back to database.secret when no explicit secret is provided
     """
     if not scope:
         raise ValueError('Non-empty scope required')
 
-    secret = env['ir.config_parameter'].get_param('database.secret')
+    if secret is None:
+        secret = env['ir.config_parameter'].get_param('database.secret')
+    if isinstance(secret, str):
+        secret = secret.encode()
+
+    if not isinstance(secret, bytes):
+        raise TypeError("secret must be a str or bytes")
+    if not secret:
+        raise ValueError("Non-empty secret required")
+
     message = repr((scope, message))
     return hmac_lib.new(
-        secret.encode(),
+        secret,
         message.encode(),
         hash_function,
     ).hexdigest()
 
 
-def hash_sign(env, scope, message_values, expiration=None, expiration_hours=None):
+def hash_sign(env, scope, message_values, expiration=None, expiration_hours=None, *, secret=None):
     """ Generate an urlsafe payload signed with the HMAC signature for an iterable set of data.
     This feature is very similar to JWT, but in a more generic implementation that is inline with out previous hmac implementation.
 
@@ -1793,6 +1819,7 @@ def hash_sign(env, scope, message_values, expiration=None, expiration_hours=None
     :param message_values: values to be encoded inside the payload
     :param expiration: optional, a datetime or timedelta
     :param expiration_hours: optional, a int representing a number of hours before expiration. Cannot be set at the same time as expiration
+    :param secret: secret used for sign, falls back to database.secret when no explicit secret is provided
     :return: the payload that can be used as a token
     """
     assert not (expiration and expiration_hours)
@@ -1805,18 +1832,19 @@ def hash_sign(env, scope, message_values, expiration=None, expiration_hours=None
             expiration = datetime.datetime.now() + expiration
     expiration_timestamp = 0 if not expiration else int(expiration.timestamp())
     message_strings = json.dumps(message_values)
-    hash_value = hmac(env, scope, f'1:{message_strings}:{expiration_timestamp}', hash_function=hashlib.sha256)
+    hash_value = hmac(env, scope, f'1:{message_strings}:{expiration_timestamp}', hash_function=hashlib.sha256, secret=secret)
     token = b"\x01" + expiration_timestamp.to_bytes(8, 'little') + bytes.fromhex(hash_value) + message_strings.encode()
     return base64.urlsafe_b64encode(token).decode().rstrip('=')
 
 
-def verify_hash_signed(env, scope, payload):
+def verify_hash_signed(env, scope, payload, *, secret=None):
     """ Verify and extract data from a given urlsafe  payload generated with hash_sign()
 
     :param env: sudo environment to use for retrieving config parameter
     :param scope: scope of the authentication, to have different signature for the same
         message in different usage
     :param payload: the token to verify
+    :param secret: secret used to verify signature, falls back to database.secret when no explicit secret is provided
     :return: The payload_values if the check was successful, None otherwise.
     """
 
@@ -1827,7 +1855,7 @@ def verify_hash_signed(env, scope, payload):
 
     expiration_value, hash_value, message = token[1:9], token[9:41].hex(), token[41:].decode()
     expiration_value = int.from_bytes(expiration_value, byteorder='little')
-    hash_value_expected = hmac(env, scope, f'1:{message}:{expiration_value}', hash_function=hashlib.sha256)
+    hash_value_expected = hmac(env, scope, f'1:{message}:{expiration_value}', hash_function=hashlib.sha256, secret=secret)
 
     if consteq(hash_value, hash_value_expected) and (expiration_value == 0 or datetime.datetime.now().timestamp() < expiration_value):
         message_values = json.loads(message)
@@ -1894,14 +1922,46 @@ def verify_limited_field_access_token(record, field_name, access_token, *, scope
     ) and datetime.datetime.now() < datetime.datetime.fromtimestamp(int(timestamp, 16))
 
 
-ADDRESS_REGEX = re.compile(r'^(.*?)(\s[0-9][0-9\S]*)?(?: - (.+))?$', flags=re.DOTALL)
+ADDRESS_REGEXES = [
+    # Same as regex bellow, but match if the building number is at the start of the string
+    re.compile(r'''^
+        (?P<building_number>[0-9][a-zA-Z0-9/-]*)[,\s]+
+        (?P<street>.*?)
+        # We want to capture the door number after the last comma of the string, as we could
+        # have commas in the street name
+        (?:\s*[-,/]\s*(?P<door_number>(?=.*\d)(?:(?!\s*,\s*|\s+-\s+).)+))?
+    $''', flags=re.DOTALL | re.VERBOSE),
+    # Match addresses where building number is between street name and door number
+    re.compile(r'''^
+        # Non greedy match on street name, so it will stops as soon as it faces a digit
+        (?P<street>.*?)\s*
+        # We will use this comma for a condition later
+        (?P<comma>,)?\s*
+        # Match the building number, it must starts with a digit, and it stops when facing
+        # a blank space, a comma or end of string
+        (?P<building_number>[0-9][a-zA-Z0-9/-]*)?
+        # If we didn't capture a comma in the comma group, we do a positive lookahead to check
+        # if we have a door number after
+        (?(comma)|(?=\s+[,-/]|\s*$))
+        # Door number group has to starts with '-', ',' or '/'
+        (?:\s*[-,/]\s*(?P<door_number>(?=.*\d)(?:(?!\s*,\s*|\s+-\s+).)+))?
+    ''', flags=re.DOTALL | re.VERBOSE),
+]
 def street_split(street):
-    match = ADDRESS_REGEX.match(street or '')
-    results = match.groups('') if match else ('', '', '')
+    for regex in ADDRESS_REGEXES:
+        match = regex.match(street or '')
+        results = match.groupdict() if match else {}
+        if results:
+            return {
+                'street_name': (results.get('street') or '').strip(),
+                'street_number': (results.get('building_number') or '').strip(),
+                'street_number2': (results.get('door_number') or '').strip(),
+            }
+
     return {
-        'street_name': results[0].strip(),
-        'street_number': results[1].strip(),
-        'street_number2': results[2],
+        'street_name': '',
+        'street_number': '',
+        'street_number2': '',
     }
 
 

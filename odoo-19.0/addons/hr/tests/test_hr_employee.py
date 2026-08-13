@@ -617,6 +617,8 @@ class TestHrEmployee(TestHrCommon):
         ])
         employeeA = self.env['hr.employee'].create({
             'name': 'Employee',
+            'date_version': datetime(2025, 1, 1),
+            'contract_date_start': datetime(2025, 1, 1),
         })
 
         # Testing employeA on regular working schedule
@@ -660,6 +662,12 @@ class TestHrEmployee(TestHrCommon):
             }, {
                 'name': 'Multi Email Employee',
                 'work_email': '"Name1" <name@test.example.com>, "Name 2" <name2@test.example.com>',
+            }, {
+                'name': 'Duplicate Email Employee 1',
+                'work_email': 'duplicate@example.com',
+            }, {
+                'name': 'Duplicate Email Employee 2',
+                'work_email': 'duplicate@example.com',
             },
         ])
         # Add an existing employee who already has a user to the employee list
@@ -669,13 +677,15 @@ class TestHrEmployee(TestHrCommon):
         action = confirmed_employees.action_create_users()
 
         params = action.get('params')
+        self.assertEqual(params.get('message'), f"The following employees have the same work email address: {employees[6].name}, {employees[7].name}")
+        params = params.get('next').get('params')
         self.assertEqual(params.get('message'), f"User already exists with the same email for Employees {employees[0].name}, {employees[4].name}")
         params = params.get('next').get('params')
         self.assertEqual(params.get('message'), f"You need to set a valid work email address for {employees[2].name}, {employees[5].name}")
         params = params.get('next').get('params')
         self.assertEqual(params.get('message'), f"You need to set the work email address for {employees[3].name}")
         params = params.get('next').get('params')
-        self.assertEqual(params.get('message'), f"User already exists for Those Employees {employees[6].name}")
+        self.assertEqual(params.get('message'), f"User already exists for Those Employees {employees[8].name}")
         params = params.get('next').get('params')
         self.assertEqual(params.get('message'), f"Users {employees[1].name} creation successful")
         self.assertTrue(employees[1].user_id)
@@ -712,6 +722,21 @@ class TestHrEmployee(TestHrCommon):
         self.assertNotEqual(partner.email, second_employee.work_email)
         self.assertNotEqual(partner.email, first_employee.work_email)
 
+    def test_exclude_archived_employees_from_direct_subordinate_filter(self):
+        """ Test that archived subordinates aren't included when searching on child_ids. """
+        employee_1, employee_2 = self.env['hr.employee'].create([
+            {'name': 'first employee'},
+            {'name': 'second employee'}
+        ])
+        employee_2.parent_id = employee_1
+
+        result = self.env['hr.employee'].search([('child_ids', '!=', False)])
+        self.assertIn(employee_1, result)
+
+        employee_2.active = False
+
+        result = self.env['hr.employee'].search([('child_ids', '!=', False)])
+        self.assertNotIn(employee_1, result)
 
 @tagged('-at_install', 'post_install')
 class TestHrEmployeeLinks(HttpCase):

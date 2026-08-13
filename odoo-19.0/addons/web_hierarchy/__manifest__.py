@@ -26,4 +26,5 @@ an organization such as an Organization Chart for employees for instance.
         ],
     },
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

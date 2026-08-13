@@ -21,4 +21,5 @@ backend. It notably includes IAP bridges modules to test their impact. """,
         'website_crm_livechat',
     ],
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

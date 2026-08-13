@@ -39,4 +39,5 @@ Coupon & promotion programs can be edited in the Catalog menu of the Website app
         ],
     },
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

@@ -205,16 +205,12 @@ export function clickPartnerButton() {
         },
         {
             content: "partner screen is shown",
-            trigger: `${PartnerList.clickPartner().trigger}`,
+            trigger: PartnerList.partnerListTrigger(),
         },
     ];
 }
-export function clickCustomer(name, pressEnter = false) {
-    return [
-        ...PartnerList.searchCustomerValue(name, pressEnter),
-        PartnerList.clickPartner(name),
-        { ...back(), isActive: ["mobile"] },
-    ];
+export function clickCustomer(name) {
+    return [...PartnerList.clickPartner(name), { ...back(), isActive: ["mobile"] }];
 }
 export function selectPreset(selectedPreset, presetToSelect) {
     return [
@@ -871,7 +867,7 @@ export function checkTotalAmount(amount) {
 export function selectCategoryAndAddProduct(categoryName, productName) {
     return [
         {
-            trigger: `.category-button > span:contains(${categoryName})`,
+            trigger: `.category-button > div span:contains(${categoryName})`,
             run: "click",
         },
         ...addOrderline(productName, "1"),
@@ -881,7 +877,7 @@ export function selectCategoryAndAddProduct(categoryName, productName) {
 export function verifyCategorySequence(categories) {
     return categories.map((category, index) => ({
         content: `Verify '${category}' category has sequence number ${index + 1}`,
-        trigger: `.category-button > span:contains("${category}")`,
+        trigger: `.category-button > div span:contains("${category}")`,
     }));
 }
 
@@ -1047,6 +1043,17 @@ export function openCartMobile() {
             trigger: ".switchpane .btn-switchpane:contains('Cart')",
             run: "click",
             isActive: ["mobile"],
+        },
+    ];
+}
+
+export function saveOrder() {
+    return [
+        clickReview(),
+        {
+            content: "save order",
+            trigger: ".pads .fa-upload",
+            run: "click",
         },
     ];
 }

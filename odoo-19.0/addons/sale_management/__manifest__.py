@@ -62,6 +62,9 @@ The Dashboard for the Sales Manager will include
         'web.assets_frontend': [
             'sale_management/static/src/interactions/**/*',
         ],
+        'web.assets_tests': [
+            'sale_management/static/tests/tours/**/*',
+        ],
         'web.assets_unit_tests': [
             'sale_management/static/tests/**/*.test.js',
         ],
@@ -71,4 +74,5 @@ The Dashboard for the Sales Manager will include
     'post_init_hook': 'post_init_hook',
     'uninstall_hook': 'uninstall_hook',
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

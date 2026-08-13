@@ -19,7 +19,7 @@ class SaleOrderLine(models.Model):
     @api.depends_context('with_remaining_hours', 'company')
     def _compute_display_name(self):
         super()._compute_display_name()
-        with_remaining_hours = self.env.context.get('with_remaining_hours')
+        with_remaining_hours = self.env.context.get('with_remaining_hours') and not self.env.context.get('skip_remaining_hours', False)
         if with_remaining_hours and any(line.remaining_hours_available for line in self):
             company = self.env.company
             encoding_uom = company.timesheet_encode_uom_id
@@ -157,10 +157,14 @@ class SaleOrderLine(models.Model):
             :param start_date: the start date of the period
             :param end_date: the end date of the period
         """
-        lines_by_timesheet = self.filtered(lambda sol: sol.product_id and sol.product_id._is_delivered_timesheet())
+        lines_by_timesheet = self.filtered(
+            lambda sol:
+            sol.product_id
+            and sol.product_id._is_delivered_timesheet()
+            and sol.invoice_status == 'to invoice')
         domain = Domain(lines_by_timesheet._timesheet_compute_delivered_quantity_domain())
         refund_account_moves = self.order_id.invoice_ids.filtered(lambda am: am.state == 'posted' and am.move_type == 'out_refund').reversed_entry_id
-        timesheet_domain = Domain('timesheet_invoice_id', '=', False) | Domain('timesheet_invoice_id.state', '=', 'cancel')
+        timesheet_domain = Domain('timesheet_invoice_id', '=', False) | Domain('timesheet_invoice_id.state', '=', 'cancel') & Domain('timesheet_invoice_id.payment_state', '!=', 'invoicing_legacy')
         if refund_account_moves:
             credited_timesheet_domain = Domain('timesheet_invoice_id.state', '=', 'posted') & Domain('timesheet_invoice_id', 'in', refund_account_moves.ids)
             timesheet_domain |= credited_timesheet_domain
@@ -172,10 +176,15 @@ class SaleOrderLine(models.Model):
         mapping = lines_by_timesheet.sudo()._get_delivered_quantity_by_analytic(domain)
 
         for line in lines_by_timesheet:
-            qty_to_invoice = mapping.get(line.id, 0.0)
+            # A period only selects which delivered hours are candidates; qty_delivered
+            # - qty_invoiced remains the authoritative quantity still due.
+            qty_to_invoice = max(0.0, min(
+                mapping.get(line.id, 0.0),
+                line.qty_delivered - line.qty_invoiced,
+            ))
             if qty_to_invoice:
                 line.qty_to_invoice = qty_to_invoice
-            else:
+            elif start_date or end_date:
                 prev_inv_status = line.invoice_status
                 line.qty_to_invoice = qty_to_invoice
                 line.invoice_status = prev_inv_status

@@ -34,4 +34,5 @@ can setup API keys to replace their main password.
         ],
     },
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

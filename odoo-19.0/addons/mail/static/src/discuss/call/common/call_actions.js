@@ -91,7 +91,10 @@ registerCallAction("deafen", {
     tags: ({ action }) => (action.isActive ? ACTION_TAGS.DANGER : undefined),
 });
 export const cameraOnAction = {
-    badge: ({ owner, store, thread }) => !owner.env.inCallMenu && thread?.default_display_mode === "video_full_screen" && store.rtc.cameraPermission !== "granted",
+    badge: ({ owner, store, thread }) =>
+        !owner.env.inCallMenu &&
+        thread?.default_display_mode === "video_full_screen" &&
+        store.rtc.cameraPermission !== "granted",
     badgeIcon: "fa fa-exclamation",
     condition: ({ thread }) => thread?.isSelfInCall,
     disabledCondition: ({ store }) => store.rtc?.isRemote,
@@ -188,7 +191,7 @@ export const blurBackgroundAction = {
     name: ({ store }) => (store.settings.useBlur ? _t("Remove Blur") : _t("Blur Background")),
     isActive: ({ store }) => store?.settings?.useBlur,
     icon: "fa fa-photo",
-    onSelected: ({ store }) => (store.settings.useBlur = !store.settings.useBlur),
+    onSelected: ({ store }) => store.settings.setUseBlur(!store.settings.useBlur),
     sequence: 60,
     sequenceGroup: 200,
 };
@@ -216,11 +219,7 @@ registerCallAction("fullscreen", {
     tags: ACTION_TAGS.CALL_LAYOUT,
 });
 registerCallAction("picture-in-picture", {
-    condition: ({ owner, store, thread }) =>
-        !owner.env.inCallMenu &&
-        thread?.isSelfInCall &&
-        store.env.services["discuss.pip_service"] &&
-        !store.env?.isSmall,
+    condition: ({ owner, store, thread }) => thread?.isSelfInCall && !store.env?.isSmall,
     disabledCondition: ({ store }) => store.rtc?.isRemote,
     name: ({ store }) =>
         store.rtc?.state.isPipMode ? _t("Exit Picture in Picture") : _t("Picture in Picture"),

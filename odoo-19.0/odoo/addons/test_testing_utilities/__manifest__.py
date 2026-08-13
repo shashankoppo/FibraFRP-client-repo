@@ -13,4 +13,5 @@ supposed to do
         'views/menu.xml',
     ],
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

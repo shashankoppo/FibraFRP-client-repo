@@ -29,4 +29,5 @@ Allows users to create custom dashboard.
         ],
     },
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

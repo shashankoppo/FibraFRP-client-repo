@@ -66,4 +66,5 @@
             ('include', 'html_builder.assets'),
         ],
     },
+    'license': 'LGPL-3',
 }

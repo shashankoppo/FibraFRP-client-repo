@@ -17,6 +17,7 @@
         'views/l10n_in_hr_leave_optional_holiday_views.xml',
     ],
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
     'assets': {
         'web.assets_backend': [
             'l10n_in_hr_holidays/static/src/**/*',

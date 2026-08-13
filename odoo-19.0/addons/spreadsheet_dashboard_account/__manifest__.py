@@ -13,4 +13,5 @@
     'installable': True,
     'auto_install': ['account'],
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

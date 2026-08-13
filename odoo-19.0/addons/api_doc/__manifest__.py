@@ -60,4 +60,5 @@ the methods over HTTP, with examples in various programming languages.
     },
     'bootstrap': True,
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

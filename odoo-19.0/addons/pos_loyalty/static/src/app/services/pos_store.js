@@ -322,6 +322,7 @@ patch(PosStore.prototype, {
                     program_id: this.models["loyalty.program"].get(payload.program_id),
                     partner_id: this.models["res.partner"].get(payload.partner_id),
                     points: payload.points,
+                    points_display: payload.points_display,
                     // TODO JCB: make the expiration_date work.
                     // expiration_date: payload.expiration_date,
                 });
@@ -342,11 +343,7 @@ patch(PosStore.prototype, {
             }
         }
         if (!rule && order.lines.length === 0 && coupon) {
-            return _t(
-                "Gift Card: %s\nBalance: %s",
-                code,
-                this.env.utils.formatCurrency(coupon.points)
-            );
+            return _t("%s: %s\nBalance: %s", coupon.program_id.name, code, coupon.points_display);
         }
         return true;
     },
@@ -364,6 +361,10 @@ patch(PosStore.prototype, {
                 )
             );
         });
+    },
+    async applyDiscount(percent, order = this.getOrder()) {
+        await super.applyDiscount(...arguments);
+        await this.updatePrograms();
     },
     async addLineToCurrentOrder(vals, opt = {}, configure = true) {
         if (!vals.product_tmpl_id && vals.product_id) {
@@ -561,9 +562,7 @@ patch(PosStore.prototype, {
 
         this.partnerId2CouponIds = {};
 
-        this.computeDiscountProductIdsForAllRewards({
-            ids: this.data.models["product.product"].getAllIds(),
-        });
+        this.computeDiscountProductIdsForAllRewards();
 
         this.models["product.product"].addEventListener(
             "create",
@@ -582,7 +581,8 @@ patch(PosStore.prototype, {
     },
 
     computeDiscountProductIdsForAllRewards(data) {
-        const products = this.models["product.product"].readMany(data.ids);
+        const productModel = this.models["product.product"].toRaw(); // Limit the number of reactivity proxy instances
+        const products = data ? productModel.readMany(data.ids) : productModel.getAll();
         for (const reward of this.models["loyalty.reward"].getAll()) {
             this.computeDiscountProductIds(reward, products);
         }
@@ -591,7 +591,7 @@ patch(PosStore.prototype, {
     computePartnerCouponIds(loyaltyCards = null) {
         const cards = loyaltyCards || this.models["loyalty.card"].getAll();
         for (const card of cards) {
-            if (!card.partner_id || card.id < 0) {
+            if (!card.partner_id || card.id < 0 || !card.program_id) {
                 continue;
             }
 
@@ -702,7 +702,7 @@ patch(PosStore.prototype, {
      *   - This way, we don't need to remember the lines linked to negative coupon ids and relink them after pushing the order.
      */
     async preSyncAllOrders(orders) {
-        await super.preSyncAllOrders(orders);
+        const result = await super.preSyncAllOrders(orders);
 
         for (const order of orders) {
             Object.assign(
@@ -726,6 +726,7 @@ patch(PosStore.prototype, {
                 }, {})
             );
         }
+        return result;
     },
     async postSyncAllOrders(orders) {
         super.postSyncAllOrders(orders);
@@ -757,8 +758,12 @@ patch(PosStore.prototype, {
         const rewardLines = order._get_reward_lines();
         const partner = order.getPartner();
         let couponData = Object.values(order.uiState.couponPointChanges).reduce((agg, pe) => {
+            const earnedPoints =
+                pe.points - order._getPointsCorrection(ProgramModel.get(pe.program_id));
             agg[pe.coupon_id] = Object.assign({}, pe, {
-                points: pe.points - order._getPointsCorrection(ProgramModel.get(pe.program_id)),
+                points: earnedPoints,
+                points_earned: earnedPoints,
+                points_spent: 0,
             });
             const program = ProgramModel.get(pe.program_id);
             if (
@@ -778,6 +783,8 @@ patch(PosStore.prototype, {
             if (!couponData[couponId]) {
                 couponData[couponId] = {
                     points: 0,
+                    points_earned: 0,
+                    points_spent: 0,
                     program_id: reward.program_id.id,
                     coupon_id: couponId,
                     barcode: false,
@@ -793,6 +800,7 @@ patch(PosStore.prototype, {
                 !couponData[couponId].line_codes.push(line.reward_identifier_code);
             }
             couponData[couponId].points -= line.points_cost;
+            couponData[couponId].points_spent += line.points_cost;
         }
         // We actually do not care about coupons for 'current' programs that did not claim any reward, they will be lost if not validated
         couponData = Object.fromEntries(

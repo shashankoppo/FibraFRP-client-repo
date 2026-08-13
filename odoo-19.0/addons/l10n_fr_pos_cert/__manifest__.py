@@ -47,4 +47,5 @@ The module adds following features:
         ],
     },
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

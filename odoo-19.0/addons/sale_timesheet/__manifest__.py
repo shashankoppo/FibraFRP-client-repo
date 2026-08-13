@@ -56,5 +56,6 @@ have real delivered quantities in sales orders.
         ]
     },
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
     'post_init_hook': '_sale_timesheet_post_init',
 }

@@ -19,4 +19,5 @@ Add support to fill three fields used when using Chorus Pro, especially when inv
         'views/report_invoice.xml',
     ],
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

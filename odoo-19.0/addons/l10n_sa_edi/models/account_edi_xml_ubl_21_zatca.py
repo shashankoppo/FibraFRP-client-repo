@@ -61,6 +61,8 @@ class AccountEdiXmlUbl_21Zatca(models.AbstractModel):
         # Get downpayment moves' base lines
         if not invoice._is_downpayment():
             prepayment_moves = invoice.line_ids._get_downpayment_lines().move_id.filtered(lambda m: m.move_type == 'out_invoice')
+            if non_reversed := prepayment_moves.filtered(lambda m: m.payment_state != 'reversed'):
+                prepayment_moves = non_reversed
         else:
             prepayment_moves = self.env['account.move']
 
@@ -260,7 +262,7 @@ class AccountEdiXmlUbl_21Zatca(models.AbstractModel):
         """ Override to include/update values specific to ZATCA's UBL 2.1 specs """
         identification_number = partner.l10n_sa_edi_additional_identification_number
         vat = re.sub(r'[^a-zA-Z0-9]', '', partner.vat or "")
-        if partner.country_code != "SA":
+        if partner.country_code != "SA" and vat:
             identification_number = vat
         elif partner.l10n_sa_edi_additional_identification_scheme == 'TIN':
             # according to ZATCA, the TIN number is always the first 10 digits of the VAT number
@@ -294,7 +296,7 @@ class AccountEdiXmlUbl_21Zatca(models.AbstractModel):
                 'cac:TaxScheme': {
                     'cbc:ID': {'_text': 'VAT'}
                 }
-            } if role != 'customer' or partner.country_id.code == 'SA' else None,  # BR-KSA-46
+            } if (role != 'customer' or partner.country_id.code == 'SA') and commercial_partner.vat and commercial_partner.vat != '/' else None,  # BR-KSA-46
             'cac:PartyLegalEntity': {
                 'cbc:RegistrationName': {'_text': commercial_partner.name},
                 'cbc:CompanyID': {'_text': commercial_partner.vat} if commercial_partner.country_code == 'SA' else None,
@@ -352,8 +354,13 @@ class AccountEdiXmlUbl_21Zatca(models.AbstractModel):
             '_text': self.format_float(vals['total_allowance_currency'], vals['currency_dp']),
             'currencyID': vals['currency_name'],
         }
+
+        # Retrieve the rounding amount
+        payable_rounding_amount = vals['cash_rounding_base_amount_currency']
+
+        payable_amount = vals['tax_inclusive_amount_currency'] - prepaid_amount + payable_rounding_amount
         monetary_total_node['cbc:PrepaidAmount']['_text'] = self.format_float(prepaid_amount, vals['currency_dp'])
-        monetary_total_node['cbc:PayableAmount']['_text'] = self.format_float(vals['tax_inclusive_amount_currency'] - prepaid_amount, vals['currency_dp'])
+        monetary_total_node['cbc:PayableAmount']['_text'] = self.format_float(payable_amount, vals['currency_dp'])
 
     # -------------------------------------------------------------------------
     # EXPORT: Templates for document allowance charge nodes

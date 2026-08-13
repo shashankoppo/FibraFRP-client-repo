@@ -9,9 +9,14 @@ import {
     start,
     startServer,
 } from "@mail/../tests/mail_test_helpers";
-import { describe, test, expect } from "@odoo/hoot";
+import { describe, select, test, expect } from "@odoo/hoot";
 import { advanceTime } from "@odoo/hoot-mock";
-import { asyncStep, patchWithCleanup, waitForSteps } from "@web/../tests/web_test_helpers";
+import {
+    asyncStep,
+    getService,
+    patchWithCleanup,
+    waitForSteps,
+} from "@web/../tests/web_test_helpers";
 
 import { browser } from "@web/core/browser/browser";
 
@@ -122,13 +127,46 @@ test("local storage for call settings", async () => {
 
     // testing save to local storage
     await click("input[title='Show video participants only']");
-    await waitForSteps([
-        "mail_user_setting_use_blur: true",
-        "mail_user_setting_show_only_video: false",
-    ]);
+    await waitForSteps(["mail_user_setting_show_only_video: false"]);
     await click("input[title='Blur video background']");
     expect(localStorage.getItem("mail_user_setting_use_blur")).toBe(null);
     await editInput(document.body, ".o-Discuss-CallSettings-thresholdInput", 0.3);
     await advanceTime(2000); // threshold setting debounce timer
     await waitForSteps(["mail_user_setting_voice_threshold: 0.3"]);
+});
+
+test("Changing inputs in Call Settings should pre-ask for browser permission", async () => {
+    patchWithCleanup(browser.navigator.mediaDevices, {
+        enumerateDevices: () =>
+            Promise.resolve([
+                {
+                    deviceId: "mockAudioDeviceId1",
+                    kind: "audioinput",
+                    label: "mockAudioDeviceLabel1",
+                },
+                {
+                    deviceId: "mockAudioDeviceId2",
+                    kind: "audioinput",
+                    label: "mockAudioDeviceLabel2",
+                },
+            ]),
+        getUserMedia: async () => {
+            asyncStep("getUserMedia:permission-asked");
+            return { getTracks: () => [] };
+        },
+    });
+    const pyEnv = await startServer();
+    const channelId = pyEnv["discuss.channel"].create({ name: "test" });
+    patchUiSize({ size: SIZES.SM });
+    await start();
+    getService("discuss.rtc").microphonePermission = "granted";
+    await openDiscuss(channelId);
+    await contains("[title='Open Actions Menu']");
+    await click("[title='Open Actions Menu']");
+    await click(".o-dropdown-item", { text: "Call Settings" });
+    await contains(".o-discuss-CallSettings");
+    await contains("option[value=mockAudioDeviceId1]:checked");
+    await select("mockAudioDeviceId2", { target: "label[aria-label='Microphone'] select" });
+    await waitForSteps(["getUserMedia:permission-asked"]);
+    await contains("option[value=mockAudioDeviceId2]:checked");
 });

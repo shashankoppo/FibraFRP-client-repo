@@ -39,7 +39,7 @@
                        action="'toggleEndMessage'"/>
     </BuilderRow>
     <BuilderRow label.translate="URL">
-        <WebsiteUrlPicker dataAttributeAction="'successPage'" default="'/contactus-thank-you'" id="'url_opt'" t-if="isActiveItem('show_redirect_opt')"/>
+        <BuilderUrlPicker dataAttributeAction="'successPage'" default="'/contactus-thank-you'" id="'url_opt'" t-if="isActiveItem('show_redirect_opt')"/>
     </BuilderRow>
     <BuilderRow t-if="hasRecaptchaKey" label.translate="Show reCaptcha Policy">
         <BuilderCheckbox action="'formToggleRecaptchaLegal'" preview="false"/>
@@ -172,7 +172,7 @@
     <BuilderRow label.translate="Default Value">
         <BuilderTextInput action="'selectTextareaValue'" applyTo="'textarea'"/>
         <BuilderCheckbox attributeAction="'checked'" attributeActionValue="'checked'"
-            applyTo="`.col-sm > * > input[type='checkbox']`" preview="false"
+            applyTo="`[data-type='boolean'] input[type='checkbox']`" preview="false"
         />
         <BuilderTextInput attributeAction="'value'" action="'property'" actionParam="{ property: 'value' }"
             applyTo="`input[type='text']:not(.datetimepicker-input), input[type='email'], input[type='tel'], input[type='url']`"

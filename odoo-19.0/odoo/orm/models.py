@@ -322,7 +322,7 @@ READ_GROUP_DISPLAY_FORMAT = {
     # Mixing both formats, e.g. 'MMM YYYY' would yield wrong results,
     # such as 2006-01-01 being formatted as "January 2005" in some locales.
     # Cfr: http://babel.pocoo.org/en/latest/dates.html#date-fields
-    'hour': 'hh:00 dd MMM',
+    'hour': 'HH:00 dd MMM',
     'day': 'dd MMM yyyy', # yyyy = normal year
     'week': "'W'w YYYY",  # w YYYY = ISO week-year
     'month': 'MMMM yyyy',
@@ -1313,7 +1313,7 @@ class BaseModel(metaclass=MetaModel):
                 continue
 
             # 5. delegate to parent model
-            if field.inherited:
+            if field.inherited and self._has_field_access(field, 'write'):
                 field = field.related_field
                 parent_fields[field.model_name].append(field.name)
 
@@ -3117,10 +3117,9 @@ class BaseModel(metaclass=MetaModel):
                      if field.store and field.column_type]
         cr.execute(SQL(
             """ SELECT a.attname, a.attnotnull
-                  FROM pg_class c, pg_attribute a, pg_namespace n
+                  FROM pg_class c, pg_attribute a
                  WHERE c.relname=%s
-                   AND c.relnamespace = n.oid
-                   AND n.nspname = current_schema
+                   AND c.relnamespace = current_schema::regnamespace
                    AND c.oid=a.attrelid
                    AND a.attisdropped=%s
                    AND pg_catalog.format_type(a.atttypid, a.atttypmod) NOT IN ('cid', 'tid', 'oid', 'xid')
@@ -3911,7 +3910,7 @@ class BaseModel(metaclass=MetaModel):
                     # otherwise, re-create the SQL without flushing
                     if not field.translate:
                         to_flush = (f for f in sql.to_flush if f != field)
-                        sql = SQL(sql.code, *sql.params, to_flush=to_flush)
+                        sql = SQL("%s", sql, to_flush=to_flush)
                 sql_terms.append(sql)
 
             # select the given columns from the rows in the query
@@ -4685,6 +4684,8 @@ class BaseModel(metaclass=MetaModel):
                 # against (re)computation
                 if field.compute and (not field.readonly or field.precompute):
                     protected.update(self.pool.field_computed.get(field, [field]))
+                if field.type == 'many2one' and field.bypass_search_access and not self.env.su:
+                    self.env[field.comodel_name].browse(field.convert_to_cache(val, self)).check_access('read')
 
             data_list.append(data)
 
@@ -5382,7 +5383,10 @@ class BaseModel(metaclass=MetaModel):
         # add order and limits
         if order:
             query.order = self._order_to_sql(order, query)
-        if limit is not None:
+
+        # In RPC, None is not available; False is used instead to mean "no limit"
+        # Note: True is kept for backward-compatibility (treated as 1)
+        if limit is not None and limit is not False:
             query.limit = limit
         if offset is not None:
             query.offset = offset
@@ -6968,12 +6972,13 @@ class BaseModel(metaclass=MetaModel):
             for dep in self.pool.get_dependent_fields(field.base_field)
         )
 
-    def _apply_onchange_methods(self, field_name: str, result: dict) -> None:
-        """ Apply onchange method(s) for field ``field_name`` on ``self``. Value
-            assignments are applied on ``self``, while warning messages are put
-            in dictionary ``result``.
+    def _apply_onchange_methods(self, field_name: str, result: dict, excluded_methods=()) -> None:
+        """ Apply onchange method(s) (not in ``excluded_methods``) for field ``field_name`` on ``self``.
+        Value assignments are applied on ``self``, while warning messages are put in dictionary ``result``.
         """
         for method in self._onchange_methods.get(field_name, ()):
+            if method in excluded_methods:
+                continue
             res = method(self)
             if not res:
                 continue
@@ -7117,10 +7122,9 @@ def get_columns_from_sql_diagnostics(cr, diagnostics, *, check_registry=False) -
             ) as "columns"
         FROM pg_constraint
         JOIN pg_class t ON t.oid = conrelid
-        JOIN pg_namespace n ON t.relnamespace = n.oid
         WHERE conname = %s
             AND t.relname = %s
-            AND n.nspname = current_schema
+            AND t.relnamespace = current_schema::regnamespace
     """, diagnostics.constraint_name, diagnostics.table_name))
     columns = cr.fetchone()
     return columns[0] if columns else []

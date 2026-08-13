@@ -67,6 +67,13 @@ class TestImage(TransactionCase):
         ], fill=self.fill_color)
         self.img_1080x1920_png = tools.image_apply_opt(image, 'PNG')
 
+        # Create an animated GIF with an adaptive color palette to preserve frames during processing
+        gif_stream = io.BytesIO()
+        gif_f1 = Image.new("RGB", (200, 200), color="red").convert("P", palette=Image.Palette.ADAPTIVE)
+        gif_f2 = Image.new("RGB", (200, 200), color="blue").convert("P", palette=Image.Palette.ADAPTIVE)
+        gif_f1.save(gif_stream, format="GIF", save_all=True, append_images=[gif_f2], duration=100, loop=0)
+        self.img_animated_gif = gif_stream.getvalue()
+
     def test_00_base64_to_image(self):
         """Test that base64 is correctly opened as a PIL image."""
         image = img_open(self.img_1x1_png)
@@ -158,6 +165,20 @@ class TestImage(TransactionCase):
         image_excessive = tools.image_apply_opt(Image.new('RGB', (50001, 1000)), 'PNG')
         with self.assertRaises(UserError, msg="size excessive"):
             tools.image_process(image_excessive, verify_resolution=True)
+
+        # Oversized webp images shouldn't be uploaded without any limit.
+        def make_webp(width, height):
+            wm1, hm1 = width - 1, height - 1
+            dims = bytes((wm1 & 0xFF, (wm1 >> 8) & 0xFF, (wm1 >> 16) & 0xFF,
+                          hm1 & 0xFF, (hm1 >> 8) & 0xFF, (hm1 >> 16) & 0xFF))
+            chunk = b'VP8X' + (10).to_bytes(4, 'little') + b'\x00\x00\x00\x00' + dims
+            body = b'WEBP' + chunk
+            return b'RIFF' + len(body).to_bytes(4, 'little') + body
+
+        res = tools.image_process(make_webp(2000, 2000), verify_resolution=True)
+        self.assertNotEqual(res, False, "webp size ok")
+        with self.assertRaises(UserError, msg="webp size excessive"):
+            tools.image_process(make_webp(8000, 8000), verify_resolution=True)
 
     def test_13_image_process_quality(self):
         """Test the quality parameter of image_process."""
@@ -369,3 +390,20 @@ class TestImage(TransactionCase):
         image1 = Image.new('P', (1, 1), color='red')
         image2 = Image.new('RGB', (1, 1), color='red')
         self.assertEqual(tools.image_apply_opt(image1, 'JPEG'), tools.image_apply_opt(image2, 'JPEG'))
+
+    def test_animated_gif_downscale(self):
+        """ Test that downscaling an animated GIF shrinks frames properly. """
+        processed_binary = tools.image_process(self.img_animated_gif, size=(100, 100))
+        img = img_open(processed_binary)
+
+        self.assertEqual(img.format, "GIF")
+        self.assertEqual(img.n_frames, 2)
+        self.assertEqual(img.size, (100, 100))
+
+    def test_animated_gif_upscale_is_blocked(self):
+        """ Test that upscaling an animated GIF safely leaves it unchanged. """
+        processed_binary = tools.image_process(self.img_animated_gif, size=(500, 500), expand=True)
+        img = img_open(processed_binary)
+
+        self.assertEqual(img.n_frames, 2)
+        self.assertEqual(img.size, (200, 200))

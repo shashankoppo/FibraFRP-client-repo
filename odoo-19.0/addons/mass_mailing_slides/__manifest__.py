@@ -18,4 +18,5 @@ Bridge module adding UX requirements to ease mass mailing of course members.
     ],
     'auto_install': True,
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

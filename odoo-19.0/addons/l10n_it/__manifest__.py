@@ -1,7 +1,7 @@
 {
     'name': 'Italy - Accounting',
     'countries': ['it'],
-    'version': '0.8',
+    'version': '0.10',
     'depends': [
         'account',
         'base_iban',
@@ -34,4 +34,5 @@ Italian accounting chart and localization.
     'demo': [
         'demo/demo_company.xml',
     ],
+    'license': 'LGPL-3',
 }

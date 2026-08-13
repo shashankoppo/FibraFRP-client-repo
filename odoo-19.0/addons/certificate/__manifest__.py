@@ -14,4 +14,5 @@
     ],
     'depends': ['base_setup'],
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

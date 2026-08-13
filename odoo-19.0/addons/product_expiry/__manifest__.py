@@ -38,4 +38,5 @@ Also implements the removal strategy First Expiry First Out (FEFO) widely used, 
         ],
     },
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

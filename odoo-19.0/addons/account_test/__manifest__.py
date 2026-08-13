@@ -27,4 +27,5 @@ and print the report from Print button in header area.
     ],
     'installable': True,
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

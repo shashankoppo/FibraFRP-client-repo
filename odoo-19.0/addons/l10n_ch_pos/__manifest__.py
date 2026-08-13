@@ -10,4 +10,5 @@ Swiss POS Localization
     'depends': ['l10n_ch', 'point_of_sale'],
     'auto_install': True,
     'installable': True,
+    'license': 'LGPL-3',
 }

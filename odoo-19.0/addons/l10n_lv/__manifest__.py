@@ -14,6 +14,7 @@ This module also includes:
 author is Allegro IT (visit for more information https://www.allegro.lv)
 co-author is Chick.Farm (visit for more information https://www.myacc.cloud)
     """,
+    'license': 'LGPL-3',
     'author': "Allegro IT, Chick.Farm",
     'website': "https://allegro.lv",
     'category': 'Accounting/Localizations/Account Charts',
@@ -24,6 +25,7 @@ co-author is Chick.Farm (visit for more information https://www.myacc.cloud)
     ],
     'auto_install': ['account'],
     'data': [
+        'data/account.account.tag.csv',
         'data/account_tax_report_data.xml',
     ],
     'demo': [

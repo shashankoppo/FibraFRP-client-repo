@@ -5,4 +5,5 @@
     'auto_install': True,
     'data': ['views/templates.xml'],
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

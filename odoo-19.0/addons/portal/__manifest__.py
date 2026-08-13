@@ -114,4 +114,5 @@ a dependency towards website editing and customization capabilities.""",
         ],
     },
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

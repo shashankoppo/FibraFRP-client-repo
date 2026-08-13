@@ -132,6 +132,39 @@ class TestGlobalLeaves(TestHrHolidaysCommon):
         # The user in Europe/Brussels timezone see 4:30 and not 2:30 because he is in UTC +02:00.
         # The user in Asia/Kolkata timezone (determined via the browser) see 8:00 because he is in UTC +05:30
 
+    def test_global_leave_working_schedule_without_company(self):
+        """
+        Check public holidays for a company apply to employees of this company
+        when using a working schedule without a company.
+        """
+        calendar_no_company = self.env['resource.calendar'].create({
+            'name': 'Schedule without company',
+            'company_id': False,
+        })
+        self.employee_emp.resource_calendar_id = calendar_no_company
+
+        self.env['resource.calendar.leaves'].create({
+            'name': 'Public Holiday',
+            'date_from': datetime(2024, 1, 3, 0, 0),
+            'date_to': datetime(2024, 1, 3, 23, 59),
+            'calendar_id': calendar_no_company.id,
+            'company_id': self.employee_emp.company_id.id,
+        })
+        leave_type = self.env['hr.leave.type'].create({
+            'name': 'Paid Time Off',
+            'time_type': 'leave',
+            'requires_allocation': False,
+        })
+        leave = self.env['hr.leave'].create({
+            'name': 'Time Off',
+            'employee_id': self.employee_emp.id,
+            'holiday_status_id': leave_type.id,
+            'request_date_from': date(2024, 1, 2),
+            'request_date_to': date(2024, 1, 4),
+        })
+
+        self.assertEqual(leave.number_of_days, 2, "Public holiday duration should not be included")
+
     def test_global_leave_number_of_days_with_new(self):
         """
             Check that leaves stored in memory (and not in the database)
@@ -291,6 +324,52 @@ class TestGlobalLeaves(TestHrHolidaysCommon):
             'calendar_id': employee_david.resource_calendar_id.id,
         })
         self.assertEqual(employee_leave.number_of_days, 2, 'Leave duration should be reduced because of public holiday day 3')
+
+    def test_get_unusual_days_for_leaves(self):
+        """
+        Test that get_unusual_days return True
+        for out of contract days so they get greyed out in calendar view
+        """
+        test_emp = self.env['hr.employee'].create({
+            'name': 'Test Emp',
+            'date_version': date(2026, 1, 8),
+            'contract_date_start': date(2026, 1, 8),
+            'contract_date_end': date(2026, 1, 13),
+            'resource_calendar_id': self.calendar_1.id,
+        })
+        test_emp.create_version({
+            'date_version': date(2026, 1, 16),
+            'contract_date_start': date(2026, 1, 16),
+            'contract_date_end': date(2026, 1, 21),
+            'resource_calendar_id': self.calendar_1.id,
+        })
+        start = '2026-01-05 00:00:00'
+        end = '2026-01-24 00:00:00'
+
+        unusual_days = self.env['hr.leave'].with_context(employee_id=test_emp.id).get_unusual_days(start, end)
+        expected = {  # starting Monday
+            '2026-01-05': True,  # No contract
+            '2026-01-06': True,  # No contract
+            '2026-01-07': True,  # No contract
+            '2026-01-08': False,
+            '2026-01-09': False,
+            '2026-01-10': True,  # Weekend
+            '2026-01-11': True,  # Weekend
+            '2026-01-12': False,
+            '2026-01-13': False,
+            '2026-01-14': True,  # No contract
+            '2026-01-15': True,  # No contract
+            '2026-01-16': False,
+            '2026-01-17': True,  # Weekend
+            '2026-01-18': True,  # Weekend
+            '2026-01-19': False,
+            '2026-01-20': False,
+            '2026-01-21': False,
+            '2026-01-22': True,  # No contract
+            '2026-01-23': True,  # No contract
+            '2026-01-24': True,  # No contract
+        }
+        self.assertDictEqual(unusual_days, expected)
 
     def test_multi_day_public_holidays_for_flexible_schedule(self):
         """

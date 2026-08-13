@@ -14,4 +14,5 @@
     'installable': True,
     'auto_install': ['im_livechat'],
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
 }

@@ -22,9 +22,11 @@ import {
     negate,
     negateStep,
     assertCurrentOrderDirty,
+    refresh,
 } from "@point_of_sale/../tests/generic_helpers/utils";
 import * as FeedbackScreen from "@point_of_sale/../tests/pos/tours/utils/feedback_screen_util";
 const ProductScreen = { ...ProductScreenPos, ...ProductScreenResto };
+import * as Notification from "@point_of_sale/../tests/generic_helpers/notification_util";
 
 registry.category("web_tour.tours").add("pos_restaurant_sync", {
     steps: () =>
@@ -54,6 +56,10 @@ registry.category("web_tour.tours").add("pos_restaurant_sync", {
                 { name: "Water", qty: 1 },
             ]),
             ProductScreen.clickOrderButton(),
+            FloorScreen.table({ name: "5", run: "click", waitForSync: false }),
+            Notification.has(
+                "This order is currently syncing, please wait a moment before loading it."
+            ),
             Chrome.closePrintingWarning(),
             FloorScreen.clickTable("5"),
             ProductScreen.orderlinesHaveNoChange(),
@@ -321,6 +327,13 @@ registry.category("web_tour.tours").add("OrderChange", {
             Chrome.closePrintingWarning(),
             FloorScreen.clickTable("5"),
             ProductScreen.orderlinesHaveNoChange(),
+            ProductScreen.clickInternalNoteButton("Note"),
+            TextInputPopup.inputText("test note"),
+            Dialog.confirm(),
+            negateStep(...ProductScreen.OrderButtonNotContain("Message")),
+            ProductScreen.clickInternalNoteButton("Note"),
+            Dialog.cancel(),
+            negateStep(...ProductScreen.clickOrderButton()),
             ProductScreen.clickPayButton(),
             PaymentScreen.clickPaymentMethod("Cash"),
             PaymentScreen.clickNumpad("+10"),
@@ -359,6 +372,7 @@ registry.category("web_tour.tours").add("PoSPaymentSyncTour1", {
             ProductScreen.isShown(),
             ProductScreen.clickOrderButton(),
             Chrome.closePrintingWarning(),
+            FloorScreen.clickTable("5"),
             ProductScreen.orderlinesHaveNoChange(),
             Chrome.clickPlanButton(),
         ].flat(),
@@ -383,6 +397,7 @@ registry.category("web_tour.tours").add("PoSPaymentSyncTour2", {
             ProductScreen.isShown(),
             ProductScreen.clickOrderButton(),
             Chrome.closePrintingWarning(),
+            FloorScreen.clickTable("5"),
             ProductScreen.orderlinesHaveNoChange(),
             Chrome.clickPlanButton(),
         ].flat(),
@@ -406,6 +421,7 @@ registry.category("web_tour.tours").add("PoSPaymentSyncTour3", {
             ProductScreen.isShown(),
             ProductScreen.clickOrderButton(),
             Chrome.closePrintingWarning(),
+            FloorScreen.clickTable("5"),
             ProductScreen.orderlinesHaveNoChange(),
             Chrome.clickPlanButton(),
         ].flat(),
@@ -460,6 +476,7 @@ registry.category("web_tour.tours").add("PreparationPrinterContent", {
             ProductScreen.selectPreset("Eat in", "Takeaway"),
             Chrome.presetTimingSlotHourNotExists("09:00"),
             Chrome.selectPresetTimingSlotHour("12:00"),
+            Chrome.presetTimingSlotIs("12:00"),
             checkPreparationTicketData([{ name: "Water", qty: 1 }], {
                 visibleInDom: ["12:00", "Takeaway"],
                 invisibleInDom: ["colorIndex"],
@@ -642,6 +659,7 @@ registry.category("web_tour.tours").add("test_preset_timing_restaurant", {
             Dialog.confirm("apply"),
             Chrome.presetTimingSlotHourNotExists("09:00"),
             Chrome.selectPresetTimingSlotHour("12:00"),
+            Chrome.presetTimingSlotIs("12:00"),
             Chrome.clickPlanButton(),
             FloorScreen.clickTable("4"),
             ProductScreen.clickDisplayedProduct("Coca-Cola"),
@@ -673,6 +691,8 @@ registry.category("web_tour.tours").add("test_open_register_with_preset_takeaway
             FloorScreen.clickTable("5"),
             Chrome.presetTimingSlotHourNotExists("09:00"),
             Chrome.selectPresetTimingSlotHour("12:20"),
+            Chrome.presetTimingSlotIs("12:20"),
+            Chrome.waitRequest(),
             ProductScreen.clickDisplayedProduct("Coca-Cola", true),
             ProductScreen.clickControlButton("Cancel Order"),
             Dialog.cancel({ title: "Existing orderlines" }),
@@ -685,6 +705,31 @@ registry.category("web_tour.tours").add("test_open_register_with_preset_takeaway
             {
                 trigger: ".orders:contains(no orders found)",
             },
+        ].flat(),
+});
+
+registry.category("web_tour.tours").add("test_cancel_future_order", {
+    steps: () =>
+        [
+            Chrome.freezeDateTime(1739370000000),
+            Chrome.startPoS(),
+            Dialog.confirm("Open Register"),
+            FloorScreen.clickNewOrder(),
+            ProductScreen.clickDisplayedProduct("Coca-Cola"),
+            ProductScreen.selectPreset("Eat in", "Takeaway"),
+            TextInputPopup.inputText("John"),
+            Dialog.confirm(),
+            Chrome.selectPresetTimingSlot("02/13/2025"),
+            Chrome.selectPresetTimingSlot("15:00"),
+            Chrome.presetTimingSlotIs("15:00"),
+            Chrome.clickPlanButton(),
+            FloorScreen.clickTable("4"),
+            ProductScreen.clickDisplayedProduct("Coca-Cola"),
+            Chrome.clickOrders(),
+            TicketScreen.deleteOrder("001"),
+            Dialog.confirm(),
+            refresh(),
+            negateStep(...TicketScreen.selectOrder("001")),
         ].flat(),
 });
 
@@ -731,10 +776,13 @@ registry.category("web_tour.tours").add("test_customer_alone_saved", {
             FloorScreen.clickTable("5"),
             ProductScreen.clickDisplayedProduct("Coca-Cola"),
             Chrome.clickOrders(),
+            Chrome.waitRequest(),
             Chrome.clickRegister(),
             ProductScreen.clickPartnerButton(),
             ProductScreen.clickCustomer("Acme Corporation"),
+            ProductScreen.customerIsSelected("Acme Corporation"),
             Chrome.clickOrders(),
+            Chrome.waitRequest(),
             Chrome.clickRegister(),
             ProductScreen.customerIsSelected("Acme Corporation"),
         ].flat(),
@@ -1209,5 +1257,58 @@ registry.category("web_tour.tours").add("test_name_preset_skip_screen", {
             PaymentScreen.clickPaymentMethod("Cash"),
             PaymentScreen.clickValidate(),
             ReceiptScreen.clickNextOrder(),
+        ].flat(),
+});
+
+registry.category("web_tour.tours").add("test_futur_orders_are_not_cancelled", {
+    steps: () =>
+        [
+            Chrome.startPoS(),
+            Dialog.confirm("Open Register"),
+            Chrome.clickMenuOption("Close Register"),
+            Dialog.confirm("Close Register"),
+            Dialog.confirm("Cancel Orders", ".btn-secondary"),
+        ].flat(),
+});
+
+registry.category("web_tour.tours").add("test_floating_order_name_change_partner", {
+    steps: () =>
+        [
+            Chrome.startPoS(),
+            Dialog.confirm("Open Register"),
+            FloorScreen.clickNewOrder(),
+
+            ProductScreen.selectPreset("Eat in", "Delivery"),
+            ProductScreen.clickCustomer("Abigael"),
+            ProductScreen.customerIsSelected("Abigael"),
+
+            // Check that order name is Abigael in the ticket screen/order list
+            Chrome.clickOrders(),
+            TicketScreen.nthRowContains(1, "Abigael"),
+            Chrome.clickRegister(),
+
+            // Change partner
+            ProductScreen.clickPartnerButton(),
+            ProductScreen.clickCustomer("Deco Addict"),
+            ProductScreen.customerIsSelected("Deco Addict"),
+
+            // Check that order name updated to Deco Addict
+            Chrome.clickOrders(),
+            TicketScreen.nthRowContains(1, "Deco Addict"),
+            Chrome.clickRegister(),
+
+            // Clear partner
+            ProductScreen.clickPartnerButton(),
+            {
+                content: "click unselect partner",
+                trigger: ".unselect-tag",
+                run: "click",
+            },
+            ProductScreen.customerIsSelected("Customer"),
+
+            // Check that order name is reset (or just not the old partner)
+            Chrome.clickOrders(),
+            TicketScreen.nthRowNotContains(1, "Deco Addict"),
+            Chrome.clickRegister(),
         ].flat(),
 });

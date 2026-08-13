@@ -12,4 +12,5 @@ Bridge module addings support for EMV Merchant-Presented QR-code generation for 
     'data': [
         'views/res_bank_views.xml',
     ],
+    'license': 'LGPL-3',
 }

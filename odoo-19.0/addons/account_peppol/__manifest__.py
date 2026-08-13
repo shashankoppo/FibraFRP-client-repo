@@ -12,8 +12,8 @@
     'countries': [
         # !!! KEEP ALIGNED WITH ACCOUNT/MODELS/COMPANY.PEPPOL_DEFAULT_COUNTRIES
         'at', 'be', 'ch', 'cy', 'cz', 'de', 'dk', 'ee', 'es', 'fi',
-        'fr', 'gr', 'ie', 'is', 'it', 'lt', 'lu', 'lv', 'mt', 'nl',
-        'no', 'pl', 'pt', 'ro', 'se', 'si',
+        'fr', 'ie', 'is', 'lt', 'lu', 'lv', 'mt', 'nl', 'no', 'se',
+        'si',
     ],
     'depends': [
         'account_edi_proxy_client',
@@ -43,9 +43,11 @@
     ],
     'post_init_hook': '_account_peppol_post_init',
     'author': 'Odoo S.A.',
+    'license': 'LGPL-3',
     'assets': {
         'web.assets_backend': [
             'account_peppol/static/src/components/**/*',
+            'account_peppol/static/src/web/**/*',
             'account_peppol/static/src/css/**/*',
         ],
         'web.assets_frontend': [

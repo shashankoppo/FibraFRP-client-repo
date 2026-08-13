@@ -1,10 +1,11 @@
 from datetime import date, datetime
 from freezegun import freeze_time
 from itertools import combinations
+from unittest.mock import patch
 
 from odoo.fields import Command, Domain
 from odoo.tests import TransactionCase, users
-from odoo.tools import SQL, OrderedSet
+from odoo.tools import Query, SQL, OrderedSet
 
 from odoo.addons.base.tests.test_expression import TransactionExpressionCase
 
@@ -337,6 +338,24 @@ class TestDomain(TransactionExpressionCase):
         res_search = self._search(Child, [('tag_ids', 'not any', [('name', '=', 'Urgent')])])
         self.assertEqual(res_search, child_2 + child_3)
 
+    def test_any_in_search_field(self):
+        Message = self.env.registry['test_orm.message']
+        model = self.env[Message._name]
+        with patch.object(Message, '_search_author_partner', side_effect=Message._search_author_partner, autospec=True) as mock:
+            # using _search_author_partner
+            domain = Domain('author_partner', 'any', [('name', '=', 'demo')]).optimize_full(model)
+            call_args = mock.call_args.args
+            self.assertEqual(call_args[1], 'any')
+            sub_domain = call_args[2]
+            self.assertIsInstance(sub_domain, Domain)
+            self.assertTrue(isinstance(sub_domain.value, Query), "Sub-Domain should be compiled into a Query")
+
+            self.assertEqual(domain.field_expr, 'author')
+            u_domain = domain.value
+            self.assertEqual(u_domain.field_expr, 'partner_id')
+            self.assertEqual(u_domain.operator, 'any!')
+            self.assertIs(u_domain.value, sub_domain.value, "The query should be used as-is")
+
 
 class TestDomainComplement(TransactionExpressionCase):
 
@@ -595,6 +614,12 @@ class TestDomainOptimize(TransactionCase):
             Domain('active', 'in', [True, False]).optimize_full(model),
             Domain.TRUE,
         )
+        with patch.object(model.__class__, '_search_has_important_sibling') as sib:
+            self.assertEqual(
+                Domain('has_important_sibling', 'in', [True, False]).optimize_full(model),
+                Domain.TRUE,
+            )
+            sib.assert_not_called()
 
     def test_condition_optimize_date(self):
         model = self.env['test_orm.mixed']
@@ -1005,3 +1030,58 @@ class TestDomainOptimize(TransactionCase):
             list(base_domain.optimize_full(model.sudo())),
             [('currency_id', 'not in', [2, False])],
         )
+
+    def subset_condition_optimize_properties_date(self, date_type='date'):
+        message_model = self.env['test_orm.message'].with_context(tz='UTC')
+        discussion_model = self.env['test_orm.discussion'].with_context(tz='UTC')
+
+        is_dt = date_type == 'datetime'
+        hour_str = ' 13:05:34' if is_dt else ''
+        discussion = self.env['test_orm.discussion'].create({
+            'name': 'Test Discussion',
+            'participants': [Command.link(self.env.user.id)],
+            'attributes_definition': [{
+                'name': 'mydate',
+                'string': 'Prop',
+                'type': date_type,
+            }],
+        })
+
+        message_model.create({
+            'discussion': discussion.id,
+            'name': 'Test Message',
+            'attributes': {
+                'mydate': f'2077-05-02{hour_str}',
+            },
+        })
+
+        with freeze_time(f'2027-05-02{hour_str}'):
+            self.assertEqual(
+                Domain('attributes.mydate', '=', '+50y').optimize_full(message_model),
+                Domain('attributes.mydate', 'in', OrderedSet([f'2077-05-02{hour_str}'])),
+            )
+
+            self.assertEqual(
+                Domain(
+                    'messages',
+                    'any',
+                    Domain.AND([
+                        Domain('attributes.mydate', '>=', 'today'),
+                        Domain('attributes.mydate', '<', '+60y'),
+                    ]),
+                ).optimize_full(discussion_model),
+                Domain(
+                    'messages',
+                    'any!',
+                    Domain.AND([
+                        Domain('attributes.mydate', '<', f'2087-05-02{hour_str}'),
+                        Domain('attributes.mydate', '>=', f"2027-05-02{' 00:00:00' if is_dt else ''}"),
+                    ]),
+                ),
+            )
+
+    def test_condition_optimize_properties_date(self):
+        self.subset_condition_optimize_properties_date("date")
+
+    def test_condition_optimize_properties_datetime(self):
+        self.subset_condition_optimize_properties_date("datetime")
