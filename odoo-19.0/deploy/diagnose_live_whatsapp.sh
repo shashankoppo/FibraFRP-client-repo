@@ -100,6 +100,34 @@ docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
     UNION ALL SELECT 'webhook_logs', count(*) FROM whatsapp_webhook_log;"
 
 echo
+echo "==> PostgreSQL connection usage"
+docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
+  "SELECT datname, usename, state, count(*) AS connections
+     FROM pg_stat_activity
+    WHERE datname = ${LIVE_DB_SQL}
+    GROUP BY datname, usename, state
+    ORDER BY connections DESC;"
+
+echo
+echo "==> Recent and active campaigns"
+docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
+  "SELECT campaign.id,
+          campaign.name,
+          campaign.state,
+          campaign.last_batch_at,
+          count(message.id) FILTER (WHERE message.status = 'queued') AS queued,
+          count(message.id) FILTER (WHERE message.status = 'failed') AS failed,
+          count(message.id) FILTER (WHERE message.status IN ('sent', 'delivered', 'read')) AS accepted
+     FROM whatsapp_campaign campaign
+     LEFT JOIN whatsapp_message message
+       ON message.campaign_id = campaign.id
+      AND message.direction = 'outbound'
+    WHERE campaign.state IN ('scheduled', 'running')
+       OR campaign.id IN (SELECT id FROM whatsapp_campaign ORDER BY id DESC LIMIT 10)
+    GROUP BY campaign.id, campaign.name, campaign.state, campaign.last_batch_at
+    ORDER BY campaign.id DESC;"
+
+echo
 echo "==> WhatsApp delivery workers"
 docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
   "SELECT model.model,
@@ -207,7 +235,7 @@ docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
 echo
 echo "==> Recent webhook logs"
 docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
-  "SELECT id, create_date, event_type, status, account_id, left(coalesce(error_message, ''), 180) AS error
+  "SELECT id, create_date, event_type, status, account_id, left(coalesce(error_detail, ''), 180) AS error
      FROM whatsapp_webhook_log
     ORDER BY id DESC
     LIMIT 20;"

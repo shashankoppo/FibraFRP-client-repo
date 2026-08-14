@@ -2,6 +2,7 @@ import base64
 import json
 from unittest.mock import Mock, patch
 
+from odoo import fields
 from odoo.tests.common import TransactionCase
 
 from ..controllers.whatsapp_webhook import WhatsAppWebhook
@@ -241,6 +242,23 @@ class TestPrivateMediaRecovery(TransactionCase):
 
         self.account.invalidate_recordset(['last_webhook_at'])
         self.assertFalse(self.account.last_webhook_at)
+
+    def test_status_freshness_is_rate_limited_during_webhook_bursts(self):
+        checked_at = fields.Datetime.now()
+        self.account.write({
+            'last_status_webhook_at': checked_at,
+            'last_status_wamid': 'wamid-before-burst',
+        })
+
+        WhatsAppWebhook()._touch_account_webhook(
+            self.env,
+            self.account,
+            status_wamid='wamid-during-burst',
+        )
+
+        self.account.invalidate_recordset(['last_status_webhook_at', 'last_status_wamid'])
+        self.assertEqual(self.account.last_status_webhook_at, checked_at)
+        self.assertEqual(self.account.last_status_wamid, 'wamid-before-burst')
 
     def test_webhook_recovery_detects_postgres_serialization_code(self):
         class SerializationError(Exception):

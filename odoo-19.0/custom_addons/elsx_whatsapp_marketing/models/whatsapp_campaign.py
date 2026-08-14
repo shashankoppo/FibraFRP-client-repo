@@ -801,6 +801,35 @@ class WhatsAppCampaign(models.Model):
         media_kwargs = self._effective_header_media_kwargs(template, version)
         return bool(media_kwargs.get('header_media_url') or media_kwargs.get('header_media_file'))
 
+    def _prepare_shared_header_media(self, template, version='a'):
+        """Resolve campaign header media once so every recipient reuses one reference."""
+        self.ensure_one()
+        if not template or template.header_type not in ('image', 'video', 'document'):
+            return {}
+        media_kwargs = self._effective_header_media_kwargs(template, version)
+        filename = (
+            media_kwargs.get('header_media_filename')
+            or template.header_media_filename
+            or template._header_media_upload_filename(template.header_type)
+        )
+        media_value = template._resolve_header_media_value(
+            template.header_type,
+            media_file=media_kwargs.get('header_media_file'),
+            media_filename=filename,
+            media_url=media_kwargs.get('header_media_url'),
+            account=self.account_id,
+        )
+        if self.account_id._is_private_meta_media_url(media_value):
+            media_value = self.account_id._download_and_upload_private_media(
+                media_value,
+                template.header_type,
+                filename,
+            )
+        return {
+            'header_media_url': media_value,
+            'header_media_filename': filename,
+        }
+
     def _check_template_ready_for_campaign(self, template, label, version='a'):
         if not template:
             return
@@ -873,8 +902,8 @@ class WhatsAppCampaign(models.Model):
                 body = body.replace(f'{{{{{idx}}}}}', str(val))
         return body
 
-    def _template_payload_for_partner(self, template, partner, version='a'):
-        media_kwargs = self._effective_header_media_kwargs(template, version)
+    def _template_payload_for_partner(self, template, partner, version='a', media_kwargs=None):
+        media_kwargs = media_kwargs if media_kwargs is not None else self._effective_header_media_kwargs(template, version)
         return template._prepare_send_payload(
             partner=partner,
             account=self.account_id,
@@ -1386,6 +1415,12 @@ class WhatsAppCampaign(models.Model):
                 part_a = partner_list
                 part_b = []
 
+            shared_media_by_version = {}
+            if self.template_id:
+                shared_media_by_version['a'] = self._prepare_shared_header_media(self.template_id, 'a')
+            if self.is_ab_test and self.template_id_b:
+                shared_media_by_version['b'] = self._prepare_shared_header_media(self.template_id_b, 'b')
+
             for i, partner in enumerate(partner_list):
                 version = 'a' if partner in part_a else 'b'
 
@@ -1424,9 +1459,14 @@ class WhatsAppCampaign(models.Model):
 
                     if current_template:
                         message_body = self._render_body_for_partner(message_body, partner, current_template)
-                        media_kwargs = self._effective_header_media_kwargs(current_template, version)
+                        media_kwargs = shared_media_by_version.get(version, {})
                         try:
-                            template_payload = self._template_payload_for_partner(current_template, partner, version=version)
+                            template_payload = self._template_payload_for_partner(
+                                current_template,
+                                partner,
+                                version=version,
+                                media_kwargs=media_kwargs,
+                            )
                         except (UserError, ValidationError) as e:
                             failed_messages_to_create.append(failed_message_vals(
                                 partner, phone, version, current_template, message_body, e,

@@ -57,7 +57,7 @@ def _should_notify_realtime(message):
     return True
 
 
-def notify_sidecar_background(env, message_id, event_type='new_message'):
+def _notify_sidecar_with_cursor_legacy(env, message_id, event_type='new_message'):
     """Fire-and-forget notification to the sidecar â€” non-blocking thread."""
     # Capture db_name from the current cursor before spawning a thread
     try:
@@ -108,6 +108,60 @@ def notify_sidecar_background(env, message_id, event_type='new_message'):
             _logger.warning('[SIDECAR-ASYNC] notification failed: %s', e)
 
     _submit_best_effort(SIDECAR_NOTIFY_EXECUTOR, _do_request, '[SIDECAR-ASYNC]')
+
+
+def notify_sidecar_background(env, message_id, event_type='new_message'):
+    """Notify the socket sidecar after commit without borrowing another DB cursor."""
+    try:
+        params = env['ir.config_parameter'].sudo()
+        if params.get_param('whatsapp.realtime.mode', default='bus') != 'socket':
+            return False
+        base_url = params.get_param('whatsapp.sidecar.url')
+        secret = params.get_param('whatsapp.sidecar.secret')
+        if not base_url or not secret:
+            return False
+
+        msg = env['whatsapp.message'].sudo().browse(message_id).exists()
+        if not msg:
+            return False
+        payload = {
+            'chat_id': msg.chat_id_ref.id if msg.chat_id_ref else msg.phone_number,
+            'message_id': msg.id,
+            'message_wamid': msg.message_id,
+            'status': msg.status,
+            'message': {
+                'id': msg.id,
+                'wamid': msg.message_id,
+                'body': msg.body,
+                'direction': msg.direction,
+                'type': msg.message_type,
+                'status': msg.status,
+            },
+            'type': event_type,
+        }
+    except Exception as exc:
+        _logger.debug('[SIDECAR-ASYNC] notification skipped: %s', exc)
+        return False
+
+    def _do_request():
+        try:
+            requests.post(
+                f"{base_url.rstrip('/')}/relay/new-message",
+                json=payload,
+                headers={'x-sidecar-key': secret},
+                timeout=5,
+            )
+        except Exception as exc:
+            _logger.warning('[SIDECAR-ASYNC] notification failed: %s', exc)
+
+    def _submit_after_commit():
+        _submit_best_effort(SIDECAR_NOTIFY_EXECUTOR, _do_request, '[SIDECAR-ASYNC]')
+
+    try:
+        env.cr.postcommit.add(_submit_after_commit)
+    except Exception:
+        _submit_after_commit()
+    return True
 
 
 class WhatsAppMessage(models.Model):

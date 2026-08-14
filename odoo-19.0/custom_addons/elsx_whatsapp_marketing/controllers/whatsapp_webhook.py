@@ -7,7 +7,7 @@ import hashlib
 import hmac
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
 
 _logger = logging.getLogger(__name__)
@@ -28,6 +28,18 @@ class WebhookSerializationRetry(Exception):
     """Raised when a webhook row is busy and the event should be retried."""
 
 
+def _bound_request_env():
+    """Reuse Odoo's request cursor when the route is already pinned to a DB."""
+    try:
+        db_name = getattr(request, 'db', None) or request.session.db
+        env = request.env
+        if db_name and env and 'whatsapp.account' in env.registry.models:
+            return env, db_name
+    except Exception:
+        pass
+    return None, None
+
+
 def _get_env(db_name=None, payload=None):
     """Get a fresh server environment for webhook context (no request session)"""
     db_name = (
@@ -37,13 +49,6 @@ def _get_env(db_name=None, payload=None):
         or request.session.db
         or getattr(request, 'db', None)
     )
-
-    from odoo.service import db as db_service
-    try:
-        dbs = db_service.list_dbs()
-    except Exception as exc:
-        _logger.warning('[WH-DB] Could not list databases while resolving webhook DB: %s', exc)
-        dbs = []
 
     def open_env(db):
         try:
@@ -78,6 +83,13 @@ def _get_env(db_name=None, payload=None):
         if env:
             return env, cr, db
         _logger.warning('[WH-DB] Explicit webhook database %s could not be opened.', db_name)
+
+    from odoo.service import db as db_service
+    try:
+        dbs = db_service.list_dbs()
+    except Exception as exc:
+        _logger.warning('[WH-DB] Could not list databases while resolving webhook DB: %s', exc)
+        dbs = []
 
     # 1. Multi-tenant phone_number_id matching. Prefer the primary/verified
     # receiver if the same WABA was copied into several databases.
@@ -228,7 +240,12 @@ class WhatsAppWebhook(http.Controller):
 
         # DB lookup only. No hard-coded fallback verify token is accepted.
         try:
-            env, cr, _ = _get_env()
+            env, db_name = _bound_request_env()
+            owns_cursor = not bool(env)
+            if owns_cursor:
+                env, cr, db_name = _get_env()
+            else:
+                cr = env.cr
             if not env or not cr:
                 _logger.error(
                     '[WH-VERIFY] Could not resolve an ERP database for webhook verification. '
@@ -245,7 +262,7 @@ class WhatsAppWebhook(http.Controller):
                     account.sudo().write({'webhook_status': 'verified', 'webhook_last_error': False})
                     return request.make_response(challenge, headers=[('Content-Type', 'text/plain')])
             finally:
-                if cr:
+                if owns_cursor and cr:
                     cr.close()
         except Exception as e:
             _logger.error(f'[WH-VERIFY] DB lookup failed: {e}')
@@ -301,32 +318,35 @@ class WhatsAppWebhook(http.Controller):
             if payload.get('object') != 'whatsapp_business_account':
                 return request.make_response('OK', status=200)
 
-            env, cr, db_name = _get_env(payload=payload)
+            env, db_name = _bound_request_env()
+            owns_cursor = not bool(env)
+            if owns_cursor:
+                env, cr, db_name = _get_env(payload=payload)
+            else:
+                cr = env.cr
             if not cr:
                 return request.make_response('Database Unavailable', status=503)
 
             try:
-                with cr:
-                    account = _find_account(env, account_id, payload)
+                account = _find_account(env, account_id, payload)
 
-                    ok, message, status = self._verify_meta_signature(
-                        account,
-                        raw_body,
-                        request.httprequest.headers.get('X-Hub-Signature-256', ''),
-                    )
-                    if not ok:
-                        return request.make_response(message, status=status)
+                ok, message, status = self._verify_meta_signature(
+                    account,
+                    raw_body,
+                    request.httprequest.headers.get('X-Hub-Signature-256', ''),
+                )
+                if not ok:
+                    return request.make_response(message, status=status)
 
-                    # 1. Instantly log the webhook for queuing (WABA Best Practice)
-                    # We store it as 'received' and instantly return 200 OK.
-                    log_record = env['whatsapp.webhook.log'].sudo().create({
-                        'account_id': account.id if account else False,
-                        'event_type': 'waba_webhook',
-                        'raw_payload': raw_data,
-                        'status': 'received'
-                    })
-                    log_id = log_record.id
-                    cr.commit()
+                # Persist first, then let a bounded worker process the durable event.
+                log_record = env['whatsapp.webhook.log'].sudo().create({
+                    'account_id': account.id if account else False,
+                    'event_type': 'waba_webhook',
+                    'raw_payload': raw_data,
+                    'status': 'received'
+                })
+                log_id = log_record.id
+                cr.commit()
 
                 # 2. Queue webhook processing with a bounded worker pool.
                 # This keeps Meta responses fast without spawning unlimited DB cursors.
@@ -398,7 +418,7 @@ class WhatsAppWebhook(http.Controller):
                 try:
                     WEBHOOK_EXECUTOR.submit(process_webhook_thread, db_name, log_id, account.id if account else None)
                 except RuntimeError as submit_err:
-                    if 'can''t start new thread' not in str(submit_err).lower():
+                    if "can't start new thread" not in str(submit_err).lower():
                         raise
                     _logger.warning(
                         '[WH-POST] Webhook executor unavailable; processing inline for log_id=%s: %s',
@@ -414,7 +434,8 @@ class WhatsAppWebhook(http.Controller):
                 _logger.error(f'[WH-INNER] Fatal processing error: {inner_err}', exc_info=True)
                 return request.make_response('Processing Error', status=500)
             finally:
-                cr.close()
+                if owns_cursor:
+                    cr.close()
 
         except json.JSONDecodeError:
             _logger.error('[WH-POST] Invalid JSON body')
@@ -432,7 +453,6 @@ class WhatsAppWebhook(http.Controller):
 
         # Log every event for audit
         self._log_event(env, account, field, value, raw_data)
-        self._touch_account_webhook(env, account)
 
         handlers = {
             'messages': self._handle_messages_field,
@@ -472,16 +492,6 @@ class WhatsAppWebhook(http.Controller):
         """Process the 'messages' field: inbound messages + delivery statuses"""
         contacts = {c['wa_id']: c.get('profile', {}).get('name', '') for c in value.get('contacts', [])}
 
-        # --- Inbound messages ---
-        for msg_data in value.get('messages', []):
-            try:
-                with env.cr.savepoint():
-                    self._process_inbound_message(env, account, msg_data, contacts, value)
-            except Exception as e:
-                if self._is_serialization_failure(e):
-                    raise
-                _logger.error(f'[WH-MSG] Processing message failed: {e}', exc_info=True)
-
         # --- Delivery status updates ---
         for status_data in value.get('statuses', []):
             try:
@@ -490,6 +500,21 @@ class WhatsAppWebhook(http.Controller):
                 if self._is_serialization_failure(e):
                     raise
                 _logger.error(f'[WH-STATUS] Processing status failed: {e}', exc_info=True)
+
+        # Statuses use a short independent transaction for duplicate/concurrency
+        # recovery. Process them before inbound work so the outer transaction has
+        # not updated the shared account row first.
+        inbound_messages = value.get('messages', [])
+        for msg_data in inbound_messages:
+            try:
+                with env.cr.savepoint():
+                    self._process_inbound_message(env, account, msg_data, contacts, value)
+            except Exception as e:
+                if self._is_serialization_failure(e):
+                    raise
+                _logger.error(f'[WH-MSG] Processing message failed: {e}', exc_info=True)
+        if inbound_messages:
+            self._touch_account_webhook(env, account, inbound=True)
 
         # --- Value-level errors (system errors) ---
         for error in value.get('errors', []):
@@ -510,8 +535,6 @@ class WhatsAppWebhook(http.Controller):
         if not account:
             _logger.error('[WH-MSG] No WhatsApp account matched inbound payload; skipping message %s', wamid)
             return
-
-        self._touch_account_webhook(env, account, inbound=True)
 
         phone_number = env['whatsapp.message'].sudo()._normalize_phone(phone_number, account=account, strict=False)
         if not phone_number:
@@ -1084,6 +1107,13 @@ class WhatsAppWebhook(http.Controller):
         if not account or not account.exists():
             return
         now = fields.Datetime.now()
+        freshness_field = (
+            'last_inbound_webhook_at'
+            if inbound
+            else 'last_status_webhook_at'
+            if status_wamid
+            else 'last_webhook_at'
+        )
         vals = {
             'last_webhook_at': now,
             'webhook_status': 'verified',
@@ -1097,9 +1127,20 @@ class WhatsAppWebhook(http.Controller):
                 'last_status_wamid': status_wamid,
             })
         try:
-            # Freshness is diagnostic data. A concurrent account update must not
-            # abort the transaction that stores messages and delivery statuses.
+            # Freshness is diagnostic data. Only one transaction per account may
+            # refresh it at a time, and status bursts need at most one update per
+            # minute. Message/status persistence must never wait on this row.
             with env.cr.savepoint():
+                env.cr.execute(
+                    'SELECT pg_try_advisory_xact_lock(%s, %s)',
+                    [0x5748, account.id],
+                )
+                if not env.cr.fetchone()[0]:
+                    return
+                account.invalidate_recordset([freshness_field])
+                last_update = account[freshness_field]
+                if last_update and last_update + timedelta(seconds=60) > now:
+                    return
                 account.sudo().write(vals)
         except Exception as exc:
             _logger.warning('[WH-WEBHOOK] Failed to update account webhook freshness: %s', exc)
@@ -1348,36 +1389,32 @@ class WhatsAppWebhook(http.Controller):
     def whatsapp_media_proxy(self, media_id, **kwargs):
         """Fetch media from Meta and serve it to the browser"""
         try:
-            env, cr, _ = _get_env()
-            with cr:
-                account = env['whatsapp.account'].sudo()._get_default_account()
-                if not account:
-                    return request.not_found()
+            account = request.env['whatsapp.account'].sudo()._get_default_account()
+            if not account:
+                return request.not_found()
 
-                import requests
-                # 1. Get media URL from ID
-                meta_url = f"https://graph.facebook.com/{account.api_version}/{media_id}"
-                headers = {'Authorization': f'Bearer {account.access_token}'}
-                resp = requests.get(meta_url, headers=headers, timeout=10)
-                if resp.status_code != 200:
-                    return request.not_found()
+            import requests
+            meta_url = f"https://graph.facebook.com/{account.api_version}/{media_id}"
+            headers = {'Authorization': f'Bearer {account.access_token}'}
+            resp = requests.get(meta_url, headers=headers, timeout=10)
+            if resp.status_code != 200:
+                return request.not_found()
 
-                download_url = resp.json().get('url')
-                if not download_url:
-                    return request.not_found()
+            download_url = resp.json().get('url')
+            if not download_url:
+                return request.not_found()
 
-                # 2. Download the actual binary
-                media_resp = requests.get(download_url, headers=headers, timeout=30)
-                if media_resp.status_code != 200:
-                    return request.not_found()
+            media_resp = requests.get(download_url, headers=headers, timeout=30)
+            if media_resp.status_code != 200:
+                return request.not_found()
 
-                return request.make_response(
-                    media_resp.content,
-                    headers=[
-                        ('Content-Type', media_resp.headers.get('Content-Type', 'image/jpeg')),
-                        ('Cache-Control', 'max-age=86400'),
-                    ]
-                )
+            return request.make_response(
+                media_resp.content,
+                headers=[
+                    ('Content-Type', media_resp.headers.get('Content-Type', 'image/jpeg')),
+                    ('Cache-Control', 'max-age=86400'),
+                ]
+            )
         except Exception as e:
             _logger.error(f'[WH-MEDIA] Proxy failed: {e}')
             return request.not_found()
@@ -1406,54 +1443,54 @@ class WhatsAppWebhook(http.Controller):
             _logger.error('[SIDECAR-IN] Could not initialize environment for security check')
             return request.make_json_response({'status': 'error', 'message': 'System Initialization Error'}, status=500)
 
-        try:
+        with cr:
             expected_secret = env['ir.config_parameter'].sudo().get_param('whatsapp.sidecar.secret')
             if not expected_secret or secret != expected_secret:
                 _logger.warning('[SIDECAR-IN] Unauthorized access attempt with secret %s', _mask_secret(secret))
                 return request.make_json_response({'status': 'error', 'message': 'Unauthorized'}, status=403)
-        finally:
-            cr.close()
 
-        _logger.info('[SIDECAR-IN] Received payload for processing')
-
-        # We reuse the POST logic by calling _handle_post with raw JSON
-        # Since _handle_post normally reads from request.httprequest.data,
-        # we'll create a small helper.
-        result = self._process_payload_direct(payload, raw_body=raw_body, signature=signature)
+            _logger.info('[SIDECAR-IN] Received payload for processing')
+            result = self._process_payload_direct(
+                payload,
+                raw_body=raw_body,
+                signature=signature,
+                env=env,
+            )
         status = result.get('http_status') or (200 if result.get('status') in ('success', 'ignored') else 500)
         return request.make_json_response(result, status=status)
 
-    def _process_payload_direct(self, payload, raw_body=None, signature=None):
+    def _process_payload_direct(self, payload, raw_body=None, signature=None, env=None):
         """Helper to process a JSON payload directly without re-reading from request"""
         if payload.get('object') != 'whatsapp_business_account':
             return {'status': 'ignored'}
 
-        env, cr, _ = _get_env(payload=payload)
+        owns_cursor = not bool(env)
+        if owns_cursor:
+            env, cr, _ = _get_env(payload=payload)
+        else:
+            cr = env.cr
         if not env:
             return {'status': 'error', 'message': 'Database unavailable', 'http_status': 503}
-        with cr:
-            # We'll use the same processing logic as _handle_post
-            # but we need to pass the payload object
-            try:
-                # Find account
-                account = _find_account(env, None, payload)
-                if not account:
-                    return {'status': 'error', 'message': 'No matching account'}
+        try:
+            account = _find_account(env, None, payload)
+            if not account:
+                return {'status': 'error', 'message': 'No matching account'}
 
-                if raw_body is not None:
-                    ok, message, status = self._verify_meta_signature(account, raw_body, signature or '')
-                    if not ok:
-                        return {'status': 'error', 'message': message, 'http_status': status}
+            if raw_body is not None:
+                ok, message, status = self._verify_meta_signature(account, raw_body, signature or '')
+                if not ok:
+                    return {'status': 'error', 'message': message, 'http_status': status}
 
-                # Process entries
-                for entry in payload.get('entry', []):
-                    for change in entry.get('changes', []):
-                        field = change.get('field')
-                        value = change.get('value') or {}
-                        # Call standard dispatcher
-                        self._dispatch_change(env, account, field, value, json.dumps(payload))
-                cr.commit()
-                return {'status': 'success'}
-            except Exception as e:
-                _logger.error(f'[SIDECAR-IN] Processing failed: {e}')
-                return {'status': 'error', 'message': str(e)}
+            for entry in payload.get('entry', []):
+                for change in entry.get('changes', []):
+                    field = change.get('field')
+                    value = change.get('value') or {}
+                    self._dispatch_change(env, account, field, value, json.dumps(payload))
+            cr.commit()
+            return {'status': 'success'}
+        except Exception as exc:
+            _logger.error('[SIDECAR-IN] Processing failed: %s', exc)
+            return {'status': 'error', 'message': str(exc)}
+        finally:
+            if owns_cursor:
+                cr.close()

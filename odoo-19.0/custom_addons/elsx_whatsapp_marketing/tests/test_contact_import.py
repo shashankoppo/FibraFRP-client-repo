@@ -6,6 +6,7 @@ from odoo import fields
 from odoo.exceptions import UserError
 from odoo.tests.common import TransactionCase
 
+from ..models import whatsapp_message as message_module
 from ..models.whatsapp_account import WhatsAppAccount
 
 
@@ -289,6 +290,26 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
                 'body': 'Sent message',
             })
             notify.assert_called_once_with(self.env, sent_message.id)
+
+    def test_bus_realtime_notification_does_not_open_cursor_or_thread(self):
+        self.env['ir.config_parameter'].sudo().set_param('whatsapp.realtime.mode', 'bus')
+        message = self.env['whatsapp.message'].create({
+            'account_id': self.account.id,
+            'phone_number': '919881934780',
+            'direction': 'outbound',
+            'status': 'queued',
+            'body': 'Bus notification check',
+        })
+
+        with (
+            patch.object(message_module.SIDECAR_NOTIFY_EXECUTOR, 'submit') as submit,
+            patch.object(message_module.odoo.modules.registry, 'Registry') as registry,
+        ):
+            notified = message_module.notify_sidecar_background(self.env, message.id)
+
+        self.assertFalse(notified)
+        submit.assert_not_called()
+        registry.assert_not_called()
 
     def test_immediate_campaign_launch_leaves_delivery_to_background_queue(self):
         partner = self.env['res.partner'].with_context(skip_whatsapp_contact_sync=True).create({
@@ -618,3 +639,47 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
 
         with self.assertRaises(UserError):
             campaign.action_send_campaign()
+
+    def test_campaign_header_file_is_uploaded_once_for_all_recipients(self):
+        partners = self.env['res.partner'].with_context(skip_whatsapp_contact_sync=True).create([
+            {'name': 'Media Recipient One', 'phone': '919881936141'},
+            {'name': 'Media Recipient Two', 'phone': '919881936142'},
+            {'name': 'Media Recipient Three', 'phone': '919881936143'},
+        ])
+        template = self.env['whatsapp.template'].create({
+            'name': 'Shared Video Header',
+            'meta_template_name': 'shared_video_header',
+            'account_id': self.account.id,
+            'language': 'en_US',
+            'language_code': 'en_US',
+            'status': 'approved',
+            'header_type': 'video',
+            'header_media_file': base64.b64encode(b'test-video'),
+            'header_media_filename': 'campaign.mp4',
+            'body': 'Hello',
+        })
+        campaign = self.env['whatsapp.campaign'].create({
+            'name': 'Shared Media Campaign',
+            'account_id': self.account.id,
+            'campaign_type': 'broadcast',
+            'target_type': 'manual',
+            'partner_ids': [(6, 0, partners.ids)],
+            'template_id': template.id,
+            'exclude_recently_contacted': False,
+        })
+
+        with patch.object(
+            WhatsAppAccount,
+            '_upload_media_to_meta',
+            return_value='uploaded-video-id',
+        ) as upload:
+            campaign.action_send_campaign()
+
+        upload.assert_called_once()
+        messages = campaign.message_ids.filtered(lambda message: message.direction == 'outbound')
+        self.assertEqual(len(messages), 3)
+        self.assertTrue(all(message.media_url == 'uploaded-video-id' for message in messages))
+        for message in messages:
+            payload = json.loads(message.raw_data)
+            header = next(component for component in payload['components'] if component['type'] == 'header')
+            self.assertEqual(header['parameters'][0]['video'], {'id': 'uploaded-video-id'})
