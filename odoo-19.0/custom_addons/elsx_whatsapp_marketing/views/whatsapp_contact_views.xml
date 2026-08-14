@@ -7,6 +7,7 @@
             <list string="WhatsApp Contacts">
                 <field name="name"/>
                 <field name="phone_number"/>
+                <field name="email" optional="show"/>
                 <field name="partner_id"/>
                 <field name="opt_in" widget="boolean_toggle"/>
                 <field name="message_count"/>
@@ -25,6 +26,7 @@
                     <group>
                         <field name="name"/>
                         <field name="phone_number"/>
+                        <field name="email" widget="email"/>
                         <field name="partner_id"/>
                         <field name="tag_ids" widget="many2many_tags"/>
                     </group>

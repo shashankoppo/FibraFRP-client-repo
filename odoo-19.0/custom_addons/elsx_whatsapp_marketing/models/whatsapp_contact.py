@@ -9,6 +9,7 @@ class WhatsAppContact(models.Model):
 
     name = fields.Char('Name', required=True)
     phone_number = fields.Char('Phone Number', required=True)
+    email = fields.Char('Email')
     partner_id = fields.Many2one('res.partner', string='Related Contact')
 
     # Opt-in status
@@ -52,7 +53,7 @@ class WhatsAppContact(models.Model):
 
     def write(self, vals):
         res = super(WhatsAppContact, self).write(vals)
-        fields_to_check = ['opt_in', 'partner_id', 'phone_number', 'name']
+        fields_to_check = ['opt_in', 'partner_id', 'phone_number', 'name', 'email']
         if any(f in vals for f in fields_to_check):
             for record in self:
                 record._sync_to_partner()
@@ -76,6 +77,8 @@ class WhatsAppContact(models.Model):
             update_vals['whatsapp_opt_in'] = self.opt_in
         if partner.name != self.name:
             update_vals['name'] = self.name
+        if self.email and not partner.email:
+            update_vals['email'] = self.email
 
         if update_vals:
             partner.with_context(skip_whatsapp_contact_sync=True).write(update_vals)

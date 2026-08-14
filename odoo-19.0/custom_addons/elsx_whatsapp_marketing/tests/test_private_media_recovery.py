@@ -149,3 +149,21 @@ class TestPrivateMediaRecovery(TransactionCase):
 
         self.assertEqual(result, payload)
         upload.assert_not_called()
+
+
+class TestWhatsAppContactImport(TransactionCase):
+    def test_email_and_new_tag_import_together(self):
+        result = self.env['whatsapp.contact'].load(
+            ['name', 'phone_number', 'email', 'tag_ids'],
+            [[
+                'Rohit Karday',
+                '9881934777',
+                'indryansteel@gmail.com',
+                'Fibera_CN_2025',
+            ]],
+        )
+
+        self.assertFalse(result['messages'])
+        contact = self.env['whatsapp.contact'].browse(result['ids'])
+        self.assertEqual(contact.email, 'indryansteel@gmail.com')
+        self.assertEqual(contact.tag_ids.name, 'Fibera_CN_2025')
