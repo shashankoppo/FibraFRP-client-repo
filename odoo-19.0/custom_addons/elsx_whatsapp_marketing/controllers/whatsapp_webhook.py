@@ -891,7 +891,7 @@ class WhatsAppWebhook(http.Controller):
                 time.sleep(delay)
             registry = Registry(db_name)
             with registry.cursor() as status_cr:
-                status_env = api.Environment(status_cr, odoo.SUPERUSER_ID, {})
+                status_env = api.Environment(status_cr, odoo.SUPERUSER_ID, dict(env.context))
                 status_account = status_env['whatsapp.account'].sudo().browse(account_id) if account_id else False
                 try:
                     self._process_status_update_once(status_env, status_account, status_data)
@@ -1042,6 +1042,8 @@ class WhatsAppWebhook(http.Controller):
 
     def _touch_account_webhook(self, env, account, inbound=False, status_wamid=False):
         """Record webhook freshness for dashboard/account health diagnostics."""
+        if env.context.get('whatsapp_webhook_replay'):
+            return
         if not account or not account.exists():
             return
         now = fields.Datetime.now()
@@ -1058,7 +1060,10 @@ class WhatsAppWebhook(http.Controller):
                 'last_status_wamid': status_wamid,
             })
         try:
-            account.sudo().write(vals)
+            # Freshness is diagnostic data. A concurrent account update must not
+            # abort the transaction that stores messages and delivery statuses.
+            with env.cr.savepoint():
+                account.sudo().write(vals)
         except Exception as exc:
             _logger.warning('[WH-WEBHOOK] Failed to update account webhook freshness: %s', exc)
 

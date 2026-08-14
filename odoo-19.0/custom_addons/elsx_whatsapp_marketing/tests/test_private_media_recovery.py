@@ -229,6 +229,19 @@ class TestPrivateMediaRecovery(TransactionCase):
         self.assertEqual(dispatch.call_args.args[1], self.account)
         self.assertEqual(dispatch.call_args.args[2], 'messages')
 
+    def test_replayed_webhook_does_not_contend_on_account_freshness(self):
+        replay_env = self.env(context={
+            **self.env.context,
+            'whatsapp_webhook_replay': True,
+        })
+        account = self.account.with_env(replay_env)
+        account.last_webhook_at = False
+
+        WhatsAppWebhook()._touch_account_webhook(replay_env, account)
+
+        self.account.invalidate_recordset(['last_webhook_at'])
+        self.assertFalse(self.account.last_webhook_at)
+
 
 class TestWhatsAppContactImport(TransactionCase):
     def test_email_and_new_tag_import_together(self):

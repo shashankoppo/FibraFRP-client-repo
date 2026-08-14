@@ -1047,7 +1047,7 @@ class WhatsAppMessage(models.Model):
             def _after_commit(db_name=db_name, message_id=message_id):
                 def _download():
                     try:
-                        registry = odoo.registry(db_name)
+                        registry = odoo.modules.registry.Registry(db_name)
                         with registry.cursor() as cr:
                             env = api.Environment(cr, odoo.SUPERUSER_ID, {})
                             msg = env['whatsapp.message'].sudo().browse(message_id)

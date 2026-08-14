@@ -61,12 +61,15 @@ class WhatsAppWebhookLog(models.Model):
 
         from odoo.addons.elsx_whatsapp_marketing.controllers.whatsapp_webhook import WhatsAppWebhook
 
+        replay_log = self.with_context(whatsapp_webhook_replay=True)
+        replay_env = replay_log.env
+        replay_account = account.with_env(replay_env)
         dispatcher = WhatsAppWebhook()
         for entry in payload.get('entry', []):
             for change in entry.get('changes', []):
                 dispatcher._dispatch_change(
-                    self.env,
-                    account,
+                    replay_env,
+                    replay_account,
                     change.get('field', ''),
                     change.get('value') or {},
                     self.raw_payload or '',
@@ -113,8 +116,12 @@ class WhatsAppWebhookLog(models.Model):
         cutoff = fields.Datetime.now() - timedelta(minutes=1)
         pending = self.sudo().search([
             ('event_type', '=', 'waba_webhook'),
-            ('status', '=', 'received'),
             ('create_date', '<=', cutoff),
+            '|',
+                ('status', '=', 'received'),
+                '&',
+                    ('status', '=', 'error'),
+                    ('error_detail', 'ilike', 'serialize'),
         ], order='create_date asc, id asc', limit=limit)
         processed = 0
         failed = 0
