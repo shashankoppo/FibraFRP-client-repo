@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data noupdate="0">
-        <function model="whatsapp.contact" name="_reconcile_partner_links" eval="()"/>
-        <function model="whatsapp.campaign" name="_repair_delivery_crons" eval="()"/>
+        <function model="whatsapp.contact" name="_reconcile_all_partner_links"/>
+        <function model="whatsapp.campaign" name="_repair_delivery_crons"/>
     </data>
 </odoo>

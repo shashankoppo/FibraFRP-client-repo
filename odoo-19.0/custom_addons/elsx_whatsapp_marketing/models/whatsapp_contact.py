@@ -170,6 +170,11 @@ class WhatsAppContact(models.Model):
         )
         return {'processed': len(contacts), 'linked': linked, 'failed': failed}
 
+    @api.model
+    def _reconcile_all_partner_links(self):
+        """Reconcile every imported contact during a module upgrade."""
+        return self.sudo().search([])._reconcile_partner_links()
+
 
 class WhatsAppContactTag(models.Model):
     _name = 'whatsapp.contact.tag'
