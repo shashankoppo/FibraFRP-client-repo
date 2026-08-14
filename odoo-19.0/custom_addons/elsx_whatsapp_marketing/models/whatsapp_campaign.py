@@ -189,6 +189,7 @@ class WhatsAppCampaign(models.Model):
         apply=False,
         window_minutes=15,
         expected_message_count=0,
+        expected_recipient_count=0,
         pending_action='cancel',
     ):
         """Rebuild a deleted campaign from its detached message rows without sending."""
@@ -196,9 +197,10 @@ class WhatsAppCampaign(models.Model):
             source_campaign_id = int(source_campaign_id)
             window_minutes = max(int(window_minutes or 15), 1)
             expected_message_count = max(int(expected_message_count or 0), 0)
+            expected_recipient_count = max(int(expected_recipient_count or 0), 0)
         except (TypeError, ValueError):
             raise UserError(_(
-                'Campaign ID, recovery window, and expected message count must be numeric.'
+                'Campaign ID, recovery window, and expected counts must be numeric.'
             ))
         if pending_action not in ('cancel', 'resume'):
             raise UserError(_('Pending action must be either cancel or resume.'))
@@ -212,7 +214,6 @@ class WhatsAppCampaign(models.Model):
         domain = [
             ('direction', '=', 'outbound'),
             ('campaign_id', '=', False),
-            ('chat_id_ref', '=', False),
             ('is_campaign_message', '=', True),
             ('account_id', '=', source.account_id.id),
         ]
@@ -255,20 +256,71 @@ class WhatsAppCampaign(models.Model):
             for status in dict(Message._fields['status'].selection)
         }
         status_counts = {status: count for status, count in status_counts.items() if count}
-        pending = messages.filtered(lambda message: message.status in ('draft', 'queued'))
-        accepted_pending = pending.filtered('message_id')
-        unsent_pending = pending - accepted_pending
         quarantine_reason = _(
             'Delivery stopped automatically because the original campaign was deleted.'
         )
-        quarantined = messages.filtered(lambda message: (
-            message.status == 'cancelled'
-            and not message.message_id
-            and message.error_message == quarantine_reason
-        ))
-        retryable_failed = messages.filtered(
-            lambda message: message.status == 'failed' and message.next_retry_at
-        )
+
+        def recipient_key(message):
+            phone = False
+            try:
+                phone = Message._normalize_phone(
+                    message.phone_number,
+                    account=source.account_id,
+                    strict=False,
+                )
+            except (UserError, ValidationError, TypeError, ValueError):
+                phone = ''.join(character for character in (message.phone_number or '') if character.isdigit())
+            if phone:
+                return ('phone', phone)
+            if message.partner_id:
+                return ('partner', message.partner_id.id)
+            return ('message', message.id)
+
+        recipient_groups = {}
+        for message in messages:
+            key = recipient_key(message)
+            recipient_groups.setdefault(key, Message.browse())
+            recipient_groups[key] |= message
+
+        accepted_messages = Message.browse()
+        accepted_pending = Message.browse()
+        accepted_retryable = Message.browse()
+        queue_to_resume = Message.browse()
+        duplicate_queue_rows = Message.browse()
+        failed_only_recipient_count = 0
+        for group in recipient_groups.values():
+            accepted = group.filtered(lambda message: (
+                bool(message.message_id)
+                or message.status in ('sent', 'delivered', 'read')
+            ))
+            accepted_messages |= accepted
+            accepted_pending |= accepted.filtered(
+                lambda message: message.status in ('draft', 'queued')
+            )
+            accepted_retryable |= accepted.filtered(
+                lambda message: message.status == 'failed' and message.next_retry_at
+            )
+            recoverable = group.filtered(lambda message: (
+                not message.message_id
+                and (
+                    message.status in ('draft', 'queued')
+                    or (
+                        message.status == 'cancelled'
+                        and message.error_message == quarantine_reason
+                    )
+                    or (message.status == 'failed' and message.next_retry_at)
+                )
+            ))
+            if accepted:
+                duplicate_queue_rows |= recoverable
+            elif recoverable:
+                selected = recoverable.sorted(lambda message: message.id)[:1]
+                queue_to_resume |= selected
+                duplicate_queue_rows |= recoverable - selected
+            elif group.filtered(lambda message: message.status == 'failed'):
+                failed_only_recipient_count += 1
+
+        unique_recipient_count = len(recipient_groups)
         result = {
             'apply': bool(apply),
             'reference_campaign_id': source.id,
@@ -281,11 +333,24 @@ class WhatsAppCampaign(models.Model):
             'message_count': len(messages),
             'expected_message_count': expected_message_count or False,
             'expected_count_matches': not expected_message_count or len(messages) == expected_message_count,
+            'unique_recipient_count': unique_recipient_count,
+            'expected_recipient_count': expected_recipient_count or False,
+            'expected_recipient_count_matches': (
+                not expected_recipient_count
+                or unique_recipient_count == expected_recipient_count
+            ),
+            'duplicate_message_row_count': len(messages) - unique_recipient_count,
             'partner_count': len(messages.mapped('partner_id')),
             'meta_accepted_count': len(messages.filtered('message_id')),
-            'unsent_pending_count': len(unsent_pending),
-            'quarantined_pending_count': len(quarantined),
-            'retryable_failed_count': len(retryable_failed),
+            'accepted_message_count': len(accepted_messages),
+            'accepted_retry_stopped_count': len(accepted_retryable),
+            'accepted_recipient_count': sum(
+                1 for group in recipient_groups.values()
+                if group & accepted_messages
+            ),
+            'recipient_count_to_resume': len(queue_to_resume),
+            'duplicate_queue_rows_to_suppress': len(duplicate_queue_rows),
+            'failed_only_recipient_count': failed_only_recipient_count,
             'pending_action': pending_action,
             'statuses_before': status_counts,
         }
@@ -300,6 +365,14 @@ class WhatsAppCampaign(models.Model):
                 'matched': len(messages),
                 'expected': expected_message_count,
             })
+        if expected_recipient_count and unique_recipient_count != expected_recipient_count:
+            raise UserError(_(
+                'Recovery stopped before making changes: matched %(matched)s unique recipients, '
+                'but %(expected)s were expected. Do not bypass this check; review the dry run.'
+            ) % {
+                'matched': unique_recipient_count,
+                'expected': expected_recipient_count,
+            })
 
         if accepted_pending:
             accepted_pending.write({
@@ -307,30 +380,36 @@ class WhatsAppCampaign(models.Model):
                 'error_message': False,
                 'next_retry_at': False,
             })
+        if accepted_retryable:
+            accepted_retryable.write({'next_retry_at': False})
         if pending_action == 'resume':
-            if quarantined:
-                quarantined.write({
+            if queue_to_resume:
+                queue_to_resume.write({
                     'status': 'queued',
                     'error_message': False,
                     'next_retry_at': False,
                 })
-        elif unsent_pending:
-            unsent_pending.write({
+            if duplicate_queue_rows:
+                duplicate_queue_rows.write({
+                    'status': 'cancelled',
+                    'next_retry_at': False,
+                    'error_message': _(
+                        'Duplicate queue row suppressed during deleted campaign recovery.'
+                    ),
+                })
+        elif queue_to_resume or duplicate_queue_rows:
+            (queue_to_resume | duplicate_queue_rows).write({
                 'status': 'cancelled',
                 'next_retry_at': False,
                 'error_message': _(
                     'Unsent work was stopped while recovering the deleted campaign.'
                 ),
             })
-        if retryable_failed and pending_action == 'cancel':
-            retryable_failed.write({'next_retry_at': False})
-
         anchor_label = fields.Datetime.to_string(anchor)
         recovered = source.copy({
             'name': _('%s (Recovered %s)') % (source.name, anchor_label),
         })
-        resumable = unsent_pending | quarantined | retryable_failed
-        recovered_state = 'running' if pending_action == 'resume' and resumable else (
+        recovered_state = 'running' if pending_action == 'resume' and queue_to_resume else (
             'completed' if pending_action == 'resume' else 'cancelled'
         )
         recovered.write({
@@ -345,7 +424,7 @@ class WhatsAppCampaign(models.Model):
                 '%(pending)s existing pending message(s) were %(action)s; recovery itself '
                 'created and sent no messages.'
             ) % {
-                'pending': len(resumable),
+                'pending': len(queue_to_resume),
                 'action': _('reattached for normal queue processing')
                 if pending_action == 'resume' else _('cancelled'),
             },
@@ -362,11 +441,13 @@ class WhatsAppCampaign(models.Model):
             'recovered_campaign_id': recovered.id,
             'recovered_campaign': recovered.display_name,
             'recovered_state': recovered.state,
-            'pending_cancelled': len(unsent_pending) if pending_action == 'cancel' else 0,
-            'pending_resumed': len(unsent_pending | quarantined) if pending_action == 'resume' else 0,
+            'pending_cancelled': len(queue_to_resume | duplicate_queue_rows)
+            if pending_action == 'cancel' else 0,
+            'pending_resumed': len(queue_to_resume) if pending_action == 'resume' else 0,
             'accepted_pending_normalized': len(accepted_pending),
-            'quarantined_resumed': len(quarantined) if pending_action == 'resume' else 0,
-            'retries_stopped': len(retryable_failed) if pending_action == 'cancel' else 0,
+            'accepted_retries_stopped': len(accepted_retryable),
+            'duplicate_queue_rows_suppressed': len(duplicate_queue_rows)
+            if pending_action == 'resume' else 0,
         })
         _logger.warning('Recovered deleted WhatsApp campaign: %s', result)
         return result

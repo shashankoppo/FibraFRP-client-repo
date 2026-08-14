@@ -5,6 +5,7 @@ LIVE_DB_NAME="${1:-${LIVE_DB_NAME:-FiberaFRP_DB}}"
 SOURCE_CAMPAIGN_ID="${2:-}"
 WINDOW_MINUTES="${RECOVERY_WINDOW_MINUTES:-15}"
 EXPECTED_MESSAGES="${EXPECTED_MESSAGES:-0}"
+EXPECTED_RECIPIENTS="${EXPECTED_RECIPIENTS:-0}"
 PENDING_ACTION="${RECOVERY_PENDING_ACTION:-cancel}"
 CONFIG="${ODOO_CONFIG:-/etc/odoo/odoo.conf}"
 APPLY_RECOVERY="false"
@@ -20,6 +21,10 @@ if ! [[ "${WINDOW_MINUTES}" =~ ^[0-9]+$ ]] || [ "${WINDOW_MINUTES}" -lt 1 ]; the
 fi
 if ! [[ "${EXPECTED_MESSAGES}" =~ ^[0-9]+$ ]]; then
   echo "ERROR: EXPECTED_MESSAGES must be zero or a positive integer." >&2
+  exit 1
+fi
+if ! [[ "${EXPECTED_RECIPIENTS}" =~ ^[0-9]+$ ]]; then
+  echo "ERROR: EXPECTED_RECIPIENTS must be zero or a positive integer." >&2
   exit 1
 fi
 if [ "${PENDING_ACTION}" != "cancel" ] && [ "${PENDING_ACTION}" != "resume" ]; then
@@ -54,6 +59,7 @@ docker compose run --rm -T --no-deps \
   -e RECOVERY_SOURCE_CAMPAIGN_ID="${SOURCE_CAMPAIGN_ID}" \
   -e RECOVERY_WINDOW_MINUTES="${WINDOW_MINUTES}" \
   -e EXPECTED_MESSAGES="${EXPECTED_MESSAGES}" \
+  -e EXPECTED_RECIPIENTS="${EXPECTED_RECIPIENTS}" \
   -e RECOVERY_PENDING_ACTION="${PENDING_ACTION}" \
   -e APPLY_RECOVERY="${APPLY_RECOVERY}" \
   odoo \
@@ -69,6 +75,7 @@ result = env['whatsapp.campaign'].sudo().recover_deleted_campaign_messages(
     apply=apply_recovery,
     window_minutes=int(os.environ['RECOVERY_WINDOW_MINUTES']),
     expected_message_count=int(os.environ['EXPECTED_MESSAGES']),
+    expected_recipient_count=int(os.environ['EXPECTED_RECIPIENTS']),
     pending_action=os.environ['RECOVERY_PENDING_ACTION'],
 )
 if apply_recovery:
