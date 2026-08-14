@@ -3,10 +3,16 @@ set -euo pipefail
 
 LIVE_DB_NAME="${1:-${LIVE_DB_NAME:-FiberaFRP_DB}}"
 CAMPAIGN_ID="${2:-}"
+RECIPIENT_PHONE="$(printf '%s' "${3:-}" | tr -cd '0-9')"
 DB_USER="${POSTGRES_USER:-odoo}"
 
 if [ -n "${CAMPAIGN_ID}" ] && ! [[ "${CAMPAIGN_ID}" =~ ^[0-9]+$ ]]; then
   echo "ERROR: Campaign ID must be numeric." >&2
+  exit 1
+fi
+
+if [ -n "${3:-}" ] && [ -z "${RECIPIENT_PHONE}" ]; then
+  echo "ERROR: Recipient phone must contain digits." >&2
   exit 1
 fi
 
@@ -147,6 +153,38 @@ docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
     ORDER BY connections DESC;"
 
 echo
+echo "==> PostgreSQL waits"
+docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
+  "SELECT state,
+          COALESCE(wait_event_type, '') AS wait_type,
+          COALESCE(wait_event, '') AS wait_event,
+          count(*) AS connections
+     FROM pg_stat_activity
+    WHERE datname = ${LIVE_DB_SQL}
+    GROUP BY state, wait_event_type, wait_event
+    ORDER BY connections DESC;"
+
+echo
+echo "==> Odoo HTTP capacity"
+docker compose exec -T odoo sh -c \
+  'printf "ODOO_MAX_HTTP_THREADS=%s\n" "${ODOO_MAX_HTTP_THREADS:-unset}"' || true
+docker stats --no-stream odoo_app whatsapp_sidecar || true
+
+echo
+echo "==> Meta API throughput (last 30 minutes)"
+docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
+  "SELECT date_trunc('minute', create_date) AS minute,
+          count(*) AS attempts,
+          count(*) FILTER (WHERE status_code BETWEEN 200 AND 299) AS accepted,
+          round(avg(latency)::numeric, 1) AS avg_latency_ms,
+          max(latency) AS max_latency_ms
+     FROM whatsapp_api_log
+    WHERE create_date >= NOW() AT TIME ZONE 'UTC' - interval '30 minutes'
+    GROUP BY minute
+    ORDER BY minute DESC
+    LIMIT 30;"
+
+echo
 echo "==> Recent and active campaigns"
 docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
   "SELECT campaign.id,
@@ -232,6 +270,43 @@ if [ -n "${CAMPAIGN_ID}" ]; then
       ORDER BY id DESC;"
 fi
 
+if [ -n "${RECIPIENT_PHONE}" ]; then
+  echo
+  echo "==> Recipient identity and personalization source: ${RECIPIENT_PHONE}"
+  docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
+    "WITH latest_target AS (
+        SELECT id, account_id, partner_id, phone_number, template_name, body, create_date
+          FROM whatsapp_message
+         WHERE regexp_replace(COALESCE(phone_number, ''), '[^0-9]', '', 'g') = '${RECIPIENT_PHONE}'
+         ORDER BY id DESC
+         LIMIT 1
+     )
+     SELECT target.phone_number,
+            partner.id AS partner_id,
+            partner.name AS linked_odoo_name_used_for_template,
+            (
+              SELECT contact.name
+                FROM whatsapp_contact contact
+               WHERE contact.partner_id = target.partner_id
+                  OR regexp_replace(COALESCE(contact.phone_number, ''), '[^0-9]', '', 'g') = '${RECIPIENT_PHONE}'
+               ORDER BY (contact.partner_id = target.partner_id) DESC, contact.id DESC
+               LIMIT 1
+            ) AS imported_contact_name,
+            (
+              SELECT chat.whatsapp_profile_name
+                FROM whatsapp_chat chat
+               WHERE chat.account_id = target.account_id
+                 AND regexp_replace(COALESCE(chat.phone_number, ''), '[^0-9]', '', 'g') = '${RECIPIENT_PHONE}'
+               ORDER BY chat.id DESC
+               LIMIT 1
+            ) AS meta_whatsapp_profile_name,
+            target.template_name,
+            target.create_date AS latest_message_at,
+            left(replace(replace(COALESCE(target.body, ''), chr(10), ' '), chr(13), ' '), 220) AS latest_rendered_body
+       FROM latest_target target
+       LEFT JOIN res_partner partner ON partner.id = target.partner_id;"
+fi
+
 echo
 echo "==> Flow status"
 docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
@@ -281,7 +356,7 @@ docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
 echo
 echo "==> Recent Odoo/sidecar errors"
 docker logs --since 30m odoo_app 2>&1 | grep -Ei \
-  'WH-|webhook|ERROR|Traceback|CRITICAL|RPC_ERROR|OwlError|ParseError|Exception|Invalid Operation' || true
+  'WH-|webhook|ERROR|Traceback|CRITICAL|RPC_ERROR|OwlError|ParseError|Exception|Invalid Operation|PoolError|Connection Pool Is Full|can.t start new thread|SerializationFailure|UndefinedColumn' || true
 docker logs --since 30m whatsapp_sidecar 2>&1 | grep -Ei \
   'ERROR|Traceback|CRITICAL|Exception|Unhandled|ECONN|webhook|socket' || true
 

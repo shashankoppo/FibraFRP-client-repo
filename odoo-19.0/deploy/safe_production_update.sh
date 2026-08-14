@@ -5,8 +5,8 @@ LIVE_DB_NAME="${1:-${LIVE_DB_NAME:-}}"
 DB_USER="${POSTGRES_USER:-odoo}"
 CONFIG="${ODOO_CONFIG:-/etc/odoo/odoo.conf}"
 OUTPUT_DIR="${OUTPUT_DIR:-secure_backups}"
-INSTALL_MODULES="${INSTALL_MODULES:-elsx_client_restrictions,elsx_rebrand,elsx_attendance_tracking,elsx_face_attendance}"
-UPGRADE_MODULES="${UPGRADE_MODULES:-elsx_client_restrictions,elsx_rebrand,elsx_attendance_tracking,elsx_face_attendance}"
+INSTALL_MODULES="${INSTALL_MODULES:-elsx_client_restrictions,elsx_rebrand,elsx_attendance_tracking,elsx_face_attendance,elsx_whatsapp_marketing}"
+UPGRADE_MODULES="${UPGRADE_MODULES:-elsx_client_restrictions,elsx_rebrand,elsx_attendance_tracking,elsx_face_attendance,elsx_whatsapp_marketing}"
 EXTRA_INSTALL_MODULES="${EXTRA_INSTALL_MODULES:-}"
 EXTRA_UPGRADE_MODULES="${EXTRA_UPGRADE_MODULES:-}"
 
@@ -103,6 +103,28 @@ docker compose run --rm -T --no-deps odoo \
     -i "${ALL_INSTALL_MODULES}" \
     -u "${ALL_UPGRADE_MODULES}" \
     --stop-after-init
+
+case ",${ALL_INSTALL_MODULES},${ALL_UPGRADE_MODULES}," in
+  *",elsx_whatsapp_marketing,"*)
+    echo "==> Verifying required WhatsApp schema before restart"
+    REQUIRED_WHATSAPP_COLUMNS="$(
+      docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -Atc \
+        "SELECT COUNT(*)
+           FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'whatsapp_message'
+            AND column_name IN (
+              'is_campaign_message',
+              'campaign_origin_id',
+              'campaign_name_snapshot'
+            );"
+    )"
+    if [ "${REQUIRED_WHATSAPP_COLUMNS}" != "3" ]; then
+      echo "ERROR: WhatsApp schema is incomplete after upgrade; Odoo remains stopped to prevent RPC/500 errors." >&2
+      exit 1
+    fi
+    ;;
+esac
 
 echo "==> Starting Odoo and WhatsApp sidecar"
 docker compose up -d odoo sidecar

@@ -654,6 +654,11 @@ class WhatsAppCampaign(models.Model):
                 )
 
             add(bool(record.partner_ids), 'Recipients loaded', f"{len(record.partner_ids)} recipient(s) ready.")
+            add(
+                True,
+                'Recipient name personalization',
+                'Template name variables use the linked Odoo Contact Name; the Meta WhatsApp profile name labels the Team Inbox separately.',
+            )
             if record.excluded_count:
                 add(True, 'Audience exclusions applied', record.exclusion_notes or f"{record.excluded_count} excluded.", warn=True)
             else:

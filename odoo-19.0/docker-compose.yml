@@ -34,6 +34,8 @@ services:
       - DB_PORT=5432
       - DB_USER=${POSTGRES_USER:-odoo}
       - DB_PASSWORD=${POSTGRES_PASSWORD:-odoo}
+      # Preserve DB connections for cron and webhook workers during campaign bursts.
+      - ODOO_MAX_HTTP_THREADS=${ODOO_MAX_HTTP_THREADS:-24}
     volumes:
       - .:/opt/odoo
       - ./odoo.docker.conf:/etc/odoo/odoo.conf

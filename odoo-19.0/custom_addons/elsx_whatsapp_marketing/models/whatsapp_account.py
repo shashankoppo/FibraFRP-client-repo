@@ -812,54 +812,57 @@ class WhatsAppAccount(models.Model):
 
         now = fields.Datetime.now()
         try:
-            self.env.cr.execute("""
-                WITH locked_account AS (
-                    SELECT
-                        id,
-                        COALESCE(token_bucket_level, rate_limit_capacity, 1)::float AS token_bucket_level,
-                        token_bucket_last_fill,
-                        GREATEST(COALESCE(NULLIF(rate_limit_capacity, 0), 1), 1)::float AS capacity,
-                        GREATEST(COALESCE(rate_limit_fill_rate, 0), 0)::float AS fill_rate,
-                        COALESCE(daily_message_count, 0) AS daily_message_count,
-                        COALESCE(max_daily_limit, 0) AS max_daily_limit
-                    FROM whatsapp_account
-                    WHERE id = %s
-                    FOR UPDATE SKIP LOCKED
-                ),
-                computed AS (
-                    SELECT
-                        id,
-                        LEAST(
-                            capacity,
-                            CASE
-                                WHEN token_bucket_last_fill IS NULL THEN capacity
-                                ELSE token_bucket_level + (
-                                    EXTRACT(EPOCH FROM (%s::timestamp - token_bucket_last_fill)) * fill_rate
-                                )
-                            END
-                        ) AS available_level,
-                        daily_message_count,
-                        max_daily_limit
-                    FROM locked_account
-                ),
-                eligible AS (
-                    SELECT *
-                    FROM computed
-                    WHERE available_level >= 1.0
-                      AND max_daily_limit > 0
-                      AND daily_message_count < max_daily_limit
-                )
-                UPDATE whatsapp_account account
-                   SET token_bucket_level = eligible.available_level - 1.0,
-                       token_bucket_last_fill = %s,
-                       daily_message_count = account.daily_message_count + 1,
-                       write_uid = %s,
-                       write_date = NOW() AT TIME ZONE 'UTC'
-                  FROM eligible
-                 WHERE account.id = eligible.id
-             RETURNING account.id
-            """, (self.id, now, now, self.env.uid))
-            consumed = bool(self.env.cr.fetchone())
+            # A serialization failure must roll back only this lock attempt. Without
+            # a savepoint, PostgreSQL aborts the surrounding message transaction.
+            with self.env.cr.savepoint(flush=False):
+                self.env.cr.execute("""
+                    WITH locked_account AS (
+                        SELECT
+                            id,
+                            COALESCE(token_bucket_level, rate_limit_capacity, 1)::float AS token_bucket_level,
+                            token_bucket_last_fill,
+                            GREATEST(COALESCE(NULLIF(rate_limit_capacity, 0), 1), 1)::float AS capacity,
+                            GREATEST(COALESCE(rate_limit_fill_rate, 0), 0)::float AS fill_rate,
+                            COALESCE(daily_message_count, 0) AS daily_message_count,
+                            COALESCE(max_daily_limit, 0) AS max_daily_limit
+                        FROM whatsapp_account
+                        WHERE id = %s
+                        FOR UPDATE SKIP LOCKED
+                    ),
+                    computed AS (
+                        SELECT
+                            id,
+                            LEAST(
+                                capacity,
+                                CASE
+                                    WHEN token_bucket_last_fill IS NULL THEN capacity
+                                    ELSE token_bucket_level + (
+                                        EXTRACT(EPOCH FROM (%s::timestamp - token_bucket_last_fill)) * fill_rate
+                                    )
+                                END
+                            ) AS available_level,
+                            daily_message_count,
+                            max_daily_limit
+                        FROM locked_account
+                    ),
+                    eligible AS (
+                        SELECT *
+                        FROM computed
+                        WHERE available_level >= 1.0
+                          AND max_daily_limit > 0
+                          AND daily_message_count < max_daily_limit
+                    )
+                    UPDATE whatsapp_account account
+                       SET token_bucket_level = eligible.available_level - 1.0,
+                           token_bucket_last_fill = %s,
+                           daily_message_count = account.daily_message_count + 1,
+                           write_uid = %s,
+                           write_date = NOW() AT TIME ZONE 'UTC'
+                      FROM eligible
+                     WHERE account.id = eligible.id
+                 RETURNING account.id
+                """, (self.id, now, now, self.env.uid))
+                consumed = bool(self.env.cr.fetchone())
             self.invalidate_recordset(['token_bucket_level', 'token_bucket_last_fill', 'daily_message_count'])
             return consumed
         except Exception as exc:
