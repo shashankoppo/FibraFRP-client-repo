@@ -61,6 +61,34 @@ class WhatsAppCampaign(models.Model):
                     )
         return created
 
+    @api.model
+    def _wake_campaign_queue_cron(self):
+        """Make the campaign queue worker due now after queue creation or repair."""
+        cron = self.env.ref('elsx_whatsapp_marketing.ir_cron_process_whatsapp_queue', raise_if_not_found=False)
+        if not cron:
+            _logger.warning("WhatsApp campaign queue cron is missing; queued campaigns will need manual processing.")
+            return False
+
+        vals = {'active': True, 'nextcall': fields.Datetime.now()}
+        try:
+            cron.sudo().write(vals)
+        except Exception as exc:
+            _logger.warning("Could not wake WhatsApp campaign queue cron: %s", exc)
+            return False
+
+        trigger = getattr(cron.sudo(), '_trigger', None)
+        if trigger:
+            try:
+                trigger(at=fields.Datetime.now())
+            except TypeError:
+                try:
+                    trigger()
+                except Exception as exc:
+                    _logger.debug("WhatsApp campaign queue cron trigger skipped: %s", exc)
+            except Exception as exc:
+                _logger.debug("WhatsApp campaign queue cron trigger skipped: %s", exc)
+        return True
+
     name = fields.Char('Campaign Name', required=True)
     account_id = fields.Many2one('whatsapp.account', string='WhatsApp Account', required=True)
     
@@ -1156,6 +1184,8 @@ class WhatsAppCampaign(models.Model):
                 )
                 if messages_to_create:
                     self.state = 'scheduled' if scheduled_for_later else 'running'
+                    if not scheduled_for_later:
+                        self._wake_campaign_queue_cron()
                     _logger.info(
                         "Campaign %s queued %s messages and recorded %s preparation failure(s).",
                         self.name,
@@ -1215,7 +1245,7 @@ class WhatsAppCampaign(models.Model):
         auto_dispatch_failed = False
         if self.campaign_type == 'broadcast' and messages_to_create and not scheduled_for_later:
             launch_message += _(
-                " Delivery will continue in the background queue; refresh after a minute to see sent/delivered counts."
+                " Delivery will continue in the background queue now; refresh after a minute to see sent/delivered counts."
             )
 
         return {
@@ -1318,13 +1348,16 @@ class WhatsAppCampaign(models.Model):
                 _logger.error(f"Failed to process queued message: {e}")
                 
         # Optional: update state to completed if done
-        if not self.env['whatsapp.message'].search_count([
+        due_remaining_domain = [
             ('campaign_id', '=', self.id),
             '|',
                 ('status', 'in', ['draft', 'queued']),
                 '&', '&', ('status', '=', 'failed'), ('retry_count', '<', 5), ('next_retry_at', '!=', False),
-        ]):
+        ]
+        if not self.env['whatsapp.message'].search_count(due_remaining_domain):
             self.state = 'completed'
+        else:
+            self._wake_campaign_queue_cron()
             
         return {
             'type': 'ir.actions.client',
@@ -1408,13 +1441,21 @@ class WhatsAppCampaign(models.Model):
             ]):
                 campaign.state = 'completed'
         duration_ms = round((time.monotonic() - started) * 1000, 2)
-        remaining = self.env['whatsapp.message'].search_count([
+        due_remaining = self.env['whatsapp.message'].search_count([
+            ('campaign_id.state', 'in', ['running', 'scheduled']),
+            '|',
+                ('status', '=', 'draft'),
+                '&', ('status', '=', 'queued'), '|', ('next_retry_at', '=', False), ('next_retry_at', '<=', fields.Datetime.now()),
+        ])
+        total_remaining = self.env['whatsapp.message'].search_count([
             ('campaign_id.state', 'in', ['running', 'scheduled']),
             ('status', 'in', ['draft', 'queued']),
         ])
+        if due_remaining:
+            self._wake_campaign_queue_cron()
         _logger.info(
-            "[CRON-CAMPAIGN-QUEUE] processed=%s sent=%s failed=%s remaining=%s duration_ms=%s",
-            len(messages), sent_count, failed_count, remaining, duration_ms,
+            "[CRON-CAMPAIGN-QUEUE] processed=%s sent=%s failed=%s due_remaining=%s total_remaining=%s duration_ms=%s",
+            len(messages), sent_count, failed_count, due_remaining, total_remaining, duration_ms,
         )
 
     @api.model
@@ -1508,6 +1549,8 @@ class WhatsAppCampaign(models.Model):
                 'interval_type': interval_type,
                 'active': True,
             }
+            if xmlid == 'elsx_whatsapp_marketing.ir_cron_process_whatsapp_queue':
+                expected['nextcall'] = fields.Datetime.now()
             changes = {}
             for key, value in expected.items():
                 current = cron[key].id if key == 'model_id' else cron[key]

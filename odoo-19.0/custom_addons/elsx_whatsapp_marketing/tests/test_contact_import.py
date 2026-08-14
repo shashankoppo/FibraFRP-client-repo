@@ -2,6 +2,7 @@ import base64
 import json
 from unittest.mock import patch
 
+from odoo import fields
 from odoo.tests.common import TransactionCase
 
 from ..models.whatsapp_account import WhatsAppAccount
@@ -231,6 +232,10 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
         self.assertEqual(campaign.audience_source_count, 1)
 
     def test_campaign_delivery_crons_are_repaired(self):
+        stale_nextcall = fields.Datetime.subtract(fields.Datetime.now(), days=1)
+        queue_cron = self.env.ref('elsx_whatsapp_marketing.ir_cron_process_whatsapp_queue')
+        queue_cron.write({'active': False, 'nextcall': stale_nextcall})
+
         self.env['whatsapp.campaign']._repair_delivery_crons()
 
         queue_cron = self.env.ref('elsx_whatsapp_marketing.ir_cron_process_whatsapp_queue')
@@ -240,6 +245,7 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
         self.assertTrue(queue_cron.active)
         self.assertEqual(queue_cron.model_id.model, 'whatsapp.campaign')
         self.assertEqual(queue_cron.code, 'model._cron_process_global_queue()')
+        self.assertGreaterEqual(queue_cron.nextcall, stale_nextcall)
         self.assertTrue(retry_cron.active)
         self.assertEqual(retry_cron.model_id.model, 'whatsapp.message')
         self.assertTrue(direct_queue_cron.active)
