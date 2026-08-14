@@ -62,32 +62,27 @@ class WhatsAppCampaign(models.Model):
         return created
 
     @api.model
-    def _wake_campaign_queue_cron(self):
-        """Make the campaign queue worker due now after queue creation or repair."""
+    def _schedule_campaign_queue_cron(self, delay_seconds=60):
+        """Keep the campaign queue cron active without creating a tight loop."""
         cron = self.env.ref('elsx_whatsapp_marketing.ir_cron_process_whatsapp_queue', raise_if_not_found=False)
         if not cron:
             _logger.warning("WhatsApp campaign queue cron is missing; queued campaigns will need manual processing.")
             return False
 
-        vals = {'active': True, 'nextcall': fields.Datetime.now()}
+        delay_seconds = max(int(delay_seconds or 0), 0)
+        nextcall = fields.Datetime.now() + timedelta(seconds=delay_seconds)
+        vals = {'active': True, 'nextcall': nextcall}
         try:
             cron.sudo().write(vals)
         except Exception as exc:
-            _logger.warning("Could not wake WhatsApp campaign queue cron: %s", exc)
+            _logger.warning("Could not schedule WhatsApp campaign queue cron: %s", exc)
             return False
-
-        trigger = getattr(cron.sudo(), '_trigger', None)
-        if trigger:
-            try:
-                trigger(at=fields.Datetime.now())
-            except TypeError:
-                try:
-                    trigger()
-                except Exception as exc:
-                    _logger.debug("WhatsApp campaign queue cron trigger skipped: %s", exc)
-            except Exception as exc:
-                _logger.debug("WhatsApp campaign queue cron trigger skipped: %s", exc)
         return True
+
+    @api.model
+    def _wake_campaign_queue_cron(self):
+        """Make the campaign queue worker due soon after queue creation or repair."""
+        return self._schedule_campaign_queue_cron(delay_seconds=10)
 
     name = fields.Char('Campaign Name', required=True)
     account_id = fields.Many2one('whatsapp.account', string='WhatsApp Account', required=True)
@@ -1357,7 +1352,8 @@ class WhatsAppCampaign(models.Model):
         if not self.env['whatsapp.message'].search_count(due_remaining_domain):
             self.state = 'completed'
         else:
-            self._wake_campaign_queue_cron()
+            delay_minutes = max(int(self.batch_interval or 1), 1)
+            self._schedule_campaign_queue_cron(delay_seconds=delay_minutes * 60)
             
         return {
             'type': 'ir.actions.client',
@@ -1373,28 +1369,44 @@ class WhatsAppCampaign(models.Model):
     def _cron_process_global_queue(self):
         """
         Enterprise Background Worker: Runs every minute.
-        Fetches up to 500 draft messages and sends them to respect Meta API TPS limits.
-        Commits after each chunk to prevent massive rollbacks.
+        Processes each running campaign by its configured batch size and interval.
         """
         started = time.monotonic()
         now = fields.Datetime.now()
-        messages = self.env['whatsapp.message'].search([
-            ('campaign_id.state', 'in', ['running', 'scheduled']),
-            '|',
-                ('status', '=', 'draft'),
-                '&', ('status', '=', 'queued'), '|', ('next_retry_at', '=', False), ('next_retry_at', '<=', now),
-        ], limit=500, order='create_date asc')
-        
-        if not messages:
+        campaigns = self.search([
+            ('state', 'in', ['running', 'scheduled']),
+            ('message_ids.status', 'in', ['draft', 'queued']),
+        ], limit=20, order='create_date asc')
+
+        if not campaigns:
             _logger.debug("[CRON-CAMPAIGN-QUEUE] processed=0 duration_ms=0")
+            return
+
+        Message = self.env['whatsapp.message']
+        messages = Message.browse()
+        for campaign in campaigns:
+            if campaign.state == 'scheduled' and campaign.schedule_date and campaign.schedule_date > now:
+                continue
+            batch_size = max(int(campaign.batch_size or 50), 1)
+            messages |= Message.search([
+                ('campaign_id', '=', campaign.id),
+                '|',
+                    ('status', '=', 'draft'),
+                    '&', ('status', '=', 'queued'), '|', ('next_retry_at', '=', False), ('next_retry_at', '<=', now),
+            ], limit=batch_size, order='create_date asc')
+
+        if not messages:
+            _logger.debug("[CRON-CAMPAIGN-QUEUE] processed=0 due_campaigns=%s duration_ms=0", len(campaigns))
             return
 
         sent_count = 0
         failed_count = 0
+        processed_by_campaign = {}
         for msg in messages:
+            campaign = msg.campaign_id
+            processed_by_campaign[campaign.id] = processed_by_campaign.get(campaign.id, 0) + 1
             try:
                 with self.env.cr.savepoint():
-                    campaign = msg.campaign_id
                     if campaign and campaign.state == 'scheduled':
                         if campaign.schedule_date and campaign.schedule_date > fields.Datetime.now():
                             continue
@@ -1403,7 +1415,6 @@ class WhatsAppCampaign(models.Model):
                     msg.action_send()
                     if msg.status in ('sent', 'delivered', 'read'):
                         sent_count += 1
-                    # Enterprise Logic: Auto-Start Bot Flow
                     flow = msg.flow_id or (campaign.flow_id if campaign else False)
                     if flow and msg.status in ('sent', 'delivered', 'read'):
                         try:
@@ -1429,33 +1440,40 @@ class WhatsAppCampaign(models.Model):
                 except Exception as db_err:
                     _logger.error(f"Could not save failed state for cron message {msg.id}: {db_err}")
                 _logger.error(f"Failed to process queued message {msg.id}: {e}")
-                
-        # Check if campaigns have finished their drafts
-        campaigns = messages.mapped('campaign_id')
-        for campaign in campaigns:
-            if not self.env['whatsapp.message'].search_count([
+
+        touched_campaigns = messages.mapped('campaign_id')
+        for campaign in touched_campaigns:
+            remaining_count = Message.search_count([
                 ('campaign_id', '=', campaign.id),
                 '|',
                     ('status', 'in', ['draft', 'queued']),
                     '&', '&', ('status', '=', 'failed'), ('retry_count', '<', 5), ('next_retry_at', '!=', False),
-            ]):
+            ])
+            if not remaining_count:
                 campaign.state = 'completed'
-        duration_ms = round((time.monotonic() - started) * 1000, 2)
-        due_remaining = self.env['whatsapp.message'].search_count([
-            ('campaign_id.state', 'in', ['running', 'scheduled']),
-            '|',
-                ('status', '=', 'draft'),
-                '&', ('status', '=', 'queued'), '|', ('next_retry_at', '=', False), ('next_retry_at', '<=', fields.Datetime.now()),
-        ])
-        total_remaining = self.env['whatsapp.message'].search_count([
+                continue
+
+            delay_minutes = max(int(campaign.batch_interval or 1), 1)
+            next_batch_at = fields.Datetime.now() + timedelta(minutes=delay_minutes)
+            due_remaining = Message.search([
+                ('campaign_id', '=', campaign.id),
+                ('status', 'in', ['draft', 'queued']),
+                '|', ('next_retry_at', '=', False), ('next_retry_at', '<=', fields.Datetime.now()),
+            ])
+            if due_remaining:
+                due_remaining.write({'status': 'queued', 'next_retry_at': next_batch_at})
+
+        total_remaining = Message.search_count([
             ('campaign_id.state', 'in', ['running', 'scheduled']),
             ('status', 'in', ['draft', 'queued']),
         ])
-        if due_remaining:
-            self._wake_campaign_queue_cron()
+        if total_remaining:
+            self._schedule_campaign_queue_cron(delay_seconds=60)
+
+        duration_ms = round((time.monotonic() - started) * 1000, 2)
         _logger.info(
-            "[CRON-CAMPAIGN-QUEUE] processed=%s sent=%s failed=%s due_remaining=%s total_remaining=%s duration_ms=%s",
-            len(messages), sent_count, failed_count, due_remaining, total_remaining, duration_ms,
+            "[CRON-CAMPAIGN-QUEUE] campaigns=%s processed=%s sent=%s failed=%s total_remaining=%s duration_ms=%s batches=%s",
+            len(campaigns), len(messages), sent_count, failed_count, total_remaining, duration_ms, processed_by_campaign,
         )
 
     @api.model
