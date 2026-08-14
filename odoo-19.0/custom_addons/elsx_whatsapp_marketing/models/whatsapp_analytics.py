@@ -40,68 +40,95 @@ class WhatsAppAnalytics(models.Model):
     failed_count = fields.Integer('Failed')
     
     # Performance
-    delivery_rate = fields.Float('Delivery Rate %')
-    read_rate = fields.Float('Read Rate %')
-    failure_rate = fields.Float('Failure Rate %')
-    avg_latency = fields.Float('Avg Latency (ms)')
+    delivery_rate = fields.Float('Delivery Rate %', aggregator='avg')
+    read_rate = fields.Float('Read Rate %', aggregator='avg')
+    failure_rate = fields.Float('Failure Rate %', aggregator='avg')
+    avg_latency = fields.Float('Avg Latency (ms)', aggregator='avg')
     total_spend = fields.Float('Total Spend')
     opt_out_count = fields.Integer('Opt-outs')
     
     # Engagement
     unique_contacts = fields.Integer('Unique Contacts')
     conversations = fields.Integer('Conversations')
-    avg_response_time = fields.Float('Avg Response Time (hours)')
+    avg_response_time = fields.Float('Avg Response Time (hours)', aggregator='avg')
     
     # Campaign Stats
     campaign_count = fields.Integer('Campaigns Run')
     campaign_send_count = fields.Integer('Campaign Messages Sent')
-    campaign_delivery_rate = fields.Float('Campaign Delivery Rate %')
+    campaign_delivery_rate = fields.Float('Campaign Delivery Rate %', aggregator='avg')
     
     # Business Metrics
     revenue_attributed = fields.Float('Revenue Attributed')
-    cost_per_message = fields.Float('Cost per Message')
-    roi = fields.Float('ROI %')
+    cost_per_message = fields.Float('Cost per Message', aggregator='avg')
+    roi = fields.Float('ROI %', aggregator='avg')
 
     def init(self):
         from odoo import tools
         tools.drop_view_if_exists(self.env.cr, self._table)
         self.env.cr.execute("""
             CREATE OR REPLACE VIEW %s AS (
-                SELECT
-                    m.id AS id,
+                WITH daily AS (
+                    SELECT
+                    MIN(m.id) AS id,
                     m.account_id AS account_id,
-                    m.create_date AS period_start,
-                    m.create_date AS period_end,
-                    1 AS total_messages,
-                    CASE WHEN m.direction = 'inbound' THEN 1 ELSE 0 END AS inbound_count,
-                    CASE WHEN m.direction = 'outbound' THEN 1 ELSE 0 END AS outbound_count,
-                    CASE WHEN m.message_type = 'template' THEN 1 ELSE 0 END AS template_count,
-                    CASE WHEN m.message_type = 'text' THEN 1 ELSE 0 END AS text_count,
-                    CASE WHEN m.message_type = 'image' THEN 1 ELSE 0 END AS image_count,
-                    CASE WHEN m.message_type = 'video' THEN 1 ELSE 0 END AS video_count,
-                    CASE WHEN m.message_type = 'document' THEN 1 ELSE 0 END AS document_count,
-                    CASE WHEN m.message_type = 'audio' THEN 1 ELSE 0 END AS audio_count,
-                    CASE WHEN m.status IN ('sent', 'delivered', 'read') THEN 1 ELSE 0 END AS sent_count,
-                    CASE WHEN m.status IN ('delivered', 'read') THEN 1 ELSE 0 END AS delivered_count,
-                    CASE WHEN m.status = 'read' THEN 1 ELSE 0 END AS read_count,
-                    CASE WHEN m.status = 'failed' THEN 1 ELSE 0 END AS failed_count,
-                    m.latency_ms AS avg_latency,
-                    m.message_cost AS total_spend,
-                    CASE WHEN m.is_opt_out THEN 1 ELSE 0 END AS opt_out_count,
-                    0.0 AS delivery_rate,
-                    0.0 AS read_rate,
-                    0.0 AS failure_rate,
-                    1 AS unique_contacts,
-                    1 AS conversations,
+                    date_trunc('day', m.create_date) AS period_start,
+                    date_trunc('day', m.create_date) + interval '1 day' AS period_end,
+                    COUNT(*)::integer AS total_messages,
+                    COUNT(*) FILTER (WHERE m.direction = 'inbound')::integer AS inbound_count,
+                    COUNT(*) FILTER (WHERE m.direction = 'outbound')::integer AS outbound_count,
+                    COUNT(*) FILTER (WHERE m.message_type = 'template')::integer AS template_count,
+                    COUNT(*) FILTER (WHERE m.message_type = 'text')::integer AS text_count,
+                    COUNT(*) FILTER (WHERE m.message_type = 'image')::integer AS image_count,
+                    COUNT(*) FILTER (WHERE m.message_type = 'video')::integer AS video_count,
+                    COUNT(*) FILTER (WHERE m.message_type = 'document')::integer AS document_count,
+                    COUNT(*) FILTER (WHERE m.message_type = 'audio')::integer AS audio_count,
+                    COUNT(*) FILTER (
+                        WHERE m.direction = 'outbound' AND m.status IN ('sent', 'delivered', 'read')
+                    )::integer AS sent_count,
+                    COUNT(*) FILTER (
+                        WHERE m.direction = 'outbound' AND m.status IN ('delivered', 'read')
+                    )::integer AS delivered_count,
+                    COUNT(*) FILTER (
+                        WHERE m.direction = 'outbound' AND m.status = 'read'
+                    )::integer AS read_count,
+                    COUNT(*) FILTER (
+                        WHERE m.direction = 'outbound' AND m.status = 'failed'
+                    )::integer AS failed_count,
+                    COALESCE(AVG(m.latency_ms) FILTER (WHERE m.direction = 'outbound'), 0.0) AS avg_latency,
+                    COALESCE(SUM(m.message_cost) FILTER (WHERE m.direction = 'outbound'), 0.0) AS total_spend,
+                    COUNT(*) FILTER (WHERE m.is_opt_out)::integer AS opt_out_count,
+                    COUNT(DISTINCT COALESCE(m.partner_id::text, NULLIF(m.phone_number, '')))::integer AS unique_contacts,
+                    COUNT(DISTINCT COALESCE(NULLIF(m.conversation_id, ''), m.account_id::text || ':' || m.phone_number))::integer AS conversations,
                     0.0 AS avg_response_time,
-                    0 AS campaign_count,
-                    0 AS campaign_send_count,
-                    0.0 AS campaign_delivery_rate,
+                    COUNT(DISTINCT m.campaign_id) FILTER (WHERE m.campaign_id IS NOT NULL)::integer AS campaign_count,
+                    COUNT(*) FILTER (
+                        WHERE m.campaign_id IS NOT NULL
+                          AND m.direction = 'outbound'
+                          AND m.status IN ('sent', 'delivered', 'read')
+                    )::integer AS campaign_send_count,
                     0.0 AS revenue_attributed,
-                    0.0 AS cost_per_message,
                     0.0 AS roi
-                FROM
-                    whatsapp_message m
+                    FROM whatsapp_message m
+                    GROUP BY m.account_id, date_trunc('day', m.create_date)
+                )
+                SELECT
+                    daily.*,
+                    CASE WHEN sent_count > 0 THEN delivered_count * 100.0 / sent_count ELSE 0.0 END AS delivery_rate,
+                    CASE WHEN sent_count > 0 THEN read_count * 100.0 / sent_count ELSE 0.0 END AS read_rate,
+                    CASE WHEN sent_count + failed_count > 0
+                        THEN failed_count * 100.0 / (sent_count + failed_count) ELSE 0.0 END AS failure_rate,
+                    CASE WHEN campaign_send_count > 0 THEN (
+                        SELECT COUNT(*) * 100.0 / daily.campaign_send_count
+                        FROM whatsapp_message campaign_message
+                        WHERE campaign_message.account_id = daily.account_id
+                          AND campaign_message.create_date >= daily.period_start
+                          AND campaign_message.create_date < daily.period_end
+                          AND campaign_message.campaign_id IS NOT NULL
+                          AND campaign_message.direction = 'outbound'
+                          AND campaign_message.status IN ('delivered', 'read')
+                    ) ELSE 0.0 END AS campaign_delivery_rate,
+                    CASE WHEN outbound_count > 0 THEN total_spend / outbound_count ELSE 0.0 END AS cost_per_message
+                FROM daily
             )
         """ % (self._table,))
 

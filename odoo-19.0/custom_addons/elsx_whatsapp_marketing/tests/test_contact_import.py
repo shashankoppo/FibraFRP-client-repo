@@ -634,6 +634,84 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
         self.assertFalse(queued.next_retry_at)
         self.assertFalse(reference.message_ids)
 
+    def test_deleted_campaign_recovery_can_resume_exact_existing_queue(self):
+        partners = self.env['res.partner'].with_context(skip_whatsapp_contact_sync=True).create([
+            {'name': 'Recovered Delivered Recipient', 'phone': '919881936108'},
+            {'name': 'Recovered Queued Recipient', 'phone': '919881936109'},
+        ])
+        reference = self.env['whatsapp.campaign'].create({
+            'name': 'Reference Resume Copy',
+            'account_id': self.account.id,
+            'campaign_type': 'broadcast',
+            'target_type': 'manual',
+            'partner_ids': [(6, 0, partners.ids)],
+            'message_body': 'Resume recovery content',
+        })
+        deleted = reference.copy({'name': 'Deleted Active Campaign'})
+        delivered, queued = self.env['whatsapp.message'].create([
+            {
+                'account_id': self.account.id,
+                'campaign_id': deleted.id,
+                'partner_id': partners[0].id,
+                'phone_number': partners[0].phone,
+                'direction': 'outbound',
+                'status': 'delivered',
+                'body': 'Resume recovery content',
+            },
+            {
+                'account_id': self.account.id,
+                'campaign_id': deleted.id,
+                'partner_id': partners[1].id,
+                'phone_number': partners[1].phone,
+                'direction': 'outbound',
+                'status': 'queued',
+                'body': 'Resume recovery content',
+            },
+        ])
+        original_campaign_id = deleted.id
+        (delivered | queued).write({'campaign_id': False})
+        queued.write({
+            'status': 'cancelled',
+            'error_message': 'Delivery stopped automatically because the original campaign was deleted.',
+        })
+        deleted.unlink()
+
+        mismatch = self.env['whatsapp.campaign'].recover_deleted_campaign_messages(
+            reference.id,
+            apply=False,
+            expected_message_count=3,
+            pending_action='resume',
+        )
+        self.assertFalse(mismatch['expected_count_matches'])
+        with self.assertRaises(UserError):
+            self.env['whatsapp.campaign'].recover_deleted_campaign_messages(
+                reference.id,
+                apply=True,
+                expected_message_count=3,
+                pending_action='resume',
+            )
+
+        result = self.env['whatsapp.campaign'].recover_deleted_campaign_messages(
+            reference.id,
+            apply=True,
+            expected_message_count=2,
+            pending_action='resume',
+        )
+        recovered = self.env['whatsapp.campaign'].browse(result['recovered_campaign_id'])
+        (delivered | queued).invalidate_recordset([
+            'campaign_id', 'campaign_origin_id', 'campaign_name_snapshot', 'status',
+        ])
+
+        self.assertEqual(recovered.state, 'running')
+        self.assertEqual(recovered.delivered_count, 1)
+        self.assertEqual(queued.status, 'queued')
+        self.assertEqual(delivered.campaign_id, recovered)
+        self.assertEqual(queued.campaign_id, recovered)
+        self.assertEqual(delivered.campaign_origin_id, original_campaign_id)
+        self.assertEqual(delivered.campaign_name_snapshot, 'Deleted Active Campaign')
+        self.assertEqual(result['pending_resumed'], 1)
+        self.assertEqual(result['quarantined_resumed'], 1)
+
     def test_duplicate_campaign_is_clean_draft_with_configuration(self):
         partner = self.env['res.partner'].with_context(skip_whatsapp_contact_sync=True).create({
             'name': 'Duplicate Recipient',

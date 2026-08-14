@@ -183,13 +183,25 @@ class WhatsAppCampaign(models.Model):
         return len(pending) + len(retryable_failed)
 
     @api.model
-    def recover_deleted_campaign_messages(self, source_campaign_id, apply=False, window_minutes=15):
+    def recover_deleted_campaign_messages(
+        self,
+        source_campaign_id,
+        apply=False,
+        window_minutes=15,
+        expected_message_count=0,
+        pending_action='cancel',
+    ):
         """Rebuild a deleted campaign from its detached message rows without sending."""
         try:
             source_campaign_id = int(source_campaign_id)
             window_minutes = max(int(window_minutes or 15), 1)
+            expected_message_count = max(int(expected_message_count or 0), 0)
         except (TypeError, ValueError):
-            raise UserError(_('Campaign ID and recovery window must be numeric.'))
+            raise UserError(_(
+                'Campaign ID, recovery window, and expected message count must be numeric.'
+            ))
+        if pending_action not in ('cancel', 'resume'):
+            raise UserError(_('Pending action must be either cancel or resume.'))
 
         source = self.sudo().browse(source_campaign_id).exists()
         if not source:
@@ -224,6 +236,17 @@ class WhatsAppCampaign(models.Model):
                 'Run the WhatsApp module upgrade before recovery.'
             ) % source.display_name)
 
+        # Prefer the immutable provenance left by the deleted campaign. The time
+        # window remains a second boundary for legacy rows without provenance.
+        anchor_candidate = candidates[0]
+        cohort_key = (
+            anchor_candidate.campaign_origin_id or 0,
+            anchor_candidate.campaign_name_snapshot or '',
+        )
+        candidates = candidates.filtered(lambda message: (
+            message.campaign_origin_id or 0,
+            message.campaign_name_snapshot or '',
+        ) == cohort_key)
         anchor = candidates[0].create_date
         window_start = anchor - timedelta(minutes=window_minutes)
         messages = candidates.filtered(lambda message: message.create_date >= window_start)
@@ -232,63 +255,118 @@ class WhatsAppCampaign(models.Model):
             for status in dict(Message._fields['status'].selection)
         }
         status_counts = {status: count for status, count in status_counts.items() if count}
+        pending = messages.filtered(lambda message: message.status in ('draft', 'queued'))
+        accepted_pending = pending.filtered('message_id')
+        unsent_pending = pending - accepted_pending
+        quarantine_reason = _(
+            'Delivery stopped automatically because the original campaign was deleted.'
+        )
+        quarantined = messages.filtered(lambda message: (
+            message.status == 'cancelled'
+            and not message.message_id
+            and message.error_message == quarantine_reason
+        ))
+        retryable_failed = messages.filtered(
+            lambda message: message.status == 'failed' and message.next_retry_at
+        )
         result = {
             'apply': bool(apply),
             'reference_campaign_id': source.id,
             'reference_campaign': source.display_name,
             'anchor_utc': fields.Datetime.to_string(anchor),
+            'first_message_utc': fields.Datetime.to_string(min(messages.mapped('create_date'))),
+            'original_campaign_id': cohort_key[0] or False,
+            'original_campaign': cohort_key[1] or False,
             'window_minutes': window_minutes,
             'message_count': len(messages),
+            'expected_message_count': expected_message_count or False,
+            'expected_count_matches': not expected_message_count or len(messages) == expected_message_count,
             'partner_count': len(messages.mapped('partner_id')),
+            'meta_accepted_count': len(messages.filtered('message_id')),
+            'unsent_pending_count': len(unsent_pending),
+            'quarantined_pending_count': len(quarantined),
+            'retryable_failed_count': len(retryable_failed),
+            'pending_action': pending_action,
             'statuses_before': status_counts,
         }
         if not apply:
             return result
+        if expected_message_count and len(messages) != expected_message_count:
+            raise UserError(_(
+                'Recovery stopped before making changes: matched %(matched)s messages, '
+                'but %(expected)s were expected. Adjust the recovery window or reference '
+                'campaign and run a dry run again.'
+            ) % {
+                'matched': len(messages),
+                'expected': expected_message_count,
+            })
 
-        pending = messages.filtered(lambda message: message.status in ('draft', 'queued'))
-        if pending:
-            pending.write({
+        if accepted_pending:
+            accepted_pending.write({
+                'status': 'sent',
+                'error_message': False,
+                'next_retry_at': False,
+            })
+        if pending_action == 'resume':
+            if quarantined:
+                quarantined.write({
+                    'status': 'queued',
+                    'error_message': False,
+                    'next_retry_at': False,
+                })
+        elif unsent_pending:
+            unsent_pending.write({
                 'status': 'cancelled',
                 'next_retry_at': False,
                 'error_message': _(
                     'Unsent work was stopped while recovering the deleted campaign.'
                 ),
             })
-        retryable_failed = messages.filtered(
-            lambda message: message.status == 'failed' and message.next_retry_at
-        )
-        if retryable_failed:
+        if retryable_failed and pending_action == 'cancel':
             retryable_failed.write({'next_retry_at': False})
 
         anchor_label = fields.Datetime.to_string(anchor)
         recovered = source.copy({
             'name': _('%s (Recovered %s)') % (source.name, anchor_label),
         })
+        resumable = unsent_pending | quarantined | retryable_failed
+        recovered_state = 'running' if pending_action == 'resume' and resumable else (
+            'completed' if pending_action == 'resume' else 'cancelled'
+        )
         recovered.write({
-            'state': 'cancelled',
+            'state': recovered_state,
             'schedule_type': 'immediate',
             'schedule_date': False,
             'last_batch_at': False,
             'preflight_state': 'warning',
             'preflight_checked_at': fields.Datetime.now(),
             'preflight_report': _(
-                'Recovered from a deleted campaign. Accepted delivery history was preserved; '
-                '%s unsent message(s) were cancelled and no messages were sent by recovery.'
-            ) % len(pending),
+                'Recovered from a deleted campaign. Accepted delivery history was preserved. '
+                '%(pending)s existing pending message(s) were %(action)s; recovery itself '
+                'created and sent no messages.'
+            ) % {
+                'pending': len(resumable),
+                'action': _('reattached for normal queue processing')
+                if pending_action == 'resume' else _('cancelled'),
+            },
         })
         messages.write({
             'campaign_id': recovered.id,
             'is_campaign_message': True,
-            'campaign_origin_id': recovered.id,
-            'campaign_name_snapshot': recovered.name,
         })
         recovered._compute_statistics()
+        if recovered.state == 'running':
+            recovered._wake_campaign_queue_cron()
 
         result.update({
             'recovered_campaign_id': recovered.id,
             'recovered_campaign': recovered.display_name,
-            'pending_cancelled': len(pending),
-            'retries_stopped': len(retryable_failed),
+            'recovered_state': recovered.state,
+            'pending_cancelled': len(unsent_pending) if pending_action == 'cancel' else 0,
+            'pending_resumed': len(unsent_pending | quarantined) if pending_action == 'resume' else 0,
+            'accepted_pending_normalized': len(accepted_pending),
+            'quarantined_resumed': len(quarantined) if pending_action == 'resume' else 0,
+            'retries_stopped': len(retryable_failed) if pending_action == 'cancel' else 0,
         })
         _logger.warning('Recovered deleted WhatsApp campaign: %s', result)
         return result

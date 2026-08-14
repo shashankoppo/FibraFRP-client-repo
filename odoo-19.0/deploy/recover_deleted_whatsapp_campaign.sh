@@ -4,6 +4,8 @@ set -euo pipefail
 LIVE_DB_NAME="${1:-${LIVE_DB_NAME:-FiberaFRP_DB}}"
 SOURCE_CAMPAIGN_ID="${2:-}"
 WINDOW_MINUTES="${RECOVERY_WINDOW_MINUTES:-15}"
+EXPECTED_MESSAGES="${EXPECTED_MESSAGES:-0}"
+PENDING_ACTION="${RECOVERY_PENDING_ACTION:-cancel}"
 CONFIG="${ODOO_CONFIG:-/etc/odoo/odoo.conf}"
 APPLY_RECOVERY="false"
 RESTART_SERVICES="false"
@@ -14,6 +16,14 @@ if ! [[ "${SOURCE_CAMPAIGN_ID}" =~ ^[0-9]+$ ]]; then
 fi
 if ! [[ "${WINDOW_MINUTES}" =~ ^[0-9]+$ ]] || [ "${WINDOW_MINUTES}" -lt 1 ]; then
   echo "ERROR: RECOVERY_WINDOW_MINUTES must be a positive integer." >&2
+  exit 1
+fi
+if ! [[ "${EXPECTED_MESSAGES}" =~ ^[0-9]+$ ]]; then
+  echo "ERROR: EXPECTED_MESSAGES must be zero or a positive integer." >&2
+  exit 1
+fi
+if [ "${PENDING_ACTION}" != "cancel" ] && [ "${PENDING_ACTION}" != "resume" ]; then
+  echo "ERROR: RECOVERY_PENDING_ACTION must be cancel or resume." >&2
   exit 1
 fi
 if [ "${CONFIRM_RECOVERY:-NO}" = "YES" ]; then
@@ -43,6 +53,8 @@ fi
 docker compose run --rm -T --no-deps \
   -e RECOVERY_SOURCE_CAMPAIGN_ID="${SOURCE_CAMPAIGN_ID}" \
   -e RECOVERY_WINDOW_MINUTES="${WINDOW_MINUTES}" \
+  -e EXPECTED_MESSAGES="${EXPECTED_MESSAGES}" \
+  -e RECOVERY_PENDING_ACTION="${PENDING_ACTION}" \
   -e APPLY_RECOVERY="${APPLY_RECOVERY}" \
   odoo \
   python3 /opt/odoo/odoo-bin shell \
@@ -56,6 +68,8 @@ result = env['whatsapp.campaign'].sudo().recover_deleted_campaign_messages(
     int(os.environ['RECOVERY_SOURCE_CAMPAIGN_ID']),
     apply=apply_recovery,
     window_minutes=int(os.environ['RECOVERY_WINDOW_MINUTES']),
+    expected_message_count=int(os.environ['EXPECTED_MESSAGES']),
+    pending_action=os.environ['RECOVERY_PENDING_ACTION'],
 )
 if apply_recovery:
     env.cr.commit()
@@ -67,5 +81,9 @@ PY
 if [ "${APPLY_RECOVERY}" = "true" ]; then
   restart_services
   RESTART_SERVICES="false"
-  echo "==> Recovery complete. The recovered campaign is Cancelled and cannot send pending rows."
+  if [ "${PENDING_ACTION}" = "resume" ]; then
+    echo "==> Recovery complete. Existing pending rows were reattached for normal processing."
+  else
+    echo "==> Recovery complete. The recovered campaign is Cancelled and cannot send pending rows."
+  fi
 fi

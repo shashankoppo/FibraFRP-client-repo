@@ -1464,8 +1464,10 @@ class WhatsAppMessage(models.Model):
             ('chat_id_ref', '=', False),
         ])
         if orphaned:
-            orphaned.write({
+            orphaned.filtered(lambda message: not message.is_campaign_message).write({
                 'is_campaign_message': True,
+            })
+            orphaned.filtered(lambda message: not message.campaign_name_snapshot).write({
                 'campaign_name_snapshot': _('Deleted campaign (legacy recovery)'),
             })
 
