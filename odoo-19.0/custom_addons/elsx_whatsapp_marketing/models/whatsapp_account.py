@@ -901,12 +901,25 @@ class WhatsAppAccount(models.Model):
             raise UserError(_("Meta accepted the media upload but did not return a media ID."))
         return media_id
 
-    def _replace_private_media_links(self, value, filename=False, uploaded=None):
+    def _replace_private_media_links(
+        self,
+        value,
+        filename=False,
+        uploaded=None,
+        fallback_media_file=False,
+        fallback_media_url=False,
+    ):
         """Replace authenticated Meta links anywhere in a message payload."""
         uploaded = uploaded if uploaded is not None else {}
         if isinstance(value, list):
             for item in value:
-                self._replace_private_media_links(item, filename=filename, uploaded=uploaded)
+                self._replace_private_media_links(
+                    item,
+                    filename=filename,
+                    uploaded=uploaded,
+                    fallback_media_file=fallback_media_file,
+                    fallback_media_url=fallback_media_url,
+                )
             return value
         if not isinstance(value, dict):
             return value
@@ -920,16 +933,36 @@ class WhatsAppAccount(models.Model):
                 continue
             cache_key = (media_link, media_type)
             if cache_key not in uploaded:
-                uploaded[cache_key] = self._download_and_upload_private_media(
-                    media_link,
-                    media_type,
-                    media_object.get('filename') or filename,
+                use_fallback = (
+                    fallback_media_file
+                    and (
+                        not fallback_media_url
+                        or media_link == str(fallback_media_url).strip()
+                    )
                 )
+                if use_fallback:
+                    uploaded[cache_key] = self._upload_media_to_meta(
+                        fallback_media_file,
+                        media_object.get('filename') or filename,
+                        media_type,
+                    )
+                else:
+                    uploaded[cache_key] = self._download_and_upload_private_media(
+                        media_link,
+                        media_type,
+                        media_object.get('filename') or filename,
+                    )
             media_object.pop('link', None)
             media_object['id'] = uploaded[cache_key]
 
         for nested in value.values():
-            self._replace_private_media_links(nested, filename=filename, uploaded=uploaded)
+            self._replace_private_media_links(
+                nested,
+                filename=filename,
+                uploaded=uploaded,
+                fallback_media_file=fallback_media_file,
+                fallback_media_url=fallback_media_url,
+            )
         return value
 
     def send_message(self, to_number, message_type='text', **kwargs):
@@ -997,11 +1030,23 @@ class WhatsAppAccount(models.Model):
                 }
             
             if template_payload:
+                template_record = kwargs.get('template_record')
                 template_payload = self._replace_private_media_links(
                     copy.deepcopy(template_payload),
                     filename=(
                         kwargs.get('header_media_filename')
                         or (existing_msg.media_filename if existing_msg else False)
+                        or (template_record.header_media_filename if template_record else False)
+                    ),
+                    fallback_media_file=(
+                        kwargs.get('header_media_file')
+                        or (existing_msg.media_file if existing_msg else False)
+                        or (template_record.header_media_file if template_record else False)
+                    ),
+                    fallback_media_url=(
+                        kwargs.get('header_media_url')
+                        or (existing_msg.media_url if existing_msg else False)
+                        or (template_record.header_media_url if template_record else False)
                     ),
                 )
                 # Ensure components key is omitted entirely if empty for Meta API stability (Prevents 131009 error)

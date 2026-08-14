@@ -96,6 +96,33 @@ class TestPrivateMediaRecovery(TransactionCase):
         self.assertEqual(upload.call_args.args[0], base64.b64encode(b'video-bytes'))
         self.assertEqual(upload.call_args.args[1:], ('campaign.mp4', 'video'))
 
+    def test_matching_expired_link_uses_local_file(self):
+        media_url = 'https://scontent.whatsapp.net/v/t62/expired.mp4'
+        media_file = base64.b64encode(b'local-video-bytes')
+        payload = {'video': {'link': media_url}}
+
+        with (
+            patch.object(
+                WhatsAppAccount,
+                '_upload_media_to_meta',
+                return_value='reuploaded-media-id',
+            ) as upload,
+            patch.object(
+                WhatsAppAccount,
+                '_download_and_upload_private_media',
+            ) as download,
+        ):
+            result = self.account._replace_private_media_links(
+                payload,
+                filename='campaign.mp4',
+                fallback_media_file=media_file,
+                fallback_media_url=media_url,
+            )
+
+        self.assertEqual(result['video'], {'id': 'reuploaded-media-id'})
+        upload.assert_called_once_with(media_file, 'campaign.mp4', 'video')
+        download.assert_not_called()
+
     def test_upload_uses_mime_type(self):
         response = Mock(
             status_code=200,
