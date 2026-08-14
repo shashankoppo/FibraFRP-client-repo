@@ -182,6 +182,132 @@ class WhatsAppCampaign(models.Model):
         )
         return len(pending) + len(retryable_failed)
 
+    @api.model
+    def recover_deleted_campaign_messages(self, source_campaign_id, apply=False, window_minutes=15):
+        """Rebuild a deleted campaign from its detached message rows without sending."""
+        try:
+            source_campaign_id = int(source_campaign_id)
+            window_minutes = max(int(window_minutes or 15), 1)
+        except (TypeError, ValueError):
+            raise UserError(_('Campaign ID and recovery window must be numeric.'))
+
+        source = self.sudo().browse(source_campaign_id).exists()
+        if not source:
+            raise UserError(_('Reference campaign %s was not found.') % source_campaign_id)
+        source.ensure_one()
+
+        Message = self.env['whatsapp.message'].sudo()
+        domain = [
+            ('direction', '=', 'outbound'),
+            ('campaign_id', '=', False),
+            ('chat_id_ref', '=', False),
+            ('is_campaign_message', '=', True),
+            ('account_id', '=', source.account_id.id),
+        ]
+        if source.partner_ids:
+            domain.append(('partner_id', 'in', source.partner_ids.ids))
+        candidates = Message.search(domain, order='create_date desc, id desc')
+
+        templates = source.template_id | source.template_id_b
+        if templates:
+            template_ids = set(templates.ids)
+            template_names = set(filter(None, templates.mapped('meta_template_name')))
+            template_names.update(filter(None, templates.mapped('name')))
+            candidates = candidates.filtered(
+                lambda message: message.template_id.id in template_ids
+                or message.template_name in template_names
+            )
+
+        if not candidates:
+            raise UserError(_(
+                'No detached campaign messages match reference campaign %s. '
+                'Run the WhatsApp module upgrade before recovery.'
+            ) % source.display_name)
+
+        anchor = candidates[0].create_date
+        window_start = anchor - timedelta(minutes=window_minutes)
+        messages = candidates.filtered(lambda message: message.create_date >= window_start)
+        status_counts = {
+            status: len(messages.filtered(lambda message, value=status: message.status == value))
+            for status in dict(Message._fields['status'].selection)
+        }
+        status_counts = {status: count for status, count in status_counts.items() if count}
+        result = {
+            'apply': bool(apply),
+            'reference_campaign_id': source.id,
+            'reference_campaign': source.display_name,
+            'anchor_utc': fields.Datetime.to_string(anchor),
+            'window_minutes': window_minutes,
+            'message_count': len(messages),
+            'partner_count': len(messages.mapped('partner_id')),
+            'statuses_before': status_counts,
+        }
+        if not apply:
+            return result
+
+        pending = messages.filtered(lambda message: message.status in ('draft', 'queued'))
+        if pending:
+            pending.write({
+                'status': 'cancelled',
+                'next_retry_at': False,
+                'error_message': _(
+                    'Unsent work was stopped while recovering the deleted campaign.'
+                ),
+            })
+        retryable_failed = messages.filtered(
+            lambda message: message.status == 'failed' and message.next_retry_at
+        )
+        if retryable_failed:
+            retryable_failed.write({'next_retry_at': False})
+
+        anchor_label = fields.Datetime.to_string(anchor)
+        recovered = source.copy({
+            'name': _('%s (Recovered %s)') % (source.name, anchor_label),
+        })
+        recovered.write({
+            'state': 'cancelled',
+            'schedule_type': 'immediate',
+            'schedule_date': False,
+            'last_batch_at': False,
+            'preflight_state': 'warning',
+            'preflight_checked_at': fields.Datetime.now(),
+            'preflight_report': _(
+                'Recovered from a deleted campaign. Accepted delivery history was preserved; '
+                '%s unsent message(s) were cancelled and no messages were sent by recovery.'
+            ) % len(pending),
+        })
+        messages.write({
+            'campaign_id': recovered.id,
+            'is_campaign_message': True,
+            'campaign_origin_id': recovered.id,
+            'campaign_name_snapshot': recovered.name,
+        })
+        recovered._compute_statistics()
+
+        result.update({
+            'recovered_campaign_id': recovered.id,
+            'recovered_campaign': recovered.display_name,
+            'pending_cancelled': len(pending),
+            'retries_stopped': len(retryable_failed),
+        })
+        _logger.warning('Recovered deleted WhatsApp campaign: %s', result)
+        return result
+
+    def unlink(self):
+        """Preserve campaign delivery history; operators should cancel or archive it."""
+        ScheduledCampaign = self.env['whatsapp.scheduled.campaign'].sudo()
+        protected = self.filtered(
+            lambda campaign: campaign.message_ids
+            or campaign.participant_ids
+            or ScheduledCampaign.search_count([('campaign_id', '=', campaign.id)])
+        )
+        if protected:
+            raise UserError(_(
+                'Campaigns with messages, participants, or schedules cannot be deleted. '
+                'Cancel or archive them so delivery history and queue ownership remain intact.'
+            ))
+        return super().unlink()
+
     def copy_data(self, default=None):
         """Duplicate campaign configuration as a clean, unsent draft."""
         defaults = dict(default or {})

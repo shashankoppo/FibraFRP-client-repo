@@ -1006,6 +1006,11 @@ class WhatsAppAccount(models.Model):
         self.ensure_one()
         to_number = self.env['whatsapp.message']._normalize_phone(to_number, account=self, strict=True)
         existing_msg = kwargs.get('existing_message')
+        if existing_msg and existing_msg.is_campaign_message and not existing_msg.campaign_id:
+            raise UserError(_(
+                'Detached campaign message blocked before API dispatch. '
+                'Recover or archive its campaign before taking any delivery action.'
+            ))
         partner_id = kwargs.get('partner_id') or (existing_msg.partner_id.id if existing_msg and existing_msg.partner_id else False)
         campaign_id = kwargs.get('campaign_id') or (existing_msg.campaign_id.id if existing_msg and existing_msg.campaign_id else False)
         flow_id = kwargs.get('flow_id') or (existing_msg.flow_id.id if existing_msg and existing_msg.flow_id else False)

@@ -52,7 +52,11 @@ def _should_notify_realtime(message):
     """Queued campaign records are queue state, not live chat events yet."""
     if message.status in ('draft', 'queued'):
         return False
-    if message.campaign_id and message.direction == 'outbound' and not message.chat_id_ref:
+    if (
+        (message.campaign_id or message.is_campaign_message)
+        and message.direction == 'outbound'
+        and not message.chat_id_ref
+    ):
         return False
     return True
 
@@ -259,8 +263,14 @@ class WhatsAppMessage(models.Model):
     parent_id = fields.Many2one('whatsapp.message', string='Replying To', ondelete='set null')
     parent_message_id = fields.Char('Meta Parent ID', help='Original wamid being replied to')
 
-    # Campaign relation
-    campaign_id = fields.Many2one('whatsapp.campaign', string='Campaign', ondelete='set null')
+    # Keep campaign ownership independently so detached bulk rows can never be
+    # mistaken for direct one-to-one messages.
+    campaign_id = fields.Many2one('whatsapp.campaign', string='Campaign', ondelete='restrict')
+    is_campaign_message = fields.Boolean(
+        'Campaign Message', default=False, index=True, copy=False, readonly=True,
+    )
+    campaign_origin_id = fields.Integer('Original Campaign ID', index=True, copy=False, readonly=True)
+    campaign_name_snapshot = fields.Char('Original Campaign', copy=False, readonly=True)
     flow_id = fields.Many2one('whatsapp.bot.flow', string='Auto-Start Flow', ondelete='set null')
     ab_test_version = fields.Selection([
         ('a', 'Version A'),
@@ -539,7 +549,15 @@ class WhatsAppMessage(models.Model):
 
             # Skip chat creation for campaign/bulk messages â€” they are marketing blasts,
             # not conversations. A chat will be created when the customer replies.
-            is_campaign = bool(vals.get('campaign_id'))
+            campaign = False
+            if vals.get('campaign_id'):
+                campaign = self.env['whatsapp.campaign'].sudo().browse(vals['campaign_id']).exists()
+                vals['is_campaign_message'] = True
+                vals['campaign_origin_id'] = campaign.id or vals['campaign_id']
+                if campaign:
+                    vals['campaign_name_snapshot'] = campaign.name
+
+            is_campaign = bool(campaign or vals.get('is_campaign_message'))
             if not is_campaign and not vals.get('chat_id_ref') and vals.get('phone_number') and vals.get('account_id'):
                 # Link to existing chat or create new one
                 chat = self.env['whatsapp.chat'].sudo()._get_or_create_chat(vals['account_id'], vals['phone_number'])
@@ -604,6 +622,13 @@ class WhatsAppMessage(models.Model):
         return messages
 
     def write(self, vals):
+        if vals.get('campaign_id'):
+            campaign = self.env['whatsapp.campaign'].sudo().browse(vals['campaign_id']).exists()
+            vals = dict(vals)
+            vals['is_campaign_message'] = True
+            vals['campaign_origin_id'] = campaign.id or vals['campaign_id']
+            if campaign:
+                vals['campaign_name_snapshot'] = campaign.name
         res = super(WhatsAppMessage, self).write(vals)
         notify_fields = {
             'status',
@@ -1280,6 +1305,13 @@ class WhatsAppMessage(models.Model):
             if record.direction == 'inbound' or record.status in ['sent', 'delivered', 'read']:
                 continue
 
+            if record.is_campaign_message and not record.campaign_id:
+                raise ValidationError(_(
+                    'This message belongs to a campaign that is no longer linked. '
+                    'It was blocked to prevent an unintended bulk send. Recover or archive '
+                    'the campaign before taking any delivery action.'
+                ))
+
             # Compliance Check before attempting send
             record._check_compliance()
 
@@ -1406,6 +1438,67 @@ class WhatsAppMessage(models.Model):
         self.write({'status': 'read', 'read_date': fields.Datetime.now()})
 
     @api.model
+    def _repair_campaign_message_provenance(self):
+        """Backfill campaign ownership and quarantine legacy detached bulk rows."""
+        self.env.cr.execute("""
+            UPDATE whatsapp_message AS message
+               SET is_campaign_message = TRUE,
+                   campaign_origin_id = campaign.id,
+                   campaign_name_snapshot = campaign.name
+              FROM whatsapp_campaign AS campaign
+             WHERE message.campaign_id = campaign.id
+               AND (
+                    NOT COALESCE(message.is_campaign_message, FALSE)
+                    OR message.campaign_origin_id IS DISTINCT FROM campaign.id
+                    OR message.campaign_name_snapshot IS NULL
+               )
+        """)
+        linked_backfilled = self.env.cr.rowcount
+
+        # Campaign queue rows have no chat by design. Direct outbound messages
+        # create or link a chat, which identifies rows detached by the previous
+        # campaign ondelete='set null' behavior.
+        orphaned = self.sudo().search([
+            ('direction', '=', 'outbound'),
+            ('campaign_id', '=', False),
+            ('chat_id_ref', '=', False),
+        ])
+        if orphaned:
+            orphaned.write({
+                'is_campaign_message': True,
+                'campaign_name_snapshot': _('Deleted campaign (legacy recovery)'),
+            })
+
+        pending = orphaned.filtered(lambda message: message.status in ('draft', 'queued'))
+        if pending:
+            pending.write({
+                'status': 'cancelled',
+                'next_retry_at': False,
+                'error_message': _(
+                    'Delivery stopped automatically because the original campaign was deleted.'
+                ),
+            })
+        retryable_failed = orphaned.filtered(
+            lambda message: message.status == 'failed' and message.next_retry_at
+        )
+        if retryable_failed:
+            retryable_failed.write({'next_retry_at': False})
+
+        _logger.warning(
+            'WhatsApp campaign provenance repair linked=%s orphaned=%s pending_stopped=%s retries_stopped=%s',
+            linked_backfilled,
+            len(orphaned),
+            len(pending),
+            len(retryable_failed),
+        )
+        return {
+            'linked_backfilled': linked_backfilled,
+            'orphaned': len(orphaned),
+            'pending_stopped': len(pending),
+            'retries_stopped': len(retryable_failed),
+        }
+
+    @api.model
     def _cleanup_old_messages(self, days=None):
         if days is None:
             try:
@@ -1435,6 +1528,7 @@ class WhatsAppMessage(models.Model):
             ('status', '=', 'queued'),
             ('retry_count', '=', 0),
             ('campaign_id', '=', False),
+            ('is_campaign_message', '=', False),
             '|', ('next_retry_at', '=', False), ('next_retry_at', '<=', now)
         ], limit=limit, order='create_date asc')
 
@@ -1482,7 +1576,7 @@ class WhatsAppMessage(models.Model):
             ('next_retry_at', '!=', False),
             ('next_retry_at', '<=', now),
             '|',
-                ('campaign_id', '=', False),
+                '&', ('campaign_id', '=', False), ('is_campaign_message', '=', False),
                 ('campaign_id.state', 'in', ['running', 'scheduled']),
         ], limit=50, order='next_retry_at asc, create_date asc')
 

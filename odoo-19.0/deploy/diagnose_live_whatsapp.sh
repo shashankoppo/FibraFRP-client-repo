@@ -99,6 +99,44 @@ docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
     UNION ALL SELECT 'flows', count(*) FROM whatsapp_bot_flow
     UNION ALL SELECT 'webhook_logs', count(*) FROM whatsapp_webhook_log;"
 
+PROVENANCE_COLUMN="$(
+  docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -Atc \
+    "SELECT EXISTS (
+       SELECT 1
+         FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'whatsapp_message'
+          AND column_name = 'is_campaign_message'
+     );"
+)"
+
+echo
+echo "==> Detached campaign queue safety"
+if [ "${PROVENANCE_COLUMN}" = "t" ]; then
+  docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
+    "SELECT status,
+            count(*) AS messages,
+            count(*) FILTER (WHERE next_retry_at IS NOT NULL) AS retry_scheduled,
+            min(create_date) AS oldest,
+            max(create_date) AS newest
+       FROM whatsapp_message
+      WHERE direction = 'outbound'
+        AND campaign_id IS NULL
+        AND is_campaign_message IS TRUE
+      GROUP BY status
+      ORDER BY status;"
+else
+  echo "Campaign provenance fields are missing; upgrade elsx_whatsapp_marketing before resuming delivery."
+  docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
+    "SELECT status, count(*) AS legacy_detached_candidates
+       FROM whatsapp_message
+      WHERE direction = 'outbound'
+        AND campaign_id IS NULL
+        AND chat_id_ref IS NULL
+      GROUP BY status
+      ORDER BY status;"
+fi
+
 echo
 echo "==> PostgreSQL connection usage"
 docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
