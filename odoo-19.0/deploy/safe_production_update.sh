@@ -107,6 +107,40 @@ docker compose run --rm -T --no-deps odoo \
 echo "==> Starting Odoo and WhatsApp sidecar"
 docker compose up -d odoo sidecar
 
+echo "==> Waiting for Odoo health check"
+ODOO_HEALTHY="NO"
+for _attempt in $(seq 1 30); do
+  if docker compose exec -T odoo curl -fsS http://127.0.0.1:8069/web/health >/dev/null 2>&1; then
+    ODOO_HEALTHY="YES"
+    break
+  fi
+  sleep 4
+done
+if [ "${ODOO_HEALTHY}" != "YES" ]; then
+  echo "ERROR: Odoo did not become healthy after the module upgrade." >&2
+  docker logs --tail 250 odoo_app >&2 || true
+  exit 1
+fi
+
+case ",${ALL_INSTALL_MODULES},${ALL_UPGRADE_MODULES}," in
+  *",elsx_whatsapp_marketing,"*)
+    echo "==> Verifying WhatsApp contact import schema"
+    NULLABLE_IMPORT_COLUMNS="$(
+      docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -Atc \
+        "SELECT COUNT(*)
+           FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'whatsapp_contact'
+            AND column_name IN ('name', 'phone_number')
+            AND is_nullable = 'YES';"
+    )"
+    if [ "${NULLABLE_IMPORT_COLUMNS}" != "2" ]; then
+      echo "ERROR: WhatsApp contact import schema verification failed." >&2
+      exit 1
+    fi
+    ;;
+esac
+
 echo "==> Module state check"
 docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
   "SELECT name, state, latest_version

@@ -29,6 +29,20 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
     def test_contact_name_is_optional_for_standard_imports(self):
         self.assertFalse(self.env['whatsapp.contact']._fields['name'].required)
 
+    def test_contact_phone_is_optional_for_incomplete_import_rows(self):
+        self.assertFalse(self.env['whatsapp.contact']._fields['phone_number'].required)
+        result = self.env['whatsapp.contact'].load(
+            ['name', 'phone_number', 'email'],
+            [['Email Only', '', 'email-only@example.com']],
+        )
+
+        errors = [message for message in result['messages'] if message.get('type') == 'error']
+        self.assertFalse(errors)
+        contact = self.env['whatsapp.contact'].browse(result['ids'])
+        self.assertEqual(contact.name, 'Email Only')
+        self.assertFalse(contact.phone_number)
+        self.assertEqual(contact.email, 'email-only@example.com')
+
     def test_imports_flexible_headers_tags_consent_and_attributes(self):
         wizard = self._wizard(
             'Full Name;Mobile;Email Address;Labels;Consent;Language;Company;Custom: Tier\n'

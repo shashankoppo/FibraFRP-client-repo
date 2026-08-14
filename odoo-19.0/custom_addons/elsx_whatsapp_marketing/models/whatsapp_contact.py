@@ -8,7 +8,11 @@ class WhatsAppContact(models.Model):
     _rec_name = 'name'
 
     name = fields.Char('Name', default='Unknown WhatsApp Contact')
-    phone_number = fields.Char('Phone Number', required=True)
+    phone_number = fields.Char(
+        'Phone Number',
+        index=True,
+        help='Required for WhatsApp delivery. Incomplete imported contacts can be completed later.',
+    )
     email = fields.Char('Email')
     company_name = fields.Char('Company')
     language_code = fields.Char('Language Code')
@@ -47,9 +51,11 @@ class WhatsAppContact(models.Model):
     def create(self, vals_list):
         for vals in vals_list:
             if not vals.get('name'):
+                partner = self.env['res.partner'].sudo().browse(vals.get('partner_id')).exists()
                 vals['name'] = (
                     vals.get('phone_number')
                     or vals.get('email')
+                    or partner.name
                     or _('Unknown WhatsApp Contact')
                 )
             if not vals.get('partner_id') and vals.get('phone_number'):
