@@ -77,6 +77,10 @@ class WhatsAppCampaign(models.Model):
         except Exception as exc:
             _logger.warning("Could not schedule WhatsApp campaign queue cron: %s", exc)
             return False
+        try:
+            cron.sudo()._trigger(at=nextcall)
+        except Exception as exc:
+            _logger.debug("Could not create WhatsApp campaign queue cron trigger: %s", exc)
         return True
 
     @api.model
@@ -1327,7 +1331,7 @@ class WhatsAppCampaign(models.Model):
             _logger.info(f"Campaign {record.name} execution triggered. Queued for background worker chunking.")
 
     def action_process_queue(self):
-        """Safe Sending Rate Limiter: Processes 50 draft messages at a time"""
+        """Release one safe batch and let the cron worker send it."""
         self.ensure_one()
         if self.state == 'scheduled' and self.schedule_date and self.schedule_date > fields.Datetime.now():
             return {
@@ -1344,14 +1348,14 @@ class WhatsAppCampaign(models.Model):
             self.state = 'running'
 
         now = fields.Datetime.now()
-        batch_size = self.batch_size or 50
-        draft_messages = self.message_ids.filtered(
-            lambda m: m.status == 'draft' or (
-                m.status == 'queued' and (not m.next_retry_at or m.next_retry_at <= now)
-            )
-        )[:batch_size]
-        
-        if not draft_messages:
+        Message = self.env['whatsapp.message'].sudo()
+        pending_domain = [
+            ('campaign_id', '=', self.id),
+            ('status', 'in', ['draft', 'queued']),
+        ]
+        pending_count = Message.search_count(pending_domain)
+
+        if not pending_count:
             self.state = 'completed'
             return {
                 'type': 'ir.actions.client',
@@ -1362,62 +1366,33 @@ class WhatsAppCampaign(models.Model):
                     'type': 'info',
                 }
             }
-            
-        sent = 0
-        queued = 0
-        for msg in draft_messages:
-            try:
-                with self.env.cr.savepoint():
-                    msg.action_send()
-                    if msg.status in ('sent', 'delivered', 'read'):
-                        sent += 1
-                        # Enterprise Logic: Auto-Start Bot Flow
-                        flow = msg.flow_id or self.flow_id
-                        if flow:
-                            try:
-                                flow.sudo().start_flow_for_participant(False, msg)
-                            except Exception as flow_err:
-                                _logger.error(f"Failed to auto-start flow {flow.name}: {flow_err}")
-                    elif msg.status == 'queued':
-                        queued += 1
-            except Exception as e:
-                try:
-                    with self.env.cr.savepoint():
-                        vals = {
-                            'status': 'failed',
-                            'error_message': str(e),
-                            'next_retry_at': False,
-                        }
-                        if not isinstance(e, ValidationError):
-                            backoff_seconds = min(3600, 60 * (2 ** min(msg.retry_count, 5)))
-                            vals.update({
-                                'retry_count': msg.retry_count + 1,
-                                'next_retry_at': fields.Datetime.now() + timedelta(seconds=backoff_seconds + random.uniform(0, 10)),
-                            })
-                        msg.write(vals)
-                except Exception as db_err:
-                    _logger.error(f"Could not save failed state for message {msg.id}: {db_err}")
-                _logger.error(f"Failed to process queued message: {e}")
-                
-        # Optional: update state to completed if done
-        due_remaining_domain = [
+
+        batch_size = max(int(self.batch_size or 50), 1)
+        due_domain = [
             ('campaign_id', '=', self.id),
             '|',
-                ('status', 'in', ['draft', 'queued']),
-                '&', '&', ('status', '=', 'failed'), ('retry_count', '<', 5), ('next_retry_at', '!=', False),
+                ('status', '=', 'draft'),
+                '&', ('status', '=', 'queued'), '|', ('next_retry_at', '=', False), ('next_retry_at', '<=', now),
         ]
-        if not self.env['whatsapp.message'].search_count(due_remaining_domain):
-            self.state = 'completed'
+        released = Message.search(due_domain, order='create_date asc', limit=batch_size)
+        if not released:
+            released = Message.search(pending_domain, order='next_retry_at asc, create_date asc', limit=batch_size)
+
+        if released:
+            released.write({'status': 'queued', 'next_retry_at': now})
+            self._wake_campaign_queue_cron()
         else:
-            delay_minutes = max(int(self.batch_interval or 1), 1)
-            self._schedule_campaign_queue_cron(delay_seconds=delay_minutes * 60)
+            self._schedule_next_campaign_queue_run(default_delay_seconds=60)
             
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
-                'title': 'Queue Processed',
-                'message': f'Safely dispatched {sent} messages. {queued} remain queued.',
+                'title': 'Queue Worker Started',
+                'message': (
+                    f'Released {len(released)} message(s) for background sending. '
+                    f'{pending_count} message(s) remain in this campaign queue.'
+                ),
                 'type': 'success',
             }
         }
