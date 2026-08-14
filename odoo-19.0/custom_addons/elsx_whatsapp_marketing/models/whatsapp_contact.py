@@ -46,6 +46,8 @@ class WhatsAppContact(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
+            if not vals.get('name') and vals.get('phone_number'):
+                vals['name'] = vals['phone_number']
             if not vals.get('partner_id') and vals.get('phone_number'):
                 partner = self.env['whatsapp.message']._find_partner_by_phone(vals['phone_number'])
                 if partner:
@@ -57,6 +59,9 @@ class WhatsAppContact(models.Model):
         return records
 
     def write(self, vals):
+        if 'name' in vals and not vals['name']:
+            vals = dict(vals)
+            vals.pop('name')
         res = super(WhatsAppContact, self).write(vals)
         fields_to_check = ['opt_in', 'partner_id', 'phone_number', 'name', 'email', 'tag_ids']
         if any(f in vals for f in fields_to_check):

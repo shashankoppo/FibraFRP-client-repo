@@ -105,3 +105,25 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
         self.assertEqual(wizard.imported_count, 1)
         self.assertEqual(wizard.error_count, 1)
         self.assertTrue(wizard.report_file)
+
+    def test_standard_odoo_import_uses_phone_when_name_is_blank(self):
+        result = self.env['whatsapp.contact'].load(
+            ['name', 'phone_number', 'email'],
+            [['', '919881934777', 'standard-import@example.com']],
+        )
+
+        errors = [message for message in result['messages'] if message.get('type') == 'error']
+        self.assertFalse(errors)
+        contact = self.env['whatsapp.contact'].browse(result['ids'])
+        self.assertEqual(contact.name, '919881934777')
+
+    def test_blank_name_update_preserves_existing_name(self):
+        contact = self.env['whatsapp.contact'].create({
+            'name': 'Keep This Name',
+            'phone_number': '919881934777',
+        })
+
+        contact.write({'name': False, 'email': 'updated@example.com'})
+
+        self.assertEqual(contact.name, 'Keep This Name')
+        self.assertEqual(contact.email, 'updated@example.com')
