@@ -4,5 +4,6 @@
         <function model="whatsapp.contact" name="_reconcile_all_partner_links"/>
         <function model="whatsapp.campaign" name="_repair_delivery_crons"/>
         <function model="whatsapp.campaign" name="_repair_running_campaign_queues"/>
+        <function model="whatsapp.campaign" name="_repair_campaign_statistics"/>
     </data>
 </odoo>

@@ -326,6 +326,7 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
             'batch_size': 2,
             'batch_interval': 5,
             'state': 'running',
+            'last_batch_at': fields.Datetime.now(),
         })
         future = fields.Datetime.add(fields.Datetime.now(), hours=1)
         messages = self.env['whatsapp.message'].create([
@@ -347,6 +348,7 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
         due = messages.filtered(lambda msg: msg.next_retry_at <= fields.Datetime.now())
         self.assertEqual(repaired, 2)
         self.assertEqual(len(due), 2)
+        self.assertFalse(campaign.last_batch_at)
 
     def test_manual_process_queue_only_releases_batch(self):
         campaign = self.env['whatsapp.campaign'].create({
@@ -380,3 +382,72 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
         messages.invalidate_recordset(['next_retry_at'])
         due = messages.filtered(lambda msg: msg.next_retry_at <= fields.Datetime.now())
         self.assertEqual(len(due), 2)
+
+    def test_campaign_percentage_widgets_receive_ratios(self):
+        partners = self.env['res.partner'].with_context(skip_whatsapp_contact_sync=True).create([
+            {'name': 'Delivered Recipient', 'phone': '919881936001'},
+            {'name': 'Sent Recipient', 'phone': '919881936002'},
+        ])
+        campaign = self.env['whatsapp.campaign'].create({
+            'name': 'Accurate Campaign Rates',
+            'account_id': self.account.id,
+            'campaign_type': 'broadcast',
+            'target_type': 'manual',
+            'partner_ids': [(6, 0, partners.ids)],
+            'message_body': 'Hello',
+        })
+        self.env['whatsapp.message'].create([
+            {
+                'account_id': self.account.id,
+                'campaign_id': campaign.id,
+                'partner_id': partners[0].id,
+                'phone_number': partners[0].phone,
+                'direction': 'outbound',
+                'status': 'delivered',
+                'body': 'Delivered',
+            },
+            {
+                'account_id': self.account.id,
+                'campaign_id': campaign.id,
+                'partner_id': partners[1].id,
+                'phone_number': partners[1].phone,
+                'direction': 'outbound',
+                'status': 'sent',
+                'body': 'Sent',
+            },
+        ])
+
+        campaign.invalidate_recordset([
+            'total_recipients', 'sent_count', 'delivered_count', 'delivery_rate', 'read_rate',
+        ])
+        self.assertEqual(campaign.sent_count, 2)
+        self.assertEqual(campaign.delivered_count, 1)
+        self.assertEqual(campaign.delivery_rate, 0.5)
+        self.assertEqual(campaign.read_rate, 0.0)
+
+    def test_campaign_cron_does_not_reschedule_itself_while_batch_is_paced(self):
+        campaign = self.env['whatsapp.campaign'].create({
+            'name': 'Paced Campaign',
+            'account_id': self.account.id,
+            'campaign_type': 'broadcast',
+            'target_type': 'manual',
+            'message_body': 'Hello',
+            'batch_size': 50,
+            'batch_interval': 5,
+            'state': 'running',
+            'last_batch_at': fields.Datetime.now(),
+        })
+        self.env['whatsapp.message'].create({
+            'account_id': self.account.id,
+            'campaign_id': campaign.id,
+            'phone_number': '919881936003',
+            'direction': 'outbound',
+            'status': 'queued',
+            'body': 'Queued',
+            'next_retry_at': fields.Datetime.now(),
+        })
+
+        with patch.object(type(campaign), '_schedule_next_campaign_queue_run') as schedule_next:
+            self.env['whatsapp.campaign']._cron_process_global_queue()
+
+        schedule_next.assert_not_called()
