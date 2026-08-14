@@ -31,14 +31,16 @@
                 <header>
                     <button name="action_load_recipients" string="Load Recipients" type="object" class="btn-secondary" invisible="state != 'draft'"/>
                     <button name="action_generate_ai_content" string="Draft Content" type="object" class="btn-secondary" invisible="state != 'draft'"/>
+                    <button name="action_run_preflight" string="Run Preflight" type="object" class="btn-secondary" invisible="state != 'draft'"/>
                     <button name="%(elsx_whatsapp_marketing.action_whatsapp_campaign_schedule_wizard)d" string="Schedule / Send" type="action" class="btn-primary" invisible="state != 'draft'" context="{'default_campaign_id': id}"/>
                     <button name="action_process_queue" string="Process Queue (Send 50)" type="object" class="btn-warning" invisible="state != 'running'"/>
-                    <button name="action_retry_failed_messages" string="Retry Failed" type="object" class="btn-secondary" invisible="failed_count == 0"/>
+                    <button name="action_retry_failed_messages" string="Retry Failed" type="object" class="btn-secondary" invisible="failed_count == 0 or state in ['cancelled', 'archived']"/>
                     <button name="action_view_failed_recipients" string="Failed Recipients" type="object" class="btn-secondary" invisible="failed_count == 0"/>
                     <button name="action_export_failed_recipients" string="Export Failed" type="object" class="btn-secondary" invisible="failed_count == 0"/>
                     <button name="action_cancel" string="Cancel" type="object" class="btn-danger" invisible="state in ['completed', 'cancelled', 'archived']"/>
                     <button name="action_archive_record" string="Archive" type="object" class="btn-secondary" invisible="state == 'archived'"/>
                     <button name="action_unarchive_record" string="Unarchive" type="object" class="btn-primary" invisible="state != 'archived'"/>
+                    <button name="action_reset_to_draft" string="Reset to Draft" type="object" class="btn-primary" invisible="state not in ['cancelled', 'archived']"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,scheduled,running,completed"/>
                 </header>
                 <sheet>
@@ -96,6 +98,11 @@
                         </group>
                     </group>
                     <group string="Pre-send Checklist">
+                        <group>
+                            <field name="preflight_state" widget="badge" readonly="1"/>
+                            <field name="preflight_checked_at" readonly="1" invisible="preflight_state == 'not_run'"/>
+                        </group>
+                        <field name="preflight_report" nolabel="1" readonly="1" invisible="not preflight_report"/>
                         <div class="alert alert-light border mb-0" role="status">
                             <field name="pre_send_checklist_text" nolabel="1" readonly="1" class="wa-campaign-checklist-text"/>
                         </div>

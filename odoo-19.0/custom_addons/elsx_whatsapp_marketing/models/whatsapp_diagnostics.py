@@ -82,7 +82,10 @@ class WhatsAppDiagnosticSnapshot(models.Model):
                 'ai_jobs': self._count_if_model('elsx.ai.job'),
             },
             'queues': {
-                'queued_campaign_messages': Message.search_count([('campaign_id', '!=', False), ('status', 'in', ['draft', 'queued'])]),
+                'queued_campaign_messages': Message.search_count([
+                    ('campaign_id.state', 'in', ['running', 'scheduled']),
+                    ('status', 'in', ['draft', 'queued']),
+                ]),
                 'failed_retryable_messages': Message.search_count([
                     ('status', '=', 'failed'),
                     ('retry_count', '<', 5),

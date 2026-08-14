@@ -191,6 +191,7 @@ class WhatsAppMessage(models.Model):
         ('delivered', 'Delivered'),
         ('read', 'Read'),
         ('failed', 'Failed'),
+        ('cancelled', 'Cancelled'),
         ('deleted', 'Deleted'),
     ], string='Status', default='draft', required=True)
 
@@ -1329,6 +1330,14 @@ class WhatsAppMessage(models.Model):
         return True
 
     def action_retry(self):
+        cancelled_campaign_messages = self.filtered(
+            lambda msg: msg.campaign_id and msg.campaign_id.state in ('cancelled', 'archived')
+        )
+        if cancelled_campaign_messages:
+            raise UserError(_(
+                'Messages from a Cancelled or Archived campaign cannot be retried. '
+                'Duplicate the campaign to start a new delivery run.'
+            ))
         non_retryable = self.filtered(lambda msg: msg._is_non_retryable_failure())
         if non_retryable:
             raise UserError(_(
@@ -1418,6 +1427,9 @@ class WhatsAppMessage(models.Model):
             ('retry_count', '<', 5),
             ('next_retry_at', '!=', False),
             ('next_retry_at', '<=', now),
+            '|',
+                ('campaign_id', '=', False),
+                ('campaign_id.state', 'in', ['running', 'scheduled']),
         ], limit=50, order='next_retry_at asc, create_date asc')
 
         retried_count = 0

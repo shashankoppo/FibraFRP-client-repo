@@ -2,7 +2,13 @@
 set -euo pipefail
 
 LIVE_DB_NAME="${1:-${LIVE_DB_NAME:-FiberaFRP_DB}}"
+CAMPAIGN_ID="${2:-}"
 DB_USER="${POSTGRES_USER:-odoo}"
+
+if [ -n "${CAMPAIGN_ID}" ] && ! [[ "${CAMPAIGN_ID}" =~ ^[0-9]+$ ]]; then
+  echo "ERROR: Campaign ID must be numeric." >&2
+  exit 1
+fi
 
 sql_quote() {
   local value="${1//\'/\'\'}"
@@ -94,6 +100,73 @@ docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
     UNION ALL SELECT 'webhook_logs', count(*) FROM whatsapp_webhook_log;"
 
 echo
+echo "==> WhatsApp delivery workers"
+docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
+  "SELECT model.model,
+          action.code,
+          cron.active,
+          cron.lastcall,
+          cron.nextcall,
+          cron.failure_count
+     FROM ir_cron cron
+     JOIN ir_act_server action ON action.id = cron.ir_actions_server_id
+     JOIN ir_model model ON model.id = action.model_id
+    WHERE (model.model = 'whatsapp.campaign' AND action.code IN (
+             'model._cron_process_global_queue()',
+             'model._cron_evaluate_ab_tests()'
+          ))
+       OR (model.model = 'whatsapp.message' AND action.code IN (
+             'model._cron_process_broadcast_queue()',
+             'model._cron_retry_failed()'
+          ))
+       OR (model.model = 'whatsapp.scheduled.campaign' AND action.code = 'model._cron_process_scheduled_campaigns()')
+       OR (model.model = 'whatsapp.campaign.participant' AND action.code = 'model.process_drip_campaigns()')
+       OR (model.model = 'whatsapp.webhook.log' AND action.code = 'model._cron_recover_received()')
+    ORDER BY model.model, action.code;"
+
+if [ -n "${CAMPAIGN_ID}" ]; then
+  echo
+  echo "==> Campaign ${CAMPAIGN_ID}"
+  docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
+    "SELECT id,
+            name,
+            state,
+            schedule_type,
+            schedule_date,
+            last_batch_at,
+            preflight_state,
+            preflight_checked_at,
+            audience_source_count,
+            audience_unique_count,
+            audience_duplicate_count,
+            audience_invalid_phone_count
+       FROM whatsapp_campaign
+      WHERE id = ${CAMPAIGN_ID};"
+
+  echo
+  echo "==> Campaign ${CAMPAIGN_ID} message queue"
+  docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
+    "SELECT status,
+            count(*) AS messages,
+            count(*) FILTER (WHERE next_retry_at IS NOT NULL) AS retry_scheduled,
+            min(create_date) AS oldest,
+            max(write_date) AS latest_change
+       FROM whatsapp_message
+      WHERE campaign_id = ${CAMPAIGN_ID}
+        AND direction = 'outbound'
+      GROUP BY status
+      ORDER BY status;"
+
+  echo
+  echo "==> Campaign ${CAMPAIGN_ID} schedules"
+  docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
+    "SELECT id, status, schedule_type, scheduled_date, next_execution_date, execution_count
+       FROM whatsapp_scheduled_campaign
+      WHERE campaign_id = ${CAMPAIGN_ID}
+      ORDER BY id DESC;"
+fi
+
+echo
 echo "==> Flow status"
 docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
   "SELECT id, name, account_id, active, trigger_type, keywords
@@ -145,6 +218,13 @@ docker logs --since 30m odoo_app 2>&1 | grep -Ei \
   'WH-|webhook|ERROR|Traceback|CRITICAL|RPC_ERROR|OwlError|ParseError|Exception|Invalid Operation' || true
 docker logs --since 30m whatsapp_sidecar 2>&1 | grep -Ei \
   'ERROR|Traceback|CRITICAL|Exception|Unhandled|ECONN|webhook|socket' || true
+
+echo
+echo "==> Sidecar health"
+if ! docker compose exec -T sidecar wget -q -O - http://127.0.0.1:3000/health; then
+  echo "ERROR: WhatsApp sidecar health check failed." >&2
+  exit 1
+fi
 
 echo
 echo "==> Diagnostic complete."

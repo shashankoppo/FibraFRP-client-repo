@@ -13,6 +13,8 @@ from html import escape as html_escape
 from datetime import timedelta
 from urllib.parse import quote
 
+import requests
+
 _logger = logging.getLogger(__name__)
 
 
@@ -152,6 +154,59 @@ class WhatsAppCampaign(models.Model):
         _logger.info("WhatsApp campaign statistics refreshed=%s", len(campaign_ids))
         return len(campaign_ids)
 
+    @api.model
+    def _repair_cancelled_campaign_queues(self):
+        """Keep canceled/archived campaigns from leaking work into delivery queues."""
+        Message = self.env['whatsapp.message'].sudo()
+        pending = Message.search([
+            ('campaign_id.state', 'in', ['cancelled', 'archived']),
+            ('status', 'in', ['draft', 'queued']),
+        ])
+        if pending:
+            pending.write({
+                'status': 'cancelled',
+                'next_retry_at': False,
+                'error_message': False,
+            })
+        retryable_failed = Message.search([
+            ('campaign_id.state', 'in', ['cancelled', 'archived']),
+            ('status', '=', 'failed'),
+            ('next_retry_at', '!=', False),
+        ])
+        if retryable_failed:
+            retryable_failed.write({'next_retry_at': False})
+        _logger.info(
+            "WhatsApp cancelled campaign queue repair cancelled=%s retries_stopped=%s",
+            len(pending),
+            len(retryable_failed),
+        )
+        return len(pending) + len(retryable_failed)
+
+    def copy_data(self, default=None):
+        """Duplicate campaign configuration as a clean, unsent draft."""
+        defaults = dict(default or {})
+        defaults.update({
+            'state': 'draft',
+            'schedule_type': 'immediate',
+            'schedule_date': False,
+            'last_batch_at': False,
+            'tracking_campaign_code': False,
+            'tracking_entry_keyword': False,
+            'conversion_count': 0,
+            'excluded_count': 0,
+            'exclusion_notes': False,
+            'audience_source_count': 0,
+            'audience_unique_count': 0,
+            'audience_duplicate_count': 0,
+            'audience_unlinked_count': 0,
+            'audience_missing_phone_count': 0,
+            'audience_invalid_phone_count': 0,
+            'preflight_state': 'not_run',
+            'preflight_checked_at': False,
+            'preflight_report': False,
+        })
+        return super().copy_data(defaults)
+
     name = fields.Char('Campaign Name', required=True)
     account_id = fields.Many2one('whatsapp.account', string='WhatsApp Account', required=True)
     
@@ -224,7 +279,7 @@ class WhatsAppCampaign(models.Model):
     ab_test_winner = fields.Selection([
         ('a', 'Version A'),
         ('b', 'Version B'),
-    ], string='Winner', readonly=True)
+    ], string='Winner', readonly=True, copy=False)
 
     @api.depends('split_percentage')
     def _compute_split_b(self):
@@ -235,9 +290,9 @@ class WhatsAppCampaign(models.Model):
     schedule_type = fields.Selection([
         ('immediate', 'Send Immediately'),
         ('scheduled', 'Schedule'),
-    ], string='Schedule', default='immediate')
+    ], string='Schedule', default='immediate', copy=False)
     
-    schedule_date = fields.Datetime('Scheduled Date')
+    schedule_date = fields.Datetime('Scheduled Date', copy=False)
     last_batch_at = fields.Datetime(
         'Last Batch Sent At',
         readonly=True,
@@ -254,7 +309,7 @@ class WhatsAppCampaign(models.Model):
         ('completed', 'Completed'),
         ('cancelled', 'Cancelled'),
         ('archived', 'Archived'),
-    ], string='Status', default='draft', required=True)
+    ], string='Status', default='draft', required=True, copy=False)
     
     # Statistics
     total_recipients = fields.Integer('Total Recipients', compute='_compute_statistics', store=True)
@@ -268,13 +323,13 @@ class WhatsAppCampaign(models.Model):
     read_rate = fields.Float('Read Rate', compute='_compute_statistics', store=True)
     
     # Relations
-    message_ids = fields.One2many('whatsapp.message', 'campaign_id', string='Messages')
-    step_ids = fields.One2many('whatsapp.campaign.step', 'campaign_id', string='Drip Steps')
-    participant_ids = fields.One2many('whatsapp.campaign.participant', 'campaign_id', string='Participants')
+    message_ids = fields.One2many('whatsapp.message', 'campaign_id', string='Messages', copy=False)
+    step_ids = fields.One2many('whatsapp.campaign.step', 'campaign_id', string='Drip Steps', copy=True)
+    participant_ids = fields.One2many('whatsapp.campaign.participant', 'campaign_id', string='Participants', copy=False)
     
     # Analytics
     click_count = fields.Integer('Clicks', compute='_compute_statistics', store=True)
-    conversion_count = fields.Integer('Conversions', default=0)
+    conversion_count = fields.Integer('Conversions', default=0, copy=False)
     roi = fields.Float('ROI %', compute='_compute_roi')
     
     # Enterprise Logic
@@ -289,15 +344,15 @@ class WhatsAppCampaign(models.Model):
     )
     tracking_source = fields.Char('Source', default='whatsapp')
     tracking_medium = fields.Char('Medium', default='campaign')
-    tracking_campaign_code = fields.Char('Campaign Code')
-    tracking_entry_keyword = fields.Char('Entry Keyword')
+    tracking_campaign_code = fields.Char('Campaign Code', copy=False)
+    tracking_entry_keyword = fields.Char('Entry Keyword', copy=False)
     tracking_wa_link = fields.Char('wa.me Tracking Link', compute='_compute_tracking_wa_link')
     form_submission_count = fields.Integer('Form Submissions', compute='_compute_conversion_counters')
     payment_action_count = fields.Integer('Payment Actions', compute='_compute_conversion_counters')
     tracked_reply_count = fields.Integer('Tracked Replies', compute='_compute_conversion_counters')
 
     # Reply handling and audience safety
-    reply_rule_ids = fields.One2many('whatsapp.campaign.reply.rule', 'campaign_id', string='Reply Actions')
+    reply_rule_ids = fields.One2many('whatsapp.campaign.reply.rule', 'campaign_id', string='Reply Actions', copy=True)
     default_reply_action = fields.Selection([
         ('none', 'No Action'),
         ('start_flow', 'Start Flow'),
@@ -328,15 +383,23 @@ class WhatsAppCampaign(models.Model):
     exclude_recently_contacted = fields.Boolean('Exclude Recently Contacted', default=True)
     recent_contact_days = fields.Integer('Recent Contact Window (days)', default=7)
     frequency_cap_days = fields.Integer('Frequency Cap (days)', default=0)
-    excluded_count = fields.Integer('Excluded', readonly=True, default=0)
-    exclusion_notes = fields.Text('Audience Exclusion Notes', readonly=True)
-    audience_source_count = fields.Integer('Matched Contact Rows', readonly=True)
-    audience_unique_count = fields.Integer('Unique Contact Records', readonly=True)
-    audience_duplicate_count = fields.Integer('Duplicate Rows', readonly=True)
-    audience_unlinked_count = fields.Integer('Unresolved Contacts', readonly=True)
-    audience_missing_phone_count = fields.Integer('Missing Phone', readonly=True)
-    audience_invalid_phone_count = fields.Integer('Invalid Phone', readonly=True)
-    preview_partner_id = fields.Many2one('res.partner', string='Preview Recipient')
+    excluded_count = fields.Integer('Excluded', readonly=True, default=0, copy=False)
+    exclusion_notes = fields.Text('Audience Exclusion Notes', readonly=True, copy=False)
+    audience_source_count = fields.Integer('Matched Contact Rows', readonly=True, copy=False)
+    audience_unique_count = fields.Integer('Unique Contact Records', readonly=True, copy=False)
+    audience_duplicate_count = fields.Integer('Duplicate Rows', readonly=True, copy=False)
+    audience_unlinked_count = fields.Integer('Unresolved Contacts', readonly=True, copy=False)
+    audience_missing_phone_count = fields.Integer('Missing Phone', readonly=True, copy=False)
+    audience_invalid_phone_count = fields.Integer('Invalid Phone', readonly=True, copy=False)
+    preview_partner_id = fields.Many2one('res.partner', string='Preview Recipient', copy=False)
+    preflight_state = fields.Selection([
+        ('not_run', 'Not Run'),
+        ('passed', 'Passed'),
+        ('warning', 'Passed with Warnings'),
+        ('failed', 'Failed'),
+    ], string='Preflight', default='not_run', readonly=True, copy=False)
+    preflight_checked_at = fields.Datetime('Preflight Checked At', readonly=True, copy=False)
+    preflight_report = fields.Text('Preflight Report', readonly=True, copy=False)
     recipient_preview_html = fields.Html('Recipient Preview', compute='_compute_recipient_preview_html')
     recipient_preview_text = fields.Text('Recipient Preview Text', compute='_compute_recipient_preview_html')
     pre_send_checklist_html = fields.Html('Pre-send Checklist', compute='_compute_pre_send_checklist_html')
@@ -741,10 +804,18 @@ class WhatsAppCampaign(models.Model):
     def _check_template_ready_for_campaign(self, template, label, version='a'):
         if not template:
             return
+        if not template.active:
+            raise ValidationError(f"{label} template is archived and cannot be used in a campaign.")
         if template.account_id and self.account_id and template.account_id != self.account_id:
             raise ValidationError(f"{label} template must belong to the selected WhatsApp account.")
         if template.status != 'approved':
             raise ValidationError(f"{label} template must be approved before it can be used in a campaign.")
+        template._validate_variable_structure()
+        if not self._template_media_ready(template, version=version):
+            raise ValidationError(
+                f"{label} template requires a send-ready {template.header_type} header. "
+                "Upload campaign header media, use a valid Meta media ID, or configure a public HTTPS URL."
+            )
 
     def _check_variant_message(self, label, template, body, version='a'):
         if template:
@@ -833,6 +904,62 @@ class WhatsAppCampaign(models.Model):
                 invalid |= partner
         return valid, missing, invalid
 
+    def _normalized_recipient_phones(self, partners):
+        self.ensure_one()
+        normalizer = self.env['whatsapp.message']
+        result = {}
+        for partner in partners:
+            phone = getattr(partner, 'mobile', False) or partner.phone
+            if phone:
+                result[partner.id] = normalizer._normalize_phone(phone, account=self.account_id)
+        return result
+
+    def _partners_with_recent_campaign_activity(self, partners, cutoff, campaign_only=False):
+        """Match actual sends by partner or normalized phone, never queued-only rows."""
+        self.ensure_one()
+        if not partners:
+            return self.env['res.partner']
+        phone_by_partner = self._normalized_recipient_phones(partners)
+        phones = list({phone for phone in phone_by_partner.values() if phone})
+        identity_domain = ['|', ('partner_id', 'in', partners.ids), ('phone_number', 'in', phones)]
+        domain = identity_domain + [
+            ('direction', '=', 'outbound'),
+            ('status', 'in', ['sent', 'delivered', 'read']),
+            '|',
+                ('sent_date', '>=', cutoff),
+                '&', ('sent_date', '=', False), ('create_date', '>=', cutoff),
+        ]
+        if campaign_only:
+            domain.append(('campaign_id', '!=', False))
+        history = self.env['whatsapp.message'].sudo().search(domain)
+        history_partner_ids = set(history.mapped('partner_id').ids)
+        history_phones = {
+            self.env['whatsapp.message']._normalize_phone(message.phone_number, account=self.account_id)
+            for message in history
+            if message.phone_number
+        }
+        return partners.filtered(
+            lambda partner: partner.id in history_partner_ids
+            or phone_by_partner.get(partner.id) in history_phones
+        )
+
+    def _deduplicate_recipient_phones(self, partners):
+        """Keep one eligible recipient per normalized WhatsApp number."""
+        self.ensure_one()
+        phone_by_partner = self._normalized_recipient_phones(partners)
+        seen = set()
+        unique = self.env['res.partner']
+        duplicates = self.env['res.partner']
+        for partner in partners:
+            phone = phone_by_partner.get(partner.id)
+            if phone and phone in seen:
+                duplicates |= partner
+            else:
+                if phone:
+                    seen.add(phone)
+                unique |= partner
+        return unique, duplicates
+
     def action_load_recipients(self):
         """Load, reconcile, qualify, and explain the campaign audience."""
         self.ensure_one()
@@ -850,7 +977,7 @@ class WhatsAppCampaign(models.Model):
         if unlinked_contacts:
             unlinked_contacts._reconcile_partner_links()
 
-        source_contacts = Contact
+        source_contacts = Contact.browse()
         if self.target_type == 'all':
             partners = Partner.search(self._partner_phone_domain())
         elif self.target_type == 'segment' and self.domain_filter:
@@ -959,38 +1086,41 @@ class WhatsAppCampaign(models.Model):
             exclusion_notes.append(f'Opted out/DND: {len(opted_out)}')
         if self.exclude_recently_contacted and self.recent_contact_days > 0 and partners:
             cutoff = fields.Datetime.now() - timedelta(days=self.recent_contact_days)
-            recent_partner_ids = self.env['whatsapp.message'].sudo().search([
-                ('partner_id', 'in', partners.ids),
-                ('direction', '=', 'outbound'),
-                ('create_date', '>=', cutoff),
-                ('campaign_id', '!=', self.id),
-            ]).mapped('partner_id')
-            if recent_partner_ids:
-                partners = partners - recent_partner_ids
-                exclusion_notes.append(f'Recently contacted ({self.recent_contact_days}d): {len(recent_partner_ids)}')
+            recent_partners = self._partners_with_recent_campaign_activity(partners, cutoff)
+            if recent_partners:
+                partners = partners - recent_partners
+                exclusion_notes.append(f'Recently contacted ({self.recent_contact_days}d): {len(recent_partners)}')
         if self.frequency_cap_days > 0 and partners:
             cutoff = fields.Datetime.now() - timedelta(days=self.frequency_cap_days)
-            capped_partner_ids = self.env['whatsapp.message'].sudo().search([
-                ('partner_id', 'in', partners.ids),
-                ('direction', '=', 'outbound'),
-                ('campaign_id', '!=', False),
-                ('create_date', '>=', cutoff),
-            ]).mapped('partner_id')
-            if capped_partner_ids:
-                partners = partners - capped_partner_ids
-                exclusion_notes.append(f'Campaign frequency cap ({self.frequency_cap_days}d): {len(capped_partner_ids)}')
+            capped_partners = self._partners_with_recent_campaign_activity(
+                partners,
+                cutoff,
+                campaign_only=True,
+            )
+            if capped_partners:
+                partners = partners - capped_partners
+                exclusion_notes.append(f'Campaign frequency cap ({self.frequency_cap_days}d): {len(capped_partners)}')
+
+        partners, duplicate_phone_partners = self._deduplicate_recipient_phones(partners)
+        if duplicate_phone_partners:
+            duplicate_phone_partners.write({
+                'whatsapp_last_exclusion_reason': 'Duplicate normalized WhatsApp phone number',
+            })
+            duplicate_count += len(duplicate_phone_partners)
+            exclusion_notes.append(f'Duplicate WhatsApp numbers merged: {len(duplicate_phone_partners)}')
 
         compliance_excluded = original_partners - partners
         if compliance_excluded:
             compliance_excluded.write({
                 'whatsapp_last_exclusion_reason': '; '.join(exclusion_notes) or 'Excluded by campaign audience rules',
             })
+        filtered_excluded = compliance_excluded - duplicate_phone_partners
         excluded_count = (
             duplicate_count
             + unlinked_count
             + len(missing_phone)
             + len(invalid_phone)
-            + len(compliance_excluded)
+            + len(filtered_excluded)
         )
         audience_notes = [
             f'Matched contact rows: {source_count}',
@@ -1007,7 +1137,7 @@ class WhatsAppCampaign(models.Model):
         audience_notes.extend(exclusion_notes)
         audience_notes.append(f'Final sendable recipients: {len(partners)}')
 
-        self.write({
+        audience_vals = {
             'partner_ids': [(6, 0, partners.ids)],
             'excluded_count': excluded_count,
             'exclusion_notes': '\n'.join(audience_notes),
@@ -1017,7 +1147,14 @@ class WhatsAppCampaign(models.Model):
             'audience_unlinked_count': unlinked_count,
             'audience_missing_phone_count': len(missing_phone),
             'audience_invalid_phone_count': len(invalid_phone),
-        })
+        }
+        if not self.env.context.get('preserve_campaign_preflight'):
+            audience_vals.update({
+                'preflight_state': 'not_run',
+                'preflight_checked_at': False,
+                'preflight_report': False,
+            })
+        self.write(audience_vals)
         if not partners:
             return {
                 'type': 'ir.actions.client',
@@ -1042,6 +1179,121 @@ class WhatsAppCampaign(models.Model):
             }
         }
     
+    def _prepare_campaign_for_launch(self):
+        """Refresh dynamic inputs and enforce local launch requirements."""
+        self.ensure_one()
+        self._check_account_ready_for_send()
+        if self.campaign_type not in ('broadcast', 'drip'):
+            raise UserError(_(
+                "Campaign type '%s' is not wired to a sender yet. "
+                "Use Broadcast or Drip Campaign for production sends."
+            ) % dict(self._fields['campaign_type'].selection).get(self.campaign_type, self.campaign_type))
+        if self.campaign_type == 'broadcast':
+            self._check_recipient_configuration()
+            self._check_message_configuration()
+        elif not self.step_ids:
+            raise UserError(_('Please configure at least one drip step before launching this campaign.'))
+
+        # Refresh immediately before queue creation so copied campaigns include
+        # current opt-outs, valid phones, tags, and frequency exclusions.
+        self.with_context(preserve_campaign_preflight=True).action_load_recipients()
+        if not self.partner_ids:
+            raise UserError(_('No sendable recipients remain after phone, consent, and frequency checks.'))
+        return True
+
+    def action_run_preflight(self):
+        """Run a non-sending end-to-end readiness check for this campaign."""
+        self.ensure_one()
+        checks = []
+        warnings = []
+        errors = []
+
+        if self.state != 'draft':
+            errors.append(_("Campaign must be a Draft. Use Reset to Draft only for an empty copied campaign."))
+        if self.message_ids.filtered(lambda message: message.direction == 'outbound'):
+            errors.append(_("This campaign already has outbound history. Duplicate it before launching another send."))
+
+        if not errors:
+            try:
+                self._prepare_campaign_for_launch()
+                checks.append(_("Audience refreshed: %s unique sendable recipient(s).") % len(self.partner_ids))
+                checks.append(_("Template/content, media, reply rules, consent, and phone checks passed."))
+            except (UserError, ValidationError) as exc:
+                errors.append(str(exc))
+
+        try:
+            self.account_id.action_sync_meta_health()
+            checks.append(
+                _("Meta account is reachable (quality: %s, limit: %s).") % (
+                    self.account_id.quality_rating or _('unknown'),
+                    self.account_id.messaging_limit or _('unknown'),
+                )
+            )
+        except Exception as exc:
+            errors.append(_("Meta account health check failed: %s") % (str(exc) or exc.__class__.__name__))
+
+        worker_issues = []
+        for xmlid, model_name, code, _interval, _interval_type in self._delivery_cron_specs():
+            cron = self.env.ref(xmlid, raise_if_not_found=False)
+            actual_model = cron.model_id.model if cron and cron.model_id else False
+            if not cron or not cron.active or actual_model != model_name or cron.code != code:
+                worker_issues.append(xmlid.rsplit('.', 1)[-1])
+        if worker_issues:
+            errors.append(_("Delivery workers need repair: %s") % ', '.join(worker_issues))
+        else:
+            checks.append(_("All %s WhatsApp delivery workers are active.") % len(self._delivery_cron_specs()))
+
+        parameters = self.env['ir.config_parameter'].sudo()
+        realtime_mode = parameters.get_param('whatsapp.realtime.mode', default='bus')
+        sidecar_url = parameters.get_param('whatsapp.sidecar.url')
+        if sidecar_url:
+            try:
+                response = requests.get(f"{sidecar_url.rstrip('/')}/health", timeout=5)
+                response.raise_for_status()
+                sidecar_data = response.json() if 'application/json' in response.headers.get('Content-Type', '') else {}
+                queue_data = sidecar_data.get('queue') or {}
+                checks.append(
+                    _("Sidecar is online (queue driver: %s, queued: %s, dead: %s).") % (
+                        queue_data.get('driver') or sidecar_data.get('redis') or _('unknown'),
+                        queue_data.get('queued', 0),
+                        queue_data.get('dead', 0),
+                    )
+                )
+                if queue_data.get('dead'):
+                    warnings.append(_("Sidecar has %s dead-letter webhook item(s) requiring review.") % queue_data['dead'])
+            except Exception as exc:
+                message = _("Sidecar health check failed: %s") % (str(exc) or exc.__class__.__name__)
+                (errors if realtime_mode == 'socket' else warnings).append(message)
+        elif realtime_mode == 'socket':
+            errors.append(_("Realtime mode is Sidecar Socket but no sidecar URL is configured."))
+        else:
+            warnings.append(_("Sidecar URL is not configured; ERP Bus mode remains available."))
+
+        if self.account_id.webhook_status != 'verified':
+            warnings.append(_("Webhook is not marked Verified; delivery/read/reply updates may be delayed."))
+
+        state = 'failed' if errors else ('warning' if warnings else 'passed')
+        report_lines = (
+            ["OK - %s" % line for line in checks]
+            + ["CHECK - %s" % line for line in warnings]
+            + ["FIX - %s" % line for line in errors]
+        )
+        self.write({
+            'preflight_state': state,
+            'preflight_checked_at': fields.Datetime.now(),
+            'preflight_report': '\n'.join(report_lines),
+        })
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Campaign Preflight Passed') if not errors else _('Campaign Preflight Failed'),
+                'message': '\n'.join(report_lines),
+                'type': 'danger' if errors else ('warning' if warnings else 'success'),
+                'sticky': bool(errors or warnings),
+            },
+        }
+
     def action_send_campaign(self):
         """Send campaign messages and turn unexpected failures into operator-safe errors."""
         self.ensure_one()
@@ -1070,21 +1322,23 @@ class WhatsAppCampaign(models.Model):
     def _action_send_campaign_impl(self):
         """Send campaign messages or start drip sequence"""
         self.ensure_one()
-        self._check_account_ready_for_send()
-        if self.campaign_type not in ('broadcast', 'drip'):
+        self.lock_for_update()
+        scheduled_execution = bool(self.env.context.get('scheduled_campaign_execution'))
+        if self.state != 'draft' and not (scheduled_execution and self.state == 'scheduled'):
             raise UserError(_(
-                "Campaign type '%s' is not wired to a sender yet. "
-                "Use Broadcast or Drip Campaign for production sends."
-            ) % dict(self._fields['campaign_type'].selection).get(self.campaign_type, self.campaign_type))
-        if self.campaign_type == 'broadcast':
-            self._check_recipient_configuration()
-            self._check_message_configuration()
-        
-        if not self.partner_ids:
-            self.action_load_recipients()
-        if not self.partner_ids:
-            from odoo.exceptions import UserError
-            raise UserError('No recipients selected.')
+                "Only a Draft campaign can be launched. Duplicate campaigns with send history, "
+                "or reset an empty copied campaign to Draft first."
+            ))
+        existing_outbound = self.env['whatsapp.message'].sudo().search_count([
+            ('campaign_id', '=', self.id),
+            ('direction', '=', 'outbound'),
+        ])
+        if existing_outbound and not self.env.context.get('allow_campaign_rerun'):
+            raise UserError(_(
+                "This campaign already has %s outbound message record(s). "
+                "It was not queued again; duplicate the campaign to start a new run."
+            ) % existing_outbound)
+        self._prepare_campaign_for_launch()
 
         now = fields.Datetime.now()
         scheduled_for_later = (
@@ -1094,9 +1348,6 @@ class WhatsAppCampaign(models.Model):
         )
         target_state = 'scheduled' if scheduled_for_later else 'running'
 
-        if self.campaign_type == 'drip' and not self.step_ids:
-            raise UserError('Please configure at least one drip step before launching this campaign.')
-        
         if self.campaign_type == 'broadcast':
             messages_to_create = []
             failed_messages_to_create = []
@@ -1681,36 +1932,151 @@ class WhatsAppCampaign(models.Model):
             'target': 'current',
         }
 
+    def _stop_pending_delivery(self):
+        """Stop queue, retry, drip, and scheduler work without deleting history."""
+        Message = self.env['whatsapp.message'].sudo()
+        ScheduledCampaign = self.env['whatsapp.scheduled.campaign'].sudo()
+        stopped_messages = 0
+        stopped_retries = 0
+        stopped_participants = 0
+        stopped_schedules = 0
+
+        for campaign in self:
+            pending = Message.search([
+                ('campaign_id', '=', campaign.id),
+                ('status', 'in', ['draft', 'queued']),
+            ])
+            if pending:
+                pending.write({
+                    'status': 'cancelled',
+                    'next_retry_at': False,
+                    'error_message': False,
+                })
+                stopped_messages += len(pending)
+
+            retryable_failed = Message.search([
+                ('campaign_id', '=', campaign.id),
+                ('status', '=', 'failed'),
+                ('next_retry_at', '!=', False),
+            ])
+            if retryable_failed:
+                retryable_failed.write({'next_retry_at': False})
+                stopped_retries += len(retryable_failed)
+
+            active_participants = campaign.participant_ids.filtered(
+                lambda participant: participant.state in ('running', 'paused')
+            )
+            if active_participants:
+                active_participants.write({'state': 'stopped', 'next_execution_date': False})
+                stopped_participants += len(active_participants)
+
+            active_schedules = ScheduledCampaign.search([
+                ('campaign_id', '=', campaign.id),
+                ('status', 'in', ['draft', 'scheduled', 'running']),
+            ])
+            if active_schedules:
+                active_schedules.write({'status': 'cancelled'})
+                stopped_schedules += len(active_schedules)
+
+            campaign.last_batch_at = False
+
+        return {
+            'messages': stopped_messages,
+            'retries': stopped_retries,
+            'participants': stopped_participants,
+            'schedules': stopped_schedules,
+        }
+
     def action_cancel(self):
-        """Cancel the campaign"""
-        self.state = 'cancelled'
+        """Cancel future work while preserving delivered message history."""
+        stopped = self._stop_pending_delivery()
+        self.write({'state': 'cancelled'})
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Campaign Cancelled'),
+                'message': _(
+                    '%(messages)s queued message(s), %(retries)s retry attempt(s), '
+                    '%(participants)s drip participant(s), and %(schedules)s schedule(s) were stopped.'
+                ) % stopped,
+                'type': 'success',
+            },
+        }
 
     def action_archive_record(self):
+        self._stop_pending_delivery()
         self.write({'state': 'archived'})
         return True
 
     def action_unarchive_record(self):
-        self.filtered(lambda campaign: campaign.state == 'archived').write({'state': 'draft'})
+        for campaign in self.filtered(lambda item: item.state == 'archived'):
+            has_history = bool(campaign.message_ids or campaign.participant_ids)
+            campaign.write({'state': 'cancelled' if has_history else 'draft'})
+        return True
+
+    def action_reset_to_draft(self):
+        """Reopen only empty cancelled copies; sent campaign history is immutable."""
+        for campaign in self:
+            if campaign.state not in ('cancelled', 'archived'):
+                raise UserError(_('Only a Cancelled or Archived campaign can be reset.'))
+            if campaign.message_ids or campaign.participant_ids:
+                raise UserError(_(
+                    'This campaign has delivery history and cannot be reset. '
+                    'Duplicate it to create a clean Draft campaign.'
+                ))
+            active_schedule = self.env['whatsapp.scheduled.campaign'].sudo().search_count([
+                ('campaign_id', '=', campaign.id),
+                ('status', 'in', ['draft', 'scheduled', 'running']),
+            ])
+            if active_schedule:
+                raise UserError(_('Cancel the active campaign schedule before resetting to Draft.'))
+            campaign.write({
+                'state': 'draft',
+                'schedule_type': 'immediate',
+                'schedule_date': False,
+                'last_batch_at': False,
+                'preflight_state': 'not_run',
+                'preflight_checked_at': False,
+                'preflight_report': False,
+            })
         return True
 
     def action_retry_failed_messages(self):
+        total_retryable = 0
+        total_blocked = 0
         for campaign in self:
+            if campaign.state in ('cancelled', 'archived'):
+                raise UserError(_(
+                    'A Cancelled or Archived campaign cannot be restarted with Retry Failed. '
+                    'Duplicate it to create a new delivery run.'
+                ))
             failed = campaign.message_ids.filtered(lambda msg: msg.status == 'failed')
-            failed.write({
+            retryable = failed.filtered(lambda msg: not msg._is_non_retryable_failure())
+            blocked = failed - retryable
+            total_retryable += len(retryable)
+            total_blocked += len(blocked)
+            if not retryable:
+                continue
+            retryable.write({
                 'status': 'queued',
                 'retry_count': 0,
                 'next_retry_at': fields.Datetime.now(),
                 'error_message': False,
             })
-            if failed and campaign.state in ('completed', 'cancelled'):
-                campaign.state = 'running'
+            campaign.write({'state': 'running', 'last_batch_at': False})
+        if total_retryable:
+            self._wake_campaign_queue_cron()
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
                 'title': 'Failed Messages Requeued',
-                'message': 'Failed campaign messages were placed back into the safe sending queue.',
-                'type': 'success',
+                'message': _(
+                    '%(retryable)s retryable message(s) were queued. '
+                    '%(blocked)s permanent failure(s) were left unchanged.'
+                ) % {'retryable': total_retryable, 'blocked': total_blocked},
+                'type': 'success' if total_retryable else 'warning',
             },
         }
 

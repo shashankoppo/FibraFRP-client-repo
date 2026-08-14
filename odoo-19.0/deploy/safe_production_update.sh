@@ -122,6 +122,21 @@ if [ "${ODOO_HEALTHY}" != "YES" ]; then
   exit 1
 fi
 
+echo "==> Waiting for WhatsApp sidecar health check"
+SIDECAR_HEALTHY="NO"
+for _attempt in $(seq 1 30); do
+  if docker compose exec -T sidecar wget -q -O /dev/null http://127.0.0.1:3000/health >/dev/null 2>&1; then
+    SIDECAR_HEALTHY="YES"
+    break
+  fi
+  sleep 2
+done
+if [ "${SIDECAR_HEALTHY}" != "YES" ]; then
+  echo "ERROR: WhatsApp sidecar did not become healthy after the module upgrade." >&2
+  docker logs --tail 250 whatsapp_sidecar >&2 || true
+  exit 1
+fi
+
 case ",${ALL_INSTALL_MODULES},${ALL_UPGRADE_MODULES}," in
   *",elsx_whatsapp_marketing,"*)
     echo "==> Verifying WhatsApp contact import schema"

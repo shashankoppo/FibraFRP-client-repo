@@ -3,6 +3,7 @@ import json
 from unittest.mock import patch
 
 from odoo import fields
+from odoo.exceptions import UserError
 from odoo.tests.common import TransactionCase
 
 from ..models.whatsapp_account import WhatsAppAccount
@@ -451,3 +452,169 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
             self.env['whatsapp.campaign']._cron_process_global_queue()
 
         schedule_next.assert_not_called()
+
+    def test_cancel_campaign_stops_pending_delivery_without_losing_history(self):
+        campaign = self.env['whatsapp.campaign'].create({
+            'name': 'Campaign To Cancel',
+            'account_id': self.account.id,
+            'campaign_type': 'broadcast',
+            'target_type': 'manual',
+            'message_body': 'Hello',
+            'state': 'running',
+        })
+        future = fields.Datetime.add(fields.Datetime.now(), hours=1)
+        queued, failed, sent = self.env['whatsapp.message'].create([
+            {
+                'account_id': self.account.id,
+                'campaign_id': campaign.id,
+                'phone_number': '919881936101',
+                'direction': 'outbound',
+                'status': 'queued',
+                'body': 'Queued',
+                'next_retry_at': future,
+            },
+            {
+                'account_id': self.account.id,
+                'campaign_id': campaign.id,
+                'phone_number': '919881936102',
+                'direction': 'outbound',
+                'status': 'failed',
+                'body': 'Failed',
+                'next_retry_at': future,
+                'error_message': 'Temporary failure',
+            },
+            {
+                'account_id': self.account.id,
+                'campaign_id': campaign.id,
+                'phone_number': '919881936103',
+                'direction': 'outbound',
+                'status': 'sent',
+                'body': 'Sent',
+            },
+        ])
+
+        campaign.action_cancel()
+
+        (queued | failed | sent).invalidate_recordset(['status', 'next_retry_at'])
+        self.assertEqual(campaign.state, 'cancelled')
+        self.assertEqual(queued.status, 'cancelled')
+        self.assertFalse(queued.next_retry_at)
+        self.assertEqual(failed.status, 'failed')
+        self.assertFalse(failed.next_retry_at)
+        self.assertEqual(sent.status, 'sent')
+
+    def test_duplicate_campaign_is_clean_draft_with_configuration(self):
+        partner = self.env['res.partner'].with_context(skip_whatsapp_contact_sync=True).create({
+            'name': 'Duplicate Recipient',
+            'phone': '919881936111',
+        })
+        campaign = self.env['whatsapp.campaign'].create({
+            'name': 'Completed Campaign',
+            'account_id': self.account.id,
+            'campaign_type': 'broadcast',
+            'target_type': 'manual',
+            'partner_ids': [(6, 0, partner.ids)],
+            'message_body': 'Preserved content',
+            'schedule_type': 'scheduled',
+            'schedule_date': fields.Datetime.add(fields.Datetime.now(), hours=1),
+            'state': 'cancelled',
+        })
+        self.env['whatsapp.message'].create({
+            'account_id': self.account.id,
+            'campaign_id': campaign.id,
+            'partner_id': partner.id,
+            'phone_number': partner.phone,
+            'direction': 'outbound',
+            'status': 'sent',
+            'body': campaign.message_body,
+        })
+
+        duplicate = campaign.copy({'name': 'Duplicated Campaign'})
+
+        self.assertEqual(duplicate.state, 'draft')
+        self.assertEqual(duplicate.schedule_type, 'immediate')
+        self.assertFalse(duplicate.schedule_date)
+        self.assertEqual(duplicate.partner_ids, partner)
+        self.assertEqual(duplicate.message_body, 'Preserved content')
+        self.assertFalse(duplicate.message_ids)
+        self.assertEqual(duplicate.preflight_state, 'not_run')
+
+    def test_cancelled_queue_does_not_suppress_new_campaign_recipients(self):
+        queued_partner, sent_partner = self.env['res.partner'].with_context(
+            skip_whatsapp_contact_sync=True
+        ).create([
+            {'name': 'Cancelled Queue Recipient', 'phone': '919881936121'},
+            {'name': 'Actually Sent Recipient', 'phone': '919881936122'},
+        ])
+        old_campaign = self.env['whatsapp.campaign'].create({
+            'name': 'Old Campaign',
+            'account_id': self.account.id,
+            'campaign_type': 'broadcast',
+            'target_type': 'manual',
+            'message_body': 'Old',
+            'state': 'running',
+        })
+        self.env['whatsapp.message'].create([
+            {
+                'account_id': self.account.id,
+                'campaign_id': old_campaign.id,
+                'partner_id': queued_partner.id,
+                'phone_number': queued_partner.phone,
+                'direction': 'outbound',
+                'status': 'queued',
+                'body': 'Never sent',
+            },
+            {
+                'account_id': self.account.id,
+                'campaign_id': old_campaign.id,
+                'partner_id': sent_partner.id,
+                'phone_number': sent_partner.phone,
+                'direction': 'outbound',
+                'status': 'sent',
+                'sent_date': fields.Datetime.now(),
+                'body': 'Sent',
+            },
+        ])
+        old_campaign.action_cancel()
+        new_campaign = self.env['whatsapp.campaign'].create({
+            'name': 'New Campaign',
+            'account_id': self.account.id,
+            'campaign_type': 'broadcast',
+            'target_type': 'manual',
+            'partner_ids': [(6, 0, (queued_partner | sent_partner).ids)],
+            'message_body': 'New',
+            'exclude_recently_contacted': True,
+            'recent_contact_days': 7,
+        })
+
+        new_campaign.action_load_recipients()
+
+        self.assertIn(queued_partner, new_campaign.partner_ids)
+        self.assertNotIn(sent_partner, new_campaign.partner_ids)
+
+    def test_campaign_with_outbound_history_cannot_be_queued_again(self):
+        partner = self.env['res.partner'].with_context(skip_whatsapp_contact_sync=True).create({
+            'name': 'Protected Recipient',
+            'phone': '919881936131',
+        })
+        campaign = self.env['whatsapp.campaign'].create({
+            'name': 'Protected Campaign',
+            'account_id': self.account.id,
+            'campaign_type': 'broadcast',
+            'target_type': 'manual',
+            'partner_ids': [(6, 0, partner.ids)],
+            'message_body': 'Hello',
+            'exclude_recently_contacted': False,
+        })
+        self.env['whatsapp.message'].create({
+            'account_id': self.account.id,
+            'campaign_id': campaign.id,
+            'partner_id': partner.id,
+            'phone_number': partner.phone,
+            'direction': 'outbound',
+            'status': 'cancelled',
+            'body': 'Old queue row',
+        })
+
+        with self.assertRaises(UserError):
+            campaign.action_send_campaign()

@@ -617,10 +617,10 @@ class WhatsAppScheduledCampaign(models.Model):
                     )
                     continue
 
-            # Force reload recipients to capture any dynamic updates without
-            # rewinding running/completed campaigns back to draft.
-            campaign.action_load_recipients()
-            campaign.action_send_campaign()
+            campaign.with_context(
+                scheduled_campaign_execution=True,
+                allow_campaign_rerun=record.schedule_type == 'recurring',
+            ).action_send_campaign()
 
     @api.model
     def _cron_process_scheduled_campaigns(self):
@@ -701,23 +701,33 @@ class WhatsAppCampaignScheduleWizard(models.TransientModel):
     def action_schedule(self):
         """Apply the schedule"""
         self.ensure_one()
+        campaign = self.campaign_id
+        if campaign.state != 'draft':
+            raise UserError('Only a Draft campaign can be scheduled or sent.')
+        active_schedule = self.env['whatsapp.scheduled.campaign'].sudo().search_count([
+            ('campaign_id', '=', campaign.id),
+            ('status', 'in', ['draft', 'scheduled', 'running']),
+        ])
+        if active_schedule:
+            raise UserError('This campaign already has an active schedule.')
         
         if self.schedule_type == 'immediate':
-            return self.campaign_id.action_send_campaign()
+            return campaign.action_send_campaign()
         elif self.schedule_type == 'scheduled':
             if not self.scheduled_date:
                 raise UserError("Please select a scheduled date.")
+            campaign._prepare_campaign_for_launch()
             
             # Create a once-off scheduled campaign record
             self.env['whatsapp.scheduled.campaign'].create({
-                'campaign_id': self.campaign_id.id,
+                'campaign_id': campaign.id,
                 'scheduled_date': self.scheduled_date,
                 'timezone_id': self.timezone_id,
                 'status': 'scheduled',
                 'schedule_type': 'once',
             })
             # Mark campaign state as scheduled
-            self.campaign_id.write({
+            campaign.write({
                 'schedule_type': 'scheduled',
                 'schedule_date': self.scheduled_date,
                 'state': 'scheduled',
@@ -733,10 +743,11 @@ class WhatsAppCampaignScheduleWizard(models.TransientModel):
                 raise UserError("Please specify a cron expression.")
             if self.recurring_type == 'custom':
                 _next_from_cron_expression(self.cron_expression, self.scheduled_date)
+            campaign._prepare_campaign_for_launch()
                 
             # Create a recurring scheduled campaign record
             self.env['whatsapp.scheduled.campaign'].create({
-                'campaign_id': self.campaign_id.id,
+                'campaign_id': campaign.id,
                 'scheduled_date': self.scheduled_date,
                 'timezone_id': self.timezone_id,
                 'status': 'scheduled',
@@ -747,7 +758,7 @@ class WhatsAppCampaignScheduleWizard(models.TransientModel):
                 'cron_expression': self.cron_expression,
             })
             # Mark campaign state as scheduled
-            self.campaign_id.write({
+            campaign.write({
                 'schedule_type': 'scheduled',
                 'schedule_date': self.scheduled_date,
                 'state': 'scheduled',
