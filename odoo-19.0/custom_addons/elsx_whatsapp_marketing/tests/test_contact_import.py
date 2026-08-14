@@ -205,16 +205,49 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
         self.assertTrue(contact.partner_id)
         self.assertIn(tag.partner_category_id, contact.partner_id.category_id)
 
+    def test_tag_audience_matches_legacy_duplicate_category_by_name(self):
+        contact_tag = self.env['whatsapp.contact.tag'].create({'name': 'Legacy Audience'})
+        selected_category = self.env['res.partner.category'].create({'name': 'legacy audience'})
+        contact = self.env['whatsapp.contact'].create({
+            'name': 'Legacy Tagged Contact',
+            'phone_number': '919881934778',
+            'tag_ids': [(6, 0, contact_tag.ids)],
+        })
+        self.assertNotEqual(contact_tag.partner_category_id, selected_category)
+
+        campaign = self.env['whatsapp.campaign'].create({
+            'name': 'Legacy Tag Campaign',
+            'account_id': self.account.id,
+            'campaign_type': 'broadcast',
+            'target_type': 'tags',
+            'tag_ids': [(6, 0, selected_category.ids)],
+            'message_body': 'Hello',
+            'exclude_recently_contacted': False,
+        })
+
+        campaign.action_load_recipients()
+
+        self.assertIn(contact.partner_id, campaign.partner_ids)
+        self.assertEqual(campaign.audience_source_count, 1)
+
     def test_campaign_delivery_crons_are_repaired(self):
         self.env['whatsapp.campaign']._repair_delivery_crons()
 
         queue_cron = self.env.ref('elsx_whatsapp_marketing.ir_cron_process_whatsapp_queue')
+        direct_queue_cron = self.env.ref('elsx_whatsapp_marketing.ir_cron_process_direct_message_queue')
         retry_cron = self.env.ref('elsx_whatsapp_marketing.ir_cron_retry_failed_messages')
+        webhook_cron = self.env.ref('elsx_whatsapp_marketing.ir_cron_recover_received_webhooks')
         self.assertTrue(queue_cron.active)
         self.assertEqual(queue_cron.model_id.model, 'whatsapp.campaign')
         self.assertEqual(queue_cron.code, 'model._cron_process_global_queue()')
         self.assertTrue(retry_cron.active)
         self.assertEqual(retry_cron.model_id.model, 'whatsapp.message')
+        self.assertTrue(direct_queue_cron.active)
+        self.assertEqual(direct_queue_cron.model_id.model, 'whatsapp.message')
+        self.assertEqual(direct_queue_cron.code, 'model._cron_process_broadcast_queue()')
+        self.assertTrue(webhook_cron.active)
+        self.assertEqual(webhook_cron.model_id.model, 'whatsapp.webhook.log')
+        self.assertEqual(webhook_cron.code, 'model._cron_recover_received()')
 
     def test_phone_matching_does_not_merge_different_country_codes(self):
         us_partner = self.env['res.partner'].with_context(skip_whatsapp_contact_sync=True).create({

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import json
+import importlib.util
 import time
 
 from markupsafe import Markup, escape
@@ -36,7 +37,27 @@ class WhatsAppDiagnosticSnapshot(models.Model):
         Message = self.env['whatsapp.message'].sudo()
         Campaign = self.env['whatsapp.campaign'].sudo()
         Account = self.env['whatsapp.account'].sudo()
+        Contact = self.env['whatsapp.contact'].sudo()
+        Template = self.env['whatsapp.template'].sudo()
         Webhook = self.env['whatsapp.webhook.log'].sudo()
+
+        cron_checks = []
+        for xmlid, model_name, code, _interval, _interval_type in Campaign._delivery_cron_specs():
+            cron = self.env.ref(xmlid, raise_if_not_found=False)
+            actual_model = cron.model_id.model if cron and cron.model_id else False
+            cron_checks.append({
+                'xmlid': xmlid,
+                'model': model_name,
+                'code': code,
+                'active': bool(cron and cron.active),
+                'healthy': bool(cron and cron.active and actual_model == model_name and cron.code == code),
+            })
+
+        approved_templates = Template.search([('status', '=', 'approved'), ('active', '=', True)])
+        send_ready_templates = approved_templates.filtered(
+            lambda template: template.header_type not in ('image', 'video', 'document')
+            or template._has_send_ready_header_media(account=template.account_id)
+        )
 
         data = {
             'generated_at': fields.Datetime.to_string(now),
@@ -46,12 +67,18 @@ class WhatsAppDiagnosticSnapshot(models.Model):
                 'ai_enabled': ICP.get_param('elsx_ai.enabled', default='False'),
                 'ai_auto_write': ICP.get_param('elsx_ai.auto_write', default='False'),
                 'sidecar_configured': bool(ICP.get_param('whatsapp.sidecar.url')),
+                'phone_validation_installed': bool(importlib.util.find_spec('phonenumbers')),
             },
             'counts': {
                 'accounts': Account.search_count([]),
+                'connected_accounts': Account.search_count([('active', '=', True), ('status', '=', 'connected')]),
                 'chats': self._count_if_model('whatsapp.chat'),
                 'messages': Message.search_count([]),
                 'campaigns': Campaign.search_count([]),
+                'contacts': Contact.search_count([]),
+                'linked_contacts': Contact.search_count([('partner_id', '!=', False)]),
+                'approved_templates': len(approved_templates),
+                'send_ready_templates': len(send_ready_templates),
                 'ai_jobs': self._count_if_model('elsx.ai.job'),
             },
             'queues': {
@@ -64,6 +91,19 @@ class WhatsAppDiagnosticSnapshot(models.Model):
                 'failed_messages': Message.search_count([('status', '=', 'failed')]),
                 'running_campaigns': Campaign.search_count([('state', 'in', ('running', 'scheduled'))]),
                 'failed_ai_jobs': self._count_if_model('elsx.ai.job', [('state', '=', 'failed')]),
+                'pending_webhooks': Webhook.search_count([
+                    ('event_type', '=', 'waba_webhook'),
+                    ('status', '=', 'received'),
+                ]),
+                'errored_webhooks': Webhook.search_count([
+                    ('event_type', '=', 'waba_webhook'),
+                    ('status', '=', 'error'),
+                ]),
+            },
+            'workers': {
+                'required': len(cron_checks),
+                'healthy': len([check for check in cron_checks if check['healthy']]),
+                'checks': cron_checks,
             },
             'freshness': {},
         }
@@ -91,9 +131,21 @@ class WhatsAppDiagnosticSnapshot(models.Model):
     def _severity_for_snapshot(self, data):
         queues = data.get('queues', {})
         freshness = data.get('freshness', {})
+        counts = data.get('counts', {})
+        workers = data.get('workers', {})
+        if workers.get('healthy', 0) != workers.get('required', 0):
+            return 'critical'
+        if counts.get('accounts', 0) and not counts.get('connected_accounts', 0):
+            return 'critical'
         if queues.get('failed_messages', 0) > 50 or queues.get('failed_ai_jobs', 0) > 10:
             return 'critical'
-        if queues.get('queued_campaign_messages', 0) > 500 or freshness.get('stale_connected_accounts'):
+        if (
+            queues.get('queued_campaign_messages', 0) > 500
+            or queues.get('pending_webhooks', 0)
+            or queues.get('errored_webhooks', 0)
+            or freshness.get('stale_connected_accounts')
+            or not data.get('settings', {}).get('phone_validation_installed')
+        ):
             return 'warning'
         if data.get('settings', {}).get('ai_enabled') == 'True' and data.get('settings', {}).get('ai_auto_write') == 'True':
             return 'warning'
@@ -121,11 +173,13 @@ class WhatsAppDiagnosticSnapshot(models.Model):
             card('Realtime', settings.get('realtime_mode'), 'socket is optional; bus is default'),
             card('History Limit', settings.get('history_initial_limit'), 'initial messages rendered'),
             card('Messages', counts.get('messages')),
+            card('Contacts Linked', f"{counts.get('linked_contacts', 0)} / {counts.get('contacts', 0)}"),
+            card('Templates Ready', f"{counts.get('send_ready_templates', 0)} / {counts.get('approved_templates', 0)}"),
+            card('Workers Healthy', f"{data.get('workers', {}).get('healthy', 0)} / {data.get('workers', {}).get('required', 0)}"),
             card('Failed Messages', queues.get('failed_messages')),
             card('Queued Campaign', queues.get('queued_campaign_messages')),
             card('Retryable Failed', queues.get('failed_retryable_messages')),
-            card('AI Enabled', settings.get('ai_enabled')),
-            card('AI Jobs Failed', queues.get('failed_ai_jobs')),
+            card('Pending Webhooks', queues.get('pending_webhooks')),
         ]
         stale = freshness.get('stale_connected_accounts') or []
         stale_html = ''
@@ -158,11 +212,18 @@ class WhatsAppDiagnosticSnapshot(models.Model):
             "Realtime mode: %s" % settings.get('realtime_mode'),
             "History initial limit: %s" % settings.get('history_initial_limit'),
             "Messages: %s" % counts.get('messages'),
+            "Connected accounts: %s / %s" % (counts.get('connected_accounts'), counts.get('accounts')),
+            "Contacts linked: %s / %s" % (counts.get('linked_contacts'), counts.get('contacts')),
+            "Approved templates send-ready: %s / %s" % (counts.get('send_ready_templates'), counts.get('approved_templates')),
+            "Critical workers healthy: %s / %s" % (data.get('workers', {}).get('healthy'), data.get('workers', {}).get('required')),
             "Chats: %s" % counts.get('chats'),
             "Campaigns: %s" % counts.get('campaigns'),
             "Failed messages: %s" % queues.get('failed_messages'),
             "Queued campaign messages: %s" % queues.get('queued_campaign_messages'),
             "Retryable failed messages: %s" % queues.get('failed_retryable_messages'),
+            "Pending webhooks: %s" % queues.get('pending_webhooks'),
+            "Errored webhooks: %s" % queues.get('errored_webhooks'),
+            "Phone validation installed: %s" % settings.get('phone_validation_installed'),
             "AI enabled: %s" % settings.get('ai_enabled'),
             "Failed AI jobs: %s" % queues.get('failed_ai_jobs'),
         ]

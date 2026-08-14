@@ -21,6 +21,16 @@
             <field name="active" eval="True"/>
         </record>
 
+        <record id="ir_cron_process_direct_message_queue" model="ir.cron">
+            <field name="name">WhatsApp: Process Direct Message Queue</field>
+            <field name="model_id" ref="elsx_whatsapp_marketing.model_whatsapp_message"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_process_broadcast_queue()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">minutes</field>
+            <field name="active" eval="True"/>
+        </record>
+
         <record id="ir_cron_resume_delayed_bot_flows" model="ir.cron">
             <field name="name">WhatsApp: Resume Delayed Bot Flows</field>
             <field name="model_id" ref="elsx_whatsapp_marketing.model_whatsapp_bot_flow_log"/>
@@ -50,6 +60,16 @@
             <field name="code">model._cron_cleanup_old_logs()</field>
             <field name="interval_number">1</field>
             <field name="interval_type">days</field>
+            <field name="active" eval="True"/>
+        </record>
+
+        <record id="ir_cron_recover_received_webhooks" model="ir.cron">
+            <field name="name">WhatsApp: Recover Pending Webhooks</field>
+            <field name="model_id" ref="elsx_whatsapp_marketing.model_whatsapp_webhook_log"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_recover_received()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">minutes</field>
             <field name="active" eval="True"/>
         </record>
 

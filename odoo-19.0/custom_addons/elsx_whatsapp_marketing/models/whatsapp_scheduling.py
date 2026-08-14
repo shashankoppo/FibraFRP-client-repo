@@ -227,7 +227,7 @@ class WhatsAppScheduledMessage(models.Model):
         vals = _canonicalize_timezone_vals(vals)
         return super().write(vals)
     
-    @api.depends('scheduled_date', 'recurring_type', 'recurrence_end_date')
+    @api.depends('scheduled_date', 'schedule_type', 'recurring_type', 'recurrence_end_date', 'status')
     def _compute_next_execution(self):
         for record in self:
             if record.status in ['completed', 'cancelled', 'failed']:
@@ -276,6 +276,8 @@ class WhatsAppScheduledMessage(models.Model):
                     record._get_next_recurring_date(record.scheduled_date)
             if not record.scheduled_date:
                 raise UserError("Please specify a scheduled date/time.")
+            if record.scheduled_date < fields.Datetime.now() and not record.send_immediately_if_past:
+                raise UserError("The scheduled time is in the past. Choose a future time or allow immediate sending.")
         self.write({'status': 'scheduled'})
         
         return {
@@ -293,16 +295,19 @@ class WhatsAppScheduledMessage(models.Model):
         self.ensure_one()
         
         try:
-            self._execute_send()
+            messages = self._execute_send()
             self.write({'status': 'completed', 'last_execution_date': fields.Datetime.now()})
+            sent = len(messages.filtered(lambda msg: msg.status in ('sent', 'delivered', 'read')))
+            queued = len(messages.filtered(lambda msg: msg.status in ('draft', 'queued')))
+            failed = len(messages.filtered(lambda msg: msg.status == 'failed'))
             
             return {
                 'type': 'ir.actions.client',
                 'tag': 'display_notification',
                 'params': {
-                    'title': 'Message Sent',
-                    'message': 'Message sent successfully',
-                    'type': 'success',
+                    'title': 'Scheduled Message Processed',
+                    'message': f'{sent} sent, {queued} queued, {failed} failed. Message records contain the delivery details.',
+                    'type': 'warning' if queued or failed else 'success',
                 }
             }
         except Exception as e:
@@ -330,15 +335,18 @@ class WhatsAppScheduledMessage(models.Model):
         elif self.recipient_type == 'campaign':
             recipients = self.campaign_id.partner_ids
         else:
-            return
+            raise UserError("Please select a valid scheduled recipient type.")
 
         recipients = recipients.filtered(lambda partner: partner)
         if not recipients:
             raise UserError("Please select at least one scheduled recipient.")
 
+        created_messages = self.env['whatsapp.message']
+        skipped_without_phone = 0
         for partner in recipients:
             phone = getattr(partner, 'mobile', False) or partner.phone
             if not phone:
+                skipped_without_phone += 1
                 continue
 
             if self.message_type == 'text':
@@ -354,7 +362,11 @@ class WhatsAppScheduledMessage(models.Model):
             elif self.message_type == 'template':
                 if not self.template_id:
                     raise UserError("Please select a template for scheduled template messages.")
-                payload = self.template_id._prepare_send_payload(partner=partner)
+                if self.template_id.status != 'approved':
+                    raise UserError("Scheduled template messages require an approved template.")
+                if self.template_id.account_id and self.template_id.account_id != self.account_id:
+                    raise UserError("The scheduled template belongs to a different WhatsApp account.")
+                payload = self.template_id._prepare_send_payload(partner=partner, account=self.account_id)
                 vals = {
                     'account_id': self.account_id.id,
                     'phone_number': phone,
@@ -388,6 +400,12 @@ class WhatsAppScheduledMessage(models.Model):
 
             message = self.env['whatsapp.message'].create(vals)
             message.action_send()
+            created_messages |= message
+
+        if not created_messages:
+            detail = f' ({skipped_without_phone} recipient(s) had no phone number)' if skipped_without_phone else ''
+            raise UserError(f'No scheduled message could be created{detail}.')
+        return created_messages
     
     def action_cancel(self):
         """Cancel scheduled message"""
@@ -497,7 +515,7 @@ class WhatsAppScheduledCampaign(models.Model):
         vals = _canonicalize_timezone_vals(vals)
         return super().write(vals)
 
-    @api.depends('scheduled_date', 'recurring_type', 'recurrence_end_date')
+    @api.depends('scheduled_date', 'schedule_type', 'recurring_type', 'recurrence_end_date', 'status')
     def _compute_next_execution(self):
         for record in self:
             if record.status in ['completed', 'cancelled', 'failed']:
@@ -535,6 +553,15 @@ class WhatsAppScheduledCampaign(models.Model):
     def action_schedule(self):
         """Schedule the campaign"""
         for record in self:
+            if record.split_percentage < 0 or record.split_percentage > 100:
+                raise UserError("Variant B percentage must be between 0 and 100.")
+            if record.variant_b_template and record.split_percentage in (0, 100):
+                raise UserError("A/B testing requires both variants to receive recipients.")
+            for template in (record.variant_a_template | record.variant_b_template):
+                if template.status != 'approved':
+                    raise UserError("Only approved templates can be used for scheduled campaigns.")
+                if template.account_id and template.account_id != record.campaign_id.account_id:
+                    raise UserError("Scheduled campaign templates must belong to the campaign account.")
             if record.schedule_type == 'recurring':
                 if not record.recurring_type:
                     raise UserError("Please select a recurrence type for recurring scheduled campaigns.")
@@ -546,6 +573,8 @@ class WhatsAppScheduledCampaign(models.Model):
                     record._get_next_recurring_date(record.scheduled_date)
             if not record.scheduled_date:
                 raise UserError("Please specify a scheduled date/time.")
+            if record.scheduled_date < fields.Datetime.now() and not record.send_immediately_if_past:
+                raise UserError("The scheduled time is in the past. Choose a future time or allow immediate sending.")
         self.write({'status': 'scheduled'})
     
     def action_send(self):
@@ -554,6 +583,18 @@ class WhatsAppScheduledCampaign(models.Model):
             campaign = record.campaign_id
             if not campaign:
                 continue
+
+            campaign_vals = {}
+            if record.variant_a_template:
+                campaign_vals['template_id'] = record.variant_a_template.id
+            if record.variant_b_template:
+                campaign_vals.update({
+                    'is_ab_test': True,
+                    'template_id_b': record.variant_b_template.id,
+                    'split_percentage': 100.0 - record.split_percentage,
+                })
+            if campaign_vals:
+                campaign.write(campaign_vals)
 
             pending_messages = campaign.message_ids.filtered(
                 lambda msg: msg.status in ('draft', 'queued')
@@ -566,12 +607,15 @@ class WhatsAppScheduledCampaign(models.Model):
                 continue
 
             if campaign.state == 'completed':
-                _logger.info(
-                    "Scheduled campaign %s skipped because campaign %s is already completed.",
-                    record.id,
-                    campaign.id,
-                )
-                continue
+                if record.schedule_type == 'recurring':
+                    campaign.state = 'draft'
+                else:
+                    _logger.info(
+                        "Scheduled campaign %s skipped because campaign %s is already completed.",
+                        record.id,
+                        campaign.id,
+                    )
+                    continue
 
             # Force reload recipients to capture any dynamic updates without
             # rewinding running/completed campaigns back to draft.

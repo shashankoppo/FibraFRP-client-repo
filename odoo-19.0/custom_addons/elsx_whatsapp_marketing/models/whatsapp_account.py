@@ -613,9 +613,28 @@ class WhatsAppAccount(models.Model):
         headers = {'Authorization': f'Bearer {self.access_token}'}
         
         try:
-            response = requests.get(url, headers=headers, timeout=30)
+            templates_data = []
+            next_url = url
+            params = {
+                'fields': 'id,name,status,category,language,components,quality_score,rejected_reason',
+                'limit': 100,
+            }
+            seen_urls = set()
+            response = None
+            for _page in range(100):
+                if not next_url or next_url in seen_urls:
+                    break
+                seen_urls.add(next_url)
+                response = requests.get(next_url, headers=headers, params=params, timeout=30)
+                params = None
+                if response.status_code != 200:
+                    break
+                page = response.json() or {}
+                templates_data.extend(page.get('data') or [])
+                next_url = (page.get('paging') or {}).get('next')
+            if response is None:
+                raise UserError(_("Meta template sync did not return a response."))
             if response.status_code == 200:
-                templates_data = response.json().get('data', [])
                 for t_data in templates_data:
                     template_name = t_data.get('name')
                     language_code = t_data.get('language') or 'en_US'
@@ -640,6 +659,18 @@ class WhatsAppAccount(models.Model):
                         'meta_quality_rating': t_data.get('quality_score') or t_data.get('quality_rating'),
                         'meta_disabled_reason': t_data.get('disabled_reason') or t_data.get('rejected_reason'),
                         'rejection_reason': t_data.get('rejected_reason') or t_data.get('reason') or False,
+                        'header_type': 'none',
+                        'header_text': False,
+                        'footer': False,
+                        'has_buttons': False,
+                        'button_type': False,
+                        'button_text_1': False,
+                        'button_text_2': False,
+                        'button_text_3': False,
+                        'cta_url_text': False,
+                        'cta_url_link': False,
+                        'cta_phone_text': False,
+                        'cta_phone_number': False,
                     }
                     
                     # Extract content
@@ -688,6 +719,8 @@ class WhatsAppAccount(models.Model):
                             elif copy_codes:
                                 vals['button_type'] = 'copy_code'
                     
+                    if not vals.get('body') and not template:
+                        vals['body'] = template_name or _('Synced WhatsApp template')
                     if template:
                         template.write(vals)
                     else:

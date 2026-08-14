@@ -1,8 +1,10 @@
 import base64
+import json
 from unittest.mock import Mock, patch
 
 from odoo.tests.common import TransactionCase
 
+from ..controllers.whatsapp_webhook import WhatsAppWebhook
 from ..models import whatsapp_account as account_module
 from ..models.whatsapp_account import WhatsAppAccount
 
@@ -149,6 +151,83 @@ class TestPrivateMediaRecovery(TransactionCase):
 
         self.assertEqual(result, payload)
         upload.assert_not_called()
+
+    def test_template_sync_reads_all_pages_and_clears_stale_buttons(self):
+        template = self.env['whatsapp.template'].create({
+            'name': 'Existing Template',
+            'meta_template_name': 'existing_template',
+            'account_id': self.account.id,
+            'language': 'en_US',
+            'status': 'approved',
+            'body': 'Old body',
+            'has_buttons': True,
+            'button_type': 'quick_reply',
+            'button_text_1': 'Old button',
+        })
+        first = Mock(status_code=200)
+        first.json.return_value = {
+            'data': [{
+                'id': 'meta-existing',
+                'name': 'existing_template',
+                'language': 'en_US',
+                'status': 'APPROVED',
+                'category': 'MARKETING',
+                'components': [{'type': 'BODY', 'text': 'Fresh body'}],
+            }],
+            'paging': {'next': 'https://graph.facebook.com/next-page'},
+        }
+        second = Mock(status_code=200)
+        second.json.return_value = {
+            'data': [{
+                'id': 'meta-second',
+                'name': 'second_template',
+                'language': 'en_US',
+                'status': 'APPROVED',
+                'category': 'UTILITY',
+                'components': [{'type': 'BODY', 'text': 'Second body'}],
+            }],
+        }
+
+        with patch.object(account_module.requests, 'get', side_effect=[first, second]) as request:
+            self.account.action_sync_templates()
+
+        template.invalidate_recordset()
+        self.assertEqual(request.call_count, 2)
+        self.assertEqual(template.body, 'Fresh body')
+        self.assertFalse(template.has_buttons)
+        self.assertFalse(template.button_text_1)
+        self.assertTrue(self.env['whatsapp.template'].search([
+            ('account_id', '=', self.account.id),
+            ('meta_template_name', '=', 'second_template'),
+        ]))
+
+    def test_received_webhook_can_be_replayed_through_normal_dispatcher(self):
+        payload = {
+            'object': 'whatsapp_business_account',
+            'entry': [{
+                'changes': [{
+                    'field': 'messages',
+                    'value': {
+                        'metadata': {'phone_number_id': self.account.phone_number_id},
+                        'messages': [],
+                    },
+                }],
+            }],
+        }
+        log = self.env['whatsapp.webhook.log'].create({
+            'account_id': self.account.id,
+            'event_type': 'waba_webhook',
+            'status': 'received',
+            'raw_payload': json.dumps(payload),
+        })
+
+        with patch.object(WhatsAppWebhook, '_dispatch_change') as dispatch:
+            self.assertTrue(log._process_received_payload())
+
+        self.assertEqual(log.status, 'processed')
+        dispatch.assert_called_once()
+        self.assertEqual(dispatch.call_args.args[1], self.account)
+        self.assertEqual(dispatch.call_args.args[2], 'messages')
 
 
 class TestWhatsAppContactImport(TransactionCase):

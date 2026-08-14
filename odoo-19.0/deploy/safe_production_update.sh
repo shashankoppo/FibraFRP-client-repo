@@ -142,19 +142,33 @@ case ",${ALL_INSTALL_MODULES},${ALL_UPGRADE_MODULES}," in
     echo "==> Verifying WhatsApp campaign delivery workers"
     ACTIVE_DELIVERY_WORKERS="$(
       docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -Atc \
-        "SELECT COUNT(DISTINCT model.model || ':' || cron.code)
-           FROM ir_cron AS cron
-           JOIN ir_model AS model ON model.id = cron.model_id
-          WHERE cron.active = TRUE
-            AND (
-              (model.model = 'whatsapp.campaign' AND cron.code = 'model._cron_process_global_queue()')
-              OR (model.model = 'whatsapp.scheduled.campaign' AND cron.code = 'model._cron_process_scheduled_campaigns()')
-              OR (model.model = 'whatsapp.message' AND cron.code = 'model._cron_retry_failed()')
-              OR (model.model = 'whatsapp.campaign.participant' AND cron.code = 'model.process_drip_campaigns()')
-            );"
+        "WITH expected(model_name, action_code) AS (
+             VALUES
+               ('whatsapp.campaign', 'model._cron_process_global_queue()'),
+               ('whatsapp.message', 'model._cron_process_broadcast_queue()'),
+               ('whatsapp.scheduled.campaign', 'model._cron_process_scheduled_campaigns()'),
+               ('whatsapp.message', 'model._cron_retry_failed()'),
+               ('whatsapp.campaign.participant', 'model.process_drip_campaigns()'),
+               ('whatsapp.bot.flow.log', 'model._cron_resume_delayed_flows()'),
+               ('whatsapp.scheduled.message', 'model._cron_send_scheduled()'),
+               ('whatsapp.campaign', 'model._cron_evaluate_ab_tests()'),
+               ('whatsapp.account', 'model._cron_reset_daily_counters()'),
+               ('whatsapp.webhook.log', 'model._cron_recover_received()')
+           )
+         SELECT COUNT(*)
+           FROM expected
+          WHERE EXISTS (
+                SELECT 1
+                  FROM ir_cron AS cron
+                  JOIN ir_act_server AS action ON action.id = cron.ir_actions_server_id
+                  JOIN ir_model AS model ON model.id = action.model_id
+                 WHERE cron.active = TRUE
+                   AND model.model = expected.model_name
+                   AND action.code = expected.action_code
+          );"
     )"
-    if [ "${ACTIVE_DELIVERY_WORKERS}" != "4" ]; then
-      echo "ERROR: Expected four active WhatsApp delivery workers; found ${ACTIVE_DELIVERY_WORKERS}." >&2
+    if [ "${ACTIVE_DELIVERY_WORKERS}" != "10" ]; then
+      echo "ERROR: Expected ten active WhatsApp ecosystem workers; found ${ACTIVE_DELIVERY_WORKERS}." >&2
       exit 1
     fi
 

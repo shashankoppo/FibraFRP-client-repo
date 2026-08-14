@@ -338,6 +338,7 @@ class WhatsAppWebhook(http.Controller):
                             thread_log = thread_env['whatsapp.webhook.log'].browse(log_id)
                             thread_acc = thread_env['whatsapp.account'].browse(account_id) if account_id else None
                             payload_json = json.loads(thread_log.raw_payload)
+                            dispatch_errors = []
 
                             for entry in payload_json.get('entry', []):
                                 for change in entry.get('changes', []):
@@ -347,11 +348,34 @@ class WhatsAppWebhook(http.Controller):
                                         self._dispatch_change(thread_env, thread_acc, field, value, thread_log.raw_payload)
                                     except Exception as dispatch_err:
                                         _logger.error(f'[WH-DISPATCH-THREAD] Failure: {dispatch_err}', exc_info=True)
+                                        dispatch_errors.append(str(dispatch_err) or dispatch_err.__class__.__name__)
 
-                            thread_log.sudo().write({'status': 'processed'})
+                            if dispatch_errors:
+                                thread_log.sudo().write({
+                                    'status': 'error',
+                                    'error_detail': '\n'.join(dispatch_errors)[:2000],
+                                })
+                            else:
+                                thread_log.sudo().write({
+                                    'status': 'processed',
+                                    'error_detail': False,
+                                })
                             thread_cr.commit()
                     except Exception as e:
                         _logger.error(f'[WH-THREAD-CRASH] Webhook processing failed: {e}', exc_info=True)
+                        try:
+                            registry = Registry(db_name)
+                            with registry.cursor() as error_cr:
+                                error_env = api.Environment(error_cr, odoo.SUPERUSER_ID, {})
+                                error_log = error_env['whatsapp.webhook.log'].sudo().browse(log_id).exists()
+                                if error_log:
+                                    error_log.write({
+                                        'status': 'error',
+                                        'error_detail': (str(e) or e.__class__.__name__)[:2000],
+                                    })
+                                error_cr.commit()
+                        except Exception:
+                            _logger.exception('[WH-THREAD-CRASH] Failed to persist webhook error log_id=%s', log_id)
 
                 WEBHOOK_EXECUTOR.submit(process_webhook_thread, db_name, log_id, account.id if account else None)
 

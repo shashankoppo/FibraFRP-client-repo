@@ -137,7 +137,7 @@ class WhatsAppCampaign(models.Model):
     participant_ids = fields.One2many('whatsapp.campaign.participant', 'campaign_id', string='Participants')
     
     # Analytics
-    click_count = fields.Integer('Clicks', default=0)
+    click_count = fields.Integer('Clicks', compute='_compute_statistics', store=True)
     conversion_count = fields.Integer('Conversions', default=0)
     roi = fields.Float('ROI %', compute='_compute_roi')
     
@@ -206,16 +206,24 @@ class WhatsAppCampaign(models.Model):
     pre_send_checklist_html = fields.Html('Pre-send Checklist', compute='_compute_pre_send_checklist_html')
     pre_send_checklist_text = fields.Text('Pre-send Checklist Text', compute='_compute_pre_send_checklist_html')
     
-    @api.depends('partner_ids', 'message_ids.status', 'message_ids.direction')
+    @api.depends(
+        'partner_ids', 'message_ids.status', 'message_ids.direction',
+        'message_ids.button_text', 'message_ids.button_payload', 'message_ids.list_item_id',
+    )
     def _compute_statistics(self):
         for record in self:
             outbound_messages = record.message_ids.filtered(lambda m: m.direction == 'outbound')
+            inbound_interactions = record.message_ids.filtered(
+                lambda message: message.direction == 'inbound'
+                and (message.button_text or message.button_payload or message.list_item_id)
+            )
             record.total_recipients = len(record.partner_ids)
             record.queued_count = len(outbound_messages.filtered(lambda m: m.status in ['draft', 'queued']))
             record.sent_count = len(outbound_messages.filtered(lambda m: m.status in ['sent', 'delivered', 'read']))
             record.delivered_count = len(outbound_messages.filtered(lambda m: m.status in ['delivered', 'read']))
             record.read_count = len(outbound_messages.filtered(lambda m: m.status == 'read'))
             record.failed_count = len(outbound_messages.filtered(lambda m: m.status == 'failed'))
+            record.click_count = len(inbound_interactions)
             
             # Rates
             if record.total_recipients > 0:
@@ -734,12 +742,17 @@ class WhatsAppCampaign(models.Model):
             matching_contact_tags = ContactTag.search([
                 ('partner_category_id', 'in', self.tag_ids.ids),
             ])
+            for tag_name in self.tag_ids.mapped('name'):
+                matching_contact_tags |= ContactTag.search([('name', '=ilike', tag_name)])
             if matching_contact_tags:
                 source_contacts = Contact.search([('tag_ids', 'in', matching_contact_tags.ids)])
                 still_unlinked = source_contacts.filtered(lambda contact: not contact.partner_id)
                 if still_unlinked:
                     still_unlinked._reconcile_partner_links()
-            partners = Partner.search([('category_id', 'in', self.tag_ids.ids)])
+            partners = (
+                Partner.search([('category_id', 'in', self.tag_ids.ids)])
+                | source_contacts.mapped('partner_id')
+            )
         elif self.target_type == 'csv' and self.csv_file:
             import base64
             import csv
@@ -1365,35 +1378,84 @@ class WhatsAppCampaign(models.Model):
         )
 
     @api.model
-    def _repair_delivery_crons(self):
-        cron_specs = (
+    def _delivery_cron_specs(self):
+        return (
             (
                 'elsx_whatsapp_marketing.ir_cron_process_whatsapp_queue',
                 'whatsapp.campaign',
                 'model._cron_process_global_queue()',
                 1,
+                'minutes',
+            ),
+            (
+                'elsx_whatsapp_marketing.ir_cron_process_direct_message_queue',
+                'whatsapp.message',
+                'model._cron_process_broadcast_queue()',
+                1,
+                'minutes',
             ),
             (
                 'elsx_whatsapp_marketing.ir_cron_process_scheduled_campaigns',
                 'whatsapp.scheduled.campaign',
                 'model._cron_process_scheduled_campaigns()',
                 5,
+                'minutes',
             ),
             (
                 'elsx_whatsapp_marketing.ir_cron_retry_failed_messages',
                 'whatsapp.message',
                 'model._cron_retry_failed()',
                 2,
+                'minutes',
             ),
             (
                 'elsx_whatsapp_marketing.ir_cron_process_whatsapp_drip_campaigns',
                 'whatsapp.campaign.participant',
                 'model.process_drip_campaigns()',
                 15,
+                'minutes',
+            ),
+            (
+                'elsx_whatsapp_marketing.ir_cron_resume_delayed_bot_flows',
+                'whatsapp.bot.flow.log',
+                'model._cron_resume_delayed_flows()',
+                1,
+                'minutes',
+            ),
+            (
+                'elsx_whatsapp_marketing.ir_cron_process_scheduled_messages',
+                'whatsapp.scheduled.message',
+                'model._cron_send_scheduled()',
+                5,
+                'minutes',
+            ),
+            (
+                'elsx_whatsapp_marketing.ir_cron_evaluate_ab_tests',
+                'whatsapp.campaign',
+                'model._cron_evaluate_ab_tests()',
+                30,
+                'minutes',
+            ),
+            (
+                'elsx_whatsapp_marketing.ir_cron_reset_daily_counters',
+                'whatsapp.account',
+                'model._cron_reset_daily_counters()',
+                1,
+                'days',
+            ),
+            (
+                'elsx_whatsapp_marketing.ir_cron_recover_received_webhooks',
+                'whatsapp.webhook.log',
+                'model._cron_recover_received()',
+                1,
+                'minutes',
             ),
         )
+
+    @api.model
+    def _repair_delivery_crons(self):
         repaired = 0
-        for xmlid, model_name, code, interval in cron_specs:
+        for xmlid, model_name, code, interval, interval_type in self._delivery_cron_specs():
             cron = self.env.ref(xmlid, raise_if_not_found=False)
             model = self.env['ir.model']._get(model_name)
             if not cron or not model:
@@ -1403,7 +1465,7 @@ class WhatsAppCampaign(models.Model):
                 'state': 'code',
                 'code': code,
                 'interval_number': interval,
-                'interval_type': 'minutes',
+                'interval_type': interval_type,
                 'active': True,
             }
             changes = {}

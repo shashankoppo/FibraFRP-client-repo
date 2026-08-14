@@ -245,7 +245,7 @@ export class WhatsAppDashboard extends Component {
                             <div class="card border-0 shadow-sm rounded-4 h-100 elsx-wa-mini-metric">
                                 <div class="card-body py-3">
                                     <span class="text-uppercase text-muted fw-bold small">Failed</span>
-                                    <h4 class="mb-0 fw-black text-warning" data-wa-kpi-value="1"><t t-esc="Math.max((state.data.funnel_data.loaded || 0) - (state.data.funnel_data.sent || 0), 0)"/></h4>
+                                    <h4 class="mb-0 fw-black text-warning" data-wa-kpi-value="1"><t t-esc="state.data.funnel_data.failed || 0"/></h4>
                                     <span class="text-muted small">needs review</span>
                                 </div>
                             </div>
@@ -991,7 +991,7 @@ export class WhatsAppDashboard extends Component {
                     total_spend: 0,
                 },
                 cost_by_category: { marketing: 0, utility: 0, authentication: 0, service: 0 },
-                funnel_data: { loaded: 0, sent: 0, delivered: 0, read: 0, clicked: 0, replied: 0 },
+                funnel_data: { loaded: 0, queued: 0, failed: 0, sent: 0, delivered: 0, read: 0, clicked: 0, replied: 0 },
                 top_templates: [],
                 recent_campaigns: [],
                 agent_stats: [],
@@ -1201,7 +1201,7 @@ export class WhatsAppDashboard extends Component {
 
     failedMessageCount() {
         const funnel = this.state.data.funnel_data || {};
-        return Math.max((funnel.loaded || 0) - (funnel.sent || 0), 0);
+        return funnel.failed || 0;
     }
 
     unverifiedAccountCount() {

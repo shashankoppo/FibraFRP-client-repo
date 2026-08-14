@@ -133,6 +133,7 @@ class WhatsAppAnalytics(models.Model):
                 COALESCE(SUM(CASE WHEN direction = 'outbound' AND status IN ('delivered', 'read') THEN 1 ELSE 0 END), 0) AS delivered,
                 COALESCE(SUM(CASE WHEN direction = 'outbound' AND status = 'read' THEN 1 ELSE 0 END), 0) AS read_count,
                 COALESCE(SUM(CASE WHEN direction = 'outbound' AND status = 'failed' THEN 1 ELSE 0 END), 0) AS failed,
+                COALESCE(SUM(CASE WHEN direction = 'outbound' AND status IN ('draft', 'queued') THEN 1 ELSE 0 END), 0) AS queued,
                 COALESCE(SUM(CASE WHEN direction = 'inbound' THEN 1 ELSE 0 END), 0) AS inbound,
                 COALESCE(SUM(CASE WHEN direction = 'inbound' AND (button_text IS NOT NULL OR button_payload IS NOT NULL OR list_item_id IS NOT NULL) THEN 1 ELSE 0 END), 0) AS clicked,
                 COALESCE(SUM(CASE WHEN direction = 'outbound' THEN message_cost ELSE 0 END), 0.0) AS total_spend,
@@ -146,6 +147,7 @@ class WhatsAppAnalytics(models.Model):
         delivered = int(row.get('delivered') or 0)
         read_count = int(row.get('read_count') or 0)
         failed = int(row.get('failed') or 0)
+        queued = int(row.get('queued') or 0)
         inbound = int(row.get('inbound') or 0)
         clicked = int(row.get('clicked') or 0)
         outbound_contacts = int(row.get('outbound_contacts') or 0)
@@ -156,6 +158,7 @@ class WhatsAppAnalytics(models.Model):
             'delivered': delivered,
             'read': read_count,
             'failed': failed,
+            'queued': queued,
             'inbound': inbound,
             'clicked': clicked,
             'total_spend': round(float(row.get('total_spend') or 0.0), 2),
@@ -230,15 +233,23 @@ class WhatsAppAnalytics(models.Model):
             extra=["template_name IS NOT NULL", "message_type = 'template'", "direction = 'outbound'"],
         )
         self.env.cr.execute("""
-            SELECT template_name, COUNT(id),
-                   SUM(CASE WHEN status IN ('delivered', 'read') THEN 1 ELSE 0 END),
-                   SUM(CASE WHEN status = 'read' THEN 1 ELSE 0 END),
-                   SUM(CASE WHEN button_text IS NOT NULL OR button_payload IS NOT NULL THEN 1 ELSE 0 END),
-                   MAX(pricing_category)
-            FROM whatsapp_message
+            SELECT outbound.template_name, COUNT(outbound.id),
+                   SUM(CASE WHEN outbound.status IN ('delivered', 'read') THEN 1 ELSE 0 END),
+                   SUM(CASE WHEN outbound.status = 'read' THEN 1 ELSE 0 END),
+                   SUM(CASE WHEN EXISTS (
+                       SELECT 1
+                         FROM whatsapp_message reply
+                        WHERE reply.parent_id = outbound.id
+                          AND reply.direction = 'inbound'
+                          AND (reply.button_text IS NOT NULL OR reply.button_payload IS NOT NULL OR reply.list_item_id IS NOT NULL)
+                   ) THEN 1 ELSE 0 END),
+                   MAX(outbound.pricing_category)
+              FROM (
+                   SELECT * FROM whatsapp_message
         """ + top_where + """
-            GROUP BY template_name
-            ORDER BY COUNT(id) DESC
+              ) AS outbound
+            GROUP BY outbound.template_name
+            ORDER BY COUNT(outbound.id) DESC
             LIMIT 5
         """, top_params)
         top_templates = [{
@@ -252,6 +263,8 @@ class WhatsAppAnalytics(models.Model):
         } for row in self.env.cr.fetchall()]
 
         campaign_domain = []
+        if start_date:
+            campaign_domain.append(('create_date', '>=', start_date))
         if account_id:
             campaign_domain.append(('account_id', '=', account_id))
         campaigns = self.env['whatsapp.campaign'].sudo().search(campaign_domain, order='create_date desc', limit=5)
@@ -262,8 +275,8 @@ class WhatsAppAnalytics(models.Model):
             'sent': c.sent_count,
             'delivered_rate': round((c.delivered_count / c.sent_count * 100.0) if c.sent_count else 0.0, 1),
             'read_rate': round((c.read_count / c.sent_count * 100.0) if c.sent_count else 0.0, 1),
-            'clicks': c.click_count or 0,
-            'ctr_rate': round((c.click_count / c.sent_count * 100.0) if c.sent_count else 0.0, 1),
+            'clicks': len(c.message_ids.filtered(lambda msg: msg.direction == 'inbound' and (msg.button_text or msg.button_payload or msg.list_item_id))),
+            'ctr_rate': round((len(c.message_ids.filtered(lambda msg: msg.direction == 'inbound' and (msg.button_text or msg.button_payload or msg.list_item_id))) / c.sent_count * 100.0) if c.sent_count else 0.0, 1),
         } for c in campaigns]
 
         chats = self.env['whatsapp.chat'].sudo().search([('account_id', '=', account_id)] if account_id else [])
@@ -348,18 +361,23 @@ class WhatsAppAnalytics(models.Model):
         total_daily_limit = 0
         reached_count = 0
         latest_webhook = False
+        stale_connected_accounts = []
         for account in accounts:
             daily_sent = max(account.daily_message_count or 0, live_usage.get(account.id, 0))
             daily_limit = account.max_daily_limit or 0
             daily_remaining = max(daily_limit - daily_sent, 0) if daily_limit else 0
             usage_percent = round((daily_sent / daily_limit * 100.0), 1) if daily_limit else 0.0
             is_limit_reached = daily_limit > 0 and daily_sent >= daily_limit
+            latest = account.last_webhook_at or account.last_inbound_webhook_at or account.last_status_webhook_at
+            if (not account_id or account.id == account_id) and account.status == 'connected' and (
+                not latest or (fields.Datetime.now() - latest).total_seconds() > 7200
+            ):
+                stale_connected_accounts.append(account.display_name or account.name)
             if not account_id or account.id == account_id:
                 total_daily_sent += daily_sent
                 total_daily_limit += daily_limit
                 if is_limit_reached:
                     reached_count += 1
-                latest = account.last_webhook_at or account.last_inbound_webhook_at or account.last_status_webhook_at
                 if latest and (not latest_webhook or latest > latest_webhook):
                     latest_webhook = latest
             cards.append({
@@ -390,6 +408,7 @@ class WhatsAppAnalytics(models.Model):
             'accounts': cards,
             'selected_account_id': account_id or False,
             'stale_seconds': stale_seconds,
+            'stale_connected_accounts': stale_connected_accounts,
         }
 
     def _dashboard_conversion_sections(self, start_date=False, account_id=False):
@@ -562,9 +581,11 @@ class WhatsAppAnalytics(models.Model):
         account_health = self._dashboard_account_health(account_id=account_id)
         conversion_sections = self._dashboard_conversion_sections(start_date=start_date, account_id=account_id)
         failed_live = live_msg['failed']
-        loaded = live_msg['sent'] + failed_live
+        loaded = live_msg['sent'] + failed_live + live_msg['queued']
         funnel_data = {
             'loaded': loaded,
+            'queued': live_msg['queued'],
+            'failed': failed_live,
             'sent': live_msg['sent'],
             'delivered': live_msg['delivered'],
             'read': live_msg['read'],
@@ -599,15 +620,15 @@ class WhatsAppAnalytics(models.Model):
             source = 'live+cached-charts'
 
         warnings = []
-        if account_health['stale_seconds'] > 7200:
-            warnings.append('No recent webhook activity for more than 2 hours.')
+        if account_health['stale_connected_accounts']:
+            warnings.append('Connected account webhook activity is missing or older than 2 hours: %s.' % ', '.join(account_health['stale_connected_accounts']))
         if failed_live:
             warnings.append('%s failed messages in the selected range.' % failed_live)
         if account_health['limit_reached_accounts']:
             warnings.append('%s WhatsApp account(s) reached the local daily cap.' % account_health['limit_reached_accounts'])
 
         sync_state = 'Live'
-        if warnings and account_health['stale_seconds'] > 7200:
+        if account_health['stale_connected_accounts']:
             sync_state = 'Stale'
 
         return {
