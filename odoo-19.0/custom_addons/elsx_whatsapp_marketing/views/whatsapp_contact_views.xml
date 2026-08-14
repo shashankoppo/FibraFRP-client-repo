@@ -8,6 +8,8 @@
                 <field name="name"/>
                 <field name="phone_number"/>
                 <field name="email" optional="show"/>
+                <field name="company_name" optional="hide"/>
+                <field name="language_code" optional="hide"/>
                 <field name="partner_id"/>
                 <field name="opt_in" widget="boolean_toggle"/>
                 <field name="message_count"/>
@@ -27,6 +29,9 @@
                         <field name="name"/>
                         <field name="phone_number"/>
                         <field name="email" widget="email"/>
+                        <field name="company_name"/>
+                        <field name="language_code"/>
+                        <field name="external_reference"/>
                         <field name="partner_id"/>
                         <field name="tag_ids" widget="many2many_tags"/>
                     </group>
@@ -40,6 +45,8 @@
                         <field name="campaign_count"/>
                         <field name="last_message_date"/>
                         <field name="last_message_direction"/>
+                        <field name="import_source" readonly="1"/>
+                        <field name="last_import_date" readonly="1"/>
                     </group>
                 </sheet>
             </form>

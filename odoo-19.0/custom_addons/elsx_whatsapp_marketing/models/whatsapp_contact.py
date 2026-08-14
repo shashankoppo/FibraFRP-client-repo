@@ -10,6 +10,11 @@ class WhatsAppContact(models.Model):
     name = fields.Char('Name', required=True)
     phone_number = fields.Char('Phone Number', required=True)
     email = fields.Char('Email')
+    company_name = fields.Char('Company')
+    language_code = fields.Char('Language Code')
+    external_reference = fields.Char('External Reference', index=True)
+    import_source = fields.Char('Import Source')
+    last_import_date = fields.Datetime('Last Imported', readonly=True)
     partner_id = fields.Many2one('res.partner', string='Related Contact')
 
     # Opt-in status
@@ -53,7 +58,7 @@ class WhatsAppContact(models.Model):
 
     def write(self, vals):
         res = super(WhatsAppContact, self).write(vals)
-        fields_to_check = ['opt_in', 'partner_id', 'phone_number', 'name', 'email']
+        fields_to_check = ['opt_in', 'partner_id', 'phone_number', 'name', 'email', 'tag_ids']
         if any(f in vals for f in fields_to_check):
             for record in self:
                 record._sync_to_partner()
@@ -79,6 +84,10 @@ class WhatsAppContact(models.Model):
             update_vals['name'] = self.name
         if self.email and not partner.email:
             update_vals['email'] = self.email
+        partner_categories = self.tag_ids._ensure_partner_categories()
+        missing_categories = partner_categories - partner.category_id
+        if missing_categories:
+            update_vals['category_id'] = [(4, category_id) for category_id in missing_categories.ids]
 
         if update_vals:
             partner.with_context(skip_whatsapp_contact_sync=True).write(update_vals)
@@ -91,4 +100,31 @@ class WhatsAppContactTag(models.Model):
 
     name = fields.Char('Tag Name', required=True)
     color = fields.Integer('Color', default=1)
+    partner_category_id = fields.Many2one(
+        'res.partner.category',
+        string='Campaign Tag',
+        ondelete='set null',
+        readonly=True,
+    )
     contact_ids = fields.Many2many('whatsapp.contact', string='Contacts')
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        Category = self.env['res.partner.category'].sudo()
+        for vals in vals_list:
+            if vals.get('partner_category_id') or not vals.get('name'):
+                continue
+            category = Category.search([('name', '=ilike', vals['name'])], limit=1)
+            if not category:
+                category = Category.create({'name': vals['name']})
+            vals['partner_category_id'] = category.id
+        return super().create(vals_list)
+
+    def _ensure_partner_categories(self):
+        Category = self.env['res.partner.category'].sudo()
+        for tag in self.filtered(lambda record: not record.partner_category_id):
+            category = Category.search([('name', '=ilike', tag.name)], limit=1)
+            if not category:
+                category = Category.create({'name': tag.name})
+            tag.sudo().write({'partner_category_id': category.id})
+        return self.mapped('partner_category_id')
