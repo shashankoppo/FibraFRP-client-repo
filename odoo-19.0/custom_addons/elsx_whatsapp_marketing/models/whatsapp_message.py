@@ -9,7 +9,7 @@ import logging
 import re
 import base64
 from datetime import timedelta
-import threading
+from concurrent.futures import ThreadPoolExecutor
 import random
 import pytz
 import time
@@ -19,6 +19,8 @@ from odoo.tools import html2plaintext
 _logger = logging.getLogger(__name__)
 
 NON_RETRYABLE_META_ERROR_CODES = {131049}
+SIDECAR_NOTIFY_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix='wa-sidecar')
+MEDIA_DOWNLOAD_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix='wa-media')
 
 
 def _safe_int(value):
@@ -26,6 +28,30 @@ def _safe_int(value):
         return int(value)
     except (TypeError, ValueError):
         return False
+
+def _submit_best_effort(executor, func, label, fallback=None):
+    """Run non-critical work without letting thread exhaustion break Odoo actions."""
+    try:
+        executor.submit(func)
+        return True
+    except RuntimeError as exc:
+        _logger.warning("%s background worker unavailable: %s", label, exc)
+        if fallback:
+            try:
+                fallback()
+                return True
+            except Exception as fallback_exc:
+                _logger.warning("%s synchronous fallback failed: %s", label, fallback_exc)
+        return False
+    except Exception as exc:
+        _logger.warning("%s background submit failed: %s", label, exc)
+        return False
+
+
+def _should_notify_realtime(message):
+    """Queued/draft outbound messages are not live chat events yet."""
+    return message.direction == 'inbound' or message.status not in ('draft', 'queued')
+
 
 def notify_sidecar_background(env, message_id, event_type='new_message'):
     """Fire-and-forget notification to the sidecar â€” non-blocking thread."""
@@ -77,8 +103,7 @@ def notify_sidecar_background(env, message_id, event_type='new_message'):
         except Exception as e:
             _logger.warning('[SIDECAR-ASYNC] notification failed: %s', e)
 
-    thread = threading.Thread(target=_do_request, daemon=True)
-    thread.start()
+    _submit_best_effort(SIDECAR_NOTIFY_EXECUTOR, _do_request, '[SIDECAR-ASYNC]')
 
 
 class WhatsAppMessage(models.Model):
@@ -514,7 +539,7 @@ class WhatsAppMessage(models.Model):
 
         # Notify real-time sidecar
         for record in messages:
-            if record.status != 'draft':
+            if _should_notify_realtime(record):
                 notify_sidecar_background(self.env, record.id)
 
         return messages
@@ -532,7 +557,8 @@ class WhatsAppMessage(models.Model):
         if notify_fields.intersection(vals):
             for record in self:
                 event_type = 'status_update' if 'status' in vals else 'message_update'
-                notify_sidecar_background(self.env, record.id, event_type=event_type)
+                if _should_notify_realtime(record):
+                    notify_sidecar_background(self.env, record.id, event_type=event_type)
                 if 'status' in vals and record.chat_id_ref:
                     try:
                         self.env['bus.bus']._sendone(
@@ -1057,9 +1083,12 @@ class WhatsAppMessage(models.Model):
                     except Exception as e:
                         _logger.error("[MEDIA-DL] Async download failed for message %s: %s", message_id, e)
 
-                thread = threading.Thread(target=_download)
-                thread.daemon = True
-                thread.start()
+                _submit_best_effort(
+                    MEDIA_DOWNLOAD_EXECUTOR,
+                    _download,
+                    '[MEDIA-DL]',
+                    fallback=_download,
+                )
 
             self.env.cr.postcommit.add(_after_commit)
 

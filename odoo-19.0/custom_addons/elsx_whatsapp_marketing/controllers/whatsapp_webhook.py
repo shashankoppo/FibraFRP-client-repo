@@ -395,7 +395,17 @@ class WhatsAppWebhook(http.Controller):
                     except Exception:
                         _logger.exception('[WH-THREAD-CRASH] Failed to persist webhook error log_id=%s', log_id)
 
-                WEBHOOK_EXECUTOR.submit(process_webhook_thread, db_name, log_id, account.id if account else None)
+                try:
+                    WEBHOOK_EXECUTOR.submit(process_webhook_thread, db_name, log_id, account.id if account else None)
+                except RuntimeError as submit_err:
+                    if 'can''t start new thread' not in str(submit_err).lower():
+                        raise
+                    _logger.warning(
+                        '[WH-POST] Webhook executor unavailable; processing inline for log_id=%s: %s',
+                        log_id,
+                        submit_err,
+                    )
+                    process_webhook_thread(db_name, log_id, account.id if account else None)
 
                 # 3. Return 200 OK instantly (< 50ms)
                 return request.make_response('OK', status=200)

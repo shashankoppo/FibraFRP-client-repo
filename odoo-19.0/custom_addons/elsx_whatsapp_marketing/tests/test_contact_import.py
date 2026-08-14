@@ -262,3 +262,23 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
         matcher = self.env['whatsapp.message']
         self.assertEqual(matcher._find_partner_by_phone('14155552671'), us_partner)
         self.assertEqual(matcher._find_partner_by_phone('914155552671'), india_partner)
+
+    def test_queued_outbound_message_does_not_notify_sidecar(self):
+        with patch('odoo.addons.elsx_whatsapp_marketing.models.whatsapp_message.notify_sidecar_background') as notify:
+            self.env['whatsapp.message'].create({
+                'account_id': self.account.id,
+                'phone_number': '919881934777',
+                'direction': 'outbound',
+                'status': 'queued',
+                'body': 'Queued campaign message',
+            })
+            notify.assert_not_called()
+
+            sent_message = self.env['whatsapp.message'].create({
+                'account_id': self.account.id,
+                'phone_number': '919881934778',
+                'direction': 'outbound',
+                'status': 'sent',
+                'body': 'Sent message',
+            })
+            notify.assert_called_once_with(self.env, sent_message.id)
