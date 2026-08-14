@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import models, fields, api
+from odoo import _, api, fields, models
 
 
 class WhatsAppContact(models.Model):
@@ -7,7 +7,7 @@ class WhatsAppContact(models.Model):
     _description = 'WhatsApp Contact'
     _rec_name = 'name'
 
-    name = fields.Char('Name', required=True)
+    name = fields.Char('Name', default='Unknown WhatsApp Contact')
     phone_number = fields.Char('Phone Number', required=True)
     email = fields.Char('Email')
     company_name = fields.Char('Company')
@@ -46,8 +46,12 @@ class WhatsAppContact(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
-            if not vals.get('name') and vals.get('phone_number'):
-                vals['name'] = vals['phone_number']
+            if not vals.get('name'):
+                vals['name'] = (
+                    vals.get('phone_number')
+                    or vals.get('email')
+                    or _('Unknown WhatsApp Contact')
+                )
             if not vals.get('partner_id') and vals.get('phone_number'):
                 partner = self.env['whatsapp.message']._find_partner_by_phone(vals['phone_number'])
                 if partner:

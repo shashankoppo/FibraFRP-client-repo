@@ -26,6 +26,9 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
             **values,
         })
 
+    def test_contact_name_is_optional_for_standard_imports(self):
+        self.assertFalse(self.env['whatsapp.contact']._fields['name'].required)
+
     def test_imports_flexible_headers_tags_consent_and_attributes(self):
         wizard = self._wizard(
             'Full Name;Mobile;Email Address;Labels;Consent;Language;Company;Custom: Tier\n'
