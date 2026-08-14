@@ -138,6 +138,33 @@ case ",${ALL_INSTALL_MODULES},${ALL_UPGRADE_MODULES}," in
       echo "ERROR: WhatsApp contact import schema verification failed." >&2
       exit 1
     fi
+
+    echo "==> Verifying WhatsApp campaign delivery workers"
+    ACTIVE_DELIVERY_WORKERS="$(
+      docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -Atc \
+        "SELECT COUNT(DISTINCT model.model || ':' || cron.code)
+           FROM ir_cron AS cron
+           JOIN ir_model AS model ON model.id = cron.model_id
+          WHERE cron.active = TRUE
+            AND (
+              (model.model = 'whatsapp.campaign' AND cron.code = 'model._cron_process_global_queue()')
+              OR (model.model = 'whatsapp.scheduled.campaign' AND cron.code = 'model._cron_process_scheduled_campaigns()')
+              OR (model.model = 'whatsapp.message' AND cron.code = 'model._cron_retry_failed()')
+              OR (model.model = 'whatsapp.campaign.participant' AND cron.code = 'model.process_drip_campaigns()')
+            );"
+    )"
+    if [ "${ACTIVE_DELIVERY_WORKERS}" != "4" ]; then
+      echo "ERROR: Expected four active WhatsApp delivery workers; found ${ACTIVE_DELIVERY_WORKERS}." >&2
+      exit 1
+    fi
+
+    echo "==> WhatsApp contact reconciliation summary"
+    docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
+      "SELECT COUNT(*) AS imported_contacts,
+              COUNT(partner_id) AS linked_partners,
+              COUNT(*) FILTER (WHERE phone_number IS NOT NULL AND BTRIM(phone_number) != '') AS contacts_with_phone,
+              COUNT(*) FILTER (WHERE phone_number IS NULL OR BTRIM(phone_number) = '') AS incomplete_contacts
+         FROM whatsapp_contact;"
     ;;
 esac
 

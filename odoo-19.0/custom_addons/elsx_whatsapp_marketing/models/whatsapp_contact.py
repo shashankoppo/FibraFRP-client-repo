@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
+import logging
+
 from odoo import _, api, fields, models
+
+
+_logger = logging.getLogger(__name__)
 
 
 class WhatsAppContact(models.Model):
@@ -85,18 +90,51 @@ class WhatsAppContact(models.Model):
             return
 
         if not self.partner_id:
+            partner = False
             if self.phone_number:
                 partner = self.env['whatsapp.message']._find_partner_by_phone(self.phone_number)
-                if partner:
-                    self.with_context(skip_partner_sync=True).write({'partner_id': partner.id})
-            return
+            if not partner and self.email:
+                partner = self.env['res.partner'].sudo().search([
+                    ('email', '=ilike', self.email.strip()),
+                ], limit=1)
+            if not partner and (self.phone_number or self.email):
+                partner_values = {
+                    'name': self.name or self.phone_number or self.email,
+                    'email': self.email or False,
+                    'whatsapp_opt_in': self.opt_in,
+                }
+                if self.phone_number:
+                    partner_values['phone'] = self.phone_number
+                    if 'mobile' in self.env['res.partner']._fields:
+                        partner_values['mobile'] = self.phone_number
+                partner = self.env['res.partner'].sudo().with_context(
+                    skip_whatsapp_contact_sync=True,
+                ).create(partner_values)
+            if partner:
+                self.with_context(skip_partner_sync=True).write({'partner_id': partner.id})
+            else:
+                return
 
         partner = self.partner_id.sudo()
         update_vals = {}
         if partner.whatsapp_opt_in != self.opt_in:
             update_vals['whatsapp_opt_in'] = self.opt_in
-        if partner.name != self.name:
+        placeholder_names = {
+            self.phone_number,
+            self.email,
+            _('Unknown WhatsApp Contact'),
+        }
+        if self.name and (
+            not partner.name
+            or partner.name in placeholder_names
+            or partner.name in {partner.phone, getattr(partner, 'mobile', False)}
+        ) and partner.name != self.name:
             update_vals['name'] = self.name
+        if self.phone_number:
+            if not partner.phone:
+                update_vals['phone'] = self.phone_number
+            if 'mobile' in partner._fields and not partner.mobile:
+                update_vals['mobile'] = self.phone_number
         if self.email and not partner.email:
             update_vals['email'] = self.email
         partner_categories = self.tag_ids._ensure_partner_categories()
@@ -106,6 +144,31 @@ class WhatsAppContact(models.Model):
 
         if update_vals:
             partner.with_context(skip_whatsapp_contact_sync=True).write(update_vals)
+
+    def _reconcile_partner_links(self):
+        contacts = self.sudo() if self else self.sudo().search([])
+        linked = 0
+        failed = 0
+        for contact in contacts:
+            had_partner = bool(contact.partner_id)
+            try:
+                with self.env.cr.savepoint():
+                    contact.with_context(skip_partner_sync=False)._sync_to_partner()
+                if not had_partner and contact.partner_id:
+                    linked += 1
+            except Exception:
+                failed += 1
+                _logger.exception(
+                    'WhatsApp contact reconciliation failed for contact_id=%s',
+                    contact.id,
+                )
+        _logger.info(
+            'WhatsApp contact reconciliation processed=%s newly_linked=%s failed=%s',
+            len(contacts),
+            linked,
+            failed,
+        )
+        return {'processed': len(contacts), 'linked': linked, 'failed': failed}
 
 
 class WhatsAppContactTag(models.Model):

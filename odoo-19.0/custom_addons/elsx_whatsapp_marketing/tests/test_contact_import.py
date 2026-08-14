@@ -1,7 +1,10 @@
 import base64
 import json
+from unittest.mock import patch
 
 from odoo.tests.common import TransactionCase
+
+from ..models.whatsapp_account import WhatsAppAccount
 
 
 class TestWhatsAppAdvancedContactImport(TransactionCase):
@@ -15,6 +18,7 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
             'business_account_id': 'import-business-id',
             'access_token': 'test-token',
             'default_country_code': '91',
+            'status': 'connected',
         })
 
     def _wizard(self, csv_text, **values):
@@ -144,3 +148,84 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
 
         self.assertEqual(contact.name, 'Keep This Name')
         self.assertEqual(contact.email, 'updated@example.com')
+
+    def test_tagged_imports_reconcile_load_and_dispatch(self):
+        tag = self.env['whatsapp.contact.tag'].create({'name': 'Campaign Audience'})
+        Contact = self.env['whatsapp.contact']
+        contacts = Contact.create([
+            {'name': 'One', 'phone_number': '919881934771', 'tag_ids': [(6, 0, tag.ids)]},
+            {'name': 'One Duplicate', 'phone_number': '919881934771', 'tag_ids': [(6, 0, tag.ids)]},
+            {'name': 'Two', 'phone_number': '919881934772', 'tag_ids': [(6, 0, tag.ids)]},
+            {'name': 'Email Only', 'email': 'email-only@example.com', 'tag_ids': [(6, 0, tag.ids)]},
+        ])
+        self.assertTrue(all(contact.partner_id for contact in contacts))
+
+        campaign = self.env['whatsapp.campaign'].create({
+            'name': 'Import Audience Campaign',
+            'account_id': self.account.id,
+            'campaign_type': 'broadcast',
+            'target_type': 'tags',
+            'tag_ids': [(6, 0, tag.partner_category_id.ids)],
+            'message_body': 'Hello {{name}}',
+            'exclude_recently_contacted': False,
+        })
+        campaign.action_load_recipients()
+
+        self.assertEqual(campaign.audience_source_count, 4)
+        self.assertEqual(campaign.audience_unique_count, 3)
+        self.assertEqual(campaign.audience_duplicate_count, 1)
+        self.assertEqual(campaign.audience_missing_phone_count, 1)
+        self.assertEqual(len(campaign.partner_ids), 2)
+        self.assertEqual(campaign.excluded_count, 2)
+
+        def fake_send(account, _to_number, message_type='text', **kwargs):
+            message = kwargs['existing_message']
+            message.write({'status': 'sent', 'message_id': f'test-{message.id}'})
+            return message
+
+        with patch.object(WhatsAppAccount, 'send_message', new=fake_send):
+            campaign.action_send_campaign()
+
+        self.assertEqual(len(campaign.message_ids), 2)
+        self.assertTrue(all(message.status == 'sent' for message in campaign.message_ids))
+
+    def test_historical_unlinked_contact_is_reconciled(self):
+        tag = self.env['whatsapp.contact.tag'].create({'name': 'Historical Import'})
+        contact = self.env['whatsapp.contact'].with_context(skip_partner_sync=True).create({
+            'name': 'Historical Contact',
+            'phone_number': '919881934779',
+            'email': 'historical@example.com',
+            'tag_ids': [(6, 0, tag.ids)],
+        })
+        self.assertFalse(contact.partner_id)
+
+        result = contact.with_context(skip_partner_sync=False)._reconcile_partner_links()
+
+        self.assertEqual(result['linked'], 1)
+        self.assertTrue(contact.partner_id)
+        self.assertIn(tag.partner_category_id, contact.partner_id.category_id)
+
+    def test_campaign_delivery_crons_are_repaired(self):
+        self.env['whatsapp.campaign']._repair_delivery_crons()
+
+        queue_cron = self.env.ref('elsx_whatsapp_marketing.ir_cron_process_whatsapp_queue')
+        retry_cron = self.env.ref('elsx_whatsapp_marketing.ir_cron_retry_failed_messages')
+        self.assertTrue(queue_cron.active)
+        self.assertEqual(queue_cron.model_id.model, 'whatsapp.campaign')
+        self.assertEqual(queue_cron.code, 'model._cron_process_global_queue()')
+        self.assertTrue(retry_cron.active)
+        self.assertEqual(retry_cron.model_id.model, 'whatsapp.message')
+
+    def test_phone_matching_does_not_merge_different_country_codes(self):
+        us_partner = self.env['res.partner'].with_context(skip_whatsapp_contact_sync=True).create({
+            'name': 'US Contact',
+            'phone': ' 14155552671 ',
+        })
+        india_partner = self.env['res.partner'].with_context(skip_whatsapp_contact_sync=True).create({
+            'name': 'India Contact',
+            'phone': ' 914155552671 ',
+        })
+
+        matcher = self.env['whatsapp.message']
+        self.assertEqual(matcher._find_partner_by_phone('14155552671'), us_partner)
+        self.assertEqual(matcher._find_partner_by_phone('914155552671'), india_partner)

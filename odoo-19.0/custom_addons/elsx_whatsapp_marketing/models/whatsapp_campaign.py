@@ -194,6 +194,12 @@ class WhatsAppCampaign(models.Model):
     frequency_cap_days = fields.Integer('Frequency Cap (days)', default=0)
     excluded_count = fields.Integer('Excluded', readonly=True, default=0)
     exclusion_notes = fields.Text('Audience Exclusion Notes', readonly=True)
+    audience_source_count = fields.Integer('Matched Contact Rows', readonly=True)
+    audience_unique_count = fields.Integer('Unique Contact Records', readonly=True)
+    audience_duplicate_count = fields.Integer('Duplicate Rows', readonly=True)
+    audience_unlinked_count = fields.Integer('Unresolved Contacts', readonly=True)
+    audience_missing_phone_count = fields.Integer('Missing Phone', readonly=True)
+    audience_invalid_phone_count = fields.Integer('Invalid Phone', readonly=True)
     preview_partner_id = fields.Many2one('res.partner', string='Preview Recipient')
     recipient_preview_html = fields.Html('Recipient Preview', compute='_compute_recipient_preview_html')
     recipient_preview_text = fields.Text('Recipient Preview Text', compute='_compute_recipient_preview_html')
@@ -285,6 +291,7 @@ class WhatsAppCampaign(models.Model):
 
     @api.depends(
         'account_id', 'partner_ids', 'excluded_count', 'exclusion_notes', 'template_id',
+        'account_id.active', 'account_id.status',
         'template_id.header_type', 'template_id.header_media_file', 'template_id.header_media_url',
         'template_header_media_file', 'template_header_media_url', 'template_header_media_filename',
         'template_id.has_buttons', 'template_id.button_type', 'template_id.button_text_1',
@@ -359,7 +366,30 @@ class WhatsAppCampaign(models.Model):
                         warn=True,
                     )
             else:
-                add(bool((record.message_body or '').strip()), 'Message content', 'Plain text campaign body is configured.' if record.message_body else 'Add a template or message body.')
+                add(
+                    bool((record.message_body or '').strip()),
+                    'Message content',
+                    (
+                        'Plain text is limited to an open customer-service window; use an approved template for proactive broadcasts.'
+                        if record.message_body else 'Add an approved template or message body.'
+                    ),
+                    warn=bool(record.message_body),
+                )
+
+            account_ready = bool(
+                record.account_id
+                and record.account_id.active
+                and record.account_id.status == 'connected'
+            )
+            add(
+                account_ready,
+                'WhatsApp account connection',
+                (
+                    'Connected and ready for Meta API requests.'
+                    if account_ready
+                    else 'Open Configuration, test the API connection, and confirm the account is Connected.'
+                ),
+            )
 
             policy = self.env['whatsapp.compliance.policy'].sudo().search([
                 ('account_id', '=', record.account_id.id),
@@ -587,6 +617,16 @@ class WhatsAppCampaign(models.Model):
             self._check_variant_message("Version B", self.template_id_b, self.message_body_b, version='b')
         self._check_reply_rule_configuration()
 
+    def _check_account_ready_for_send(self):
+        self.ensure_one()
+        if not self.account_id.active:
+            raise ValidationError('The selected WhatsApp account is inactive.')
+        if self.account_id.status != 'connected':
+            raise ValidationError(
+                'The selected WhatsApp account is not connected. Test the API connection '
+                'in Configuration before launching this campaign.'
+            )
+
     def _check_reply_rule_configuration(self):
         self.ensure_one()
         for rule in self.reply_rule_ids.filtered('active'):
@@ -632,11 +672,41 @@ class WhatsAppCampaign(models.Model):
             domain = ['|', ('mobile', '!=', False)] + domain
         return domain
 
+    def _qualify_recipient_phones(self, partners):
+        valid = self.env['res.partner']
+        missing = self.env['res.partner']
+        invalid = self.env['res.partner']
+        normalizer = self.env['whatsapp.message']
+        for partner in partners:
+            phone = getattr(partner, 'mobile', False) or partner.phone
+            if not phone:
+                missing |= partner
+                continue
+            try:
+                normalizer._normalize_phone(phone, account=self.account_id, strict=True)
+                valid |= partner
+            except ValidationError:
+                invalid |= partner
+        return valid, missing, invalid
+
     def action_load_recipients(self):
-        """Load recipients based on target type"""
+        """Load, reconcile, qualify, and explain the campaign audience."""
         self.ensure_one()
         Partner = self.env['res.partner'].sudo()
-        
+        Contact = self.env['whatsapp.contact'].sudo()
+        ContactTag = self.env['whatsapp.contact.tag'].sudo()
+
+        legacy_tags = ContactTag.search([('partner_category_id', '=', False)])
+        if legacy_tags:
+            legacy_tags._ensure_partner_categories()
+        unlinked_contacts = Contact.search([
+            ('partner_id', '=', False),
+            '|', ('phone_number', '!=', False), ('email', '!=', False),
+        ])
+        if unlinked_contacts:
+            unlinked_contacts._reconcile_partner_links()
+
+        source_contacts = Contact
         if self.target_type == 'all':
             partners = Partner.search(self._partner_phone_domain())
         elif self.target_type == 'segment' and self.domain_filter:
@@ -661,7 +731,15 @@ class WhatsAppCampaign(models.Model):
             leads = self.env['crm.lead'].sudo().search(lead_domain)
             partners = leads.mapped('partner_id')
         elif self.target_type == 'tags' and self.tag_ids:
-            partners = Partner.search(self._partner_phone_domain() + [('category_id', 'in', self.tag_ids.ids)])
+            matching_contact_tags = ContactTag.search([
+                ('partner_category_id', 'in', self.tag_ids.ids),
+            ])
+            if matching_contact_tags:
+                source_contacts = Contact.search([('tag_ids', 'in', matching_contact_tags.ids)])
+                still_unlinked = source_contacts.filtered(lambda contact: not contact.partner_id)
+                if still_unlinked:
+                    still_unlinked._reconcile_partner_links()
+            partners = Partner.search([('category_id', 'in', self.tag_ids.ids)])
         elif self.target_type == 'csv' and self.csv_file:
             import base64
             import csv
@@ -702,8 +780,23 @@ class WhatsAppCampaign(models.Model):
         else:
             partners = self.env['res.partner']
 
-        partners = partners.filtered(lambda p: p.phone or getattr(p, 'mobile', False))
-        
+        source_partners = partners
+        source_count = len(source_partners)
+        unique_contact_count = len(source_partners)
+        duplicate_count = 0
+        unlinked_count = 0
+        if source_contacts:
+            linked_source_partners = source_contacts.mapped('partner_id')
+            additional_partners = source_partners - linked_source_partners
+            source_count = len(source_contacts) + len(additional_partners)
+            unique_contact_count = len(source_partners)
+            unlinked_count = len(source_contacts.filtered(lambda contact: not contact.partner_id))
+            duplicate_count = max(0, len(source_contacts) - len(linked_source_partners) - unlinked_count)
+
+        partners, missing_phone, invalid_phone = self._qualify_recipient_phones(source_partners)
+        missing_phone.write({'whatsapp_last_exclusion_reason': 'Missing phone number'})
+        invalid_phone.write({'whatsapp_last_exclusion_reason': 'Invalid WhatsApp phone number'})
+
         # Enforce compliance: Exclude partners who have a linked opted-out whatsapp.contact or have whatsapp_opt_in = False
         original_partners = partners
         exclusion_notes = []
@@ -738,15 +831,44 @@ class WhatsAppCampaign(models.Model):
                 partners = partners - capped_partner_ids
                 exclusion_notes.append(f'Campaign frequency cap ({self.frequency_cap_days}d): {len(capped_partner_ids)}')
 
-        excluded_partners = original_partners - partners
-        if excluded_partners:
-            excluded_partners.write({
+        compliance_excluded = original_partners - partners
+        if compliance_excluded:
+            compliance_excluded.write({
                 'whatsapp_last_exclusion_reason': '; '.join(exclusion_notes) or 'Excluded by campaign audience rules',
             })
-        self.excluded_count = len(excluded_partners)
-        self.exclusion_notes = '\n'.join(exclusion_notes)
+        excluded_count = (
+            duplicate_count
+            + unlinked_count
+            + len(missing_phone)
+            + len(invalid_phone)
+            + len(compliance_excluded)
+        )
+        audience_notes = [
+            f'Matched contact rows: {source_count}',
+            f'Unique contact records: {unique_contact_count}',
+        ]
+        if duplicate_count:
+            audience_notes.append(f'Duplicate rows merged: {duplicate_count}')
+        if unlinked_count:
+            audience_notes.append(f'Unresolved contact links: {unlinked_count}')
+        if missing_phone:
+            audience_notes.append(f'Missing phone number: {len(missing_phone)}')
+        if invalid_phone:
+            audience_notes.append(f'Invalid WhatsApp phone number: {len(invalid_phone)}')
+        audience_notes.extend(exclusion_notes)
+        audience_notes.append(f'Final sendable recipients: {len(partners)}')
 
-        self.partner_ids = [(6, 0, partners.ids)]
+        self.write({
+            'partner_ids': [(6, 0, partners.ids)],
+            'excluded_count': excluded_count,
+            'exclusion_notes': '\n'.join(audience_notes),
+            'audience_source_count': source_count,
+            'audience_unique_count': unique_contact_count,
+            'audience_duplicate_count': duplicate_count,
+            'audience_unlinked_count': unlinked_count,
+            'audience_missing_phone_count': len(missing_phone),
+            'audience_invalid_phone_count': len(invalid_phone),
+        })
         if not partners:
             return {
                 'type': 'ir.actions.client',
@@ -763,8 +885,11 @@ class WhatsAppCampaign(models.Model):
             'tag': 'display_notification',
             'params': {
                 'title': 'Recipients Loaded',
-                'message': f'Successfully loaded {len(partners)} recipients.',
-                'type': 'success',
+                'message': (
+                    f'Loaded {len(partners)} sendable recipients from {source_count} matched contact rows. '
+                    f'Excluded or merged: {excluded_count}. Review the audience summary for details.'
+                ),
+                'type': 'warning' if excluded_count else 'success',
             }
         }
     
@@ -796,6 +921,7 @@ class WhatsAppCampaign(models.Model):
     def _action_send_campaign_impl(self):
         """Send campaign messages or start drip sequence"""
         self.ensure_one()
+        self._check_account_ready_for_send()
         if self.campaign_type not in ('broadcast', 'drip'):
             raise UserError(_(
                 "Campaign type '%s' is not wired to a sender yet. "
@@ -1237,6 +1363,59 @@ class WhatsAppCampaign(models.Model):
             "[CRON-CAMPAIGN-QUEUE] processed=%s sent=%s failed=%s remaining=%s duration_ms=%s",
             len(messages), sent_count, failed_count, remaining, duration_ms,
         )
+
+    @api.model
+    def _repair_delivery_crons(self):
+        cron_specs = (
+            (
+                'elsx_whatsapp_marketing.ir_cron_process_whatsapp_queue',
+                'whatsapp.campaign',
+                'model._cron_process_global_queue()',
+                1,
+            ),
+            (
+                'elsx_whatsapp_marketing.ir_cron_process_scheduled_campaigns',
+                'whatsapp.scheduled.campaign',
+                'model._cron_process_scheduled_campaigns()',
+                5,
+            ),
+            (
+                'elsx_whatsapp_marketing.ir_cron_retry_failed_messages',
+                'whatsapp.message',
+                'model._cron_retry_failed()',
+                2,
+            ),
+            (
+                'elsx_whatsapp_marketing.ir_cron_process_whatsapp_drip_campaigns',
+                'whatsapp.campaign.participant',
+                'model.process_drip_campaigns()',
+                15,
+            ),
+        )
+        repaired = 0
+        for xmlid, model_name, code, interval in cron_specs:
+            cron = self.env.ref(xmlid, raise_if_not_found=False)
+            model = self.env['ir.model']._get(model_name)
+            if not cron or not model:
+                continue
+            expected = {
+                'model_id': model.id,
+                'state': 'code',
+                'code': code,
+                'interval_number': interval,
+                'interval_type': 'minutes',
+                'active': True,
+            }
+            changes = {}
+            for key, value in expected.items():
+                current = cron[key].id if key == 'model_id' else cron[key]
+                if current != value:
+                    changes[key] = value
+            if changes:
+                cron.sudo().write(changes)
+                repaired += 1
+        _logger.info('WhatsApp delivery cron repair changed=%s', repaired)
+        return repaired
 
     def action_generate_ai_content(self):
         """Generate auditable campaign draft content without sending it."""

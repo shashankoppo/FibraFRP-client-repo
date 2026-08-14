@@ -623,7 +623,8 @@ class WhatsAppMessage(models.Model):
         if partner:
             return partner
 
-        # 3. Clean and search using suffix (last 10 digits for common mobile numbers like India/US)
+        # 3. Use suffix only to narrow candidates, then compare complete normalized
+        # numbers so equal national numbers in different countries are never merged.
         if len(normalized) >= 10:
             suffix = normalized[-10:]
             domain = [('phone', 'like', suffix)]
@@ -631,11 +632,9 @@ class WhatsAppMessage(models.Model):
                 domain = ['|', ('phone', 'like', suffix), ('mobile', 'like', suffix)]
             partners = self.env['res.partner'].sudo().search(domain)
             for p in partners:
-                # Strip all non-digits from partner's phone/mobile to see if it matches normalized suffix
-                p_phone = re.sub(r'\D', '', p.phone or '')
-                p_mobile = re.sub(r'\D', '', getattr(p, 'mobile', '') or '')
-                if p_phone.endswith(suffix) or p_mobile.endswith(suffix):
-                    return p
+                for candidate in (p.phone, getattr(p, 'mobile', False)):
+                    if candidate and self._normalize_phone(candidate) == normalized:
+                        return p
         return False
 
     def _coerce_interactive_button(self, button, index):

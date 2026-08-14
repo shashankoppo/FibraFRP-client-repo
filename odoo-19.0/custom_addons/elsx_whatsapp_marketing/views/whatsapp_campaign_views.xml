@@ -118,6 +118,14 @@
                                 <field name="excluded_count" readonly="1"/>
                                 <field name="exclusion_notes" readonly="1" nolabel="1" placeholder="Load recipients to see exclusion summary."/>
                             </group>
+                            <group string="Audience Qualification">
+                                <field name="audience_source_count" readonly="1"/>
+                                <field name="audience_unique_count" readonly="1"/>
+                                <field name="audience_duplicate_count" readonly="1"/>
+                                <field name="audience_unlinked_count" readonly="1"/>
+                                <field name="audience_missing_phone_count" readonly="1"/>
+                                <field name="audience_invalid_phone_count" readonly="1"/>
+                            </group>
                             <field name="partner_ids" required="target_type == 'manual'">
                                 <list>
                                     <field name="name"/>
