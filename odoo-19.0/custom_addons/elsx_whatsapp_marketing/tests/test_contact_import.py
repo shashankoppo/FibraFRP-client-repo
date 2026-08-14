@@ -315,3 +315,35 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
         ])
         self.assertEqual(len(queued), 1)
         self.assertEqual(queued.status, 'queued')
+
+    def test_running_campaign_queue_repair_releases_one_batch(self):
+        campaign = self.env['whatsapp.campaign'].create({
+            'name': 'Stuck Running Campaign',
+            'account_id': self.account.id,
+            'campaign_type': 'broadcast',
+            'target_type': 'manual',
+            'message_body': 'Hello',
+            'batch_size': 2,
+            'batch_interval': 5,
+            'state': 'running',
+        })
+        future = fields.Datetime.add(fields.Datetime.now(), hours=1)
+        messages = self.env['whatsapp.message'].create([
+            {
+                'account_id': self.account.id,
+                'campaign_id': campaign.id,
+                'phone_number': f'91988193478{i}',
+                'direction': 'outbound',
+                'status': 'queued',
+                'body': 'Queued',
+                'next_retry_at': future,
+            }
+            for i in range(3)
+        ])
+
+        repaired = self.env['whatsapp.campaign']._repair_running_campaign_queues()
+
+        messages.invalidate_recordset(['next_retry_at'])
+        due = messages.filtered(lambda msg: msg.next_retry_at <= fields.Datetime.now())
+        self.assertEqual(repaired, 2)
+        self.assertEqual(len(due), 2)

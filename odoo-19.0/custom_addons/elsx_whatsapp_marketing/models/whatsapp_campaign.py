@@ -84,6 +84,63 @@ class WhatsAppCampaign(models.Model):
         """Make the campaign queue worker due soon after queue creation or repair."""
         return self._schedule_campaign_queue_cron(delay_seconds=10)
 
+    @api.model
+    def _schedule_next_campaign_queue_run(self, default_delay_seconds=60):
+        """Schedule the queue cron near the next due queued campaign message."""
+        now = fields.Datetime.now()
+        Message = self.env['whatsapp.message'].sudo()
+        due_count = Message.search_count([
+            ('campaign_id.state', 'in', ['running', 'scheduled']),
+            '|',
+                ('status', '=', 'draft'),
+                '&', ('status', '=', 'queued'), '|', ('next_retry_at', '=', False), ('next_retry_at', '<=', now),
+        ])
+        if due_count:
+            return self._schedule_campaign_queue_cron(delay_seconds=default_delay_seconds)
+
+        next_msg = Message.search([
+            ('campaign_id.state', 'in', ['running', 'scheduled']),
+            ('status', 'in', ['draft', 'queued']),
+            ('next_retry_at', '!=', False),
+        ], order='next_retry_at asc, create_date asc', limit=1)
+        if not next_msg:
+            return False
+
+        delay_seconds = max(int((next_msg.next_retry_at - now).total_seconds()), default_delay_seconds)
+        return self._schedule_campaign_queue_cron(delay_seconds=delay_seconds)
+
+    @api.model
+    def _repair_running_campaign_queues(self):
+        """Unstick running campaigns that have queued rows but no due batch."""
+        Message = self.env['whatsapp.message'].sudo()
+        now = fields.Datetime.now()
+        repaired = 0
+        campaigns = self.sudo().search([('state', '=', 'running')])
+        for campaign in campaigns:
+            queued_domain = [
+                ('campaign_id', '=', campaign.id),
+                ('status', 'in', ['draft', 'queued']),
+            ]
+            if not Message.search_count(queued_domain):
+                continue
+            due_domain = queued_domain + [
+                '|',
+                    ('status', '=', 'draft'),
+                    '&', ('status', '=', 'queued'), '|', ('next_retry_at', '=', False), ('next_retry_at', '<=', now),
+            ]
+            if Message.search_count(due_domain):
+                continue
+            batch_size = max(int(campaign.batch_size or 50), 1)
+            to_release = Message.search(queued_domain, order='next_retry_at asc, create_date asc', limit=batch_size)
+            if to_release:
+                to_release.write({'status': 'queued', 'next_retry_at': now})
+                repaired += len(to_release)
+
+        if repaired:
+            self._wake_campaign_queue_cron()
+        _logger.info("WhatsApp running campaign queue repair released=%s", repaired)
+        return repaired
+
     name = fields.Char('Campaign Name', required=True)
     account_id = fields.Many2one('whatsapp.account', string='WhatsApp Account', required=True)
     
@@ -1396,7 +1453,8 @@ class WhatsAppCampaign(models.Model):
             ], limit=batch_size, order='create_date asc')
 
         if not messages:
-            _logger.debug("[CRON-CAMPAIGN-QUEUE] processed=0 due_campaigns=%s duration_ms=0", len(campaigns))
+            self._schedule_next_campaign_queue_run(default_delay_seconds=60)
+            _logger.info("[CRON-CAMPAIGN-QUEUE] processed=0 due_campaigns=%s scheduled_next=1", len(campaigns))
             return
 
         sent_count = 0
@@ -1468,7 +1526,7 @@ class WhatsAppCampaign(models.Model):
             ('status', 'in', ['draft', 'queued']),
         ])
         if total_remaining:
-            self._schedule_campaign_queue_cron(delay_seconds=60)
+            self._schedule_next_campaign_queue_run(default_delay_seconds=60)
 
         duration_ms = round((time.monotonic() - started) * 1000, 2)
         _logger.info(
