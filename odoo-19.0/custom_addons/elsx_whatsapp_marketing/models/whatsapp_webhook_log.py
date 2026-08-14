@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 from datetime import timedelta
 import json
+import time
 
-from odoo import models, fields, api, _
+from odoo import SUPERUSER_ID, models, fields, api, _
 from odoo.exceptions import UserError
 import logging
 
@@ -30,6 +31,62 @@ class WhatsAppWebhookLog(models.Model):
     error_detail = fields.Text('Error Detail')
     raw_payload = fields.Text('Raw JSON Payload')
     create_date = fields.Datetime('Received At', readonly=True)
+
+    @api.model
+    def _is_serialization_failure(self, exc):
+        seen = set()
+        current = exc
+        while current and id(current) not in seen:
+            seen.add(id(current))
+            if (
+                getattr(current, 'pgcode', None) == '40001'
+                or current.__class__.__name__ == 'SerializationFailure'
+                or 'could not serialize access due to concurrent update' in str(current)
+            ):
+                return True
+            current = getattr(current, '__cause__', None) or getattr(current, '__context__', None)
+        return False
+
+    @api.model
+    def _process_log_with_retry(self, log_id):
+        """Process one durable webhook in its own retryable transaction."""
+        last_error = None
+        for attempt, delay in enumerate((0, 0.05, 0.15, 0.35, 0.75), start=1):
+            if delay:
+                time.sleep(delay)
+            with self.env.registry.cursor() as recovery_cr:
+                recovery_env = api.Environment(recovery_cr, SUPERUSER_ID, {})
+                log = recovery_env['whatsapp.webhook.log'].sudo().browse(log_id).exists()
+                if not log or log.status in ('processed', 'ignored'):
+                    return False
+                try:
+                    processed = log._process_received_payload()
+                    recovery_cr.commit()
+                    return bool(processed)
+                except Exception as exc:
+                    recovery_cr.rollback()
+                    if self._is_serialization_failure(exc):
+                        last_error = exc
+                        _logger.info(
+                            '[WH-RECOVERY] Serialization retry %s/5 for log_id=%s',
+                            attempt,
+                            log_id,
+                        )
+                        continue
+                    raise
+        raise last_error
+
+    @api.model
+    def _persist_processing_error(self, log_id, exc):
+        with self.env.registry.cursor() as error_cr:
+            error_env = api.Environment(error_cr, SUPERUSER_ID, {})
+            log = error_env['whatsapp.webhook.log'].sudo().browse(log_id).exists()
+            if log:
+                log.write({
+                    'status': 'error',
+                    'error_detail': (str(exc) or exc.__class__.__name__)[:2000],
+                })
+            error_cr.commit()
 
     def _process_received_payload(self):
         """Replay a durable top-level webhook through the normal dispatcher."""
@@ -84,18 +141,14 @@ class WhatsAppWebhookLog(models.Model):
     def action_replay(self):
         processed = 0
         failed = 0
-        for log in self:
+        for log_id in self.ids:
             try:
-                with self.env.cr.savepoint():
-                    if log._process_received_payload():
-                        processed += 1
+                if self._process_log_with_retry(log_id):
+                    processed += 1
             except Exception as exc:
                 failed += 1
-                log.sudo().write({
-                    'status': 'error',
-                    'error_detail': (str(exc) or exc.__class__.__name__)[:2000],
-                })
-                _logger.exception("WhatsApp webhook replay failed for log_id=%s", log.id)
+                self._persist_processing_error(log_id, exc)
+                _logger.exception("WhatsApp webhook replay failed for log_id=%s", log_id)
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
@@ -125,18 +178,14 @@ class WhatsAppWebhookLog(models.Model):
         ], order='create_date asc, id asc', limit=limit)
         processed = 0
         failed = 0
-        for log in pending:
+        for log_id in pending.ids:
             try:
-                with self.env.cr.savepoint():
-                    if log._process_received_payload():
-                        processed += 1
+                if self._process_log_with_retry(log_id):
+                    processed += 1
             except Exception as exc:
                 failed += 1
-                log.sudo().write({
-                    'status': 'error',
-                    'error_detail': (str(exc) or exc.__class__.__name__)[:2000],
-                })
-                _logger.exception("WhatsApp webhook recovery failed for log_id=%s", log.id)
+                self._persist_processing_error(log_id, exc)
+                _logger.exception("WhatsApp webhook recovery failed for log_id=%s", log_id)
         _logger.info(
             "[WH-RECOVERY] pending=%s processed=%s failed=%s",
             len(pending), processed, failed,

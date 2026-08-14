@@ -242,6 +242,16 @@ class TestPrivateMediaRecovery(TransactionCase):
         self.account.invalidate_recordset(['last_webhook_at'])
         self.assertFalse(self.account.last_webhook_at)
 
+    def test_webhook_recovery_detects_postgres_serialization_code(self):
+        class SerializationError(Exception):
+            pgcode = '40001'
+
+        self.assertTrue(
+            self.env['whatsapp.webhook.log']._is_serialization_failure(
+                SerializationError('retry transaction')
+            )
+        )
+
 
 class TestWhatsAppContactImport(TransactionCase):
     def test_email_and_new_tag_import_together(self):

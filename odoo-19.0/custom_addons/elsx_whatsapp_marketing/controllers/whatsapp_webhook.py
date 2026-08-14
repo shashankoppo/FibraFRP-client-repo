@@ -331,51 +331,69 @@ class WhatsAppWebhook(http.Controller):
                 # 2. Queue webhook processing with a bounded worker pool.
                 # This keeps Meta responses fast without spawning unlimited DB cursors.
                 def process_webhook_thread(db_name, log_id, account_id):
-                    try:
-                        registry = Registry(db_name)
-                        with registry.cursor() as thread_cr:
-                            thread_env = api.Environment(thread_cr, odoo.SUPERUSER_ID, {})
-                            thread_log = thread_env['whatsapp.webhook.log'].browse(log_id)
-                            thread_acc = thread_env['whatsapp.account'].browse(account_id) if account_id else None
-                            payload_json = json.loads(thread_log.raw_payload)
-                            dispatch_errors = []
+                    last_error = None
+                    for attempt, delay in enumerate((0,) + self.SERIALIZATION_RETRY_DELAYS, start=1):
+                        if delay:
+                            time.sleep(delay)
+                        try:
+                            registry = Registry(db_name)
+                            with registry.cursor() as thread_cr:
+                                thread_env = api.Environment(thread_cr, odoo.SUPERUSER_ID, {})
+                                thread_log = thread_env['whatsapp.webhook.log'].sudo().browse(log_id).exists()
+                                if not thread_log:
+                                    return
+                                thread_acc = (
+                                    thread_env['whatsapp.account'].sudo().browse(account_id).exists()
+                                    if account_id else None
+                                )
+                                payload_json = json.loads(thread_log.raw_payload)
 
-                            for entry in payload_json.get('entry', []):
-                                for change in entry.get('changes', []):
-                                    field = change.get('field', '')
-                                    value = change.get('value') or {}
-                                    try:
+                                for entry in payload_json.get('entry', []):
+                                    for change in entry.get('changes', []):
+                                        field = change.get('field', '')
+                                        value = change.get('value') or {}
                                         self._dispatch_change(thread_env, thread_acc, field, value, thread_log.raw_payload)
-                                    except Exception as dispatch_err:
-                                        _logger.error(f'[WH-DISPATCH-THREAD] Failure: {dispatch_err}', exc_info=True)
-                                        dispatch_errors.append(str(dispatch_err) or dispatch_err.__class__.__name__)
 
-                            if dispatch_errors:
-                                thread_log.sudo().write({
-                                    'status': 'error',
-                                    'error_detail': '\n'.join(dispatch_errors)[:2000],
-                                })
-                            else:
                                 thread_log.sudo().write({
                                     'status': 'processed',
                                     'error_detail': False,
                                 })
-                            thread_cr.commit()
-                    except Exception as e:
-                        _logger.error(f'[WH-THREAD-CRASH] Webhook processing failed: {e}', exc_info=True)
-                        try:
-                            registry = Registry(db_name)
-                            with registry.cursor() as error_cr:
-                                error_env = api.Environment(error_cr, odoo.SUPERUSER_ID, {})
-                                error_log = error_env['whatsapp.webhook.log'].sudo().browse(log_id).exists()
-                                if error_log:
-                                    error_log.write({
-                                        'status': 'error',
-                                        'error_detail': (str(e) or e.__class__.__name__)[:2000],
-                                    })
-                                error_cr.commit()
-                        except Exception:
-                            _logger.exception('[WH-THREAD-CRASH] Failed to persist webhook error log_id=%s', log_id)
+                                thread_cr.commit()
+                                return
+                        except Exception as exc:
+                            last_error = exc
+                            if self._is_serialization_failure(exc):
+                                _logger.info(
+                                    '[WH-THREAD] Serialization retry %s/%s for log_id=%s',
+                                    attempt,
+                                    len(self.SERIALIZATION_RETRY_DELAYS) + 1,
+                                    log_id,
+                                )
+                                continue
+                            break
+
+                    _logger.error(
+                        '[WH-THREAD-CRASH] Webhook processing failed for log_id=%s: %s',
+                        log_id,
+                        last_error,
+                    )
+                    try:
+                        registry = Registry(db_name)
+                        with registry.cursor() as error_cr:
+                            error_env = api.Environment(error_cr, odoo.SUPERUSER_ID, {})
+                            error_log = error_env['whatsapp.webhook.log'].sudo().browse(log_id).exists()
+                            if error_log:
+                                error_log.write({
+                                    'status': 'error',
+                                    'error_detail': (
+                                        str(last_error)
+                                        or last_error.__class__.__name__
+                                        if last_error else 'Unknown webhook worker failure'
+                                    )[:2000],
+                                })
+                            error_cr.commit()
+                    except Exception:
+                        _logger.exception('[WH-THREAD-CRASH] Failed to persist webhook error log_id=%s', log_id)
 
                 WEBHOOK_EXECUTOR.submit(process_webhook_thread, db_name, log_id, account.id if account else None)
 
@@ -427,8 +445,11 @@ class WhatsAppWebhook(http.Controller):
         handler = handlers.get(field)
         if handler:
             try:
-                handler(env, account, value)
+                with env.cr.savepoint():
+                    handler(env, account, value)
             except Exception as e:
+                if self._is_serialization_failure(e):
+                    raise
                 _logger.error(f'[WH-DISPATCH] Handler for field={field} failed: {e}', exc_info=True)
                 self._update_log_error(env, field, value, str(e))
         else:
@@ -444,8 +465,11 @@ class WhatsAppWebhook(http.Controller):
         # --- Inbound messages ---
         for msg_data in value.get('messages', []):
             try:
-                self._process_inbound_message(env, account, msg_data, contacts, value)
+                with env.cr.savepoint():
+                    self._process_inbound_message(env, account, msg_data, contacts, value)
             except Exception as e:
+                if self._is_serialization_failure(e):
+                    raise
                 _logger.error(f'[WH-MSG] Processing message failed: {e}', exc_info=True)
 
         # --- Delivery status updates ---
@@ -453,6 +477,8 @@ class WhatsAppWebhook(http.Controller):
             try:
                 self._process_status_update(env, account, status_data)
             except Exception as e:
+                if self._is_serialization_failure(e):
+                    raise
                 _logger.error(f'[WH-STATUS] Processing status failed: {e}', exc_info=True)
 
         # --- Value-level errors (system errors) ---
@@ -915,6 +941,7 @@ class WhatsAppWebhook(http.Controller):
             status_data.get('id'),
             last_error,
         )
+        raise last_error
 
     def _process_status_update_once(self, env, account, status_data):
         """Update outbound message delivery status from Meta"""
@@ -1279,26 +1306,28 @@ class WhatsAppWebhook(http.Controller):
                 wamid = statuses[0].get('id', '')
                 phone = statuses[0].get('recipient_id', '')
 
-            env['whatsapp.webhook.log'].sudo().create({
-                'account_id': account.id if account and account.exists() else False,
-                'event_type': field,
-                'field_type': field,
-                'phone_number': phone,
-                'message_id': wamid,
-                'status': 'processed',
-                'raw_payload': raw_data[:5000],
-            })
+            with env.cr.savepoint():
+                env['whatsapp.webhook.log'].sudo().create({
+                    'account_id': account.id if account and account.exists() else False,
+                    'event_type': field,
+                    'field_type': field,
+                    'phone_number': phone,
+                    'message_id': wamid,
+                    'status': 'processed',
+                    'raw_payload': raw_data[:5000],
+                })
         except Exception as e:
             _logger.warning(f'[WH-LOG] Failed to write webhook log: {e}')
 
     def _update_log_error(self, env, field, value, error_msg):
         """Update the most recent log entry for a field to error status"""
         try:
-            log = env['whatsapp.webhook.log'].sudo().search(
-                [('event_type', '=', field)], order='create_date desc', limit=1
-            )
-            if log:
-                log.sudo().write({'status': 'error', 'error_detail': error_msg[:2000]})
+            with env.cr.savepoint():
+                log = env['whatsapp.webhook.log'].sudo().search(
+                    [('event_type', '=', field)], order='create_date desc', limit=1
+                )
+                if log:
+                    log.sudo().write({'status': 'error', 'error_detail': error_msg[:2000]})
         except Exception:
             pass
 
