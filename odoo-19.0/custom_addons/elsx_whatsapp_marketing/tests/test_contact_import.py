@@ -282,3 +282,30 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
                 'body': 'Sent message',
             })
             notify.assert_called_once_with(self.env, sent_message.id)
+
+    def test_immediate_campaign_launch_leaves_delivery_to_background_queue(self):
+        partner = self.env['res.partner'].with_context(skip_whatsapp_contact_sync=True).create({
+            'name': 'Campaign Recipient',
+            'phone': '919881934779',
+        })
+        campaign = self.env['whatsapp.campaign'].create({
+            'name': 'No Inline Dispatch',
+            'account_id': self.account.id,
+            'campaign_type': 'broadcast',
+            'target_type': 'manual',
+            'partner_ids': [(6, 0, partner.ids)],
+            'message_body': 'Hello from queue',
+            'exclude_recently_contacted': False,
+        })
+
+        with patch.object(type(campaign), 'action_process_queue') as process_queue:
+            campaign.action_send_campaign()
+
+        process_queue.assert_not_called()
+        self.assertEqual(campaign.state, 'running')
+        queued = self.env['whatsapp.message'].search([
+            ('campaign_id', '=', campaign.id),
+            ('phone_number', '=', '919881934779'),
+        ])
+        self.assertEqual(len(queued), 1)
+        self.assertEqual(queued.status, 'queued')

@@ -22,6 +22,44 @@ class WhatsAppCampaign(models.Model):
     _order = 'create_date desc'
 
     _campaign_state_schedule_idx = models.Index("(state, schedule_date, create_date)")
+    _SERIALIZATION_RETRY_DELAYS = (0, 0.1, 0.25, 0.5, 1.0)
+
+    def _is_serialization_failure(self, exc):
+        pgcode = getattr(exc, 'pgcode', None)
+        if pgcode == '40001':
+            return True
+        cause = getattr(exc, '__cause__', None)
+        if getattr(cause, 'pgcode', None) == '40001':
+            return True
+        text = str(exc).lower()
+        return 'could not serialize access' in text or 'serializationfailure' in text
+
+    def _create_campaign_messages_safely(self, message_model, vals_list, batch_size=100):
+        """Create campaign queue rows in retryable batches under webhook load."""
+        created = message_model.browse()
+        total = len(vals_list)
+        for offset in range(0, total, batch_size):
+            batch = vals_list[offset:offset + batch_size]
+            for attempt, delay in enumerate(self._SERIALIZATION_RETRY_DELAYS, start=1):
+                if delay:
+                    time.sleep(delay)
+                try:
+                    with self.env.cr.savepoint():
+                        created |= message_model.create(batch)
+                    break
+                except Exception as exc:
+                    if not self._is_serialization_failure(exc) or attempt == len(self._SERIALIZATION_RETRY_DELAYS):
+                        raise
+                    _logger.warning(
+                        "Campaign %s queue create serialization retry %s/%s for rows %s-%s: %s",
+                        self.id,
+                        attempt,
+                        len(self._SERIALIZATION_RETRY_DELAYS),
+                        offset + 1,
+                        min(offset + len(batch), total),
+                        exc,
+                    )
+        return created
 
     name = fields.Char('Campaign Name', required=True)
     account_id = fields.Many2one('whatsapp.account', string='WhatsApp Account', required=True)
@@ -1084,12 +1122,6 @@ class WhatsAppCampaign(models.Model):
                         'direction': 'outbound',
                         'flow_id': self.flow_id.id if self.flow_id else False,
                     }
-                    existing_chat = self.env['whatsapp.chat'].sudo().search([
-                        ('account_id', '=', self.account_id.id),
-                        ('phone_number', '=', phone),
-                    ], limit=1)
-                    if existing_chat:
-                        message_vals['chat_id_ref'] = existing_chat.id
                     message_vals.update(message_media_vals)
                     messages_to_create.append(message_vals)
                 except Exception as e:
@@ -1103,7 +1135,25 @@ class WhatsAppCampaign(models.Model):
                     ))
 
             if messages_to_create or failed_messages_to_create:
-                Message.create(messages_to_create + failed_messages_to_create)
+                if messages_to_create:
+                    phone_numbers = list({
+                        vals['phone_number'] for vals in messages_to_create if vals.get('phone_number')
+                    })
+                    if phone_numbers:
+                        existing_chats = self.env['whatsapp.chat'].sudo().search([
+                            ('account_id', '=', self.account_id.id),
+                            ('phone_number', 'in', phone_numbers),
+                        ])
+                        chat_by_phone = {chat.phone_number: chat.id for chat in existing_chats}
+                        for vals in messages_to_create:
+                            chat_id = chat_by_phone.get(vals.get('phone_number'))
+                            if chat_id:
+                                vals['chat_id_ref'] = chat_id
+
+                self._create_campaign_messages_safely(
+                    Message,
+                    messages_to_create + failed_messages_to_create,
+                )
                 if messages_to_create:
                     self.state = 'scheduled' if scheduled_for_later else 'running'
                     _logger.info(
@@ -1164,19 +1214,9 @@ class WhatsAppCampaign(models.Model):
         )
         auto_dispatch_failed = False
         if self.campaign_type == 'broadcast' and messages_to_create and not scheduled_for_later:
-            try:
-                process_action = self.action_process_queue()
-                process_params = process_action.get('params', {}) if isinstance(process_action, dict) else {}
-                process_message = process_params.get('message')
-                if process_message:
-                    launch_message += ' ' + process_message
-            except Exception as e:
-                auto_dispatch_failed = True
-                _logger.exception("Campaign %s queued but automatic queue dispatch did not start.", self.id)
-                launch_message += _(
-                    " Queue was created, but automatic dispatch could not start: %s. "
-                    "Use Process Queue or check ERP logs."
-                ) % (str(e) or e.__class__.__name__)
+            launch_message += _(
+                " Delivery will continue in the background queue; refresh after a minute to see sent/delivered counts."
+            )
 
         return {
             'type': 'ir.actions.client',

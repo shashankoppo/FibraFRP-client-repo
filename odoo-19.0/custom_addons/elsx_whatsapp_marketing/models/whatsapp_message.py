@@ -49,8 +49,12 @@ def _submit_best_effort(executor, func, label, fallback=None):
 
 
 def _should_notify_realtime(message):
-    """Queued/draft outbound messages are not live chat events yet."""
-    return message.direction == 'inbound' or message.status not in ('draft', 'queued')
+    """Queued campaign records are queue state, not live chat events yet."""
+    if message.status in ('draft', 'queued'):
+        return False
+    if message.campaign_id and message.direction == 'outbound' and not message.chat_id_ref:
+        return False
+    return True
 
 
 def notify_sidecar_background(env, message_id, event_type='new_message'):
