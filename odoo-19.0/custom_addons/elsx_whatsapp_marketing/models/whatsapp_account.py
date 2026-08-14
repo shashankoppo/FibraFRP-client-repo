@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError, ValidationError
+import copy
 import requests
 import json
 import logging
@@ -9,7 +10,7 @@ import io
 import mimetypes
 import random
 import secrets
-from urllib.parse import quote
+from urllib.parse import quote, unquote, urlparse
 from datetime import timedelta
 
 _logger = logging.getLogger(__name__)
@@ -31,6 +32,12 @@ MEDIA_SIZE_LIMITS = {
 
 TEXT_MESSAGE_LIMIT = 4096
 CAPTION_LIMIT = 1024
+META_PRIVATE_MEDIA_HOSTS = (
+    'scontent.whatsapp.net',
+    'lookaside.fbsbx.com',
+    'lookaside.facebook.com',
+)
+
 
 
 class WhatsAppAccount(models.Model):
@@ -826,6 +833,105 @@ class WhatsAppAccount(models.Model):
             _logger.warning("Token bucket contention on account %s, will retry next cycle: %s", self.id, exc)
             return False
 
+    @api.model
+    def _is_private_meta_media_url(self, media_url):
+        try:
+            hostname = (urlparse(str(media_url or '').strip()).hostname or '').lower()
+        except ValueError:
+            return False
+        return bool(
+            hostname
+            and (
+                hostname in META_PRIVATE_MEDIA_HOSTS
+                or hostname.endswith('.fbcdn.net')
+                or hostname.endswith('.whatsapp.net')
+            )
+        )
+
+    def _download_and_upload_private_media(self, media_url, media_type, filename=False):
+        """Convert an authenticated Meta CDN URL into a reusable media ID."""
+        self.ensure_one()
+        media_url = str(media_url or '').strip()
+        hostname = (urlparse(media_url).hostname or '').lower()
+        try:
+            response = requests.get(
+                media_url,
+                headers={'Authorization': f'Bearer {self.access_token}'},
+                timeout=60,
+            )
+        except requests.RequestException as exc:
+            raise UserError(_(
+                "Could not download the temporary WhatsApp media from %(host)s. "
+                "Upload the file again if the link has expired."
+            ) % {'host': hostname or _('Meta')}) from exc
+
+        if response.status_code != 200 or not response.content:
+            raise UserError(_(
+                "Could not download the temporary WhatsApp media from %(host)s "
+                "(HTTP %(status)s). The link may have expired; upload the file again."
+            ) % {
+                'host': hostname or _('Meta'),
+                'status': response.status_code,
+            })
+
+        content_type = (response.headers.get('Content-Type') or '').split(';', 1)[0].strip().lower()
+        if content_type.startswith(('application/json', 'text/html')):
+            raise UserError(_(
+                "Meta returned %(content_type)s instead of the media file. "
+                "Upload the file again and retry."
+            ) % {'content_type': content_type})
+
+        if not filename:
+            filename = unquote(urlparse(media_url).path.rsplit('/', 1)[-1]).strip()
+        if not filename or len(filename) > 180 or '.' not in filename:
+            extension = mimetypes.guess_extension(content_type) or {
+                'image': '.jpg',
+                'video': '.mp4',
+                'document': '.pdf',
+                'audio': '.mp3',
+            }.get(media_type, '.bin')
+            filename = f"whatsapp_media{extension}"
+
+        media_id = self._upload_media_to_meta(
+            base64.b64encode(response.content),
+            filename,
+            media_type,
+        )
+        if not media_id:
+            raise UserError(_("Meta accepted the media upload but did not return a media ID."))
+        return media_id
+
+    def _replace_private_media_links(self, value, filename=False, uploaded=None):
+        """Replace authenticated Meta links anywhere in a message payload."""
+        uploaded = uploaded if uploaded is not None else {}
+        if isinstance(value, list):
+            for item in value:
+                self._replace_private_media_links(item, filename=filename, uploaded=uploaded)
+            return value
+        if not isinstance(value, dict):
+            return value
+
+        for media_type in ('image', 'video', 'document', 'audio'):
+            media_object = value.get(media_type)
+            if not isinstance(media_object, dict):
+                continue
+            media_link = str(media_object.get('link') or '').strip()
+            if not self._is_private_meta_media_url(media_link):
+                continue
+            cache_key = (media_link, media_type)
+            if cache_key not in uploaded:
+                uploaded[cache_key] = self._download_and_upload_private_media(
+                    media_link,
+                    media_type,
+                    media_object.get('filename') or filename,
+                )
+            media_object.pop('link', None)
+            media_object['id'] = uploaded[cache_key]
+
+        for nested in value.values():
+            self._replace_private_media_links(nested, filename=filename, uploaded=uploaded)
+        return value
+
     def send_message(self, to_number, message_type='text', **kwargs):
         """
         Send WhatsApp message via Cloud API.
@@ -891,6 +997,13 @@ class WhatsAppAccount(models.Model):
                 }
             
             if template_payload:
+                template_payload = self._replace_private_media_links(
+                    copy.deepcopy(template_payload),
+                    filename=(
+                        kwargs.get('header_media_filename')
+                        or (existing_msg.media_filename if existing_msg else False)
+                    ),
+                )
                 # Ensure components key is omitted entirely if empty for Meta API stability (Prevents 131009 error)
                 if 'components' in template_payload and not template_payload['components']:
                     del template_payload['components']
@@ -907,7 +1020,7 @@ class WhatsAppAccount(models.Model):
                 media_id = self._upload_media_to_meta(kwargs['media_file'], kwargs.get('media_filename', 'image'), 'image')
                 payload['image'] = {'id': media_id}
             else:
-                payload['image'] = kwargs.get('image') or self._prepare_media_reference(kwargs.get('media_url'), 'image')
+                payload['image'] = kwargs.get('image') or self._prepare_media_reference(kwargs.get('media_url'), 'image', kwargs.get('media_filename'))
             if kwargs.get('caption'):
                 if len(kwargs['caption']) > CAPTION_LIMIT:
                     raise UserError(_("WhatsApp media captions cannot exceed %s characters.") % CAPTION_LIMIT)
@@ -919,7 +1032,7 @@ class WhatsAppAccount(models.Model):
                 media_id = self._upload_media_to_meta(kwargs['media_file'], kwargs.get('media_filename', 'video'), 'video')
                 payload['video'] = {'id': media_id}
             else:
-                payload['video'] = kwargs.get('video') or self._prepare_media_reference(kwargs.get('media_url'), 'video')
+                payload['video'] = kwargs.get('video') or self._prepare_media_reference(kwargs.get('media_url'), 'video', kwargs.get('media_filename'))
             if kwargs.get('caption'):
                 if len(kwargs['caption']) > CAPTION_LIMIT:
                     raise UserError(_("WhatsApp media captions cannot exceed %s characters.") % CAPTION_LIMIT)
@@ -931,7 +1044,7 @@ class WhatsAppAccount(models.Model):
                 media_id = self._upload_media_to_meta(kwargs['media_file'], kwargs.get('media_filename', 'document'), 'document')
                 payload['document'] = {'id': media_id}
             else:
-                payload['document'] = kwargs.get('document') or self._prepare_media_reference(kwargs.get('media_url'), 'document')
+                payload['document'] = kwargs.get('document') or self._prepare_media_reference(kwargs.get('media_url'), 'document', kwargs.get('media_filename'))
             if kwargs.get('media_filename'):
                 payload['document']['filename'] = kwargs['media_filename']
             if kwargs.get('caption'):
@@ -945,7 +1058,7 @@ class WhatsAppAccount(models.Model):
                 media_id = self._upload_media_to_meta(kwargs['media_file'], kwargs.get('media_filename', 'audio'), 'audio')
                 payload['audio'] = {'id': media_id}
             else:
-                payload['audio'] = kwargs.get('audio') or self._prepare_media_reference(kwargs.get('media_url'), 'audio')
+                payload['audio'] = kwargs.get('audio') or self._prepare_media_reference(kwargs.get('media_url'), 'audio', kwargs.get('media_filename'))
 
         elif message_type == 'interactive':
             payload['type'] = 'interactive'
@@ -998,7 +1111,7 @@ class WhatsAppAccount(models.Model):
                 if message_type in ('image', 'video', 'document', 'audio'):
                     media_payload = payload.get(message_type, {})
                     queued_vals.update({
-                        'media_url': kwargs.get('media_url') or media_payload.get('id') or media_payload.get('link'),
+                        'media_url': media_payload.get('id') or kwargs.get('media_url') or media_payload.get('link'),
                         'media_filename': kwargs.get('media_filename'),
                         'media_mime_type': kwargs.get('media_mime_type'),
                         'caption': kwargs.get('caption'),
@@ -1006,7 +1119,7 @@ class WhatsAppAccount(models.Model):
                     if kwargs.get('media_file'):
                         queued_vals['media_file'] = kwargs['media_file']
                 elif message_type == 'template':
-                    header_media_url = kwargs.get('header_media_url') or template_header_media_vals.get('header_media_url')
+                    header_media_url = template_header_media_vals.get('header_media_url') or kwargs.get('header_media_url')
                     header_media_filename = (
                         kwargs.get('header_media_filename')
                         or template_header_media_vals.get('header_media_filename')
@@ -1112,7 +1225,7 @@ class WhatsAppAccount(models.Model):
             if message_type in ('image', 'video', 'document', 'audio'):
                 media_payload = payload.get(message_type, {})
                 vals.update({
-                    'media_url': kwargs.get('media_url') or media_payload.get('id') or media_payload.get('link') or (existing_msg.media_url if existing_msg else False),
+                    'media_url': media_payload.get('id') or kwargs.get('media_url') or media_payload.get('link') or (existing_msg.media_url if existing_msg else False),
                     'media_filename': kwargs.get('media_filename') or (existing_msg.media_filename if existing_msg else False),
                     'media_mime_type': kwargs.get('media_mime_type') or (existing_msg.media_mime_type if existing_msg else False),
                     'caption': kwargs.get('caption') or (existing_msg.caption if existing_msg else False),
@@ -1120,7 +1233,7 @@ class WhatsAppAccount(models.Model):
                 if kwargs.get('media_file'):
                     vals['media_file'] = kwargs['media_file']
             elif message_type == 'template':
-                header_media_url = kwargs.get('header_media_url') or template_header_media_vals.get('header_media_url')
+                header_media_url = template_header_media_vals.get('header_media_url') or kwargs.get('header_media_url')
                 header_media_filename = (
                     kwargs.get('header_media_filename')
                     or template_header_media_vals.get('header_media_filename')
@@ -1217,13 +1330,21 @@ class WhatsAppAccount(models.Model):
                     _logger.exception("Failed to create failed-send message log for account %s", self.id)
             raise
 
-    def _prepare_media_reference(self, media_reference, media_type):
+    def _prepare_media_reference(self, media_reference, media_type, filename=False):
         if not media_reference:
             raise UserError(_("Please provide a media file, Meta media ID, or public HTTPS media URL for %s messages.") % media_type)
         media_reference = str(media_reference).strip()
         if media_reference.startswith('http://'):
             raise UserError(_("WhatsApp media links must use HTTPS."))
         if media_reference.startswith('https://'):
+            if self._is_private_meta_media_url(media_reference):
+                return {
+                    'id': self._download_and_upload_private_media(
+                        media_reference,
+                        media_type,
+                        filename,
+                    )
+                }
             return {'link': media_reference}
         return {'id': media_reference}
 
@@ -1276,7 +1397,7 @@ class WhatsAppAccount(models.Model):
         # Ensure data values are explicit strings.
         data = {
             'messaging_product': 'whatsapp', 
-            'type': str(media_type)
+            'type': mime_type
         }
         
         try:

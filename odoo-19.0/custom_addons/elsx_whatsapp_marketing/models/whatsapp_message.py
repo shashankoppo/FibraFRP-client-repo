@@ -414,6 +414,13 @@ class WhatsAppMessage(models.Model):
                 "transactional content."
             )
 
+        if code_int == 131053:
+            return _(
+                "[131053] Meta could not download the media link. Retry can securely re-upload "
+                "temporary WhatsApp CDN media while it is still available. For an expired or "
+                "other protected URL, upload the original file again."
+            )
+
         title = error.get('title') or ''
         message = error.get('message') or ''
         details = ''
