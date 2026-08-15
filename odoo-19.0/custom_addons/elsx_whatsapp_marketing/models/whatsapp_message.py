@@ -18,7 +18,7 @@ from odoo.tools import html2plaintext
 
 _logger = logging.getLogger(__name__)
 
-NON_RETRYABLE_META_ERROR_CODES = {131049}
+NON_RETRYABLE_META_ERROR_CODES = {131026, 131049}
 SIDECAR_NOTIFY_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix='wa-sidecar')
 MEDIA_DOWNLOAD_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix='wa-media')
 
@@ -443,6 +443,7 @@ class WhatsAppMessage(models.Model):
             body = self._render_interactive_preview_html()
         else:
             body = Markup("<div class='wa-preview-text'>%s</div>") % escape(self.body or 'Type a message...')
+        body = Markup(body)
         status = escape(self.status or 'draft')
         time_label = 'Now'
         if self.create_date:
@@ -499,6 +500,13 @@ class WhatsAppMessage(models.Model):
         error = error or {}
         code = error.get('code')
         code_int = _safe_int(code)
+        if code_int == 131026:
+            return _(
+                "[131026] Meta could not deliver this message to the recipient. The number may be "
+                "unavailable on WhatsApp, inactive, or otherwise unreachable. Do not retry the same "
+                "message immediately; verify the number or ask the customer to initiate a conversation."
+            )
+
         if code_int == 131049:
             return _(
                 "[131049] Meta blocked delivery for this recipient to maintain WhatsApp ecosystem health. "
@@ -1426,11 +1434,16 @@ class WhatsAppMessage(models.Model):
             ))
         non_retryable = self.filtered(lambda msg: msg._is_non_retryable_failure())
         if non_retryable:
+            codes = sorted({
+                msg._meta_error_code_from_text(msg.error_message)
+                for msg in non_retryable
+                if msg._meta_error_code_from_text(msg.error_message)
+            })
             raise UserError(_(
-                "This message failed with Meta error 131049, so retrying the same marketing template "
-                "immediately is blocked. Wait for the customer to reply, retry later with better "
-                "segmentation, or use an approved utility template for transactional content."
-            ))
+                "These messages have non-retryable Meta delivery errors (%(codes)s). Retrying the same "
+                "message immediately will not resolve them. Verify unreachable numbers, wait for the "
+                "customer to initiate or reply, and improve marketing opt-in and segmentation."
+            ) % {'codes': ', '.join(str(code) for code in codes)})
         self.write({'status': 'queued', 'error_message': False})
         self.action_send()
 
@@ -1499,6 +1512,22 @@ class WhatsAppMessage(models.Model):
             'pending_stopped': len(pending),
             'retries_stopped': len(retryable_failed),
         }
+
+    @api.model
+    def _repair_non_retryable_failures(self):
+        """Remove stale retry schedules from permanent Meta delivery failures."""
+        candidates = self.sudo().search([
+            ('status', '=', 'failed'),
+            ('next_retry_at', '!=', False),
+        ])
+        blocked = candidates.filtered(lambda message: message._is_non_retryable_failure())
+        if blocked:
+            blocked.write({'next_retry_at': False})
+        _logger.info(
+            'WhatsApp permanent-failure retry repair examined=%s cleared=%s',
+            len(candidates), len(blocked),
+        )
+        return {'examined': len(candidates), 'cleared': len(blocked)}
 
     @api.model
     def _cleanup_old_messages(self, days=None):

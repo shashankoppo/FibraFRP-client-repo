@@ -262,6 +262,106 @@ if [ -n "${CAMPAIGN_ID}" ]; then
       ORDER BY status;"
 
   echo
+  echo "==> Campaign ${CAMPAIGN_ID} reconciled recipient outcomes"
+  docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
+    "WITH message_rows AS (
+        SELECT id,
+               status,
+               NULLIF(message_id, '') AS meta_message_id,
+               COALESCE(
+                 NULLIF(regexp_replace(COALESCE(phone_number, ''), '[^0-9]', '', 'g'), ''),
+                 CASE WHEN partner_id IS NOT NULL THEN 'partner:' || partner_id::text END,
+                 'message:' || id::text
+               ) AS recipient_key
+          FROM whatsapp_message
+         WHERE campaign_id = ${CAMPAIGN_ID}
+           AND direction = 'outbound'
+     ), recipient_outcomes AS (
+        SELECT recipient_key,
+               bool_or(meta_message_id IS NOT NULL) AS api_accepted,
+               bool_or(status IN ('sent', 'delivered', 'read')) AS final_success,
+               bool_or(status = 'failed') AS has_failure,
+               bool_or(status IN ('draft', 'queued')) AS pending
+          FROM message_rows
+         GROUP BY recipient_key
+     ), row_totals AS (
+        SELECT count(*) AS total_rows,
+               count(*) FILTER (WHERE meta_message_id IS NOT NULL) AS api_accepted_attempts,
+               count(*) FILTER (WHERE status IN ('sent', 'delivered', 'read')) AS success_rows,
+               count(*) FILTER (WHERE status = 'failed') AS failed_attempt_rows,
+               count(*) FILTER (WHERE status IN ('draft', 'queued')) AS pending_rows,
+               count(*) FILTER (WHERE status = 'cancelled') AS cancelled_audit_rows
+          FROM message_rows
+     )
+     SELECT row_totals.total_rows,
+            count(*) AS unique_recipients,
+            row_totals.api_accepted_attempts,
+            count(*) FILTER (WHERE api_accepted) AS api_accepted_recipients,
+            row_totals.success_rows,
+            count(*) FILTER (WHERE final_success) AS successful_recipients,
+            row_totals.failed_attempt_rows,
+            count(*) FILTER (
+              WHERE has_failure AND NOT final_success AND NOT pending
+            ) AS final_failed_recipients,
+            row_totals.pending_rows,
+            count(*) FILTER (WHERE pending AND NOT final_success) AS pending_recipients,
+            row_totals.cancelled_audit_rows,
+            row_totals.total_rows - count(*) AS duplicate_or_audit_rows
+       FROM recipient_outcomes
+       CROSS JOIN row_totals
+      GROUP BY row_totals.total_rows,
+               row_totals.api_accepted_attempts,
+               row_totals.success_rows,
+               row_totals.failed_attempt_rows,
+               row_totals.pending_rows,
+               row_totals.cancelled_audit_rows;"
+
+  echo
+  echo "==> Campaign ${CAMPAIGN_ID} failed-attempt reasons"
+  docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
+    "SELECT COALESCE(
+              substring(COALESCE(error_message, '') FROM '^\\[([0-9]+)\\]'),
+              'local/no-code'
+            ) AS error_code,
+            left(
+              regexp_replace(COALESCE(NULLIF(error_message, ''), 'No error detail'), E'[\\n\\r\\t]+', ' ', 'g'),
+              220
+            ) AS reason,
+            count(*) AS failed_attempts,
+            count(*) FILTER (WHERE NULLIF(message_id, '') IS NOT NULL) AS accepted_then_failed,
+            count(*) FILTER (WHERE next_retry_at IS NOT NULL) AS retry_scheduled
+       FROM whatsapp_message
+      WHERE campaign_id = ${CAMPAIGN_ID}
+        AND direction = 'outbound'
+        AND status = 'failed'
+      GROUP BY error_code, reason
+      ORDER BY failed_attempts DESC, error_code;"
+
+  API_LOG_LINK_COLUMNS="$(
+    docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -Atc \
+      "SELECT EXISTS (
+         SELECT 1
+           FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'whatsapp_api_log'
+            AND column_name = 'campaign_id'
+       );"
+  )"
+  echo
+  echo "==> Campaign ${CAMPAIGN_ID} API-attempt reconciliation"
+  if [ "${API_LOG_LINK_COLUMNS}" = "t" ]; then
+    docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
+      "SELECT count(*) AS campaign_api_attempts,
+              count(*) FILTER (WHERE status_code BETWEEN 200 AND 299) AS api_accepted_attempts,
+              count(DISTINCT message_id_ref) AS linked_messages,
+              count(DISTINCT phone_number) FILTER (WHERE phone_number IS NOT NULL) AS linked_recipients
+         FROM whatsapp_api_log
+        WHERE campaign_id = ${CAMPAIGN_ID};"
+  else
+    echo "API log campaign links are missing; upgrade elsx_whatsapp_marketing to backfill them."
+  fi
+
+  echo
   echo "==> Campaign ${CAMPAIGN_ID} schedules"
   docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
     "SELECT id, status, schedule_type, scheduled_date, next_execution_date, execution_count

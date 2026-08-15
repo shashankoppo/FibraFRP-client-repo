@@ -4,12 +4,15 @@
         <field name="name">whatsapp.api.log.tree</field>
         <field name="model">whatsapp.api.log</field>
         <field name="arch" type="xml">
-            <list string="API Logs" decoration-danger="not success" decoration-success="success" create="false">
+            <list string="Outbound API Attempts" decoration-danger="not success" decoration-success="success" create="false">
                 <field name="create_date" string="Time"/>
                 <field name="account_id"/>
+                <field name="campaign_id" optional="show"/>
+                <field name="phone_number" optional="hide"/>
                 <field name="endpoint"/>
                 <field name="status_code"/>
-                <field name="latency" widget="float_time" string="Latency (ms)"/>
+                <field name="message_status" optional="show"/>
+                <field name="latency" string="Latency (ms)"/>
                 <field name="template_name"/>
                 <field name="success"/>
             </list>
@@ -33,12 +36,15 @@
                         <group>
                             <field name="create_date"/>
                             <field name="account_id"/>
+                            <field name="campaign_id" invisible="not campaign_id"/>
+                            <field name="phone_number" invisible="not phone_number"/>
                             <field name="latency"/>
                         </group>
                         <group>
                             <field name="method"/>
                             <field name="template_name" invisible="not template_name"/>
                             <field name="success" widget="boolean_toggle"/>
+                            <field name="message_status" invisible="not message_status"/>
                         </group>
                     </group>
                     <notebook>
@@ -58,16 +64,36 @@
         </field>
     </record>
 
+    <record id="view_whatsapp_api_log_search" model="ir.ui.view">
+        <field name="name">whatsapp.api.log.search</field>
+        <field name="model">whatsapp.api.log</field>
+        <field name="arch" type="xml">
+            <search string="Outbound API Attempts">
+                <field name="account_id"/>
+                <field name="campaign_id"/>
+                <field name="phone_number"/>
+                <field name="template_name"/>
+                <filter string="API Accepted" name="api_accepted" domain="[('success', '=', True)]"/>
+                <filter string="API Rejected" name="api_rejected" domain="[('success', '=', False)]"/>
+                <separator/>
+                <filter string="Campaign" name="group_campaign" context="{'group_by': 'campaign_id'}"/>
+                <filter string="Final Status" name="group_message_status" context="{'group_by': 'message_status'}"/>
+            </search>
+        </field>
+    </record>
+
     <record id="action_whatsapp_api_log" model="ir.actions.act_window">
-        <field name="name">Outbound API Logs</field>
+        <field name="name">Outbound API Attempts</field>
         <field name="res_model">whatsapp.api.log</field>
         <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_whatsapp_api_log_search"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 No API logs found.
             </p>
             <p>
-                All outbound requests to Meta Cloud API will be logged here for debugging.
+                Each row is an HTTP request to Meta. API Accepted means Meta received the request;
+                Sent, Delivered, Read, or Failed is the later message outcome reported by webhooks.
             </p>
         </field>
     </record>

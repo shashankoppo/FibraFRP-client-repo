@@ -1239,7 +1239,7 @@ class WhatsAppAccount(models.Model):
                 # We'll link the message later if successful
                 pass
                 
-            self.env['whatsapp.api.log'].sudo().create(log_vals)
+            api_log = self.env['whatsapp.api.log'].sudo().create(log_vals)
 
             try:
                 response_data = response.json()
@@ -1381,9 +1381,11 @@ class WhatsAppAccount(models.Model):
 
             if existing_msg:
                 existing_msg.write(vals)
+                api_log.message_id_ref = existing_msg.id
                 return existing_msg
             else:
                 msg = self.env['whatsapp.message'].create(vals)
+                api_log.message_id_ref = msg.id
                 return msg
                 
         except Exception as e:

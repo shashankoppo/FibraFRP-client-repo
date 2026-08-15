@@ -35,7 +35,7 @@
                     <button name="%(elsx_whatsapp_marketing.action_whatsapp_campaign_schedule_wizard)d" string="Schedule / Send" type="action" class="btn-primary" invisible="state != 'draft'" context="{'default_campaign_id': id}"/>
                     <button name="action_process_queue" string="Process Queue (Send 50)" type="object" class="btn-warning" invisible="state != 'running'"/>
                     <button name="action_retry_failed_messages" string="Retry Failed" type="object" class="btn-secondary" invisible="failed_count == 0 or state in ['cancelled', 'archived']"/>
-                    <button name="action_view_failed_recipients" string="Failed Recipients" type="object" class="btn-secondary" invisible="failed_count == 0"/>
+                    <button name="action_view_failed_recipients" string="Failed Recipients" type="object" class="btn-secondary" invisible="failed_recipient_count == 0"/>
                     <button name="action_export_failed_recipients" string="Export Failed" type="object" class="btn-secondary" invisible="failed_count == 0"/>
                     <button name="action_cancel" string="Cancel" type="object" class="btn-danger" invisible="state in ['completed', 'cancelled', 'archived']"/>
                     <button name="action_archive_record" string="Archive" type="object" class="btn-secondary" invisible="state == 'archived'"/>
@@ -58,6 +58,14 @@
                         <div class="wa-kpi-card">
                             <span>Sent</span>
                             <strong><field name="sent_count" readonly="1"/></strong>
+                        </div>
+                        <div class="wa-kpi-card">
+                            <span>API Accepted</span>
+                            <strong><field name="api_accepted_count" readonly="1"/></strong>
+                        </div>
+                        <div class="wa-kpi-card">
+                            <span>Failed Recipients</span>
+                            <strong><field name="failed_recipient_count" readonly="1"/></strong>
                         </div>
                         <div class="wa-kpi-card">
                             <span>Delivered</span>
@@ -95,6 +103,8 @@
                             <field name="total_recipients" readonly="1"/>
                             <field name="queued_count" readonly="1"/>
                             <field name="failed_count" readonly="1"/>
+                            <field name="failed_recipient_count" readonly="1"/>
+                            <field name="duplicate_attempt_count" readonly="1"/>
                         </group>
                     </group>
                     <group string="Pre-send Checklist">

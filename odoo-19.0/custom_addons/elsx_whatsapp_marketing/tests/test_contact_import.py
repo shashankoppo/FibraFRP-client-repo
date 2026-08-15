@@ -447,6 +447,177 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
         self.assertEqual(campaign.delivery_rate, 0.5)
         self.assertEqual(campaign.read_rate, 0.0)
 
+    def test_campaign_reconciles_attempt_rows_to_unique_recipient_outcomes(self):
+        partners = self.env['res.partner'].with_context(skip_whatsapp_contact_sync=True).create([
+            {'name': 'Permanent Failure', 'phone': '919881936151'},
+            {'name': 'Delivered Recipient', 'phone': '919881936152'},
+            {'name': 'Pending After Failure', 'phone': '919881936153'},
+        ])
+        campaign = self.env['whatsapp.campaign'].create({
+            'name': 'Reconciled Campaign Counters',
+            'account_id': self.account.id,
+            'campaign_type': 'broadcast',
+            'target_type': 'manual',
+            'partner_ids': [(6, 0, partners.ids)],
+            'message_body': 'Hello',
+        })
+        messages = self.env['whatsapp.message'].create([
+            {
+                'account_id': self.account.id,
+                'campaign_id': campaign.id,
+                'partner_id': partners[0].id,
+                'phone_number': partners[0].phone,
+                'direction': 'outbound',
+                'status': 'failed',
+                'message_id': 'wamid.failed-recipient',
+                'error_message': '[131049] Blocked by Meta',
+                'body': 'Failed attempt',
+            },
+            {
+                'account_id': self.account.id,
+                'campaign_id': campaign.id,
+                'partner_id': partners[0].id,
+                'phone_number': partners[0].phone,
+                'direction': 'outbound',
+                'status': 'cancelled',
+                'body': 'Duplicate audit row',
+            },
+            {
+                'account_id': self.account.id,
+                'campaign_id': campaign.id,
+                'partner_id': partners[1].id,
+                'phone_number': partners[1].phone,
+                'direction': 'outbound',
+                'status': 'delivered',
+                'message_id': 'wamid.delivered-recipient',
+                'body': 'Delivered',
+            },
+            {
+                'account_id': self.account.id,
+                'campaign_id': campaign.id,
+                'partner_id': partners[2].id,
+                'phone_number': partners[2].phone,
+                'direction': 'outbound',
+                'status': 'failed',
+                'error_message': 'Temporary failure',
+                'body': 'Old failed attempt',
+            },
+            {
+                'account_id': self.account.id,
+                'campaign_id': campaign.id,
+                'partner_id': partners[2].id,
+                'phone_number': partners[2].phone,
+                'direction': 'outbound',
+                'status': 'queued',
+                'body': 'Pending retry',
+            },
+        ])
+
+        campaign.invalidate_recordset([
+            'api_accepted_count', 'failed_count', 'failed_recipient_count',
+            'duplicate_attempt_count',
+        ])
+        self.assertEqual(campaign.api_accepted_count, 2)
+        self.assertEqual(campaign.failed_count, 2)
+        self.assertEqual(campaign.failed_recipient_count, 1)
+        self.assertEqual(campaign.duplicate_attempt_count, 2)
+        failed_action = campaign.action_view_failed_recipients()
+        self.assertEqual(failed_action['domain'], [('id', 'in', [messages[0].id])])
+
+    def test_template_message_preview_renders_markup_instead_of_source_text(self):
+        template = self.env['whatsapp.template'].create({
+            'name': 'Preview Template',
+            'meta_template_name': 'preview_template',
+            'account_id': self.account.id,
+            'language': 'en_US',
+            'language_code': 'en_US',
+            'status': 'approved',
+            'body': 'Hello {{name}}',
+        })
+        partner = self.env['res.partner'].with_context(skip_whatsapp_contact_sync=True).create({
+            'name': 'Preview Recipient',
+            'phone': '919881936154',
+        })
+        message = self.env['whatsapp.message'].create({
+            'account_id': self.account.id,
+            'partner_id': partner.id,
+            'phone_number': partner.phone,
+            'direction': 'outbound',
+            'status': 'failed',
+            'message_type': 'template',
+            'template_id': template.id,
+            'body': 'Hello Preview Recipient',
+        })
+
+        preview = str(message._render_preview_html())
+
+        self.assertIn("<div class='wa-template-preview-bubble'", preview)
+        self.assertNotIn('&lt;div class=&#39;wa-template-preview-bubble&#39;', preview)
+
+    def test_permanent_meta_failures_are_never_scheduled_or_manually_retried(self):
+        future = fields.Datetime.add(fields.Datetime.now(), hours=1)
+        permanent, temporary = self.env['whatsapp.message'].create([
+            {
+                'account_id': self.account.id,
+                'phone_number': '919881936155',
+                'direction': 'outbound',
+                'status': 'failed',
+                'body': 'Permanent failure',
+                'error_message': '[131026] Message undeliverable',
+                'next_retry_at': future,
+            },
+            {
+                'account_id': self.account.id,
+                'phone_number': '919881936156',
+                'direction': 'outbound',
+                'status': 'failed',
+                'body': 'Temporary failure',
+                'error_message': '[131048] Rate limited',
+                'next_retry_at': future,
+            },
+        ])
+
+        self.env['whatsapp.message']._repair_non_retryable_failures()
+        (permanent | temporary).invalidate_recordset(['next_retry_at'])
+
+        self.assertFalse(permanent.next_retry_at)
+        self.assertTrue(temporary.next_retry_at)
+        with self.assertRaisesRegex(UserError, '131026'):
+            permanent.action_retry()
+
+    def test_api_attempt_backfill_links_message_campaign_and_final_status(self):
+        campaign = self.env['whatsapp.campaign'].create({
+            'name': 'API Attempt Reconciliation',
+            'account_id': self.account.id,
+            'campaign_type': 'broadcast',
+            'target_type': 'manual',
+            'message_body': 'Hello',
+        })
+        message = self.env['whatsapp.message'].create({
+            'account_id': self.account.id,
+            'campaign_id': campaign.id,
+            'phone_number': '919881936157',
+            'direction': 'outbound',
+            'status': 'delivered',
+            'message_id': 'wamid.api-log-link',
+            'body': 'Delivered',
+        })
+        api_log = self.env['whatsapp.api.log'].create({
+            'account_id': self.account.id,
+            'endpoint': 'https://graph.facebook.com/messages',
+            'method': 'POST',
+            'response_body': json.dumps({'messages': [{'id': message.message_id}]}),
+            'status_code': 200,
+        })
+
+        result = self.env['whatsapp.api.log']._repair_message_links()
+        api_log.invalidate_recordset(['message_id_ref', 'campaign_id', 'message_status'])
+
+        self.assertGreaterEqual(result['linked'], 1)
+        self.assertEqual(api_log.message_id_ref, message)
+        self.assertEqual(api_log.campaign_id, campaign)
+        self.assertEqual(api_log.message_status, 'delivered')
+
     def test_campaign_cron_does_not_reschedule_itself_while_batch_is_paced(self):
         campaign = self.env['whatsapp.campaign'].create({
             'name': 'Paced Campaign',

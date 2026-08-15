@@ -600,9 +600,16 @@ class WhatsAppCampaign(models.Model):
     total_recipients = fields.Integer('Total Recipients', compute='_compute_statistics', store=True)
     queued_count = fields.Integer('Queued', compute='_compute_statistics', store=True)
     sent_count = fields.Integer('Sent', compute='_compute_statistics', store=True)
+    api_accepted_count = fields.Integer('API Accepted', compute='_compute_statistics', store=True)
     delivered_count = fields.Integer('Delivered', compute='_compute_statistics', store=True)
     read_count = fields.Integer('Read', compute='_compute_statistics', store=True)
-    failed_count = fields.Integer('Failed', compute='_compute_statistics', store=True)
+    failed_count = fields.Integer('Failed Attempts', compute='_compute_statistics', store=True)
+    failed_recipient_count = fields.Integer(
+        'Failed Recipients', compute='_compute_statistics', store=True,
+    )
+    duplicate_attempt_count = fields.Integer(
+        'Duplicate/Audit Rows', compute='_compute_statistics', store=True,
+    )
     
     delivery_rate = fields.Float('Delivery Rate', compute='_compute_statistics', store=True)
     read_rate = fields.Float('Read Rate', compute='_compute_statistics', store=True)
@@ -692,6 +699,7 @@ class WhatsAppCampaign(models.Model):
     
     @api.depends(
         'partner_ids', 'message_ids.status', 'message_ids.direction',
+        'message_ids.message_id', 'message_ids.phone_number', 'message_ids.partner_id',
         'message_ids.button_text', 'message_ids.button_payload', 'message_ids.list_item_id',
     )
     def _compute_statistics(self):
@@ -702,11 +710,34 @@ class WhatsAppCampaign(models.Model):
                 and (message.button_text or message.button_payload or message.list_item_id)
             )
             record.total_recipients = len(record.partner_ids)
+            recipient_outcomes = {}
+            for message in outbound_messages:
+                key = self._message_recipient_key(message)
+                outcome = recipient_outcomes.setdefault(key, {
+                    'api_accepted': False,
+                    'failed': False,
+                    'successful': False,
+                    'pending': False,
+                })
+                outcome['api_accepted'] |= bool(message.message_id)
+                outcome['failed'] |= message.status == 'failed'
+                outcome['successful'] |= message.status in ('sent', 'delivered', 'read')
+                outcome['pending'] |= message.status in ('draft', 'queued')
             record.queued_count = len(outbound_messages.filtered(lambda m: m.status in ['draft', 'queued']))
             record.sent_count = len(outbound_messages.filtered(lambda m: m.status in ['sent', 'delivered', 'read']))
+            record.api_accepted_count = sum(
+                1 for outcome in recipient_outcomes.values() if outcome['api_accepted']
+            )
             record.delivered_count = len(outbound_messages.filtered(lambda m: m.status in ['delivered', 'read']))
             record.read_count = len(outbound_messages.filtered(lambda m: m.status == 'read'))
             record.failed_count = len(outbound_messages.filtered(lambda m: m.status == 'failed'))
+            record.failed_recipient_count = sum(
+                1 for outcome in recipient_outcomes.values()
+                if outcome['failed'] and not outcome['successful'] and not outcome['pending']
+            )
+            record.duplicate_attempt_count = max(
+                len(outbound_messages) - len(recipient_outcomes), 0,
+            )
             record.click_count = len(inbound_interactions)
             
             # Rates
@@ -716,6 +747,15 @@ class WhatsAppCampaign(models.Model):
             else:
                 record.delivery_rate = 0.0
                 record.read_rate = 0.0
+
+    @api.model
+    def _message_recipient_key(self, message):
+        phone = ''.join(character for character in (message.phone_number or '') if character.isdigit())
+        if phone:
+            return ('phone', phone)
+        if message.partner_id:
+            return ('partner', message.partner_id.id)
+        return ('message', message.id)
     
     @api.depends('conversion_count', 'sent_count')
     def _compute_roi(self):
@@ -2412,13 +2452,37 @@ class WhatsAppCampaign(models.Model):
 
     def action_view_failed_recipients(self):
         self.ensure_one()
+        outbound = self.message_ids.filtered(lambda message: message.direction == 'outbound')
+        outcomes = {}
+        for message in outbound:
+            key = self._message_recipient_key(message)
+            outcome = outcomes.setdefault(key, {
+                'failed': False,
+                'successful': False,
+                'pending': False,
+            })
+            outcome['failed'] |= message.status == 'failed'
+            outcome['successful'] |= message.status in ('sent', 'delivered', 'read')
+            outcome['pending'] |= message.status in ('draft', 'queued')
+
+        final_failed_keys = {
+            key for key, outcome in outcomes.items()
+            if outcome['failed'] and not outcome['successful'] and not outcome['pending']
+        }
+        failed_message_ids = []
+        selected_keys = set()
+        for message in outbound.sorted('id', reverse=True):
+            key = self._message_recipient_key(message)
+            if message.status == 'failed' and key in final_failed_keys and key not in selected_keys:
+                failed_message_ids.append(message.id)
+                selected_keys.add(key)
         return {
             'type': 'ir.actions.act_window',
             'name': 'Failed Recipients',
             'res_model': 'whatsapp.message',
             'view_mode': 'list,form',
             'views': [(False, 'list'), (False, 'form')],
-            'domain': [('campaign_id', '=', self.id), ('status', '=', 'failed')],
+            'domain': [('id', 'in', failed_message_ids)],
             'target': 'current',
         }
 
