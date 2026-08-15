@@ -19,6 +19,12 @@ from odoo.tools import html2plaintext
 _logger = logging.getLogger(__name__)
 
 NON_RETRYABLE_META_ERROR_CODES = {131026, 131049}
+RETRYABLE_META_ERROR_CODES = {4, 17, 32, 613, 130429, 131048, 131056}
+RETRYABLE_FAILURE_TEXT_MARKERS = (
+    'connection reset', 'connection refused', 'connection aborted',
+    'could not serialize access', 'rate limit', 'server error',
+    'temporarily unavailable', 'timeout', 'timed out',
+)
 SIDECAR_NOTIFY_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix='wa-sidecar')
 MEDIA_DOWNLOAD_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix='wa-media')
 
@@ -257,6 +263,10 @@ class WhatsAppMessage(models.Model):
 
     # Retry & Exponential Backoff (Phase 2)
     retry_count = fields.Integer('Retry Count', default=0, readonly=True)
+    bulk_retry_count = fields.Integer(
+        'Safe Bulk Retry Count', default=0, readonly=True, copy=False,
+        help='Number of operator-triggered safe campaign retries for this recipient outcome.',
+    )
     next_retry_at = fields.Datetime('Next Retry', help='Next attempt time for exponential backoff retry')
 
     # Threading (Replies)
@@ -486,6 +496,10 @@ class WhatsAppMessage(models.Model):
         return _safe_int(code) in NON_RETRYABLE_META_ERROR_CODES
 
     @api.model
+    def _is_retryable_meta_error_code(self, code):
+        return _safe_int(code) in RETRYABLE_META_ERROR_CODES
+
+    @api.model
     def _meta_error_code_from_text(self, message):
         if not message:
             return False
@@ -538,6 +552,15 @@ class WhatsAppMessage(models.Model):
         return self._is_non_retryable_meta_error_code(
             self._meta_error_code_from_text(self.error_message)
         )
+
+    def _is_safe_bulk_retry_failure(self):
+        """Return true only for failures known to be transient and safe to resend once."""
+        self.ensure_one()
+        code = self._meta_error_code_from_text(self.error_message)
+        if code:
+            return self._is_retryable_meta_error_code(code)
+        error_text = (self.error_message or '').lower()
+        return any(marker in error_text for marker in RETRYABLE_FAILURE_TEXT_MARKERS)
 
 
     @api.depends('phone_number', 'account_id')

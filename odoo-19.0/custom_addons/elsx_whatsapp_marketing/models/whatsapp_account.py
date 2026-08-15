@@ -1353,12 +1353,11 @@ class WhatsAppAccount(models.Model):
                     'status': 'failed',
                     'error_message': error_msg,
                 })
-                retryable_codes = {4, 17, 32, 613, 130429, 131048, 131056}
                 retryable = (
                     not message_model._is_non_retryable_meta_error_code(error_code)
                     and (
                         response.status_code in (408, 425, 429, 500, 502, 503, 504)
-                        or error_code in retryable_codes
+                        or message_model._is_retryable_meta_error_code(error_code)
                     )
                 )
                 if retryable:

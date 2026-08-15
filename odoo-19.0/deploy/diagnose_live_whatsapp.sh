@@ -337,6 +337,76 @@ if [ -n "${CAMPAIGN_ID}" ]; then
       GROUP BY error_code, reason
       ORDER BY failed_attempts DESC, error_code;"
 
+  echo
+  echo "==> Campaign ${CAMPAIGN_ID} final failed-recipient disposition"
+  docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -c \
+    "WITH message_rows AS (
+        SELECT id,
+               status,
+               error_message,
+               bulk_retry_count,
+               COALESCE(
+                 NULLIF(regexp_replace(COALESCE(phone_number, ''), '[^0-9]', '', 'g'), ''),
+                 CASE WHEN partner_id IS NOT NULL THEN 'partner:' || partner_id::text END,
+                 'message:' || id::text
+               ) AS recipient_key
+          FROM whatsapp_message
+         WHERE campaign_id = ${CAMPAIGN_ID}
+           AND direction = 'outbound'
+     ), recipient_outcomes AS (
+        SELECT recipient_key,
+               bool_or(status IN ('sent', 'delivered', 'read')) AS successful,
+               bool_or(status IN ('draft', 'queued')) AS pending
+          FROM message_rows
+         GROUP BY recipient_key
+     ), latest_failed AS (
+        SELECT DISTINCT ON (recipient_key)
+               recipient_key,
+               error_message,
+               bulk_retry_count
+          FROM message_rows
+         WHERE status = 'failed'
+         ORDER BY recipient_key, id DESC
+     ), classified AS (
+        SELECT COALESCE(
+                 substring(COALESCE(failed.error_message, '') FROM '^\\[([0-9]+)\\]'),
+                 'local/no-code'
+               ) AS error_code,
+               CASE
+                 WHEN (
+                        substring(COALESCE(failed.error_message, '') FROM '^\\[([0-9]+)\\]')
+                          IN ('4', '17', '32', '613', '130429', '131048', '131056')
+                        OR lower(COALESCE(failed.error_message, '')) ~
+                          'connection reset|connection refused|connection aborted|could not serialize access|rate limit|server error|temporarily unavailable|timeout|timed out'
+                      ) AND COALESCE(failed.bulk_retry_count, 0) >= 1
+                   THEN 'retry_exhausted'
+                 WHEN substring(COALESCE(failed.error_message, '') FROM '^\\[([0-9]+)\\]')
+                        IN ('4', '17', '32', '613', '130429', '131048', '131056')
+                   OR lower(COALESCE(failed.error_message, '')) ~
+                        'connection reset|connection refused|connection aborted|could not serialize access|rate limit|server error|temporarily unavailable|timeout|timed out'
+                   THEN 'retryable'
+                 WHEN substring(COALESCE(failed.error_message, '') FROM '^\\[([0-9]+)\\]')
+                        IN ('131026', '131049')
+                   THEN 'permanent'
+                 ELSE 'review_required'
+               END AS disposition,
+               left(
+                 regexp_replace(COALESCE(NULLIF(failed.error_message, ''), 'No error detail'), E'[\\n\\r\\t]+', ' ', 'g'),
+                 220
+               ) AS reason
+          FROM latest_failed failed
+          JOIN recipient_outcomes outcome USING (recipient_key)
+         WHERE NOT outcome.successful
+           AND NOT outcome.pending
+     )
+     SELECT disposition,
+            error_code,
+            reason,
+            count(*) AS recipients
+       FROM classified
+      GROUP BY disposition, error_code, reason
+      ORDER BY disposition, recipients DESC, error_code;"
+
   API_LOG_LINK_COLUMNS="$(
     docker compose exec -T db psql -U "${DB_USER}" -d "${LIVE_DB_NAME}" -Atc \
       "SELECT EXISTS (

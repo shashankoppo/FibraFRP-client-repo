@@ -756,6 +756,29 @@ class WhatsAppCampaign(models.Model):
         if message.partner_id:
             return ('partner', message.partner_id.id)
         return ('message', message.id)
+
+    def _final_failed_recipient_messages(self):
+        """Return one latest failed row for each recipient with a terminal failed outcome."""
+        self.ensure_one()
+        outcomes = {}
+        outbound = self.message_ids.filtered(lambda message: message.direction == 'outbound')
+        for message in outbound.sorted('id'):
+            key = self._message_recipient_key(message)
+            outcome = outcomes.setdefault(key, {
+                'latest_failed_id': False,
+                'successful': False,
+                'pending': False,
+            })
+            if message.status == 'failed':
+                outcome['latest_failed_id'] = message.id
+            outcome['successful'] |= message.status in ('sent', 'delivered', 'read')
+            outcome['pending'] |= message.status in ('draft', 'queued')
+        failed_ids = [
+            outcome['latest_failed_id']
+            for outcome in outcomes.values()
+            if outcome['latest_failed_id'] and not outcome['successful'] and not outcome['pending']
+        ]
+        return self.env['whatsapp.message'].browse(failed_ids)
     
     @api.depends('conversion_count', 'sent_count')
     def _compute_roi(self):
@@ -1019,18 +1042,33 @@ class WhatsAppCampaign(models.Model):
 
     def action_export_failed_recipients(self):
         self.ensure_one()
-        failed = self.message_ids.filtered(lambda msg: msg.status == 'failed')
+        failed = self._final_failed_recipient_messages()
         if not failed:
             raise UserError(_("There are no failed recipients to export."))
         buffer = io.StringIO()
         writer = csv.writer(buffer)
-        writer.writerow(['partner', 'phone', 'message_type', 'status', 'error'])
+        writer.writerow([
+            'partner', 'phone', 'message_type', 'status',
+            'failure_category', 'meta_error_code', 'safe_bulk_retry_count', 'error',
+        ])
         for msg in failed:
+            error_code = msg._meta_error_code_from_text(msg.error_message)
+            if msg._is_safe_bulk_retry_failure() and msg.bulk_retry_count:
+                failure_category = 'retry_exhausted'
+            elif msg._is_safe_bulk_retry_failure():
+                failure_category = 'retryable'
+            elif msg._is_non_retryable_failure():
+                failure_category = 'permanent'
+            else:
+                failure_category = 'review_required'
             writer.writerow([
                 msg.partner_id.display_name if msg.partner_id else '',
                 msg.phone_number or '',
                 msg.message_type or '',
                 msg.status or '',
+                failure_category,
+                error_code or '',
+                msg.bulk_retry_count,
                 msg.error_message or '',
             ])
         data = base64.b64encode(buffer.getvalue().encode('utf-8')).decode('ascii')
@@ -2414,26 +2452,34 @@ class WhatsAppCampaign(models.Model):
 
     def action_retry_failed_messages(self):
         total_retryable = 0
-        total_blocked = 0
+        total_not_safe = 0
+        total_historical_attempts = 0
         for campaign in self:
             if campaign.state in ('cancelled', 'archived'):
                 raise UserError(_(
                     'A Cancelled or Archived campaign cannot be restarted with Retry Failed. '
                     'Duplicate it to create a new delivery run.'
                 ))
-            failed = campaign.message_ids.filtered(lambda msg: msg.status == 'failed')
-            retryable = failed.filtered(lambda msg: not msg._is_non_retryable_failure())
-            blocked = failed - retryable
+            failed_attempts = campaign.message_ids.filtered(
+                lambda msg: msg.direction == 'outbound' and msg.status == 'failed'
+            )
+            failed = campaign._final_failed_recipient_messages()
+            retryable = failed.filtered(
+                lambda msg: msg._is_safe_bulk_retry_failure() and msg.bulk_retry_count < 1
+            )
+            not_safe = failed - retryable
             total_retryable += len(retryable)
-            total_blocked += len(blocked)
+            total_not_safe += len(not_safe)
+            total_historical_attempts += max(len(failed_attempts) - len(failed), 0)
             if not retryable:
                 continue
-            retryable.write({
-                'status': 'queued',
-                'retry_count': 0,
-                'next_retry_at': fields.Datetime.now(),
-                'error_message': False,
-            })
+            for message in retryable:
+                message.write({
+                    'status': 'queued',
+                    'bulk_retry_count': message.bulk_retry_count + 1,
+                    'next_retry_at': fields.Datetime.now(),
+                    'error_message': False,
+                })
             campaign.write({'state': 'running', 'last_batch_at': False})
         if total_retryable:
             self._wake_campaign_queue_cron()
@@ -2441,41 +2487,23 @@ class WhatsAppCampaign(models.Model):
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
-                'title': 'Failed Messages Requeued',
+                'title': 'Safe Failed Recipients Requeued',
                 'message': _(
-                    '%(retryable)s retryable message(s) were queued. '
-                    '%(blocked)s permanent failure(s) were left unchanged.'
-                ) % {'retryable': total_retryable, 'blocked': total_blocked},
+                    '%(retryable)s transient recipient failure(s) were queued once. '
+                    '%(not_safe)s permanent or review-required recipient failure(s) and '
+                    '%(historical)s historical attempt row(s) were left unchanged.'
+                ) % {
+                    'retryable': total_retryable,
+                    'not_safe': total_not_safe,
+                    'historical': total_historical_attempts,
+                },
                 'type': 'success' if total_retryable else 'warning',
             },
         }
 
     def action_view_failed_recipients(self):
         self.ensure_one()
-        outbound = self.message_ids.filtered(lambda message: message.direction == 'outbound')
-        outcomes = {}
-        for message in outbound:
-            key = self._message_recipient_key(message)
-            outcome = outcomes.setdefault(key, {
-                'failed': False,
-                'successful': False,
-                'pending': False,
-            })
-            outcome['failed'] |= message.status == 'failed'
-            outcome['successful'] |= message.status in ('sent', 'delivered', 'read')
-            outcome['pending'] |= message.status in ('draft', 'queued')
-
-        final_failed_keys = {
-            key for key, outcome in outcomes.items()
-            if outcome['failed'] and not outcome['successful'] and not outcome['pending']
-        }
-        failed_message_ids = []
-        selected_keys = set()
-        for message in outbound.sorted('id', reverse=True):
-            key = self._message_recipient_key(message)
-            if message.status == 'failed' and key in final_failed_keys and key not in selected_keys:
-                failed_message_ids.append(message.id)
-                selected_keys.add(key)
+        failed_message_ids = self._final_failed_recipient_messages().ids
         return {
             'type': 'ir.actions.act_window',
             'name': 'Failed Recipients',

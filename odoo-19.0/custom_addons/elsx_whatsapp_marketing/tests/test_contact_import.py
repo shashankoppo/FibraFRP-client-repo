@@ -524,6 +524,121 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
         failed_action = campaign.action_view_failed_recipients()
         self.assertEqual(failed_action['domain'], [('id', 'in', [messages[0].id])])
 
+    def test_bulk_retry_requeues_one_safe_final_failure_per_recipient(self):
+        partners = self.env['res.partner'].with_context(skip_whatsapp_contact_sync=True).create([
+            {'name': 'Transient Recipient', 'phone': '919881936161'},
+            {'name': 'Permanent Recipient', 'phone': '919881936162'},
+            {'name': 'Eventually Delivered', 'phone': '919881936163'},
+            {'name': 'Review Required', 'phone': '919881936164'},
+        ])
+        campaign = self.env['whatsapp.campaign'].create({
+            'name': 'Safe Recipient Retry',
+            'account_id': self.account.id,
+            'campaign_type': 'broadcast',
+            'target_type': 'manual',
+            'partner_ids': [(6, 0, partners.ids)],
+            'message_body': 'Hello',
+            'state': 'completed',
+        })
+        old_transient, latest_transient, permanent, old_failed_success, delivered, review = (
+            self.env['whatsapp.message'].create([
+                {
+                    'account_id': self.account.id,
+                    'campaign_id': campaign.id,
+                    'partner_id': partners[0].id,
+                    'phone_number': partners[0].phone,
+                    'direction': 'outbound',
+                    'status': 'failed',
+                    'error_message': '[131048] Rate limited',
+                    'body': 'Old transient attempt',
+                },
+                {
+                    'account_id': self.account.id,
+                    'campaign_id': campaign.id,
+                    'partner_id': partners[0].id,
+                    'phone_number': partners[0].phone,
+                    'direction': 'outbound',
+                    'status': 'failed',
+                    'error_message': '[131048] Rate limited',
+                    'body': 'Latest transient attempt',
+                },
+                {
+                    'account_id': self.account.id,
+                    'campaign_id': campaign.id,
+                    'partner_id': partners[1].id,
+                    'phone_number': partners[1].phone,
+                    'direction': 'outbound',
+                    'status': 'failed',
+                    'error_message': '[131049] Marketing delivery blocked',
+                    'body': 'Permanent failure',
+                },
+                {
+                    'account_id': self.account.id,
+                    'campaign_id': campaign.id,
+                    'partner_id': partners[2].id,
+                    'phone_number': partners[2].phone,
+                    'direction': 'outbound',
+                    'status': 'failed',
+                    'error_message': '[131048] Old transient failure',
+                    'body': 'Old failure before success',
+                },
+                {
+                    'account_id': self.account.id,
+                    'campaign_id': campaign.id,
+                    'partner_id': partners[2].id,
+                    'phone_number': partners[2].phone,
+                    'direction': 'outbound',
+                    'status': 'delivered',
+                    'message_id': 'wamid.eventually-delivered',
+                    'body': 'Delivered later',
+                },
+                {
+                    'account_id': self.account.id,
+                    'campaign_id': campaign.id,
+                    'partner_id': partners[3].id,
+                    'phone_number': partners[3].phone,
+                    'direction': 'outbound',
+                    'status': 'failed',
+                    'error_message': '[132000] Template parameter mismatch',
+                    'body': 'Review required',
+                },
+            ])
+        )
+
+        final_failed = campaign._final_failed_recipient_messages()
+        self.assertEqual(set(final_failed.ids), {latest_transient.id, permanent.id, review.id})
+
+        result = campaign.action_retry_failed_messages()
+        (old_transient | latest_transient | permanent | old_failed_success | delivered | review).invalidate_recordset([
+            'status', 'next_retry_at', 'bulk_retry_count',
+        ])
+
+        self.assertEqual(old_transient.status, 'failed')
+        self.assertEqual(latest_transient.status, 'queued')
+        self.assertTrue(latest_transient.next_retry_at)
+        self.assertEqual(latest_transient.bulk_retry_count, 1)
+        self.assertEqual(permanent.status, 'failed')
+        self.assertEqual(old_failed_success.status, 'failed')
+        self.assertEqual(delivered.status, 'delivered')
+        self.assertEqual(review.status, 'failed')
+        self.assertEqual(campaign.state, 'running')
+        self.assertIn('1 transient recipient failure(s)', result['params']['message'])
+        self.assertIn('2 permanent or review-required', result['params']['message'])
+        self.assertIn('2 historical attempt row(s)', result['params']['message'])
+
+        latest_transient.write({
+            'status': 'failed',
+            'error_message': '[131048] Rate limited again',
+            'next_retry_at': False,
+        })
+        campaign.state = 'completed'
+        second_result = campaign.action_retry_failed_messages()
+        latest_transient.invalidate_recordset(['status', 'bulk_retry_count'])
+
+        self.assertEqual(latest_transient.status, 'failed')
+        self.assertEqual(latest_transient.bulk_retry_count, 1)
+        self.assertIn('0 transient recipient failure(s)', second_result['params']['message'])
+
     def test_template_message_preview_renders_markup_instead_of_source_text(self):
         template = self.env['whatsapp.template'].create({
             'name': 'Preview Template',
