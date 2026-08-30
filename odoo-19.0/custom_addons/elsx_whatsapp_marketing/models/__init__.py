@@ -13,7 +13,6 @@ from . import res_partner
 from . import sale_order
 from . import account_move
 from . import crm_lead
-from . import loyalty_card
 from . import whatsapp_contact_segment
 from . import whatsapp_analytics
 from . import whatsapp_media_library
