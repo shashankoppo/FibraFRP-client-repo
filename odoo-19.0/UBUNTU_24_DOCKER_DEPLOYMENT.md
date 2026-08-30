@@ -285,13 +285,45 @@ docker logs --tail 250 odoo_app
 ```
 
 To include a specific outside/custom module install in the same controlled run,
-copy the addon into `custom_addons`, confirm it is compatible with Odoo 19, then
-pass it through `EXTRA_INSTALL_MODULES`. Add it to `EXTRA_UPGRADE_MODULES` too
-when the module already exists in the database and needs XML/schema refresh:
+copy proprietary modules into `custom_addons` and third-party/OCA modules into
+`third_party_addons`, confirm they are compatible with Odoo 19, then pass the
+technical module names through `EXTRA_INSTALL_MODULES`. Add them to
+`EXTRA_UPGRADE_MODULES` too when the module already exists in the database and
+needs XML/schema refresh:
 
 ```bash
 EXTRA_INSTALL_MODULES=my_new_module EXTRA_UPGRADE_MODULES=my_new_module bash deploy/safe_production_update.sh FiberaFRP_DB
 ```
+
+For an easier guided path, use:
+
+```bash
+git pull origin main
+docker compose up -d --build
+
+bash deploy-prod.sh FiberaFRP_DB
+INSTALL_MODULES=my_new_module bash deploy-prod.sh FiberaFRP_DB
+bash deploy-new.sh new_client_db IN
+```
+
+The plain `docker compose up -d --build` path keeps named volumes/client data,
+then Odoo startup refreshes the Apps list, writes a pg_dump into
+`secure_backups/auto`, and upgrades modules already installed in each database
+once per source fingerprint. It does not automatically install or uninstall
+modules.
+
+If the addon is mounted outside the repository, expose its parent directory to
+the Odoo container and set `ODOO_EXTRA_ADDONS_PATH=/path/in/container`.
+
+Before installing outside modules, run:
+
+```bash
+python deploy/audit_addons_ready.py
+```
+
+The audit checks that manifests are reachable from `addons_path` and that
+manifest dependencies exist across official, custom, stub, and third-party addon
+roots.
 
 To upgrade an already installed module without installing anything new:
 

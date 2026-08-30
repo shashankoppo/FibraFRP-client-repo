@@ -24,8 +24,8 @@ param(
     [Parameter(Mandatory=$true)]
     [string]$DbName,
 
-    [string]$InstallModules = "elsx_client_restrictions,elsx_rebrand,elsx_attendance_tracking,elsx_face_attendance",
-    [string]$UpgradeModules = "elsx_client_restrictions,elsx_rebrand,elsx_attendance_tracking,elsx_face_attendance",
+    [string]$InstallModules = "",
+    [string]$UpgradeModules = "all",
     [string]$ExtraInstall   = "",
     [string]$ExtraUpgrade   = "",
     [string]$BackupDir      = "secure_backups",
@@ -38,6 +38,36 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $ProjectRoot
 
+function Join-Csv {
+    param([string[]]$Items)
+    return (($Items | Where-Object { $_ -and $_.Trim() } | ForEach-Object { $_.Trim() }) -join ",")
+}
+
+function Expand-UpgradeModules {
+    param(
+        [string]$Csv,
+        [string]$DatabaseName,
+        [string]$DatabaseUser
+    )
+
+    $items = @($Csv -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    if ($items -notcontains "all") {
+        return (Join-Csv $items)
+    }
+
+    $installed = docker compose exec -T db psql -U $DatabaseUser -d $DatabaseName -Atc `
+        "SELECT COALESCE(string_agg(name, ',' ORDER BY name), '') FROM ir_module_module WHERE state IN ('installed', 'to upgrade');" 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "ERROR: Could not read installed modules for '$DatabaseName'. $installed"
+    }
+    $installedItems = @($installed -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    if ($installedItems.Count -eq 0) {
+        Write-Error "ERROR: No installed modules found for '$DatabaseName'; refusing to run an empty upgrade."
+    }
+
+    $explicitItems = @($items | Where-Object { $_ -ne "all" })
+    return (Join-Csv ($installedItems + $explicitItems))
+}
 
 Write-Host "==> Production-safe update for database: $DbName" -ForegroundColor Cyan
 
@@ -95,19 +125,27 @@ docker compose stop odoo 2>$null
 
 # 6. Install / upgrade modules
 $allInstall = $InstallModules
-if ($ExtraInstall) { $allInstall = "$allInstall,$ExtraInstall" }
+if ($ExtraInstall) { $allInstall = Join-Csv @($allInstall, $ExtraInstall) }
 $allUpgrade = $UpgradeModules
 if ($ExtraUpgrade) { $allUpgrade = "$allUpgrade,$ExtraUpgrade" }
+$allUpgrade = Expand-UpgradeModules -Csv $allUpgrade -DatabaseName $DbName -DatabaseUser $DbUser
 
 Write-Host "==> Installing: $allInstall" -ForegroundColor Cyan
 Write-Host "==> Upgrading:  $allUpgrade" -ForegroundColor Cyan
+
+$moduleArgs = @()
+if ($allInstall) {
+    $moduleArgs += @("-i", $allInstall)
+}
+if ($allUpgrade) {
+    $moduleArgs += @("-u", $allUpgrade)
+}
 
 docker compose run --rm -T --no-deps odoo `
     python3 /opt/odoo/odoo-bin `
         -c /etc/odoo/odoo.conf `
         -d $DbName `
-        -i $allInstall `
-        -u $allUpgrade `
+        @moduleArgs `
         --stop-after-init
 if ($LASTEXITCODE -ne 0) { Write-Error "ERROR: Module upgrade failed. DB is intact - restore not needed unless Odoo reports migration errors." }
 

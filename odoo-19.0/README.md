@@ -122,6 +122,65 @@ This project is a hybrid system utilizing Odoo 19.0 as the core ERP and CRM engi
 ## 📦 Custom Module Ecosystem
 
 The `custom_addons` directory contains the proprietary logic developed specifically for FibraFRP. 
+Third-party/OCA modules should live in `third_party_addons`, or in another
+mounted directory added through `ODOO_EXTRA_ADDONS_PATH`. The default Docker and
+local configs load:
+
+```text
+addons, odoo/addons, custom_addons, custom_addons/elsx_stubs, third_party_addons
+```
+
+Before installing outside modules, run:
+
+```bash
+python deploy/audit_addons_ready.py
+```
+
+The audit confirms every manifest is reachable from `addons_path` and that
+manifest dependencies resolve against the official, custom, stub, and
+third-party addon roots.
+
+### Easy Update Button
+
+For production updates with existing client data, keep it this simple from the
+`odoo-19.0` folder:
+
+```powershell
+git pull origin main
+docker compose up -d --build
+```
+
+Those two commands keep Docker volumes/client data intact. On Odoo startup, the
+container updates the Apps list, backs up each database to `secure_backups/auto`,
+and upgrades modules already installed in that database once per source
+fingerprint. It does not automatically install or uninstall modules.
+
+The wrapper below does the same thing with a nicer title:
+
+```powershell
+.\deploy-prod.ps1
+```
+
+For a new client database:
+
+```powershell
+.\deploy-new.ps1 -DbName client_name
+```
+
+To install a newly copied custom or third-party addon:
+
+```powershell
+.\deploy-prod.ps1 -Install module_technical_name
+```
+
+For a raw Compose command with an extra module install:
+
+```powershell
+$env:ODOO_AUTO_INSTALL_MODULES = "module_technical_name"
+$env:ODOO_AUTO_UPDATE_MODULES = "all,module_technical_name"
+$env:ODOO_AUTO_ALLOW_INSTALL = "YES"
+docker compose up -d --build
+```
 
 ### 1. `elsx_whatsapp_marketing` (Flagship Module)
 The enterprise-grade WhatsApp Business console. Built to rival dedicated platforms like WATI.io or Intercom.
@@ -164,10 +223,10 @@ If you change logic in `models/` or `controllers/`:
 If you change layout XML files in `views/` or add fields:
 1. Save the XML file.
 2. **Increment Module Version**: Open `__manifest__.py` and bump the version number (e.g., `19.0.2.7.0` -> `19.0.2.8.0`).
-3. **Upgrade via UI**: 
-   - Turn on Developer Mode in Odoo.
-   - Go to Apps -> Update Apps List.
-   - Find the module and click **Upgrade**.
+3. **Upgrade modules**:
+   - For a safe all-module Docker refresh, run the deployment update script for the target database.
+   - The update scripts now expand `all` to every installed module in each database before calling Odoo.
+   - For UI-only testing, turn on Developer Mode, go to Apps -> Update Apps List, then upgrade the changed module.
 
 ### 3. Modifying JavaScript/CSS (Frontend)
 If you change OWL components, JS widgets, or CSS:

@@ -57,6 +57,15 @@ join_csv() {
   printf '%s' "${result}"
 }
 
+installed_modules_for_db() {
+  local database="$1"
+  docker compose exec -T db psql -X -v ON_ERROR_STOP=1 \
+    -U "${DB_USER}" -d "${database}" -Atc \
+    "SELECT COALESCE(string_agg(name, ',' ORDER BY name), '')
+       FROM ir_module_module
+      WHERE state IN ('installed', 'to upgrade');" | tr -d '\r'
+}
+
 if [[ "${OUTPUT_DIR}" != /* ]]; then
   OUTPUT_DIR="${PROJECT_DIR}/${OUTPUT_DIR}"
 fi
@@ -134,7 +143,12 @@ SERVICES_STOPPED=YES
 for DB in "${DATABASES[@]}"; do
   echo
   echo "---- Preparing module refresh for ${DB}"
-  MODULE_ARGS=(-u all)
+  INSTALLED_MODULES="$(installed_modules_for_db "${DB}")"
+  if [ -z "${INSTALLED_MODULES}" ]; then
+    echo "ERROR: no installed modules found on ${DB}; refusing to run an empty upgrade." >&2
+    exit 1
+  fi
+  MODULE_ARGS=(-u "${INSTALLED_MODULES}")
 
   if [ "${INSTALL_CE_PROFILE_ON_EXISTING}" = "YES" ]; then
     COUNTRY_CSV="$(
@@ -150,7 +164,7 @@ for DB in "${DATABASES[@]}"; do
     done
     CE_PROFILE_MODULES="$("${PROFILE_RUN[@]}" "${PROFILE_ARGS[@]}")"
     INSTALL_MODULES="$(join_csv "${CE_PROFILE_MODULES}" "${DEFAULT_CUSTOM_MODULES}")"
-    MODULE_ARGS=(-i "${INSTALL_MODULES}" -u all)
+    MODULE_ARGS=(-i "${INSTALL_MODULES}" -u "${INSTALLED_MODULES}")
     echo "---- Countries: ${COUNTRY_CSV:-not configured}"
     echo "---- Installing official CE application/localization profile"
   fi

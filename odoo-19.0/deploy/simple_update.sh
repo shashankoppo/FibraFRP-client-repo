@@ -8,8 +8,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${PROJECT_DIR}"
 
-INSTALL_MODULES="${INSTALL_MODULES:-elsx_client_restrictions,elsx_rebrand}"
-UPGRADE_MODULES="${UPGRADE_MODULES:-website,web_editor,html_editor,html_builder,elsx_client_restrictions,elsx_rebrand}"
+INSTALL_MODULES="${INSTALL_MODULES:-}"
+UPGRADE_MODULES="${UPGRADE_MODULES:-all}"
 OPTIONAL_UPGRADE_MODULES="${OPTIONAL_UPGRADE_MODULES:-muk_web_dialog,muk_web_appsbar}"
 DB_NAME_EXCLUDES="${DB_NAME_EXCLUDES:-postgres}"
 SKIP_PULL="${SKIP_PULL:-NO}"
@@ -35,6 +35,54 @@ installed_optional_modules_for_db() {
   docker compose exec -T db sh -lc \
     "psql -U \"\$POSTGRES_USER\" -d \"${database}\" -Atc \"SELECT COALESCE(string_agg(name, ',' ORDER BY name), '') FROM ir_module_module WHERE state = 'installed' AND name IN (${modules_sql});\"" \
     2>/dev/null || true
+}
+
+join_csv() {
+  local result=""
+  local item
+  for item in "$@"; do
+    [ -n "${item}" ] || continue
+    if [ -z "${result}" ]; then
+      result="${item}"
+    else
+      result="${result},${item}"
+    fi
+  done
+  printf '%s' "${result}"
+}
+
+csv_without_all() {
+  local csv="$1"
+  local result=""
+  local item
+  IFS=',' read -r -a ITEMS <<< "${csv}"
+  for item in "${ITEMS[@]}"; do
+    item="${item//[[:space:]]/}"
+    [ -n "${item}" ] || continue
+    [ "${item}" = "all" ] && continue
+    result="$(join_csv "${result}" "${item}")"
+  done
+  printf '%s' "${result}"
+}
+
+csv_contains_all() {
+  local csv="$1"
+  local item
+  IFS=',' read -r -a ITEMS <<< "${csv}"
+  for item in "${ITEMS[@]}"; do
+    item="${item//[[:space:]]/}"
+    if [ "${item}" = "all" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+installed_modules_for_db() {
+  local database="$1"
+  docker compose exec -T db sh -lc \
+    "psql -U \"\$POSTGRES_USER\" -d \"${database}\" -Atc \"SELECT COALESCE(string_agg(name, ',' ORDER BY name), '') FROM ir_module_module WHERE state IN ('installed', 'to upgrade');\"" \
+    2>/dev/null | tr -d '\r'
 }
 
 if [ "${SKIP_PULL}" != "YES" ]; then
@@ -85,17 +133,31 @@ docker compose stop odoo >/dev/null 2>&1 || true
 
 for DB in "${DATABASES[@]}"; do
   DB_UPGRADE_MODULES="${UPGRADE_MODULES}"
+  if csv_contains_all "${DB_UPGRADE_MODULES}"; then
+    INSTALLED_MODULES="$(installed_modules_for_db "${DB}")"
+    if [ -z "${INSTALLED_MODULES}" ]; then
+      log "No installed module list found for ${DB}; refusing to run an empty upgrade."
+      exit 1
+    fi
+    DB_UPGRADE_MODULES="$(join_csv "${INSTALLED_MODULES}" "$(csv_without_all "${DB_UPGRADE_MODULES}")")"
+  fi
   INSTALLED_OPTIONAL_MODULES="$(installed_optional_modules_for_db "${DB}" "${OPTIONAL_UPGRADE_MODULES}" | tr -d '\r')"
   if [ -n "${INSTALLED_OPTIONAL_MODULES}" ]; then
     DB_UPGRADE_MODULES="${DB_UPGRADE_MODULES},${INSTALLED_OPTIONAL_MODULES}"
   fi
   log "Upgrading database: ${DB}"
   log "Database upgrade modules: ${DB_UPGRADE_MODULES}"
+  ODOO_MODULE_ARGS=()
+  if [ -n "${INSTALL_MODULES}" ]; then
+    ODOO_MODULE_ARGS+=("-i" "${INSTALL_MODULES}")
+  fi
+  if [ -n "${DB_UPGRADE_MODULES}" ]; then
+    ODOO_MODULE_ARGS+=("-u" "${DB_UPGRADE_MODULES}")
+  fi
   docker compose run --rm -T --no-deps odoo \
     python3 /opt/odoo/odoo-bin \
       -d "${DB}" \
-      -i "${INSTALL_MODULES}" \
-      -u "${DB_UPGRADE_MODULES}" \
+      "${ODOO_MODULE_ARGS[@]}" \
       --without-demo=True \
       --stop-after-init \
       --no-http

@@ -5,8 +5,8 @@ LIVE_DB_NAME="${1:-${LIVE_DB_NAME:-}}"
 DB_USER="${POSTGRES_USER:-odoo}"
 CONFIG="${ODOO_CONFIG:-/etc/odoo/odoo.conf}"
 OUTPUT_DIR="${OUTPUT_DIR:-secure_backups}"
-INSTALL_MODULES="${INSTALL_MODULES:-elsx_client_restrictions,elsx_rebrand,elsx_attendance_tracking,elsx_face_attendance,elsx_whatsapp_marketing}"
-UPGRADE_MODULES="${UPGRADE_MODULES:-elsx_client_restrictions,elsx_rebrand,elsx_attendance_tracking,elsx_face_attendance,elsx_whatsapp_marketing}"
+INSTALL_MODULES="${INSTALL_MODULES:-}"
+UPGRADE_MODULES="${UPGRADE_MODULES:-all}"
 EXTRA_INSTALL_MODULES="${EXTRA_INSTALL_MODULES:-}"
 EXTRA_UPGRADE_MODULES="${EXTRA_UPGRADE_MODULES:-}"
 
@@ -26,6 +26,56 @@ sql_quote() {
   printf "'%s'" "${value}"
 }
 
+join_csv() {
+  local result=""
+  local item
+  for item in "$@"; do
+    [ -n "${item}" ] || continue
+    if [ -z "${result}" ]; then
+      result="${item}"
+    else
+      result="${result},${item}"
+    fi
+  done
+  printf '%s' "${result}"
+}
+
+csv_without_all() {
+  local csv="$1"
+  local result=""
+  local item
+  IFS=',' read -r -a ITEMS <<< "${csv}"
+  for item in "${ITEMS[@]}"; do
+    item="${item//[[:space:]]/}"
+    [ -n "${item}" ] || continue
+    [ "${item}" = "all" ] && continue
+    result="$(join_csv "${result}" "${item}")"
+  done
+  printf '%s' "${result}"
+}
+
+csv_contains_all() {
+  local csv="$1"
+  local item
+  IFS=',' read -r -a ITEMS <<< "${csv}"
+  for item in "${ITEMS[@]}"; do
+    item="${item//[[:space:]]/}"
+    if [ "${item}" = "all" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+installed_modules_for_db() {
+  local database="$1"
+  docker compose exec -T db psql -X -v ON_ERROR_STOP=1 \
+    -U "${DB_USER}" -d "${database}" -Atc \
+    "SELECT COALESCE(string_agg(name, ',' ORDER BY name), '')
+       FROM ir_module_module
+      WHERE state IN ('installed', 'to upgrade');" | tr -d '\r'
+}
+
 SAFE_DB_NAME="$(printf '%s' "${LIVE_DB_NAME}" | tr -c 'A-Za-z0-9_.-' '_')"
 if [[ "${OUTPUT_DIR}" != /* ]]; then
   OUTPUT_DIR="${PROJECT_DIR}/${OUTPUT_DIR}"
@@ -33,10 +83,7 @@ fi
 mkdir -p "${OUTPUT_DIR}"
 
 echo "==> Production-safe update for database: ${LIVE_DB_NAME}"
-ALL_INSTALL_MODULES="${INSTALL_MODULES}"
-if [ -n "${EXTRA_INSTALL_MODULES}" ]; then
-  ALL_INSTALL_MODULES="${ALL_INSTALL_MODULES},${EXTRA_INSTALL_MODULES}"
-fi
+ALL_INSTALL_MODULES="$(join_csv "${INSTALL_MODULES}" "${EXTRA_INSTALL_MODULES}")"
 
 ALL_UPGRADE_MODULES="${UPGRADE_MODULES}"
 if [ -n "${EXTRA_UPGRADE_MODULES}" ]; then
@@ -77,6 +124,16 @@ if [ "${DB_EXISTS}" != "1" ]; then
   exit 1
 fi
 
+if csv_contains_all "${ALL_UPGRADE_MODULES}"; then
+  INSTALLED_MODULES="$(installed_modules_for_db "${LIVE_DB_NAME}")"
+  if [ -z "${INSTALLED_MODULES}" ]; then
+    echo "ERROR: no installed modules found on ${LIVE_DB_NAME}; refusing to run an empty upgrade." >&2
+    exit 1
+  fi
+  ALL_UPGRADE_MODULES="$(join_csv "${INSTALLED_MODULES}" "$(csv_without_all "${ALL_UPGRADE_MODULES}")")"
+  echo "==> Expanded upgrade target to every installed module"
+fi
+
 echo "==> Creating encrypted backup before any module upgrade"
 OUTPUT_DIR="${OUTPUT_DIR}" BACKUP_PASSPHRASE="${BACKUP_PASSPHRASE}" \
   bash deploy/export_live_encrypted_backup.sh "${LIVE_DB_NAME}"
@@ -96,12 +153,18 @@ docker compose stop sidecar >/dev/null 2>&1 || true
 docker compose stop odoo >/dev/null 2>&1 || true
 
 echo "==> Installing/upgrading requested modules through the backup-protected path"
+ODOO_MODULE_ARGS=()
+if [ -n "${ALL_INSTALL_MODULES}" ]; then
+  ODOO_MODULE_ARGS+=("-i" "${ALL_INSTALL_MODULES}")
+fi
+if [ -n "${ALL_UPGRADE_MODULES}" ]; then
+  ODOO_MODULE_ARGS+=("-u" "${ALL_UPGRADE_MODULES}")
+fi
 docker compose run --rm -T --no-deps odoo \
   python3 /opt/odoo/odoo-bin \
     -c "${CONFIG}" \
     -d "${LIVE_DB_NAME}" \
-    -i "${ALL_INSTALL_MODULES}" \
-    -u "${ALL_UPGRADE_MODULES}" \
+    "${ODOO_MODULE_ARGS[@]}" \
     --stop-after-init
 
 case ",${ALL_INSTALL_MODULES},${ALL_UPGRADE_MODULES}," in

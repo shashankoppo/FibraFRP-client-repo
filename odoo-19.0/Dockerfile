@@ -18,6 +18,13 @@ WORKDIR /opt/odoo
 COPY requirements.txt .
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
+# Addon collections often ship their own Python requirements. Install every
+# discovered requirements.txt so custom and third-party modules can load.
+COPY custom_addons ./custom_addons
+COPY third_party_addons ./third_party_addons
+RUN find custom_addons third_party_addons -name requirements.txt -type f -print0 \
+    | xargs -0 -r -n 1 pip install --no-cache-dir --prefix=/install -r
+
 # ── Stage 2: Runtime ─────────────────────────────────────────────
 FROM python:3.12-slim-bookworm
 
