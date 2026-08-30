@@ -6,6 +6,7 @@
     <menuitem id="menu_whatsapp_root"
               name="WhatsApp Marketing"
               sequence="50"
+              groups="elsx_whatsapp_marketing.group_whatsapp_user"
               web_icon="elsx_whatsapp_marketing,static/description/icon.png"/>
 
     <!-- =====================================================

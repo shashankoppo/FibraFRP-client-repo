@@ -286,6 +286,38 @@ class ElsxAiPrompt(models.Model):
         'AI prompt code must be unique.',
     )
 
+    @api.model
+    def _ensure_default_prompt(self, xmlid_name, values):
+        """Create/link default prompts without duplicating live DB rows."""
+        module = 'elsx_whatsapp_marketing'
+        values = dict(values or {})
+        code = values.get('code')
+        if not xmlid_name or not code:
+            return False
+
+        prompt = self.sudo().search([('code', '=', code)], limit=1)
+        if prompt:
+            prompt.write(values)
+        else:
+            prompt = self.sudo().create(values)
+
+        xmlid = self.env['ir.model.data'].sudo().search([
+            ('module', '=', module),
+            ('name', '=', xmlid_name),
+        ], limit=1)
+        xmlid_values = {
+            'module': module,
+            'name': xmlid_name,
+            'model': self._name,
+            'res_id': prompt.id,
+            'noupdate': True,
+        }
+        if xmlid:
+            xmlid.write(xmlid_values)
+        else:
+            self.env['ir.model.data'].sudo().create(xmlid_values)
+        return prompt.id
+
 
 class ElsxAiJob(models.Model):
     _name = 'elsx.ai.job'

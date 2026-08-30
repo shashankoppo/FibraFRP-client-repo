@@ -131,11 +131,11 @@
                             <field name="active"/>
                         </group>
                         <group string="API Configuration">
-                            <field name="access_token" password="True"/>
-                            <field name="app_id"/>
+                            <field name="access_token" password="True" groups="elsx_whatsapp_marketing.group_whatsapp_manager"/>
+                            <field name="app_id" groups="elsx_whatsapp_marketing.group_whatsapp_manager"/>
                             <field name="is_sandbox"/>
-                            <field name="two_factor_pin" password="1"/>
-                            <button name="action_register_phone" string="Register Phone" type="object" class="oe_highlight"/>
+                            <field name="two_factor_pin" password="1" groups="elsx_whatsapp_marketing.group_whatsapp_manager"/>
+                            <button name="action_register_phone" string="Register Phone" type="object" class="oe_highlight" groups="elsx_whatsapp_marketing.group_whatsapp_manager"/>
                             <field name="webhook_url" readonly="1"/>
                             <button name="action_refresh_webhook_url" string="Show Current Webhook URL" type="object" class="btn-secondary" icon="fa-copy"/>
                             <field name="webhook_verify_token"/>
@@ -298,12 +298,12 @@
                                     <field name="webhook_last_error" invisible="not webhook_last_error" class="text-danger fw-bold"/>
                                 </group>
                                 <group string="Enterprise Reliability">
-                                    <field name="app_secret" password="True"/>
-                                    <field name="is_primary_webhook_db"/>
-                                    <field name="skip_webhook_hmac"/>
+                                    <field name="app_secret" password="True" groups="elsx_whatsapp_marketing.group_whatsapp_manager"/>
+                                    <field name="is_primary_webhook_db" groups="elsx_whatsapp_marketing.group_whatsapp_manager"/>
+                                    <field name="skip_webhook_hmac" groups="elsx_whatsapp_marketing.group_whatsapp_manager"/>
                                 </group>
                             </group>
-                            <div class="alert alert-info mt-2" role="alert" invisible="not skip_webhook_hmac">
+                            <div class="alert alert-info mt-2" role="alert" invisible="not skip_webhook_hmac" groups="elsx_whatsapp_marketing.group_whatsapp_manager">
                                 <i class="fa fa-warning me-1" title="Warning"/>
                                 <strong>Debug Mode:</strong> Signature verification is disabled. Do not use this in production.
                             </div>

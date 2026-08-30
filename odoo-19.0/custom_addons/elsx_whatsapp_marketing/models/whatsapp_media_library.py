@@ -129,7 +129,7 @@ class WhatsAppMediaLibrary(models.Model):
         
         url = f"https://graph.facebook.com/{account.api_version}/{account.phone_number_id}/media"
         headers = {
-            'Authorization': f'Bearer {account.access_token}',
+            'Authorization': f'Bearer {account.sudo().access_token}',
         }
         
         file_content = base64.b64decode(self.media_file)

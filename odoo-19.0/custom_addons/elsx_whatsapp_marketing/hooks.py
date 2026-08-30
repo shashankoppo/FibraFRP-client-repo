@@ -2,8 +2,62 @@
 from odoo.tools.sql import column_exists, table_exists
 
 
+def _ensure_xmlid_for_existing_record(env, *, table, model, module, xmlid_name, lookup_field, lookup_value):
+    if not table_exists(env.cr, table):
+        return
+    env.cr.execute(
+        f"""
+        SELECT id
+          FROM {table}
+         WHERE {lookup_field} = %s
+         ORDER BY id
+         LIMIT 1
+        """,
+        [lookup_value],
+    )
+    row = env.cr.fetchone()
+    if not row:
+        return
+    env.cr.execute(
+        """
+        INSERT INTO ir_model_data (
+            module, name, model, res_id, noupdate, create_date, write_date
+        )
+        VALUES (%s, %s, %s, %s, true, now() at time zone 'UTC', now() at time zone 'UTC')
+        ON CONFLICT (module, name)
+        DO UPDATE SET
+            model = EXCLUDED.model,
+            res_id = EXCLUDED.res_id,
+            noupdate = true,
+            write_date = now() at time zone 'UTC'
+        """,
+        [module, xmlid_name, model, row[0]],
+    )
+
+
+def _link_existing_ai_defaults(env):
+    """Link legacy default AI rows to their XML IDs before noupdate XML loads."""
+    module = 'elsx_whatsapp_marketing'
+    for xmlid_name, code in [
+        ('elsx_ai_prompt_whatsapp_reply', 'whatsapp_reply_default'),
+        ('elsx_ai_prompt_campaign', 'whatsapp_campaign_default'),
+        ('elsx_ai_prompt_template', 'whatsapp_template_default'),
+        ('elsx_ai_prompt_flow_review', 'whatsapp_flow_review_default'),
+    ]:
+        _ensure_xmlid_for_existing_record(
+            env,
+            table='elsx_ai_prompt',
+            model='elsx.ai.prompt',
+            module=module,
+            xmlid_name=xmlid_name,
+            lookup_field='code',
+            lookup_value=code,
+        )
+
+
 def pre_init_hook(env):
-    """Make legacy duplicate webhook rows compatible with the new unique Meta ID index."""
+    """Make legacy rows compatible with current unique defaults before install."""
+    _link_existing_ai_defaults(env)
     if not table_exists(env.cr, 'whatsapp_message') or not column_exists(env.cr, 'whatsapp_message', 'message_id'):
         return
     env.cr.execute("""
@@ -11,7 +65,7 @@ def pre_init_hook(env):
             SELECT
                 id,
                 row_number() OVER (
-                    PARTITION BY message_id
+                    PARTITION BY account_id, message_id
                     ORDER BY create_date NULLS LAST, id
                 ) AS rn
             FROM whatsapp_message

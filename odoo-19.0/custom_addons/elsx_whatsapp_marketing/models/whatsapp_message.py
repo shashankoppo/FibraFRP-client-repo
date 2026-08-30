@@ -181,12 +181,12 @@ class WhatsAppMessage(models.Model):
     _rec_name = 'phone_number'
 
     _message_id_unique = models.Constraint(
-        'unique(message_id)',
-        'Duplicate WhatsApp Message ID (wamid) detected. Data integrity enforced.',
+        'unique(account_id, message_id)',
+        'Duplicate WhatsApp Message ID (wamid) detected for this account. Data integrity enforced.',
     )
 
     _message_id_idx = models.Index(
-        "(message_id) WHERE message_id IS NOT NULL",
+        "(account_id, message_id) WHERE message_id IS NOT NULL",
     )
     _campaign_queue_idx = models.Index("(campaign_id, status, next_retry_at, create_date)")
     _message_status_idx = models.Index("(status, retry_count, next_retry_at, create_date)")
@@ -1138,13 +1138,13 @@ class WhatsAppMessage(models.Model):
             return self._restore_media_from_local_cache()
 
         account = self.account_id
-        if not account or not account.access_token:
+        if not account or not account.sudo().access_token:
             return self._restore_media_from_local_cache() or self._download_media_from_sidecar()
 
         _logger.info(f"[MEDIA-DL] Starting download for media_id {self.media_url}")
 
         try:
-            headers = {'Authorization': f'Bearer {account.access_token}'}
+            headers = {'Authorization': f'Bearer {account.sudo().access_token}'}
             media_ref = str(self.media_url).strip()
             download_url = media_ref if media_ref.startswith(('http://', 'https://')) else False
             mime_type = self.media_mime_type

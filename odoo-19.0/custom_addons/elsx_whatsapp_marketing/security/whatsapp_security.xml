@@ -8,4 +8,12 @@
         <field name="name">WhatsApp Manager</field>
         <field name="implied_ids" eval="[(4, ref('group_whatsapp_user'))]"/>
     </record>
+
+    <record id="base.group_user" model="res.groups">
+        <field name="implied_ids" eval="[(4, ref('group_whatsapp_user'))]"/>
+    </record>
+
+    <record id="base.group_system" model="res.groups">
+        <field name="implied_ids" eval="[(4, ref('group_whatsapp_manager'))]"/>
+    </record>
 </odoo>

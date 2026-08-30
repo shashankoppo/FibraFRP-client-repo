@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 
-from odoo import models, fields, api
+from odoo import models, fields, api, _
 
 _logger = logging.getLogger(__name__)
 
@@ -18,8 +18,13 @@ class SaleOrder(models.Model):
     elsx_ai_discount_recommendation = fields.Float('AI Discount Rec (%)', readonly=True)
 
     def action_confirm(self):
-        """Override confirm to send WhatsApp notification"""
         res = super(SaleOrder, self).action_confirm()
+        auto_send = self.env['ir.config_parameter'].sudo().get_param(
+            'whatsapp.sale.confirmation.auto_send',
+            default='False',
+        )
+        if str(auto_send).lower() != 'true':
+            return res
         for order in self:
             order._send_whatsapp_confirmation()
         return res
@@ -66,3 +71,16 @@ class SaleOrder(models.Model):
                     'error_message': str(exc),
                 })
             _logger.exception("Failed to send WhatsApp order confirmation for %s", self.name)
+
+    def action_open_whatsapp_link(self):
+        self.ensure_one()
+        message = _(
+            "Hello %(customer)s,\n\n"
+            "Regarding your order %(order)s for %(amount)s.\n\n"
+            "Thank you."
+        ) % {
+            'customer': self.partner_id.display_name,
+            'order': self.name,
+            'amount': self.currency_id.format(self.amount_total),
+        }
+        return self.partner_id._elsx_open_whatsapp_link(message=message, title=_('Open WhatsApp'))

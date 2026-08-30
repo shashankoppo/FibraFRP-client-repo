@@ -274,10 +274,10 @@ class WhatsAppWebhook(http.Controller):
         """Validate Meta X-Hub-Signature-256 against the exact raw request body."""
         if not account:
             return False, 'No matching account', 403
-        if account.skip_webhook_hmac:
+        if account.sudo().skip_webhook_hmac:
             _logger.warning('[WH-HMAC] Signature check skipped for account %s (debug mode).', account.id)
             return True, None, None
-        if not account.app_secret:
+        if not account.sudo().app_secret:
             account.sudo().write({
                 'webhook_status': 'failed',
                 'webhook_last_error': 'Missing Meta app secret for HMAC verification',
@@ -293,7 +293,7 @@ class WhatsAppWebhook(http.Controller):
         if isinstance(raw_body, str):
             raw_body = raw_body.encode('utf-8')
         expected_sig = 'sha256=' + hmac.new(
-            account.app_secret.encode('utf-8'),
+            account.sudo().app_secret.encode('utf-8'),
             raw_body or b'',
             hashlib.sha256
         ).hexdigest()
@@ -1153,7 +1153,7 @@ class WhatsAppWebhook(http.Controller):
         import requests
         url = f'https://graph.facebook.com/{account.api_version}/{account.phone_number_id}/messages'
         headers = {
-            'Authorization': f'Bearer {account.access_token}',
+            'Authorization': f'Bearer {account.sudo().access_token}',
             'Content-Type': 'application/json',
         }
         payload = {
@@ -1395,7 +1395,7 @@ class WhatsAppWebhook(http.Controller):
 
             import requests
             meta_url = f"https://graph.facebook.com/{account.api_version}/{media_id}"
-            headers = {'Authorization': f'Bearer {account.access_token}'}
+            headers = {'Authorization': f'Bearer {account.sudo().access_token}'}
             resp = requests.get(meta_url, headers=headers, timeout=10)
             if resp.status_code != 200:
                 return request.not_found()

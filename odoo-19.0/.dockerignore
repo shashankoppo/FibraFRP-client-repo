@@ -17,6 +17,7 @@ verify_output.txt
 # Python artifacts
 venv19/
 __pycache__/
+node_modules/
 *.pyc
 *.pyo
 *.egg-info

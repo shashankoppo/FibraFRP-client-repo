@@ -27,7 +27,7 @@ class WhatsAppContact(models.Model):
     partner_id = fields.Many2one('res.partner', string='Related Contact')
 
     # Opt-in status
-    opt_in = fields.Boolean('Opted In', default=True)
+    opt_in = fields.Boolean('Opted In', default=False)
     opt_in_date = fields.Datetime('Opt-in Date')
     opt_out_date = fields.Datetime('Opt-out Date')
 

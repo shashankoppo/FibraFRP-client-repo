@@ -57,7 +57,7 @@ class WhatsAppImportWizard(models.TransientModel):
         ('skip', 'Skip Existing'),
     ], default='update_missing', required=True)
     create_missing_tags = fields.Boolean('Create Missing Tags', default=True)
-    default_opt_in = fields.Boolean('Default Opt-in', default=True)
+    default_opt_in = fields.Boolean('Default Opt-in', default=False)
     auto_format_numbers = fields.Boolean(
         'Auto-format Phone Numbers',
         default=True,

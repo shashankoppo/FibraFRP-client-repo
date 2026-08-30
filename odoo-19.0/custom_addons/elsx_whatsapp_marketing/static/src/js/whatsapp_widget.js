@@ -372,6 +372,7 @@ export class WhatsAppChatHandler {
         if (this.socket) this.socket.disconnect();
 
         let socketUrl = '';
+        let socketToken = '';
         try {
             const sysParam = await this._rpc('whatsapp.chat', 'get_sidecar_url', []);
             if (sysParam) {
@@ -380,12 +381,14 @@ export class WhatsAppChatHandler {
                     socketUrl = socketUrl.replace('sidecar', window.location.hostname);
                 }
             }
+            socketToken = await this._rpc('whatsapp.chat', 'get_sidecar_socket_token', []);
         } catch (e) {
             console.warn('[WhatsApp] Could not fetch sidecar url:', e);
         }
         if (!socketUrl) return;
 
         this.socket = io(socketUrl, {
+            auth: socketToken ? { token: socketToken } : {},
             transports: ['websocket', 'polling'],
             reconnection: true,
             reconnectionAttempts: 10,

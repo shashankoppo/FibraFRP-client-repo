@@ -17,6 +17,11 @@ class ResConfigSettings(models.TransientModel):
         config_parameter='whatsapp.sidecar.secret',
         help="Secret key used to authenticate requests between the ERP and the Node sidecar"
     )
+    whatsapp_sidecar_socket_token = fields.Char(
+        string='Sidecar Socket Token',
+        config_parameter='whatsapp.sidecar.socket_token',
+        help="Browser-facing token used only for optional Socket.IO realtime authentication."
+    )
     whatsapp_public_webhook_base_url = fields.Char(
         string='Public Webhook Base URL',
         config_parameter='whatsapp.public.webhook.base.url',
@@ -68,11 +73,35 @@ class ResConfigSettings(models.TransientModel):
         config_parameter='whatsapp.form.rate_limit.seconds',
         help="Minimum seconds between public form submissions from the same browser session."
     )
+    whatsapp_form_rate_limit_ip_seconds = fields.Integer(
+        string='Public Form IP Rate Limit Seconds',
+        default=30,
+        config_parameter='whatsapp.form.rate_limit.ip.seconds',
+        help="Minimum seconds between public form submissions from the same IP address."
+    )
     whatsapp_form_max_upload_mb = fields.Integer(
         string='Public Form Max Upload MB',
         default=10,
         config_parameter='whatsapp.form.max_upload.mb',
         help="Maximum size per file uploaded through public WhatsApp forms."
+    )
+    whatsapp_form_max_files = fields.Integer(
+        string='Public Form Max Files',
+        default=3,
+        config_parameter='whatsapp.form.max_files',
+        help="Maximum number of files accepted per public form submission."
+    )
+    whatsapp_form_max_total_upload_mb = fields.Integer(
+        string='Public Form Max Total Upload MB',
+        default=20,
+        config_parameter='whatsapp.form.max_total_upload.mb',
+        help="Maximum total upload size accepted per public form submission."
+    )
+    whatsapp_form_allowed_mimetypes = fields.Char(
+        string='Public Form Allowed MIME Types',
+        default='image/jpeg,image/png,image/webp,application/pdf',
+        config_parameter='whatsapp.form.allowed_mimetypes',
+        help="Comma-separated MIME types allowed for public WhatsApp form uploads."
     )
     whatsapp_ui_motion_enabled = fields.Boolean(
         string='Enable WhatsApp UI Motion',
@@ -122,6 +151,24 @@ class ResConfigSettings(models.TransientModel):
         string='CRM Won Template',
         config_parameter='whatsapp.crm.won.template.id',
         help="Template to send automatically when a CRM Opportunity is marked as Won."
+    )
+    whatsapp_crm_won_auto_send = fields.Boolean(
+        string='Auto-send CRM Won Message',
+        config_parameter='whatsapp.crm.won.auto_send',
+        default=False,
+        help="Automatically send WhatsApp when an opportunity is marked won."
+    )
+    whatsapp_sale_confirmation_auto_send = fields.Boolean(
+        string='Auto-send Sales Confirmation',
+        config_parameter='whatsapp.sale.confirmation.auto_send',
+        default=False,
+        help="Automatically send WhatsApp when a sales order is confirmed."
+    )
+    whatsapp_meta_default_api_version = fields.Char(
+        string='Default Meta API Version',
+        config_parameter='whatsapp.meta.default_api_version',
+        default='v18.0',
+        help="Default Graph API version for new WhatsApp accounts. Verify against official Meta docs before changing."
     )
 
     # Automation & Bots

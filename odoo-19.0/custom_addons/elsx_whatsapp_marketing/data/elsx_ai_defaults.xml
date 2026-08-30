@@ -85,39 +85,51 @@
         <field name="notes">Use this for local models, internal gateways, or providers with custom JSON contracts.</field>
     </record>
 
-    <record id="elsx_ai_prompt_whatsapp_reply" model="elsx.ai.prompt">
-        <field name="name">WhatsApp Draft Reply</field>
-        <field name="code">whatsapp_reply_default</field>
-        <field name="purpose">whatsapp_reply</field>
-        <field name="provider_id" ref="elsx_ai_provider_rules"/>
-        <field name="system_prompt">Draft helpful WhatsApp replies. Never send automatically.</field>
-        <field name="user_prompt">Use the latest conversation message and produce one concise reply draft.</field>
-    </record>
+    <function model="elsx.ai.prompt" name="_ensure_default_prompt">
+        <value eval="'elsx_ai_prompt_whatsapp_reply'"/>
+        <value eval="{
+            'name': 'WhatsApp Draft Reply',
+            'code': 'whatsapp_reply_default',
+            'purpose': 'whatsapp_reply',
+            'provider_id': ref('elsx_ai_provider_rules'),
+            'system_prompt': 'Draft helpful WhatsApp replies. Never send automatically.',
+            'user_prompt': 'Use the latest conversation message and produce one concise reply draft.',
+        }"/>
+    </function>
 
-    <record id="elsx_ai_prompt_campaign" model="elsx.ai.prompt">
-        <field name="name">WhatsApp Campaign Draft</field>
-        <field name="code">whatsapp_campaign_default</field>
-        <field name="purpose">campaign</field>
-        <field name="provider_id" ref="elsx_ai_provider_rules"/>
-        <field name="system_prompt">Draft campaign copy for WhatsApp. Keep it short, useful, and opt-in friendly.</field>
-        <field name="user_prompt">Use the campaign audience and business context to produce one campaign body draft.</field>
-    </record>
+    <function model="elsx.ai.prompt" name="_ensure_default_prompt">
+        <value eval="'elsx_ai_prompt_campaign'"/>
+        <value eval="{
+            'name': 'WhatsApp Campaign Draft',
+            'code': 'whatsapp_campaign_default',
+            'purpose': 'campaign',
+            'provider_id': ref('elsx_ai_provider_rules'),
+            'system_prompt': 'Draft campaign copy for WhatsApp. Keep it short, useful, and opt-in friendly.',
+            'user_prompt': 'Use the campaign audience and business context to produce one campaign body draft.',
+        }"/>
+    </function>
 
-    <record id="elsx_ai_prompt_template" model="elsx.ai.prompt">
-        <field name="name">WhatsApp Template Draft</field>
-        <field name="code">whatsapp_template_default</field>
-        <field name="purpose">custom</field>
-        <field name="provider_id" ref="elsx_ai_provider_rules"/>
-        <field name="system_prompt">Draft WhatsApp template text. Respect Meta template quality: clear purpose, no spam tone, no unsupported claims.</field>
-        <field name="user_prompt">Create one template body draft. Do not submit or send anything.</field>
-    </record>
+    <function model="elsx.ai.prompt" name="_ensure_default_prompt">
+        <value eval="'elsx_ai_prompt_template'"/>
+        <value eval="{
+            'name': 'WhatsApp Template Draft',
+            'code': 'whatsapp_template_default',
+            'purpose': 'custom',
+            'provider_id': ref('elsx_ai_provider_rules'),
+            'system_prompt': 'Draft WhatsApp template text. Respect Meta template quality: clear purpose, no spam tone, no unsupported claims.',
+            'user_prompt': 'Create one template body draft. Do not submit or send anything.',
+        }"/>
+    </function>
 
-    <record id="elsx_ai_prompt_flow_review" model="elsx.ai.prompt">
-        <field name="name">WhatsApp Flow Review</field>
-        <field name="code">whatsapp_flow_review_default</field>
-        <field name="purpose">custom</field>
-        <field name="provider_id" ref="elsx_ai_provider_rules"/>
-        <field name="system_prompt">Review WhatsApp bot flows for missing routes, unclear prompts, fallback gaps, and handoff quality.</field>
-        <field name="user_prompt">Return concise admin guidance only. Do not alter the flow.</field>
-    </record>
+    <function model="elsx.ai.prompt" name="_ensure_default_prompt">
+        <value eval="'elsx_ai_prompt_flow_review'"/>
+        <value eval="{
+            'name': 'WhatsApp Flow Review',
+            'code': 'whatsapp_flow_review_default',
+            'purpose': 'custom',
+            'provider_id': ref('elsx_ai_provider_rules'),
+            'system_prompt': 'Review WhatsApp bot flows for missing routes, unclear prompts, fallback gaps, and handoff quality.',
+            'user_prompt': 'Return concise admin guidance only. Do not alter the flow.',
+        }"/>
+    </function>
 </odoo>

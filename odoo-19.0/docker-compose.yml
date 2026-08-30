@@ -36,6 +36,19 @@ services:
       - DB_PASSWORD=${POSTGRES_PASSWORD:-odoo}
       # Preserve DB connections for cron and webhook workers during campaign bursts.
       - ODOO_MAX_HTTP_THREADS=${ODOO_MAX_HTTP_THREADS:-24}
+      # Comma-separated addon roots. Add extra mounted third-party roots with
+      # ODOO_EXTRA_ADDONS_PATH without editing the committed config file.
+      - ODOO_ADDONS_PATH=${ODOO_ADDONS_PATH:-/opt/odoo/addons,/opt/odoo/odoo/addons,/opt/odoo/custom_addons,/opt/odoo/custom_addons/elsx_stubs,/opt/odoo/third_party_addons}
+      - ODOO_EXTRA_ADDONS_PATH=${ODOO_EXTRA_ADDONS_PATH:-}
+      # Makes git pull + docker compose up -d --build enough for production.
+      # Locked by default: refresh Apps list and upgrade modules already
+      # installed in each DB only. No automatic installs or uninstalls.
+      - ODOO_AUTO_UPDATE_ON_START=${ODOO_AUTO_UPDATE_ON_START:-YES}
+      - ODOO_AUTO_BACKUP_ON_UPDATE=${ODOO_AUTO_BACKUP_ON_UPDATE:-YES}
+      - ODOO_AUTO_INSTALL_MODULES=${ODOO_AUTO_INSTALL_MODULES:-}
+      - ODOO_AUTO_ALLOW_INSTALL=${ODOO_AUTO_ALLOW_INSTALL:-NO}
+      - ODOO_AUTO_UPDATE_MODULES=${ODOO_AUTO_UPDATE_MODULES:-all}
+      - ODOO_AUTO_UPDATE_DB_NAME=${ODOO_AUTO_UPDATE_DB_NAME:-}
     volumes:
       - .:/opt/odoo
       - ./odoo.docker.conf:/etc/odoo/odoo.conf
@@ -60,22 +73,22 @@ services:
       - odoo-network
 
   sidecar:
-    image: node:18-alpine
+    build: ./custom_addons/elsx_whatsapp_marketing/sidecar
+    image: elsx-whatsapp-sidecar:1.0
     container_name: whatsapp_sidecar
     restart: unless-stopped
     init: true
-    working_dir: /app
-    volumes:
-      - ./custom_addons/elsx_whatsapp_marketing/sidecar:/app
-    command: sh -c "if [ -s package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi && npm start"
     environment:
       - ODOO_URL=http://odoo:8069
       - PORT=3000
+      - NODE_ENV=${WHATSAPP_SIDECAR_NODE_ENV:-development}
+      - CORS_ORIGIN=${WHATSAPP_SIDECAR_CORS_ORIGIN:-}
       - SIDECAR_SECRET=${SIDECAR_SECRET:-}
+      - SOCKET_AUTH_TOKEN=${WHATSAPP_SIDECAR_SOCKET_TOKEN:-}
       - VERIFY_TOKEN=${WHATSAPP_VERIFY_TOKEN:-}
       - META_APP_SECRET=${META_APP_SECRET:-}
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     depends_on:
       odoo:
         condition: service_healthy

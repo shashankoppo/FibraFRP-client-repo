@@ -19,6 +19,9 @@
                         <setting id="whatsapp_sidecar_secret_setting" help="Security token used to authenticate webhook relays between the ERP and the Sidecar.">
                             <field name="whatsapp_sidecar_secret" password="True"/>
                         </setting>
+                        <setting id="whatsapp_sidecar_socket_token_setting" help="Browser-facing token for optional Socket.IO realtime mode. Use a different value than the server-to-server Sidecar Secret.">
+                            <field name="whatsapp_sidecar_socket_token" password="True"/>
+                        </setting>
                         <setting id="whatsapp_public_webhook_base_url_setting" help="Public domain used in Meta webhook setup. Leave empty to use the native ERP web.base.url.">
                             <div class="d-flex flex-column gap-2">
                                 <field name="whatsapp_public_webhook_base_url" placeholder="https://your-domain.com"/>
@@ -33,6 +36,9 @@
                         </setting>
                         <setting id="whatsapp_default_account_setting" help="Default account for sending messages if not explicitly set.">
                             <field name="whatsapp_default_account_id"/>
+                        </setting>
+                        <setting id="whatsapp_meta_default_api_version_setting" help="Default Graph API version for new WhatsApp accounts. Verify the version in Meta's official docs before changing.">
+                            <field name="whatsapp_meta_default_api_version"/>
                         </setting>
                         <setting id="whatsapp_default_account_health_setting" help="Current Meta quality and messaging limit for the default WhatsApp account.">
                             <div class="d-flex flex-column gap-1">
@@ -67,14 +73,30 @@
                         <setting id="whatsapp_form_rate_limit_setting" help="Protect public WhatsApp forms from repeated submissions. Applies per browser session.">
                             <field name="whatsapp_form_rate_limit_seconds"/>
                         </setting>
+                        <setting id="whatsapp_form_ip_rate_limit_setting" help="Protect public WhatsApp forms from repeated submissions by IP address.">
+                            <field name="whatsapp_form_rate_limit_ip_seconds"/>
+                        </setting>
                         <setting id="whatsapp_form_upload_setting" help="Maximum upload size per public form file field. Keep this conservative for mobile users.">
                             <field name="whatsapp_form_max_upload_mb"/>
+                        </setting>
+                        <setting id="whatsapp_form_upload_total_setting" help="Maximum files and total upload size accepted in one public form submission.">
+                            <div class="d-flex flex-column gap-1">
+                                <field name="whatsapp_form_max_files"/>
+                                <field name="whatsapp_form_max_total_upload_mb"/>
+                                <field name="whatsapp_form_allowed_mimetypes"/>
+                            </div>
                         </setting>
                     </block>
 
                     <block title="Automation &amp; Bots / CRM Integration" id="whatsapp_automation_setting">
                         <setting id="whatsapp_enable_bot_setting" help="Process incoming messages through the visual Flow Builder and Bot Rules.">
                             <field name="whatsapp_enable_bot"/>
+                        </setting>
+                        <setting id="whatsapp_sale_confirmation_auto_send_setting" help="Automatically send WhatsApp when a sales order is confirmed. Keep disabled unless the client explicitly wants it.">
+                            <field name="whatsapp_sale_confirmation_auto_send"/>
+                        </setting>
+                        <setting id="whatsapp_crm_won_auto_send_setting" help="Automatically send WhatsApp when an opportunity is marked won. Keep disabled unless the client explicitly wants it.">
+                            <field name="whatsapp_crm_won_auto_send"/>
                         </setting>
                         <setting id="whatsapp_crm_won_template_setting" help="Select a template to automatically send when a CRM Opportunity is marked as Won. If empty, a default plain text message will be used.">
                             <field name="whatsapp_crm_won_template_id" context="{'default_status': 'approved'}"/>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="loyalty_card_view_tree_whatsapp_link" model="ir.ui.view">
+        <field name="name">loyalty.card.list.whatsapp.link</field>
+        <field name="model">loyalty.card</field>
+        <field name="inherit_id" ref="loyalty.loyalty_card_view_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//button[@name='action_coupon_send']" position="after">
+                <button name="action_open_whatsapp_link" string="WhatsApp" type="object" icon="fa-whatsapp"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="loyalty_card_view_form_whatsapp_link" model="ir.ui.view">
+        <field name="name">loyalty.card.form.whatsapp.link</field>
+        <field name="model">loyalty.card</field>
+        <field name="inherit_id" ref="loyalty.loyalty_card_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='partner_id']" position="after">
+                <button name="action_open_whatsapp_link" string="WhatsApp Link" type="object" class="btn-secondary" icon="fa-whatsapp"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

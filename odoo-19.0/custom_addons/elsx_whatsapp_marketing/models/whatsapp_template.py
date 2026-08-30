@@ -1647,7 +1647,7 @@ class WhatsAppTemplate(models.Model):
 
         url = f"https://graph.facebook.com/{self.account_id.api_version}/{self.account_id.business_account_id}/message_templates"
         headers = {
-            'Authorization': f'Bearer {self.account_id.access_token}',
+            'Authorization': f'Bearer {self.account_id.sudo().access_token}',
             'Content-Type': 'application/json',
         }
 

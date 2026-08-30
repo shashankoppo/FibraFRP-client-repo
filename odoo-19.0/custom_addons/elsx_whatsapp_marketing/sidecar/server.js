@@ -9,8 +9,54 @@ const crypto = require('crypto');
 
 dotenv.config();
 
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const IS_PRODUCTION = NODE_ENV === 'production';
+const CORS_ORIGIN = process.env.CORS_ORIGIN || (IS_PRODUCTION ? '' : '*');
+const PORT = process.env.PORT || 3000;
+const SIDECAR_SECRET = process.env.SIDECAR_SECRET || '';
+const ODOO_URL = process.env.ODOO_URL || 'http://odoo:8069';
+const VERIFY_TOKEN = process.env.VERIFY_TOKEN || '';
+const META_APP_SECRET = process.env.META_APP_SECRET || process.env.APP_SECRET || '';
+const SOCKET_AUTH_TOKEN = process.env.SOCKET_AUTH_TOKEN || '';
+const REDIS_URL = process.env.REDIS_URL || '';
+const QUEUE_KEY = process.env.REDIS_QUEUE_KEY || 'elsx:whatsapp:webhook:queue';
+const DEAD_KEY = process.env.REDIS_DEAD_KEY || 'elsx:whatsapp:webhook:dead';
+const RECENT_EVENTS_KEY = process.env.REDIS_RECENT_EVENTS_KEY || 'elsx:whatsapp:recent-events';
+const MAX_ATTEMPTS = parseInt(process.env.MAX_FORWARD_ATTEMPTS || '12', 10);
+const QUEUE_INTERVAL_MS = parseInt(process.env.QUEUE_INTERVAL_MS || '2000', 10);
+
+if (IS_PRODUCTION) {
+    const missing = [];
+    if (!SIDECAR_SECRET) missing.push('SIDECAR_SECRET');
+    if (!META_APP_SECRET) missing.push('META_APP_SECRET');
+    if (!VERIFY_TOKEN) missing.push('VERIFY_TOKEN');
+    if (!CORS_ORIGIN) missing.push('CORS_ORIGIN');
+    if (!SOCKET_AUTH_TOKEN) missing.push('SOCKET_AUTH_TOKEN');
+    if (missing.length) {
+        throw new Error(`[SIDECAR] Refusing production startup. Missing: ${missing.join(', ')}`);
+    }
+}
+
+function timingSafeSecretEquals(actual, expected) {
+    if (!actual || !expected) return false;
+    const actualBuffer = Buffer.from(String(actual));
+    const expectedBuffer = Buffer.from(String(expected));
+    return actualBuffer.length === expectedBuffer.length
+        && crypto.timingSafeEqual(actualBuffer, expectedBuffer);
+}
+
+function requireSidecarSecret(req, res, next) {
+    if (!timingSafeSecretEquals(req.headers['x-sidecar-key'], SIDECAR_SECRET)) {
+        return res.status(403).json({ error: 'Unauthorized' });
+    }
+    return next();
+}
+
 const app = express();
-app.use(cors());
+app.use(cors({
+    origin: CORS_ORIGIN || false,
+    methods: ['GET', 'POST'],
+}));
 app.use(express.json({
     limit: process.env.JSON_LIMIT || '10mb',
     verify: (req, res, buf) => {
@@ -21,22 +67,10 @@ app.use(express.json({
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: process.env.CORS_ORIGIN || '*',
+        origin: CORS_ORIGIN || false,
         methods: ['GET', 'POST'],
     },
 });
-
-const PORT = process.env.PORT || 3000;
-const SIDECAR_SECRET = process.env.SIDECAR_SECRET || '';
-const ODOO_URL = process.env.ODOO_URL || 'http://odoo:8069';
-const VERIFY_TOKEN = process.env.VERIFY_TOKEN || '';
-const META_APP_SECRET = process.env.META_APP_SECRET || process.env.APP_SECRET || '';
-const REDIS_URL = process.env.REDIS_URL || '';
-const QUEUE_KEY = process.env.REDIS_QUEUE_KEY || 'elsx:whatsapp:webhook:queue';
-const DEAD_KEY = process.env.REDIS_DEAD_KEY || 'elsx:whatsapp:webhook:dead';
-const RECENT_EVENTS_KEY = process.env.REDIS_RECENT_EVENTS_KEY || 'elsx:whatsapp:recent-events';
-const MAX_ATTEMPTS = parseInt(process.env.MAX_FORWARD_ATTEMPTS || '12', 10);
-const QUEUE_INTERVAL_MS = parseInt(process.env.QUEUE_INTERVAL_MS || '2000', 10);
 
 let redis = null;
 let redisReady = false;
@@ -183,8 +217,8 @@ async function forwardToErp(item) {
 
 function verifyMetaSignature(req) {
     if (!META_APP_SECRET) {
-        console.warn('[SIDECAR] META_APP_SECRET not configured; Meta HMAC verification skipped');
-        return true;
+        console.warn('[SIDECAR] META_APP_SECRET not configured; Meta HMAC verification skipped in development mode');
+        return !IS_PRODUCTION;
     }
 
     const signature = req.headers['x-hub-signature-256'] || '';
@@ -259,14 +293,14 @@ async function getQueueStats() {
 app.get('/health', async (req, res) => {
     res.status(200).json({
         status: 'healthy',
-        version: '1.2.0',
+        version: '1.3.0',
         odoo_url: ODOO_URL,
         redis: redisReady ? 'connected' : 'fallback',
         queue: await getQueueStats(),
     });
 });
 
-app.get('/events/recent', async (req, res) => {
+app.get('/events/recent', requireSidecarSecret, async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit || '50', 10), 200);
     if (redisReady) {
         try {
@@ -310,12 +344,7 @@ app.post('/webhook', async (req, res) => {
     });
 });
 
-app.post('/relay/new-message', async (req, res) => {
-    const authHeader = req.headers['x-sidecar-key'];
-    if (authHeader !== SIDECAR_SECRET) {
-        return res.status(403).json({ error: 'Unauthorized' });
-    }
-
+app.post('/relay/new-message', requireSidecarSecret, async (req, res) => {
     const { chat_id, message, type } = req.body;
     const event = { chat_id, message, type };
     console.log(`[SIDECAR] Relaying ${type} for chat ${chat_id}`);
@@ -323,6 +352,17 @@ app.post('/relay/new-message', async (req, res) => {
     await rememberEvent(event);
     io.emit('whatsapp_event', event);
     res.status(200).json({ status: 'sent' });
+});
+
+io.use((socket, next) => {
+    const token = socket.handshake.auth?.token || socket.handshake.query?.socket_token;
+    if (SOCKET_AUTH_TOKEN && timingSafeSecretEquals(token, SOCKET_AUTH_TOKEN)) {
+        return next();
+    }
+    if (!SOCKET_AUTH_TOKEN && !IS_PRODUCTION) {
+        return next();
+    }
+    return next(new Error('Unauthorized'));
 });
 
 io.on('connection', (socket) => {

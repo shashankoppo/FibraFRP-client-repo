@@ -2,13 +2,14 @@
 {
     'name': "ELSX WhatsApp Business",
     'summary': "WhatsApp Business Console with API, CRM, Campaigns, Automation, and AI Drafts",
-    'version': '19.0.4.4.7',
+    'version': '19.0.4.5.0',
     'category': 'Marketing/WhatsApp',
     'author': "ELSX Global",
     'license': 'LGPL-3',
-    'depends': ['base', 'crm', 'contacts', 'mail', 'sale', 'account', 'base_setup'],
+    'depends': ['base', 'crm', 'contacts', 'mail', 'sale', 'account', 'loyalty', 'base_setup'],
     'data': [
         'security/whatsapp_security.xml',
+        'security/whatsapp_record_rules.xml',
         'security/ir.model.access.csv',
         'data/elsx_ai_defaults.xml',
         'data/whatsapp_placeholder_data.xml',
@@ -42,7 +43,11 @@
         'views/elsx_ai_service_views.xml',
         'views/whatsapp_diagnostics_views.xml',
         'views/res_config_settings_views.xml',
+        'views/res_partner_whatsapp_views.xml',
+        'views/sale_order_whatsapp_views.xml',
         'views/account_move_views.xml',
+        'views/crm_lead_whatsapp_views.xml',
+        'views/loyalty_card_whatsapp_views.xml',
         'views/whatsapp_menu.xml',
     ],
     'assets': {

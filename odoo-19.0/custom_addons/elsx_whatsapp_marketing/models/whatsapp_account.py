@@ -49,10 +49,25 @@ class WhatsAppAccount(models.Model):
     phone_number = fields.Char('Phone Number', required=True, help='WhatsApp Business phone number with country code')
     phone_number_id = fields.Char('Phone Number ID', required=True, help='WhatsApp Cloud API Phone Number ID')
     business_account_id = fields.Char('Business Account ID', required=True)
-    access_token = fields.Char('Access Token', required=True, help='WhatsApp Cloud API Access Token')
-    api_version = fields.Char('API Version', default='v18.0')
+    access_token = fields.Char(
+        'Access Token',
+        required=True,
+        groups='elsx_whatsapp_marketing.group_whatsapp_manager,base.group_system',
+        help='WhatsApp Cloud API Access Token',
+    )
+    api_version = fields.Char(
+        'API Version',
+        default=lambda self: self.env['ir.config_parameter'].sudo().get_param(
+            'whatsapp.meta.default_api_version',
+            default='v18.0',
+        ),
+    )
     app_id = fields.Char('App ID', help='Meta App ID')
-    app_secret = fields.Char('App Secret', help='Meta App Secret (for HMAC verification)')
+    app_secret = fields.Char(
+        'App Secret',
+        groups='elsx_whatsapp_marketing.group_whatsapp_manager,base.group_system',
+        help='Meta App Secret (for HMAC verification)',
+    )
     default_country_code = fields.Char('Default Country Code', default='91', help='Default country code for numbers without one (e.g. 91 for India)')
     
     # Status
@@ -100,11 +115,19 @@ class WhatsAppAccount(models.Model):
         ('failed', 'Failed')
     ], string='Webhook Verification Status', default='none', readonly=True)
     webhook_last_error = fields.Text('Webhook Last Error', readonly=True)
-    skip_webhook_hmac = fields.Boolean('Skip Signature Check (Debug)', default=False, 
-                                      help="Disable HMAC verification for testing. WARNING: Highly insecure for production.")
+    skip_webhook_hmac = fields.Boolean(
+        'Skip Signature Check (Debug)',
+        default=False,
+        groups='elsx_whatsapp_marketing.group_whatsapp_manager,base.group_system',
+        help="Disable HMAC verification for testing. WARNING: Highly insecure for production.",
+    )
     is_primary_webhook_db = fields.Boolean('Is Primary Webhook DB', default=True,
                                           help="Mark this database as the receiver for webhooks.")
-    two_factor_pin = fields.Char('2FA PIN (for Registration)', help='6-digit PIN for two-step verification registration')
+    two_factor_pin = fields.Char(
+        '2FA PIN (for Registration)',
+        groups='elsx_whatsapp_marketing.group_whatsapp_manager,base.group_system',
+        help='6-digit PIN for two-step verification registration',
+    )
 
     # AI & Automation
     ai_enabled = fields.Boolean('AI Automation Enabled', default=True)
@@ -495,7 +518,7 @@ class WhatsAppAccount(models.Model):
         """Fetch phone-number health while tolerating Graph field changes."""
         self.ensure_one()
         url = f"https://graph.facebook.com/{self.api_version}/{self.phone_number_id}"
-        headers = {'Authorization': f'Bearer {self.access_token}'}
+        headers = {'Authorization': f'Bearer {self.sudo().access_token}'}
         field_sets = [
             'display_phone_number,verified_name,quality_rating,whatsapp_business_manager_messaging_limit,status,name_status,throughput',
             'display_phone_number,verified_name,quality_rating,messaging_limit_tier,status,name_status,throughput',
@@ -581,18 +604,18 @@ class WhatsAppAccount(models.Model):
     def action_register_phone(self):
         """Register phone number for Cloud API"""
         self.ensure_one()
-        if not self.two_factor_pin:
+        if not self.sudo().two_factor_pin:
             from odoo.exceptions import UserError
             raise UserError("2FA PIN is required for registration.")
 
         url = f"https://graph.facebook.com/{self.api_version}/{self.phone_number_id}/register"
         headers = {
-            'Authorization': f'Bearer {self.access_token}',
+            'Authorization': f'Bearer {self.sudo().access_token}',
             'Content-Type': 'application/json',
         }
         payload = {
             'messaging_product': 'whatsapp',
-            'pin': self.two_factor_pin,
+            'pin': self.sudo().two_factor_pin,
         }
 
         try:
@@ -610,7 +633,7 @@ class WhatsAppAccount(models.Model):
         """Sync templates from Meta WhatsApp Business Account"""
         self.ensure_one()
         url = f"https://graph.facebook.com/{self.api_version}/{self.business_account_id}/message_templates"
-        headers = {'Authorization': f'Bearer {self.access_token}'}
+        headers = {'Authorization': f'Bearer {self.sudo().access_token}'}
         
         try:
             templates_data = []
@@ -892,7 +915,7 @@ class WhatsAppAccount(models.Model):
         try:
             response = requests.get(
                 media_url,
-                headers={'Authorization': f'Bearer {self.access_token}'},
+                headers={'Authorization': f'Bearer {self.sudo().access_token}'},
                 timeout=60,
             )
         except requests.RequestException as exc:
@@ -1029,7 +1052,7 @@ class WhatsAppAccount(models.Model):
             })._check_compliance()
         url = f"https://graph.facebook.com/{self.api_version}/{self.phone_number_id}/messages"
         headers = {
-            'Authorization': f'Bearer {self.access_token}',
+            'Authorization': f'Bearer {self.sudo().access_token}',
             'Content-Type': 'application/json',
         }
         
@@ -1461,7 +1484,7 @@ class WhatsAppAccount(models.Model):
     def _upload_media_to_meta(self, binary_data, filename, media_type):
         """Upload binary data to Meta and return media_id"""
         url = f"https://graph.facebook.com/{self.api_version}/{self.phone_number_id}/media"
-        headers = {'Authorization': f'Bearer {self.access_token}'}
+        headers = {'Authorization': f'Bearer {self.sudo().access_token}'}
         
         file_content = self._check_media_upload_size(binary_data, media_type, filename)
         # Ensure we have a valid filename for the MIME guessing and Meta payload
@@ -1539,7 +1562,7 @@ class WhatsAppAccount(models.Model):
             'file_name': filename,
             'file_length': len(file_content),
             'file_type': mime_type,
-            'access_token': self.access_token,
+            'access_token': self.sudo().access_token,
         }
         start_response = requests.post(upload_url, params=params, timeout=30)
         start_data = start_response.json() if start_response.content else {}
@@ -1551,7 +1574,7 @@ class WhatsAppAccount(models.Model):
         upload_id = start_data['id']
         finish_url = f"https://graph.facebook.com/{self.api_version}/{upload_id}"
         finish_headers = {
-            'Authorization': f'OAuth {self.access_token}',
+            'Authorization': f'OAuth {self.sudo().access_token}',
             'file_offset': '0',
             'Content-Type': 'application/octet-stream',
         }
@@ -1568,7 +1591,7 @@ class WhatsAppAccount(models.Model):
         """Fetch profile from Meta"""
         self.ensure_one()
         url = f"https://graph.facebook.com/{self.api_version}/{self.phone_number_id}"
-        headers = {'Authorization': f'Bearer {self.access_token}'}
+        headers = {'Authorization': f'Bearer {self.sudo().access_token}'}
         try:
             # Profile
             res = requests.get(f"{url}/whatsapp_business_profile?fields=about,description,address,email,websites,vertical,profile_picture_url", headers=headers, timeout=20)
@@ -1608,7 +1631,7 @@ class WhatsAppAccount(models.Model):
         """Push profile to Meta"""
         self.ensure_one()
         url = f"https://graph.facebook.com/{self.api_version}/{self.phone_number_id}/whatsapp_business_profile"
-        headers = {'Authorization': f'Bearer {self.access_token}', 'Content-Type': 'application/json'}
+        headers = {'Authorization': f'Bearer {self.sudo().access_token}', 'Content-Type': 'application/json'}
         payload = {
             "messaging_product": "whatsapp",
             "description": self.business_description or "",

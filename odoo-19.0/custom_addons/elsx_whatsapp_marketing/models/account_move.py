@@ -145,6 +145,24 @@ class AccountMove(models.Model):
             }
         }
 
+    def action_open_whatsapp_link(self):
+        self.ensure_one()
+        if not self.partner_id:
+            raise UserError(_("This document has no customer/vendor set."))
+        label = _('invoice') if self.is_invoice(include_receipts=True) else _('document')
+        amount = self.currency_id.format(self.amount_total) if self.currency_id else self.amount_total
+        message = _(
+            "Hello %(customer)s,\n\n"
+            "Regarding %(label)s %(document)s for %(amount)s.\n\n"
+            "Thank you."
+        ) % {
+            'customer': self.partner_id.display_name,
+            'label': label,
+            'document': self.name or self.ref or _('your document'),
+            'amount': amount,
+        }
+        return self.partner_id._elsx_open_whatsapp_link(message=message, title=_('Open WhatsApp'))
+
     def action_send_whatsapp_reminder(self):
         """Send a quick manual WhatsApp reminder for overdue invoice"""
         self.ensure_one()

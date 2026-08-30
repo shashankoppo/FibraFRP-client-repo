@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
-from odoo import models, fields, api
+from urllib.parse import quote
+
+from odoo import models, fields, api, _
+from odoo.exceptions import UserError
 
 
 class ResPartner(models.Model):
@@ -8,7 +11,7 @@ class ResPartner(models.Model):
     # WhatsApp fields only - removed problematic ELSX fields
     whatsapp_message_ids = fields.One2many('whatsapp.message', 'partner_id', string='WhatsApp Message History')
     whatsapp_message_count = fields.Integer('WhatsApp Message Count', compute='_compute_whatsapp_count')
-    whatsapp_opt_in = fields.Boolean('WhatsApp Opt-in', default=True, help='Contact has opted in to receive WhatsApp messages')
+    whatsapp_opt_in = fields.Boolean('WhatsApp Opt-in', default=False, help='Contact has opted in to receive WhatsApp messages')
     whatsapp_last_message_date = fields.Datetime('Last WhatsApp Message', compute='_compute_whatsapp_last_message')
     whatsapp_custom_attributes = fields.Text(
         'WhatsApp Custom Attributes',
@@ -114,6 +117,31 @@ class ResPartner(models.Model):
                 'default_partner_ids': [(6, 0, self.ids)],
             }
         }
+
+    def _elsx_get_whatsapp_phone(self):
+        self.ensure_one()
+        phone = getattr(self, 'mobile', False) or self.phone
+        if not phone:
+            raise UserError(_("No phone or mobile number is set for %s.") % self.display_name)
+        normalized = self.env['whatsapp.message']._normalize_phone(phone, strict=False)
+        if not normalized:
+            raise UserError(_("Could not prepare a WhatsApp number for %s.") % self.display_name)
+        return normalized
+
+    def _elsx_open_whatsapp_link(self, message=False, title=False):
+        self.ensure_one()
+        phone = self._elsx_get_whatsapp_phone()
+        body = (message or _("Hello %s,") % self.display_name).strip()
+        return {
+            'type': 'ir.actions.act_url',
+            'name': title or _('Open WhatsApp'),
+            'target': 'new',
+            'url': 'https://wa.me/%s?text=%s' % (phone, quote(body)),
+        }
+
+    def action_open_whatsapp_link(self):
+        self.ensure_one()
+        return self._elsx_open_whatsapp_link()
 
     def action_view_whatsapp_messages(self):
         """View all WhatsApp messages for this contact"""

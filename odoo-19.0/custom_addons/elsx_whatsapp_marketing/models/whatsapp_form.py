@@ -332,6 +332,10 @@ class WhatsAppFormSubmission(models.Model):
     campaign_id = fields.Many2one('whatsapp.campaign', string='Campaign')
     lead_id = fields.Many2one('crm.lead', string='Created Lead', readonly=True)
     source = fields.Char(default='whatsapp_form')
+    ip_address = fields.Char('IP Address', readonly=True)
+    user_agent = fields.Char('User Agent', readonly=True)
+    consent_given = fields.Boolean('Consent Given', readonly=True)
+    consent_date = fields.Datetime('Consent Date', readonly=True)
     customer_name = fields.Char('Name')
     phone = fields.Char()
     email = fields.Char()
@@ -441,6 +445,7 @@ class WhatsAppFormSubmission(models.Model):
                     'email': submission.email,
                 })
                 submission.partner_id = partner.id
+            submission._record_form_consent()
             values = submission._submitted_values()
             mapped = submission._mapped_crm_values(values)
             vals = {}
@@ -456,6 +461,32 @@ class WhatsAppFormSubmission(models.Model):
                 partner.write(vals)
             submission.state = 'reviewed'
         return True
+
+    def _record_form_consent(self):
+        ConsentLog = self.env['whatsapp.consent.log'].sudo()
+        for submission in self:
+            if not submission.consent_given or not submission.partner_id or not submission.form_id.account_id:
+                continue
+            if 'whatsapp_opt_in' in submission.partner_id._fields:
+                submission.partner_id.sudo().write({'whatsapp_opt_in': True})
+            existing = ConsentLog.search_count([
+                ('partner_id', '=', submission.partner_id.id),
+                ('account_id', '=', submission.form_id.account_id.id),
+                ('source', '=', 'website'),
+                ('notes', '=', 'Consent captured from public WhatsApp form %s.' % submission.form_id.display_name),
+            ])
+            if existing:
+                continue
+            ConsentLog.create({
+                'partner_id': submission.partner_id.id,
+                'account_id': submission.form_id.account_id.id,
+                'consent_type': 'all',
+                'status': 'opted_in',
+                'source': 'website',
+                'ip_address': submission.ip_address,
+                'user_agent': submission.user_agent,
+                'notes': 'Consent captured from public WhatsApp form %s.' % submission.form_id.display_name,
+            })
 
     def _submitted_values(self):
         self.ensure_one()

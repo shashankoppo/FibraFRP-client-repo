@@ -344,7 +344,7 @@ class WhatsAppChat(models.Model):
                     import requests
                     url = f"https://graph.facebook.com/{chat.account_id.api_version}/{chat.account_id.phone_number_id}/messages"
                     headers = {
-                        'Authorization': f'Bearer {chat.account_id.access_token}',
+                        'Authorization': f'Bearer {chat.account_id.sudo().access_token}',
                         'Content-Type': 'application/json'
                     }
                     payload = {
@@ -1253,6 +1253,14 @@ class WhatsAppChat(models.Model):
         if params.get_param('whatsapp.realtime.mode', default='bus') != 'socket':
             return ''
         return params.get_param('whatsapp.sidecar.url') or ''
+
+    @api.model
+    def get_sidecar_socket_token(self):
+        """Return the optional browser-facing Socket.IO token for realtime mode."""
+        params = self.env['ir.config_parameter'].sudo()
+        if params.get_param('whatsapp.realtime.mode', default='bus') != 'socket':
+            return ''
+        return params.get_param('whatsapp.sidecar.socket_token') or ''
 
     def action_open_send_wizard(self):
         self.ensure_one()

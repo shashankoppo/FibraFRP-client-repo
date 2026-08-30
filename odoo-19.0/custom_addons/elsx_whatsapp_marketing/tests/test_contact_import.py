@@ -73,6 +73,18 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
             ('source', '=', 'import'),
         ]))
 
+    def test_import_defaults_to_no_opt_in_without_explicit_consent(self):
+        wizard = self._wizard(
+            'Name,Phone\nNo Consent,9881934778\n',
+        )
+
+        wizard.action_import()
+
+        contact = self.env['whatsapp.contact'].search([('phone_number', '=', '919881934778')])
+        self.assertEqual(len(contact), 1)
+        self.assertFalse(contact.opt_in)
+        self.assertFalse(contact.partner_id.whatsapp_opt_in)
+
     def test_fill_missing_does_not_overwrite_existing_values(self):
         partner = self.env['res.partner'].create({
             'name': 'Existing Name',
@@ -156,10 +168,10 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
         tag = self.env['whatsapp.contact.tag'].create({'name': 'Campaign Audience'})
         Contact = self.env['whatsapp.contact']
         contacts = Contact.create([
-            {'name': 'One', 'phone_number': '919881934771', 'tag_ids': [(6, 0, tag.ids)]},
-            {'name': 'One Duplicate', 'phone_number': '919881934771', 'tag_ids': [(6, 0, tag.ids)]},
-            {'name': 'Two', 'phone_number': '919881934772', 'tag_ids': [(6, 0, tag.ids)]},
-            {'name': 'Email Only', 'email': 'email-only@example.com', 'tag_ids': [(6, 0, tag.ids)]},
+            {'name': 'One', 'phone_number': '919881934771', 'tag_ids': [(6, 0, tag.ids)], 'opt_in': True},
+            {'name': 'One Duplicate', 'phone_number': '919881934771', 'tag_ids': [(6, 0, tag.ids)], 'opt_in': True},
+            {'name': 'Two', 'phone_number': '919881934772', 'tag_ids': [(6, 0, tag.ids)], 'opt_in': True},
+            {'name': 'Email Only', 'email': 'email-only@example.com', 'tag_ids': [(6, 0, tag.ids)], 'opt_in': True},
         ])
         self.assertTrue(all(contact.partner_id for contact in contacts))
 
@@ -215,6 +227,7 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
             'name': 'Legacy Tagged Contact',
             'phone_number': '919881934778',
             'tag_ids': [(6, 0, contact_tag.ids)],
+            'opt_in': True,
         })
         self.assertNotEqual(contact_tag.partner_category_id, selected_category)
 
@@ -315,6 +328,7 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
         partner = self.env['res.partner'].with_context(skip_whatsapp_contact_sync=True).create({
             'name': 'Campaign Recipient',
             'phone': '919881934779',
+            'whatsapp_opt_in': True,
         })
         campaign = self.env['whatsapp.campaign'].create({
             'name': 'No Inline Dispatch',
@@ -407,8 +421,8 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
 
     def test_campaign_percentage_widgets_receive_ratios(self):
         partners = self.env['res.partner'].with_context(skip_whatsapp_contact_sync=True).create([
-            {'name': 'Delivered Recipient', 'phone': '919881936001'},
-            {'name': 'Sent Recipient', 'phone': '919881936002'},
+            {'name': 'Delivered Recipient', 'phone': '919881936001', 'whatsapp_opt_in': True},
+            {'name': 'Sent Recipient', 'phone': '919881936002', 'whatsapp_opt_in': True},
         ])
         campaign = self.env['whatsapp.campaign'].create({
             'name': 'Accurate Campaign Rates',
@@ -449,9 +463,9 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
 
     def test_campaign_reconciles_attempt_rows_to_unique_recipient_outcomes(self):
         partners = self.env['res.partner'].with_context(skip_whatsapp_contact_sync=True).create([
-            {'name': 'Permanent Failure', 'phone': '919881936151'},
-            {'name': 'Delivered Recipient', 'phone': '919881936152'},
-            {'name': 'Pending After Failure', 'phone': '919881936153'},
+            {'name': 'Permanent Failure', 'phone': '919881936151', 'whatsapp_opt_in': True},
+            {'name': 'Delivered Recipient', 'phone': '919881936152', 'whatsapp_opt_in': True},
+            {'name': 'Pending After Failure', 'phone': '919881936153', 'whatsapp_opt_in': True},
         ])
         campaign = self.env['whatsapp.campaign'].create({
             'name': 'Reconciled Campaign Counters',
@@ -526,10 +540,10 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
 
     def test_bulk_retry_requeues_one_safe_final_failure_per_recipient(self):
         partners = self.env['res.partner'].with_context(skip_whatsapp_contact_sync=True).create([
-            {'name': 'Transient Recipient', 'phone': '919881936161'},
-            {'name': 'Permanent Recipient', 'phone': '919881936162'},
-            {'name': 'Eventually Delivered', 'phone': '919881936163'},
-            {'name': 'Review Required', 'phone': '919881936164'},
+            {'name': 'Transient Recipient', 'phone': '919881936161', 'whatsapp_opt_in': True},
+            {'name': 'Permanent Recipient', 'phone': '919881936162', 'whatsapp_opt_in': True},
+            {'name': 'Eventually Delivered', 'phone': '919881936163', 'whatsapp_opt_in': True},
+            {'name': 'Review Required', 'phone': '919881936164', 'whatsapp_opt_in': True},
         ])
         campaign = self.env['whatsapp.campaign'].create({
             'name': 'Safe Recipient Retry',
@@ -652,6 +666,7 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
         partner = self.env['res.partner'].with_context(skip_whatsapp_contact_sync=True).create({
             'name': 'Preview Recipient',
             'phone': '919881936154',
+            'whatsapp_opt_in': True,
         })
         message = self.env['whatsapp.message'].create({
             'account_id': self.account.id,
@@ -866,8 +881,8 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
 
     def test_deleted_campaign_recovery_preserves_accepted_and_cancels_pending(self):
         partners = self.env['res.partner'].with_context(skip_whatsapp_contact_sync=True).create([
-            {'name': 'Recovered Sent Recipient', 'phone': '919881936106'},
-            {'name': 'Recovered Pending Recipient', 'phone': '919881936107'},
+            {'name': 'Recovered Sent Recipient', 'phone': '919881936106', 'whatsapp_opt_in': True},
+            {'name': 'Recovered Pending Recipient', 'phone': '919881936107', 'whatsapp_opt_in': True},
         ])
         reference = self.env['whatsapp.campaign'].create({
             'name': 'Reference Campaign Copy',
@@ -922,8 +937,8 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
 
     def test_deleted_campaign_recovery_can_resume_exact_existing_queue(self):
         partners = self.env['res.partner'].with_context(skip_whatsapp_contact_sync=True).create([
-            {'name': 'Recovered Delivered Recipient', 'phone': '919881936108'},
-            {'name': 'Recovered Queued Recipient', 'phone': '919881936109'},
+            {'name': 'Recovered Delivered Recipient', 'phone': '919881936108', 'whatsapp_opt_in': True},
+            {'name': 'Recovered Queued Recipient', 'phone': '919881936109', 'whatsapp_opt_in': True},
         ])
         reference = self.env['whatsapp.campaign'].create({
             'name': 'Reference Resume Copy',
@@ -1000,8 +1015,8 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
 
     def test_deleted_campaign_recovery_deduplicates_accidental_second_queue(self):
         partners = self.env['res.partner'].with_context(skip_whatsapp_contact_sync=True).create([
-            {'name': 'Already Accepted Once', 'phone': '919881936131'},
-            {'name': 'Needs One Send', 'phone': '919881936132'},
+            {'name': 'Already Accepted Once', 'phone': '919881936131', 'whatsapp_opt_in': True},
+            {'name': 'Needs One Send', 'phone': '919881936132', 'whatsapp_opt_in': True},
         ])
         reference = self.env['whatsapp.campaign'].create({
             'name': 'Reference Duplicate Queue Copy',
@@ -1092,6 +1107,7 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
         partner = self.env['res.partner'].with_context(skip_whatsapp_contact_sync=True).create({
             'name': 'Duplicate Recipient',
             'phone': '919881936111',
+            'whatsapp_opt_in': True,
         })
         campaign = self.env['whatsapp.campaign'].create({
             'name': 'Completed Campaign',
@@ -1181,6 +1197,7 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
         partner = self.env['res.partner'].with_context(skip_whatsapp_contact_sync=True).create({
             'name': 'Protected Recipient',
             'phone': '919881936131',
+            'whatsapp_opt_in': True,
         })
         campaign = self.env['whatsapp.campaign'].create({
             'name': 'Protected Campaign',
@@ -1206,9 +1223,9 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
 
     def test_campaign_header_file_is_uploaded_once_for_all_recipients(self):
         partners = self.env['res.partner'].with_context(skip_whatsapp_contact_sync=True).create([
-            {'name': 'Media Recipient One', 'phone': '919881936141'},
-            {'name': 'Media Recipient Two', 'phone': '919881936142'},
-            {'name': 'Media Recipient Three', 'phone': '919881936143'},
+            {'name': 'Media Recipient One', 'phone': '919881936141', 'whatsapp_opt_in': True},
+            {'name': 'Media Recipient Two', 'phone': '919881936142', 'whatsapp_opt_in': True},
+            {'name': 'Media Recipient Three', 'phone': '919881936143', 'whatsapp_opt_in': True},
         ])
         template = self.env['whatsapp.template'].create({
             'name': 'Shared Video Header',

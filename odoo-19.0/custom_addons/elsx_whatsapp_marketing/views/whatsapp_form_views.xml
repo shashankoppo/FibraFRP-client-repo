@@ -86,10 +86,11 @@
                                     <field name="create_date"/>
                                     <field name="customer_name"/>
                                     <field name="phone"/>
-                                    <field name="email"/>
-                                    <field name="state"/>
-                                    <field name="lead_id"/>
-                                    <field name="chat_id"/>
+                            <field name="email"/>
+                            <field name="consent_given"/>
+                            <field name="state"/>
+                            <field name="lead_id"/>
+                            <field name="chat_id"/>
                                 </list>
                             </field>
                         </page>
@@ -159,6 +160,10 @@
                             <field name="campaign_id"/>
                             <field name="source"/>
                             <field name="lead_id" readonly="1"/>
+                            <field name="consent_given" readonly="1"/>
+                            <field name="consent_date" readonly="1"/>
+                            <field name="ip_address" readonly="1"/>
+                            <field name="user_agent" readonly="1"/>
                         </group>
                     </group>
                     <group>
