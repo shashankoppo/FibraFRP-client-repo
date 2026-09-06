@@ -59,7 +59,7 @@ class WhatsAppAccount(models.Model):
         'API Version',
         default=lambda self: self.env['ir.config_parameter'].sudo().get_param(
             'whatsapp.meta.default_api_version',
-            default='v18.0',
+            default='v26.0',
         ),
     )
     app_id = fields.Char('App ID', help='Meta App ID')
@@ -108,7 +108,11 @@ class WhatsAppAccount(models.Model):
     ], string='Send Notification Sound', default='ting')
     notification_enabled = fields.Boolean('Notification Sounds Enabled', default=True)
     webhook_url = fields.Char('Webhook URL', compute='_compute_webhook_url')
-    webhook_verify_token = fields.Char('Webhook Verify Token', default=lambda self: secrets.token_urlsafe(24))
+    webhook_verify_token = fields.Char(
+        'Webhook Verify Token',
+        default=lambda self: secrets.token_urlsafe(24),
+        groups='elsx_whatsapp_marketing.group_whatsapp_manager,base.group_system',
+    )
     webhook_status = fields.Selection([
         ('none', 'Not Tested'),
         ('verified', 'Verified'),

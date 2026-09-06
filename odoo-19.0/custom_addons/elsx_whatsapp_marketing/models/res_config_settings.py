@@ -167,8 +167,8 @@ class ResConfigSettings(models.TransientModel):
     whatsapp_meta_default_api_version = fields.Char(
         string='Default Meta API Version',
         config_parameter='whatsapp.meta.default_api_version',
-        default='v18.0',
-        help="Default Graph API version for new WhatsApp accounts. Verify against official Meta docs before changing."
+        default='v26.0',
+        help="Default Graph API version for new WhatsApp accounts. Existing accounts keep their saved API version."
     )
 
     # Automation & Bots

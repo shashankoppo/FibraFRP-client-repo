@@ -77,10 +77,27 @@ class WhatsAppApiLog(models.Model):
         return {'examined': len(logs), 'linked': linked}
 
     @api.model
-    def _cron_cleanup_old_logs(self):
-        """Remove logs older than 7 days to keep DB lean"""
-        from datetime import datetime, timedelta
-        limit_date = datetime.now() - timedelta(days=7)
+    def _cron_cleanup_old_logs(self, days=None):
+        """Cleanup API logs only when retention is explicitly enabled."""
+        from datetime import timedelta
+        if days is None:
+            retention_value = self.env['ir.config_parameter'].sudo().get_param(
+                'whatsapp.api_log.retention_days',
+                default=0,
+            )
+            try:
+                days = int(retention_value or 0)
+            except (TypeError, ValueError):
+                _logger.warning(
+                    "WhatsApp API log cleanup skipped; invalid retention value: %r",
+                    retention_value,
+                )
+                return 0
+        if days <= 0:
+            _logger.info("WhatsApp API log cleanup skipped; retention is disabled.")
+            return 0
+
+        limit_date = fields.Datetime.now() - timedelta(days=days)
         logs = self.search([('create_date', '<', limit_date)])
         count = len(logs)
         logs.unlink()

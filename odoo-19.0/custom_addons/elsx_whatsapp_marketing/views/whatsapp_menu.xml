@@ -253,7 +253,8 @@
               name="Outbound API Logs"
               parent="menu_whatsapp_analytics_section"
               action="action_whatsapp_api_log"
-              sequence="73"/>
+              sequence="73"
+              groups="elsx_whatsapp_marketing.group_whatsapp_manager"/>
 
     <!-- Media Library -->
     <record id="action_whatsapp_media_library" model="ir.actions.act_window">

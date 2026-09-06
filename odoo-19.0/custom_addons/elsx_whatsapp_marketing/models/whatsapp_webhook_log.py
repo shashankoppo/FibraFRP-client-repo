@@ -193,8 +193,25 @@ class WhatsAppWebhookLog(models.Model):
         return processed
 
     @api.model
-    def _cron_cleanup_old_logs(self, days=30):
-        """Cron job to cleanup old webhook logs (default 30 days retention)"""
+    def _cron_cleanup_old_logs(self, days=None):
+        """Cleanup webhook logs only when retention is explicitly enabled."""
+        if days is None:
+            retention_value = self.env['ir.config_parameter'].sudo().get_param(
+                'whatsapp.webhook_log.retention_days',
+                default=0,
+            )
+            try:
+                days = int(retention_value or 0)
+            except (TypeError, ValueError):
+                _logger.warning(
+                    "WhatsApp webhook log cleanup skipped; invalid retention value: %r",
+                    retention_value,
+                )
+                return 0
+        if days <= 0:
+            _logger.info("WhatsApp webhook log cleanup skipped; retention is disabled.")
+            return 0
+
         cutoff_date = fields.Datetime.now() - timedelta(days=days)
         old_logs = self.search([('create_date', '<', cutoff_date)])
         

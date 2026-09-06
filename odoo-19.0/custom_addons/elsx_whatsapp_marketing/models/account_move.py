@@ -23,7 +23,7 @@ class AccountMove(models.Model):
     # WhatsApp Invoicing Fields
     elsx_wa_message_count = fields.Integer('WhatsApp Messages', compute='_compute_wa_message_count')
     elsx_wa_last_sent = fields.Datetime('Last WhatsApp Sent', readonly=True)
-    elsx_wa_auto_reminder = fields.Boolean('Auto WhatsApp Reminder', default=True, help='Automatically send WhatsApp reminders when overdue')
+    elsx_wa_auto_reminder = fields.Boolean('Auto WhatsApp Reminder', default=False, help='Automatically send WhatsApp reminders when overdue')
     elsx_wa_reminder_count = fields.Integer('Reminders Sent', default=0, readonly=True)
     elsx_wa_next_reminder = fields.Datetime('Next Reminder', compute='_compute_wa_next_reminder', store=True)
 
