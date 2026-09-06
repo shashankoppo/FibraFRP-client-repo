@@ -1304,10 +1304,20 @@ class WhatsAppMessage(models.Model):
             raise ValidationError(_("Daily messaging limit reached for account %s.") % self.account_id.name)
 
         policy = self._get_active_compliance_policy()
+        is_manual_open_chat_reply = bool(
+            not self.is_automated
+            and not self.campaign_id
+            and self.chat_id_ref
+            and self.chat_id_ref.session_open
+        )
 
         # 2. Opt-in / Opt-out / DND Checks
         if self.partner_id:
-            if 'whatsapp_opt_in' in self.partner_id._fields and not self.partner_id.whatsapp_opt_in:
+            if (
+                not is_manual_open_chat_reply
+                and 'whatsapp_opt_in' in self.partner_id._fields
+                and not self.partner_id.whatsapp_opt_in
+            ):
                 raise ValidationError(_("Partner %s has not opted in to WhatsApp messages.") % self.partner_id.name)
 
             consent = self.env['whatsapp.consent.log'].sudo().search([
