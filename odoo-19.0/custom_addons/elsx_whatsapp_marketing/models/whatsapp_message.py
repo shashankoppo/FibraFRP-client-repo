@@ -89,6 +89,8 @@ class WhatsAppMessage(models.Model):
     _campaign_queue_idx = models.Index("(campaign_id, status, next_retry_at, create_date)")
     _message_status_idx = models.Index("(status, retry_count, next_retry_at, create_date)")
     _chat_direction_idx = models.Index("(chat_id_ref, direction, status, create_date)")
+    _outbound_sent_idx = models.Index("(direction, sent_date) WHERE sent_date IS NOT NULL")
+    _outbound_delivered_idx = models.Index("(direction, delivered_date) WHERE delivered_date IS NOT NULL")
 
     account_id = fields.Many2one('whatsapp.account', string='WhatsApp Account', required=True, ondelete='cascade')
     partner_id = fields.Many2one('res.partner', string='Contact')

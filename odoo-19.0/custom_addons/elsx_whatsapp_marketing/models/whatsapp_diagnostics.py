@@ -2,6 +2,7 @@
 import json
 import importlib.util
 import time
+from datetime import timedelta
 
 from markupsafe import Markup, escape
 
@@ -31,6 +32,61 @@ class WhatsAppDiagnosticSnapshot(models.Model):
         return self.env[model_name].search_count(domain or [])
 
     @api.model
+    def _recent_delivery_latency(self, now):
+        """Return local queue and Meta delivery timing without exposing message content."""
+        cutoff = now - timedelta(hours=24)
+        self.env.cr.execute("""
+            SELECT
+                COUNT(*) AS accepted_count,
+                percentile_cont(0.5) WITHIN GROUP (
+                    ORDER BY GREATEST(EXTRACT(EPOCH FROM (sent_date - create_date)), 0)
+                ) AS queue_to_meta_p50_seconds,
+                percentile_cont(0.95) WITHIN GROUP (
+                    ORDER BY GREATEST(EXTRACT(EPOCH FROM (sent_date - create_date)), 0)
+                ) AS queue_to_meta_p95_seconds,
+                percentile_cont(0.5) WITHIN GROUP (ORDER BY latency_ms)
+                    FILTER (WHERE latency_ms IS NOT NULL) AS api_call_p50_ms,
+                percentile_cont(0.95) WITHIN GROUP (ORDER BY latency_ms)
+                    FILTER (WHERE latency_ms IS NOT NULL) AS api_call_p95_ms
+              FROM whatsapp_message
+             WHERE direction = 'outbound'
+               AND sent_date >= %s
+        """, [cutoff])
+        accepted = self.env.cr.dictfetchone() or {}
+
+        self.env.cr.execute("""
+            SELECT
+                COUNT(*) AS delivered_count,
+                percentile_cont(0.5) WITHIN GROUP (
+                    ORDER BY EXTRACT(EPOCH FROM (delivered_date - sent_date))
+                ) AS meta_to_delivery_p50_seconds,
+                percentile_cont(0.95) WITHIN GROUP (
+                    ORDER BY EXTRACT(EPOCH FROM (delivered_date - sent_date))
+                ) AS meta_to_delivery_p95_seconds
+              FROM whatsapp_message
+             WHERE direction = 'outbound'
+               AND delivered_date >= %s
+               AND sent_date IS NOT NULL
+               AND delivered_date >= sent_date
+        """, [cutoff])
+        delivered = self.env.cr.dictfetchone() or {}
+
+        def metric(row, key, digits=2):
+            value = row.get(key)
+            return round(float(value), digits) if value is not None else 0.0
+
+        return {
+            'api_accepted_last_24h': int(accepted.get('accepted_count') or 0),
+            'queue_to_meta_p50_seconds': metric(accepted, 'queue_to_meta_p50_seconds'),
+            'queue_to_meta_p95_seconds': metric(accepted, 'queue_to_meta_p95_seconds'),
+            'api_call_p50_ms': metric(accepted, 'api_call_p50_ms'),
+            'api_call_p95_ms': metric(accepted, 'api_call_p95_ms'),
+            'delivered_last_24h': int(delivered.get('delivered_count') or 0),
+            'meta_to_delivery_p50_seconds': metric(delivered, 'meta_to_delivery_p50_seconds'),
+            'meta_to_delivery_p95_seconds': metric(delivered, 'meta_to_delivery_p95_seconds'),
+        }
+
+    @api.model
     def _collect_snapshot(self):
         ICP = self.env['ir.config_parameter'].sudo()
         now = fields.Datetime.now()
@@ -40,6 +96,16 @@ class WhatsAppDiagnosticSnapshot(models.Model):
         Contact = self.env['whatsapp.contact']
         Template = self.env['whatsapp.template']
         Webhook = self.env['whatsapp.webhook.log']
+        queued_direct_domain = [('campaign_id', '=', False), ('status', '=', 'queued')]
+        queued_campaign_domain = [
+            ('campaign_id.state', 'in', ['running', 'scheduled']),
+            ('status', 'in', ['draft', 'queued']),
+        ]
+        queued_direct_count = Message.search_count(queued_direct_domain)
+        queued_campaign_count = Message.search_count(queued_campaign_domain)
+        oldest_queued = Message.search([('status', '=', 'queued')], order='create_date, id', limit=1)
+        oldest_campaign = Message.search(queued_campaign_domain, order='create_date, id', limit=1)
+        oldest_direct = Message.search(queued_direct_domain, order='create_date, id', limit=1)
 
         cron_checks = []
         for xmlid, model_name, code, _interval, _interval_type in Campaign._delivery_cron_specs():
@@ -85,10 +151,11 @@ class WhatsAppDiagnosticSnapshot(models.Model):
                 'ai_jobs': self._count_if_model('elsx.ai.job'),
             },
             'queues': {
-                'queued_campaign_messages': Message.search_count([
-                    ('campaign_id.state', 'in', ['running', 'scheduled']),
-                    ('status', 'in', ['draft', 'queued']),
-                ]),
+                'queued_campaign_messages': queued_campaign_count,
+                'queued_direct_messages': queued_direct_count,
+                'oldest_queued_age_seconds': int((now - oldest_queued.create_date).total_seconds()) if oldest_queued else 0,
+                'oldest_campaign_queue_age_seconds': int((now - oldest_campaign.create_date).total_seconds()) if oldest_campaign else 0,
+                'oldest_direct_queue_age_seconds': int((now - oldest_direct.create_date).total_seconds()) if oldest_direct else 0,
                 'failed_retryable_messages': Message.search_count([
                     ('status', '=', 'failed'),
                     ('retry_count', '<', 5),
@@ -105,6 +172,12 @@ class WhatsAppDiagnosticSnapshot(models.Model):
                     ('event_type', '=', 'waba_webhook'),
                     ('status', '=', 'error'),
                 ]),
+                'uncertain_dispatches': self.env['whatsapp.send.attempt'].search_count([
+                    ('state', 'in', ['pending', 'uncertain']),
+                ]),
+                'webhooks_needing_review': Webhook.search_count([
+                    ('status', '=', 'error'), ('attempt_count', '>=', 12),
+                ]),
             },
             'workers': {
                 'required': len(cron_checks),
@@ -113,6 +186,7 @@ class WhatsAppDiagnosticSnapshot(models.Model):
             },
             'freshness': {},
         }
+        data['latency'] = self._recent_delivery_latency(now)
 
         last_webhook = Webhook.search([], order='create_date desc', limit=1)
         if last_webhook:
@@ -147,6 +221,7 @@ class WhatsAppDiagnosticSnapshot(models.Model):
             return 'critical'
         if (
             queues.get('queued_campaign_messages', 0) > 500
+            or queues.get('oldest_queued_age_seconds', 0) > 300
             or queues.get('pending_webhooks', 0)
             or queues.get('errored_webhooks', 0)
             or freshness.get('stale_connected_accounts')
@@ -186,6 +261,8 @@ class WhatsAppDiagnosticSnapshot(models.Model):
             card('Queued Campaign', queues.get('queued_campaign_messages')),
             card('Queued Direct', queues.get('queued_direct_messages')),
             card('Oldest Pending (seconds)', queues.get('oldest_queued_age_seconds')),
+            card('Queue to Meta p95 (s)', data.get('latency', {}).get('queue_to_meta_p95_seconds'), 'last 24 hours'),
+            card('Meta Delivery p95 (s)', data.get('latency', {}).get('meta_to_delivery_p95_seconds'), 'confirmed webhooks, last 24 hours'),
             card('Dispatch Review', queues.get('uncertain_dispatches')),
             card('Failed Webhook Review', queues.get('webhooks_needing_review')),
             card('Retryable Failed', queues.get('failed_retryable_messages')),
@@ -215,6 +292,7 @@ class WhatsAppDiagnosticSnapshot(models.Model):
         counts = data.get('counts', {})
         queues = data.get('queues', {})
         freshness = data.get('freshness', {})
+        latency = data.get('latency', {})
         stale = freshness.get('stale_connected_accounts') or []
         lines = [
             "System Health: %s" % self._severity_for_snapshot(data).upper(),
@@ -230,6 +308,10 @@ class WhatsAppDiagnosticSnapshot(models.Model):
             "Campaigns: %s" % counts.get('campaigns'),
             "Failed messages: %s" % queues.get('failed_messages'),
             "Queued campaign messages: %s" % queues.get('queued_campaign_messages'),
+            "Queued direct messages: %s" % queues.get('queued_direct_messages'),
+            "Oldest queued message age (seconds): %s" % queues.get('oldest_queued_age_seconds'),
+            "Queue to Meta p95 (seconds, last 24h): %s" % latency.get('queue_to_meta_p95_seconds'),
+            "Meta accepted to delivered p95 (seconds, last 24h): %s" % latency.get('meta_to_delivery_p95_seconds'),
             "Retryable failed messages: %s" % queues.get('failed_retryable_messages'),
             "Pending webhooks: %s" % queues.get('pending_webhooks'),
             "Errored webhooks: %s" % queues.get('errored_webhooks'),
@@ -246,14 +328,6 @@ class WhatsAppDiagnosticSnapshot(models.Model):
         self.check_access('create')
         start = time.monotonic()
         data = self._collect_snapshot()
-        messages = self.env['whatsapp.message']
-        oldest = messages.search([('status', '=', 'queued')], order='create_date, id', limit=1)
-        data['queues'].update({
-            'queued_direct_messages': messages.search_count([('campaign_id', '=', False), ('status', '=', 'queued')]),
-            'oldest_queued_age_seconds': int((fields.Datetime.now() - oldest.create_date).total_seconds()) if oldest else 0,
-            'uncertain_dispatches': self.env['whatsapp.send.attempt'].search_count([('state', 'in', ['pending', 'uncertain'])]),
-            'webhooks_needing_review': self.env['whatsapp.webhook.log'].search_count([('status', '=', 'error'), ('attempt_count', '>=', 12)]),
-        })
         severity = self._severity_for_snapshot(data)
         snapshot = self.create({
             'name': 'WhatsApp Stabilization Snapshot %s' % data['generated_at'],

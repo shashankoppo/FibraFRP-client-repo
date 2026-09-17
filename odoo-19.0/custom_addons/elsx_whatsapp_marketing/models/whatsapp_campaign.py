@@ -64,19 +64,24 @@ class WhatsAppCampaign(models.Model):
         return created
 
     @api.model
-    def _schedule_campaign_queue_cron(self, delay_seconds=60):
+    def _schedule_campaign_queue_cron(self, delay_seconds=None):
         """Trigger the regular queue cron without changing its recurring schedule."""
         cron = self.env.ref('elsx_whatsapp_marketing.ir_cron_process_whatsapp_queue', raise_if_not_found=False)
         if not cron:
             _logger.warning("WhatsApp campaign queue cron is missing; queued campaigns will need manual processing.")
             return False
 
-        delay_seconds = max(int(delay_seconds or 0), 0)
-        call_at = fields.Datetime.now() + timedelta(seconds=delay_seconds)
         try:
             if not cron.active:
                 cron.sudo().write({'active': True})
-            cron.sudo()._trigger(at=call_at)
+            if delay_seconds is None or int(delay_seconds or 0) <= 0:
+                # Odoo notifies the cron worker after this transaction commits.
+                # A dated trigger is only minute-precise, so using one here adds
+                # avoidable latency to a campaign that has just been approved.
+                cron.sudo()._trigger()
+            else:
+                call_at = fields.Datetime.now() + timedelta(seconds=int(delay_seconds))
+                cron.sudo()._trigger(at=call_at)
         except Exception as exc:
             _logger.warning("Could not trigger WhatsApp campaign queue cron: %s", exc)
             return False
@@ -84,8 +89,8 @@ class WhatsAppCampaign(models.Model):
 
     @api.model
     def _wake_campaign_queue_cron(self):
-        """Make the campaign queue worker due soon after queue creation or repair."""
-        return self._schedule_campaign_queue_cron(delay_seconds=10)
+        """Wake the campaign worker as soon as the queue transaction commits."""
+        return self._schedule_campaign_queue_cron()
 
     @api.model
     def _schedule_next_campaign_queue_run(self, default_delay_seconds=60):
@@ -627,7 +632,11 @@ class WhatsAppCampaign(models.Model):
     
     # Enterprise Logic
     batch_size = fields.Integer('Batch Size', default=50, help="Number of messages to send per batch")
-    batch_interval = fields.Integer('Batch Interval (Min)', default=5, help="Minutes between batches")
+    batch_interval = fields.Integer(
+        'Batch Interval (Min)',
+        default=1,
+        help="Minimum minutes between batches. One minute is the fastest built-in pacing; account rate limits still apply.",
+    )
     flow_id = fields.Many2one('whatsapp.bot.flow', string='Auto-Start Flow', help="Link recipients to this flow upon delivery")
     form_id = fields.Many2one(
         'whatsapp.form',

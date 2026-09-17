@@ -1,5 +1,7 @@
+from datetime import timedelta
 from unittest.mock import patch
 
+from odoo import fields
 from odoo.tests.common import TransactionCase
 
 
@@ -40,3 +42,26 @@ class TestRateLimitAndPersonalization(TransactionCase):
         rendered = campaign._render_body_for_partner('Hi {{name}}, welcome.', partner)
 
         self.assertEqual(rendered, 'Hi Manoj Pal, welcome.')
+
+    def test_new_campaign_uses_one_minute_default_pacing(self):
+        campaign = self.env['whatsapp.campaign'].new({
+            'name': 'Fast default pacing',
+            'account_id': self.account.id,
+        })
+
+        self.assertEqual(campaign.batch_interval, 1)
+
+    def test_campaign_queue_wake_creates_an_immediate_trigger(self):
+        cron = self.env.ref('elsx_whatsapp_marketing.ir_cron_process_whatsapp_queue')
+        Trigger = self.env['ir.cron.trigger']
+        existing_ids = Trigger.search([('cron_id', '=', cron.id)]).ids
+        before = fields.Datetime.now()
+
+        self.env['whatsapp.campaign']._wake_campaign_queue_cron()
+
+        trigger = Trigger.search([
+            ('cron_id', '=', cron.id),
+            ('id', 'not in', existing_ids),
+        ], order='id desc', limit=1)
+        self.assertTrue(trigger)
+        self.assertLessEqual(trigger.call_at, before + timedelta(seconds=5))

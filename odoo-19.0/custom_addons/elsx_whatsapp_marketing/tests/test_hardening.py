@@ -213,3 +213,21 @@ class TestWhatsAppHardening(TransactionCase):
         evidence._reserve(message)
         evidence._finish(message, 'rejected')
         self.assertTrue(evidence._reserve(message)[0])
+
+    def test_diagnostics_reports_queue_and_delivery_timing(self):
+        sent_at = fields.Datetime.now() - timedelta(seconds=15)
+        self.message(status='sent', sent_date=sent_at, latency_ms=120.0)
+        self.message(
+            status='delivered',
+            sent_date=sent_at,
+            delivered_date=fields.Datetime.now(),
+            latency_ms=180.0,
+        )
+
+        snapshot = self.env['whatsapp.diagnostic.snapshot']._collect_snapshot()
+
+        self.assertIn('queued_direct_messages', snapshot['queues'])
+        self.assertIn('oldest_campaign_queue_age_seconds', snapshot['queues'])
+        self.assertGreaterEqual(snapshot['latency']['api_accepted_last_24h'], 2)
+        self.assertGreaterEqual(snapshot['latency']['queue_to_meta_p95_seconds'], 0.0)
+        self.assertGreaterEqual(snapshot['latency']['meta_to_delivery_p95_seconds'], 0.0)
