@@ -1225,6 +1225,7 @@ class WhatsAppMessage(models.Model):
         policy = self._get_active_compliance_policy()
         require_opt_in = not policy or policy.require_opt_in
         category = self._consent_category()
+        is_manual_inbox_send = self._is_manual_inbox_send()
         is_service_reply = bool(
             category == 'transactional' and not self.campaign_id
             and self.chat_id_ref and self.chat_id_ref.session_open
@@ -1247,7 +1248,11 @@ class WhatsAppMessage(models.Model):
             consent_status = self.env['whatsapp.consent.log']._effective_status(
                 self.partner_id, self.account_id, category,
             )
-            if require_opt_in and not is_service_reply and consent_status == 'unknown':
+            # An agent may manually choose an approved template for an existing,
+            # linked inbox conversation.  That is not a campaign or automation;
+            # preserve the established agent workflow while still blocking an
+            # explicit opt-out below.
+            if require_opt_in and not (is_service_reply or is_manual_inbox_send) and consent_status == 'unknown':
                 raise ValidationError(_("Partner %s has not opted in to WhatsApp messages.") % self.partner_id.name)
 
             if consent_status in ('opted_out', 'revoked'):
@@ -1262,7 +1267,7 @@ class WhatsAppMessage(models.Model):
         if self.message_type != 'template' and not is_service_reply:
             raise ValidationError(_("The customer-service window is closed. Use an approved template."))
 
-        if policy and (self.is_automated or self.campaign_id or category == 'marketing'):
+        if policy and (self.is_automated or self.campaign_id or (category == 'marketing' and not is_manual_inbox_send)):
             quiet = self._current_quiet_hour(policy)
             if quiet:
                 raise WhatsAppDeliveryDeferred(_("Quiet hours are active for policy %s.") % policy.name)
@@ -1289,15 +1294,30 @@ class WhatsAppMessage(models.Model):
             ], limit=1)
             require_opt_in = not policy or policy.require_opt_in
             chat = fresh['whatsapp.chat'].browse(self.chat_id_ref.id).exists()
+            is_manual_inbox_send = self._is_manual_inbox_send(
+                chat=chat, campaign=campaign, account=account,
+            )
             service_reply = bool(category == 'transactional' and not campaign and chat
                                  and chat.account_id == account and chat.phone_number == self.phone_number
                                  and chat.session_open)
             if status in ('opted_out', 'revoked') or (
-                require_opt_in and status == 'unknown' and not service_reply
+                require_opt_in and status == 'unknown' and not (service_reply or is_manual_inbox_send)
             ):
                 raise ValidationError(_('Current recipient consent does not permit this message.'))
             if self.message_type != 'template' and not service_reply:
                 raise ValidationError(_('The customer-service window closed before dispatch.'))
+
+    def _is_manual_inbox_send(self, chat=None, campaign=None, account=None):
+        """Return whether this is an agent's direct reply from its linked inbox chat."""
+        self.ensure_one()
+        chat = self.chat_id_ref if chat is None else chat
+        campaign = self.campaign_id if campaign is None else campaign
+        account = self.account_id if account is None else account
+        return bool(
+            not campaign and not self.is_automated and chat
+            and chat.account_id.id == account.id
+            and chat.phone_number == self.phone_number
+        )
 
     def _consent_category(self):
         self.ensure_one()

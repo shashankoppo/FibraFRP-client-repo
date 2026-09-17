@@ -51,10 +51,25 @@ class TestWhatsAppHardening(TransactionCase):
         self.assertTrue(self.message()._check_compliance())
         self.assertFalse(self.partner.whatsapp_opt_in)
 
-    def test_manual_marketing_template_requires_consent_in_open_window(self):
-        self.message(direction='inbound')
+    def test_manual_inbox_template_allows_unknown_consent(self):
         template = self.env['whatsapp.template'].create({
             'name': 'marketing_test', 'account_id': self.account.id, 'category': 'marketing',
+            'body': 'Promotion', 'status': 'approved',
+        })
+        self.assertTrue(self.message(message_type='template', template_id=template.id)._check_compliance())
+
+    def test_automated_template_requires_consent(self):
+        template = self.env['whatsapp.template'].create({
+            'name': 'automated_marketing_test', 'account_id': self.account.id, 'category': 'marketing',
+            'body': 'Promotion', 'status': 'approved',
+        })
+        with self.assertRaises(ValidationError):
+            self.message(message_type='template', template_id=template.id, is_automated=True)._check_compliance()
+
+    def test_manual_inbox_template_respects_explicit_opt_out(self):
+        self.consent('opted_out', category='marketing')
+        template = self.env['whatsapp.template'].create({
+            'name': 'manual_opt_out_template', 'account_id': self.account.id, 'category': 'marketing',
             'body': 'Promotion', 'status': 'approved',
         })
         with self.assertRaises(ValidationError):
