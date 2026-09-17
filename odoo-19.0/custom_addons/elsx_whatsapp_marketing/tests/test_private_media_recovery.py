@@ -301,6 +301,24 @@ class TestPrivateMediaRecovery(TransactionCase):
         self.assertTrue(wizard.recipient_setup_required)
         self.assertEqual(wizard.action_open_chat_contact()['res_model'], 'whatsapp.contact')
 
+    def test_send_wizard_respects_account_opt_in_policy(self):
+        chat = self.env['whatsapp.chat'].create({
+            'account_id': self.account.id,
+            'phone_number': '15550000005',
+        })
+        self.env['whatsapp.compliance.policy'].create({
+            'name': 'Legacy direct sends',
+            'account_id': self.account.id,
+            'require_opt_in': False,
+        })
+        wizard = self.env['whatsapp.send.wizard'].with_context(
+            default_chat_id=chat.id,
+        ).create({
+            'account_id': self.account.id,
+        })
+
+        self.assertFalse(wizard.recipient_setup_required)
+
     def test_template_sync_reads_all_pages_and_clears_stale_buttons(self):
         template = self.env['whatsapp.template'].create({
             'name': 'Existing Template',

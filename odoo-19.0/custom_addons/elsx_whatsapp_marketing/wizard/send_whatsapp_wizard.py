@@ -55,7 +55,15 @@ class WhatsAppSendWizard(models.TransientModel):
     @api.depends('chat_id', 'chat_id.partner_id')
     def _compute_recipient_setup_required(self):
         for record in self:
-            record.recipient_setup_required = bool(record.chat_id and not record.chat_id.partner_id)
+            policy = self.env['whatsapp.compliance.policy'].sudo().search([
+                ('account_id', '=', record.account_id.id),
+                ('active', '=', True),
+            ], limit=1) if record.account_id else False
+            record.recipient_setup_required = bool(
+                record.chat_id
+                and not record.chat_id.partner_id
+                and (not policy or policy.require_opt_in)
+            )
 
     def action_open_chat_contact(self):
         self.ensure_one()

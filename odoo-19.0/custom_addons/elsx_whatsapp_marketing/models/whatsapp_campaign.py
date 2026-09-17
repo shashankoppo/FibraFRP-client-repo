@@ -1471,12 +1471,25 @@ class WhatsAppCampaign(models.Model):
         missing_phone.write({'whatsapp_last_exclusion_reason': 'Missing phone number'})
         invalid_phone.write({'whatsapp_last_exclusion_reason': 'Invalid WhatsApp phone number'})
 
-        # Enforce compliance: Exclude partners who have a linked opted-out whatsapp.contact or have whatsapp_opt_in = False
+        # The account policy controls whether unknown consent is excluded. An
+        # explicit opt-out is always excluded, regardless of that setting.
         original_partners = partners
         exclusion_notes = []
-        opted_out = partners.filtered(lambda partner: self.env['whatsapp.consent.log']._effective_status(
-            partner, self.account_id, 'marketing',
-        ) != 'opted_in')
+        policy = self.env['whatsapp.compliance.policy'].sudo().search([
+            ('account_id', '=', self.account_id.id),
+            ('active', '=', True),
+        ], limit=1)
+        require_opt_in = not policy or policy.require_opt_in
+
+        def is_excluded_for_consent(partner):
+            status = self.env['whatsapp.consent.log']._effective_status(
+                partner, self.account_id, 'marketing',
+            )
+            return status in ('opted_out', 'revoked') or (
+                require_opt_in and status != 'opted_in'
+            )
+
+        opted_out = partners.filtered(is_excluded_for_consent)
         if opted_out:
             partners = partners - opted_out
             exclusion_notes.append(f'Opted out/DND: {len(opted_out)}')

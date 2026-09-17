@@ -35,9 +35,17 @@ class WhatsAppCampaignParticipant(models.Model):
             # Check opt-in status dynamically before executing any steps
             if participant.campaign_id.state != 'running':
                 continue
-            is_opted_out = self.env['whatsapp.consent.log']._effective_status(
+            consent_status = self.env['whatsapp.consent.log']._effective_status(
                 participant.partner_id, participant.campaign_id.account_id, 'marketing',
-            ) != 'opted_in'
+            )
+            policy = self.env['whatsapp.compliance.policy'].sudo().search([
+                ('account_id', '=', participant.campaign_id.account_id.id),
+                ('active', '=', True),
+            ], limit=1)
+            require_opt_in = not policy or policy.require_opt_in
+            is_opted_out = consent_status in ('opted_out', 'revoked') or (
+                require_opt_in and consent_status != 'opted_in'
+            )
             if is_opted_out:
                 participant.write({'state': 'stopped'})
                 _logger.info(f"Drip Campaign stopped for {participant.partner_id.name} due to opt-out.")

@@ -60,6 +60,36 @@ class TestWhatsAppHardening(TransactionCase):
         with self.assertRaises(ValidationError):
             self.message(message_type='template', template_id=template.id)._check_compliance()
 
+    def test_policy_can_explicitly_allow_unknown_consent(self):
+        self.env['whatsapp.compliance.policy'].create({
+            'name': 'Legacy permitted sends',
+            'account_id': self.account.id,
+            'require_opt_in': False,
+        })
+        template = self.env['whatsapp.template'].create({
+            'name': 'legacy_permitted_template', 'account_id': self.account.id,
+            'category': 'marketing', 'body': 'Promotion', 'status': 'approved',
+        })
+
+        self.assertTrue(
+            self.message(message_type='template', template_id=template.id)._check_compliance()
+        )
+
+    def test_policy_does_not_override_explicit_opt_out(self):
+        self.env['whatsapp.compliance.policy'].create({
+            'name': 'Legacy permitted sends',
+            'account_id': self.account.id,
+            'require_opt_in': False,
+        })
+        self.consent('opted_out', category='marketing')
+        template = self.env['whatsapp.template'].create({
+            'name': 'legacy_opt_out_template', 'account_id': self.account.id,
+            'category': 'marketing', 'body': 'Promotion', 'status': 'approved',
+        })
+
+        with self.assertRaises(ValidationError):
+            self.message(message_type='template', template_id=template.id)._check_compliance()
+
     def test_explicit_reconsent_supersedes_old_withdrawal(self):
         self.consent('opted_out', minutes=-10)
         self.consent('opted_in', minutes=-1)

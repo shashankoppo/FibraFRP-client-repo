@@ -1221,6 +1221,7 @@ class WhatsAppMessage(models.Model):
             raise WhatsAppDeliveryDeferred(_("Daily messaging limit reached for account %s.") % self.account_id.name)
 
         policy = self._get_active_compliance_policy()
+        require_opt_in = not policy or policy.require_opt_in
         category = self._consent_category()
         is_service_reply = bool(
             category == 'transactional' and not self.campaign_id
@@ -1244,7 +1245,7 @@ class WhatsAppMessage(models.Model):
             consent_status = self.env['whatsapp.consent.log']._effective_status(
                 self.partner_id, self.account_id, category,
             )
-            if not is_service_reply and consent_status == 'unknown':
+            if require_opt_in and not is_service_reply and consent_status == 'unknown':
                 raise ValidationError(_("Partner %s has not opted in to WhatsApp messages.") % self.partner_id.name)
 
             if consent_status in ('opted_out', 'revoked'):
@@ -1253,7 +1254,7 @@ class WhatsAppMessage(models.Model):
             if policy and policy.respect_dnd_list and self.partner_id.id in policy.dnd_contact_ids.ids:
                 raise ValidationError(_("Partner %s is on the WhatsApp do-not-contact list.") % self.partner_id.name)
 
-        elif not is_service_reply:
+        elif require_opt_in and not is_service_reply:
             raise ValidationError(_("Link a recipient with recorded consent before sending this message."))
 
         if self.message_type != 'template' and not is_service_reply:
@@ -1280,11 +1281,18 @@ class WhatsAppMessage(models.Model):
                 return
             category = self._consent_category()
             status = fresh['whatsapp.consent.log']._effective_status(partner, account, category)
+            policy = fresh['whatsapp.compliance.policy'].search([
+                ('account_id', '=', account.id),
+                ('active', '=', True),
+            ], limit=1)
+            require_opt_in = not policy or policy.require_opt_in
             chat = fresh['whatsapp.chat'].browse(self.chat_id_ref.id).exists()
             service_reply = bool(category == 'transactional' and not campaign and chat
                                  and chat.account_id == account and chat.phone_number == self.phone_number
                                  and chat.session_open)
-            if status in ('opted_out', 'revoked') or status == 'unknown' and not service_reply:
+            if status in ('opted_out', 'revoked') or (
+                require_opt_in and status == 'unknown' and not service_reply
+            ):
                 raise ValidationError(_('Current recipient consent does not permit this message.'))
             if self.message_type != 'template' and not service_reply:
                 raise ValidationError(_('The customer-service window closed before dispatch.'))
