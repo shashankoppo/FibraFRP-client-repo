@@ -1304,11 +1304,16 @@ class WhatsAppAccount(models.Model):
         existing_msg._check_compliance()
         existing_msg._check_latest_dispatch_eligibility()
         if not self._consume_rate_limit_token():
+            retry_delay_seconds = int(60 + random.uniform(0, 15))
             existing_msg.write({
                 'status': 'queued',
                 'error_message': 'Rate limit exceeded; queued for retry.',
-                'next_retry_at': fields.Datetime.now() + timedelta(seconds=60 + random.uniform(0, 15)),
+                'next_retry_at': fields.Datetime.now() + timedelta(seconds=retry_delay_seconds),
             })
+            if not existing_msg.campaign_id:
+                self.env['whatsapp.message']._schedule_direct_queue_cron(
+                    delay_seconds=retry_delay_seconds,
+                )
             return existing_msg
 
         attempts = self.env['whatsapp.send.attempt']

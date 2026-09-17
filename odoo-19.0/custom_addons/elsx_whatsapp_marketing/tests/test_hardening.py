@@ -9,6 +9,8 @@ from odoo.exceptions import AccessError, ValidationError
 from odoo.tests.common import TransactionCase, new_test_user
 
 from ..controllers.whatsapp_webhook import WhatsAppWebhook
+from ..models.whatsapp_account import WhatsAppAccount
+from ..models.whatsapp_message import WhatsAppMessage
 
 
 class TestWhatsAppHardening(TransactionCase):
@@ -74,6 +76,22 @@ class TestWhatsAppHardening(TransactionCase):
         })
         with self.assertRaises(ValidationError):
             self.message(message_type='template', template_id=template.id)._check_compliance()
+
+    def test_rate_limited_manual_reply_wakes_direct_queue(self):
+        template = self.env['whatsapp.template'].create({
+            'name': 'rate_limited_manual_reply', 'account_id': self.account.id,
+            'category': 'marketing', 'body': 'Promotion', 'status': 'approved',
+        })
+        with patch.object(WhatsAppAccount, '_consume_rate_limit_token', return_value=False), \
+             patch.object(WhatsAppMessage, '_schedule_direct_queue_cron') as wake_queue:
+            message = self.account.send_message(
+                self.partner.phone,
+                partner_id=self.partner.id,
+                message_type='template',
+                template_record=template,
+            )
+        self.assertEqual(message.status, 'queued')
+        wake_queue.assert_called_once()
 
     def test_policy_can_explicitly_allow_unknown_consent(self):
         self.env['whatsapp.compliance.policy'].create({

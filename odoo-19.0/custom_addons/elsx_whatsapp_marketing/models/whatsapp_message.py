@@ -1351,6 +1351,8 @@ class WhatsAppMessage(models.Model):
             except WhatsAppDeliveryDeferred as exc:
                 record.write({'status': 'queued', 'next_retry_at': fields.Datetime.now() + timedelta(minutes=5),
                               'error_message': str(exc)})
+                if not record.campaign_id:
+                    self._schedule_direct_queue_cron(delay_seconds=300)
                 continue
 
             payload = {}
@@ -1451,6 +1453,30 @@ class WhatsAppMessage(models.Model):
                 message_type=record.message_type,
                 **send_kwargs
             )
+        return True
+
+    @api.model
+    def _schedule_direct_queue_cron(self, delay_seconds=None):
+        """Wake the direct-message worker without changing its recurring schedule."""
+        cron = self.env.ref(
+            'elsx_whatsapp_marketing.ir_cron_process_direct_message_queue',
+            raise_if_not_found=False,
+        )
+        if not cron:
+            _logger.warning('WhatsApp direct-message queue cron is missing.')
+            return False
+        try:
+            if not cron.active:
+                cron.sudo().write({'active': True})
+            if delay_seconds is None or int(delay_seconds or 0) <= 0:
+                cron.sudo()._trigger()
+            else:
+                cron.sudo()._trigger(
+                    at=fields.Datetime.now() + timedelta(seconds=int(delay_seconds))
+                )
+        except Exception as exc:
+            _logger.warning('Could not trigger WhatsApp direct-message queue cron: %s', exc)
+            return False
         return True
 
     def action_retry(self):
