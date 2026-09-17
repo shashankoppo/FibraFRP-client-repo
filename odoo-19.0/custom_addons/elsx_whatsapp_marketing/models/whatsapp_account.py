@@ -730,7 +730,24 @@ class WhatsAppAccount(models.Model):
                                 if isinstance(header_handles, str):
                                     header_handles = [header_handles]
                                 header_example = header_handles[0] if header_handles else False
-                                if header_example and str(header_example).startswith(('http://', 'https://')):
+                                # Meta examples are temporary download links, not replacements
+                                # for an operator's uploaded file or configured send reference.
+                                preserve_media = bool(
+                                    template
+                                    and template.header_type == vals['header_type']
+                                    and (
+                                        template.header_media_file
+                                        or (
+                                            template._is_send_media_reference(template.header_media_url)
+                                            and not self._is_private_meta_media_url(template.header_media_url)
+                                        )
+                                    )
+                                )
+                                if (
+                                    not preserve_media
+                                    and header_example
+                                    and str(header_example).startswith(('http://', 'https://'))
+                                ):
                                     vals['header_media_url'] = header_example
                                     if vals['header_type'] == 'document':
                                         current_filename = template.header_media_filename if template else False

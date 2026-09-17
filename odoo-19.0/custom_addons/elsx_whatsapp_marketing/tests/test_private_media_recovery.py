@@ -3,6 +3,7 @@ import json
 from unittest.mock import Mock, patch
 
 from odoo import fields
+from odoo.exceptions import UserError
 from odoo.tests.common import TransactionCase
 
 from ..controllers.whatsapp_webhook import WhatsAppWebhook
@@ -152,6 +153,111 @@ class TestPrivateMediaRecovery(TransactionCase):
 
         self.assertEqual(result, payload)
         upload.assert_not_called()
+
+    def _document_template(self, **values):
+        return self.env['whatsapp.template'].create({
+            'name': 'document_media_test',
+            'meta_template_name': 'document_media_test',
+            'account_id': self.account.id,
+            'language': 'en_US',
+            'language_code': 'en_US',
+            'body': 'Document media test',
+            'header_type': 'document',
+            'header_media_filename': 'brochure.pdf',
+            **values,
+        })
+
+    def _sync_document_sample(self, media_url):
+        response = Mock(status_code=200)
+        response.json.return_value = {'data': [{
+            'id': 'meta-document-test',
+            'name': 'document_media_test',
+            'language': 'en_US',
+            'status': 'APPROVED',
+            'category': 'MARKETING',
+            'components': [
+                {'type': 'BODY', 'text': 'Document media test'},
+                {'type': 'HEADER', 'format': 'DOCUMENT',
+                 'example': {'header_handle': [media_url]}},
+            ],
+        }]}
+        with patch.object(account_module.requests, 'get', return_value=response):
+            self.account.action_sync_templates()
+
+    def test_sync_preserves_configured_media(self):
+        template = self._document_template()
+        local_file = base64.b64encode(b'local-pdf-bytes')
+        for saved_url, saved_file in (
+            ('123456789', False),
+            ('https://cdn.example.com/brochure.pdf', False),
+            ('https://scontent.whatsapp.net/old.pdf', local_file),
+            (False, local_file),
+        ):
+            with self.subTest(saved_url=saved_url):
+                template.write({'header_media_url': saved_url, 'header_media_file': saved_file})
+                self._sync_document_sample('https://scontent.whatsapp.net/new.pdf')
+                self.assertEqual(template.header_media_url, saved_url)
+                self.assertEqual(template.header_media_file, saved_file)
+                self.assertEqual(template.header_media_filename, 'brochure.pdf')
+
+    def test_sync_refreshes_sample_when_no_durable_source_exists(self):
+        sample_url = 'https://scontent.whatsapp.net/new.pdf'
+        self._sync_document_sample(sample_url)
+        template = self.env['whatsapp.template'].search([
+            ('account_id', '=', self.account.id),
+            ('meta_template_name', '=', 'document_media_test'),
+        ])
+        self.assertEqual(len(template), 1)
+        self.assertEqual(template.header_media_url, sample_url)
+        template.header_media_url = 'https://scontent.whatsapp.net/old.pdf'
+        self._sync_document_sample(sample_url)
+        self.assertEqual(template.header_media_url, sample_url)
+
+    def test_saved_file_recovers_temporary_template_link(self):
+        local_file = base64.b64encode(b'local-pdf-bytes')
+        template = self._document_template(
+            header_media_url='https://scontent.whatsapp.net/expired.pdf',
+            header_media_file=local_file,
+        )
+        with (
+            patch.object(WhatsAppAccount, '_upload_media_to_meta', return_value='123456789') as upload,
+            patch.object(account_module.requests, 'get') as download,
+        ):
+            first = template._resolve_header_media_value('document')
+            second = template._resolve_header_media_value('document')
+        self.assertEqual(first, '123456789')
+        self.assertEqual(second, first)
+        upload.assert_called_once_with(local_file, 'brochure.pdf', 'document')
+        download.assert_not_called()
+        self.assertEqual(template.header_media_file, local_file)
+
+    def test_explicit_media_override_is_not_replaced_by_template_file(self):
+        template = self._document_template(
+            header_media_url='https://scontent.whatsapp.net/expired.pdf',
+            header_media_file=base64.b64encode(b'template-pdf-bytes'),
+        )
+        with patch.object(WhatsAppAccount, '_upload_media_to_meta') as upload:
+            result = template._resolve_header_media_value(
+                'document', media_url='987654321', account=self.account,
+            )
+        self.assertEqual(result, '987654321')
+        upload.assert_not_called()
+
+    def test_expired_link_without_file_fails_without_sending(self):
+        template = self._document_template(
+            header_media_url='https://scontent.whatsapp.net/expired.pdf',
+        )
+        response = Mock(status_code=403, content=b'Forbidden')
+        with (
+            patch.object(account_module.requests, 'get', return_value=response),
+            patch.object(account_module.requests, 'post') as send,
+        ):
+            value = template._resolve_header_media_value('document')
+            with self.assertRaisesRegex(UserError, 'HTTP 403'):
+                self.account._replace_private_media_links({'document': {'link': value}})
+        send.assert_not_called()
+        self.assertEqual(template.header_media_url, value)
+        self.assertFalse(template.header_media_file)
 
     def test_template_sync_reads_all_pages_and_clears_stale_buttons(self):
         template = self.env['whatsapp.template'].create({

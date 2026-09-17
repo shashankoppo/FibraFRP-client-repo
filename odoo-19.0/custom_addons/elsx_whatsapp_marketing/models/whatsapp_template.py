@@ -574,7 +574,13 @@ class WhatsAppTemplate(models.Model):
             return upload_account._upload_media_to_meta(media_file, filename, media_type)
 
         if self.header_media_url and self._is_send_media_reference(self.header_media_url):
-            return self.header_media_url
+            # Prefer the template's own file over an expiring Meta example URL.
+            # Keep explicit per-send overrides and reusable IDs/public URLs intact.
+            if not (
+                self.header_media_file
+                and self.env['whatsapp.account']._is_private_meta_media_url(self.header_media_url)
+            ):
+                return self.header_media_url
 
         if self.header_media_file:
             if not upload_account:
