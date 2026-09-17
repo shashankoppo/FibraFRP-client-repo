@@ -6,7 +6,7 @@ COUNTRY_CODE="${2:-IN}"
 ADMIN_LOGIN="${3:-admin}"
 ADMIN_LANGUAGE="${ADMIN_LANGUAGE:-en_US}"
 CONFIG="${ODOO_CONFIG:-/etc/odoo/odoo.conf}"
-DEFAULT_CUSTOM_MODULES="${DEFAULT_CUSTOM_MODULES:-elsx_client_restrictions,elsx_rebrand}"
+INSTALL_MODULES="${INSTALL_MODULES:?An explicit initial module list is required}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -44,10 +44,6 @@ fi
 echo "==> Building latest Odoo CE image"
 docker compose build odoo
 
-CE_PROFILE="$(
-  docker compose run --rm -T --no-deps     --entrypoint python3     odoo /opt/odoo/deploy/ce_module_profile.py       --applications --country "${COUNTRY_CODE}" --format csv
-)"
-INSTALL_MODULES="${CE_PROFILE},${DEFAULT_CUSTOM_MODULES}"
 
 echo "==> Creating ${DB_NAME} for country ${COUNTRY_CODE}"
 docker compose run --rm -T --no-deps \
@@ -71,7 +67,7 @@ docker compose run --rm -T --no-deps \
       --password "${TARGET_ADMIN_PASSWORD}"
   '
 
-echo "==> Installing complete official CE application/localization profile"
+echo "==> Installing explicitly selected modules and their dependencies"
 docker compose run --rm -T --no-deps   -e ELSX_NATIVE_ADMIN_CLEANUP=NO   odoo   python3 /opt/odoo/odoo-bin     -c "${CONFIG}"     -d "${DB_NAME}"     -i "${INSTALL_MODULES}"     --without-demo=True     --stop-after-init     --no-http
 
 PENDING="$(
@@ -84,11 +80,22 @@ if [ -n "${PENDING}" ]; then
   exit 1
 fi
 
-docker compose up -d odoo sidecar
+echo "==> Verifying every explicitly requested module is installed"
+docker compose run --rm -T --no-deps \
+  --entrypoint python3 \
+  -e DEPLOY_DB="${DB_NAME}" \
+  -e EXPECTED_INSTALL_MODULES="${INSTALL_MODULES}" \
+  odoo /opt/odoo/deploy/guarded_upgrade.py verify-new
+
+if ! docker compose up -d --no-deps --wait --wait-timeout 240 odoo; then
+  docker compose stop -t 30 odoo
+  echo "ERROR: startup health checks failed; the new database is retained for investigation." >&2
+  exit 1
+fi
 docker compose ps
 
 echo
 echo "==> New client database is ready: ${DB_NAME}"
 echo "Country profile: ${COUNTRY_CODE}"
 echo "Administrator login: ${ADMIN_LOGIN}"
-echo "Official CE applications and matching localization modules are installed."
+echo "Selected modules and required dependencies are installed."

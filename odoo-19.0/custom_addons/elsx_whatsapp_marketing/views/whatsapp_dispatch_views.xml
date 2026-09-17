@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_whatsapp_send_attempt_list" model="ir.ui.view">
+        <field name="name">whatsapp.send.attempt.list</field>
+        <field name="model">whatsapp.send.attempt</field>
+        <field name="arch" type="xml">
+            <list create="false" edit="false" delete="false">
+                <field name="write_date"/>
+                <field name="account_ref"/>
+                <field name="message_ref"/>
+                <field name="state"/>
+                <field name="wamid"/>
+                <field name="detail"/>
+                <button name="action_confirm_not_sent" type="object" icon="fa-check" string="Confirm Not Sent"
+                        invisible="state not in ['pending', 'uncertain']"
+                        confirm="Confirm that Meta has not accepted or delivered this message. This permits a subsequent manual retry."/>
+            </list>
+        </field>
+    </record>
+    <record id="action_whatsapp_send_attempt" model="ir.actions.act_window">
+        <field name="name">Dispatch Review</field>
+        <field name="res_model">whatsapp.send.attempt</field>
+        <field name="view_mode">list</field>
+        <field name="domain">[('state', 'in', ['pending', 'uncertain'])]</field>
+    </record>
+    <menuitem id="menu_whatsapp_send_attempt" name="Dispatch Review" parent="menu_whatsapp_config"
+              action="action_whatsapp_send_attempt" sequence="89" groups="elsx_whatsapp_marketing.group_whatsapp_manager"/>
+</odoo>

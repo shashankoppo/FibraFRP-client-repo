@@ -5,6 +5,7 @@ from odoo.modules.registry import Registry
 import json
 import hashlib
 import hmac
+import os
 import logging
 import time
 from datetime import datetime, timedelta
@@ -41,146 +42,70 @@ def _bound_request_env():
 
 
 def _get_env(db_name=None, payload=None):
-    """Get a fresh server environment for webhook context (no request session)"""
-    db_name = (
-        db_name
-        or request.params.get('db')
-        or request.httprequest.headers.get('X-Odoo-Db')
-        or request.session.db
-        or getattr(request, 'db', None)
-    )
+    """Never guess between copied client databases or fall back after a bad pin."""
+    requested = (db_name or request.params.get('db') or request.httprequest.headers.get('X-Odoo-Db')
+                 or request.session.db or getattr(request, 'db', None))
+    configured = os.environ.get('ODOO_AUTO_UPDATE_DB_NAME') or os.environ.get('LIVE_DB_NAME')
+    if configured and requested and configured != requested:
+        return None, None, None
+    pinned = configured or requested
 
-    def open_env(db):
+    def open_env(name):
         try:
-            registry = Registry(db)
+            registry = Registry(name)
             if 'whatsapp.account' not in registry.models:
                 return None, None, None
             cr = registry.cursor()
-            return api.Environment(cr, odoo.SUPERUSER_ID, {}), cr, db
+            return api.Environment(cr, odoo.SUPERUSER_ID, {}), cr, name
         except Exception:
+            _logger.warning('[WH-DB] Unable to open configured webhook database.')
             return None, None, None
-
-    def payload_phone_number_id():
-        if not payload:
-            return False
-        try:
-            meta = payload.get('entry', [{}])[0].get('changes', [{}])[0].get('value', {}).get('metadata', {})
-            return meta.get('phone_number_id')
-        except Exception:
-            return False
-
-    def account_score(account):
-        return (
-            10 if account.is_primary_webhook_db else 0,
-            5 if account.webhook_status == 'verified' else 0,
-            3 if account.status == 'connected' else 0,
-            account.last_inbound_webhook_at or account.last_webhook_at or fields.Datetime.to_datetime('1970-01-01 00:00:00'),
-        )
-
-    # 0. Explicit DB pin wins. This is essential when several copied DBs exist.
-    if db_name:
-        env, cr, db = open_env(db_name)
-        if env:
-            return env, cr, db
-        _logger.warning('[WH-DB] Explicit webhook database %s could not be opened.', db_name)
 
     from odoo.service import db as db_service
     try:
-        dbs = db_service.list_dbs()
-    except Exception as exc:
-        _logger.warning('[WH-DB] Could not list databases while resolving webhook DB: %s', exc)
-        dbs = []
-
-    # 1. Multi-tenant phone_number_id matching. Prefer the primary/verified
-    # receiver if the same WABA was copied into several databases.
-    phone_number_id = payload_phone_number_id()
-    if phone_number_id:
-        matches = []
-        for db in dbs:
-            env, cr, _ = open_env(db)
-            if not env:
-                continue
-            try:
-                account = env['whatsapp.account'].sudo().search([
-                    ('phone_number_id', '=', phone_number_id),
-                    ('active', '=', True),
-                ], limit=1)
-                if account:
-                    matches.append((account_score(account), db))
-            except Exception:
-                pass
-            finally:
-                cr.close()
-        if matches:
-            matches.sort(key=lambda item: item[0], reverse=True)
-            if len(matches) > 1:
-                _logger.warning(
-                    '[WH-DB] phone_number_id=%s exists in multiple DBs. Selected %s. Matches=%s. '
-                    'Set only one WhatsApp account as primary, or use ?db=DB_NAME in the webhook URL.',
-                    phone_number_id, matches[0][1], [db for _, db in matches],
-                )
-            env, cr, db = open_env(matches[0][1])
-            if env:
-                return env, cr, db
-
-    # 2. Iterate through all DBs, looking for the marked "Primary Webhook DB"
-    primary_matches = []
-    for db in dbs:
-        env, cr, _ = open_env(db)
+        allowed = http.db_filter(db_service.list_dbs())
+    except Exception:
+        allowed = []
+    if pinned:
+        return open_env(pinned) if pinned in allowed else (None, None, None)
+    matches = []
+    for name in allowed:
+        env, cr, _ = open_env(name)
         if not env:
             continue
         try:
-            primary_acc = env['whatsapp.account'].sudo().search([
-                ('is_primary_webhook_db', '=', True),
-                ('active', '=', True),
-            ], limit=1)
-            if primary_acc:
-                primary_matches.append((account_score(primary_acc), db))
-        except Exception:
-            pass
+            if payload:
+                matched = bool(_find_account(env, None, payload))
+            else:
+                matched = bool(env['whatsapp.account'].search_count([('active', '=', True)]))
+            if matched:
+                matches.append(name)
         finally:
             cr.close()
-    if primary_matches:
-        primary_matches.sort(key=lambda item: item[0], reverse=True)
-        if len(primary_matches) > 1:
-            _logger.warning(
-                '[WH-DB] Multiple primary webhook DBs found. Selected %s. Matches=%s.',
-                primary_matches[0][1], [db for _, db in primary_matches],
-            )
-        env, cr, db = open_env(primary_matches[0][1])
-        if env:
-            return env, cr, db
-
-    # 3. Final fallback: search for ANY DB with our model
-    for db in dbs:
-        env, cr, db = open_env(db)
-        if env:
-            return env, cr, db
-
-    # 4. Critical failure
+    if len(matches) == 1:
+        return open_env(matches[0])
+    _logger.warning('[WH-DB] Webhook database is missing or ambiguous; configure an explicit target.')
     return None, None, None
 
 
 def _find_account(env, account_id, payload):
-    """Find the matching WhatsApp account from the payload"""
+    """Resolve an exact phone or WABA, never the unrelated default account."""
+    entries = payload.get('entry') or []
+    entry = entries[0] if entries else {}
+    changes = entry.get('changes') or []
+    value = changes[0].get('value', {}) if changes else {}
+    phone_id = (value.get('metadata') or {}).get('phone_number_id')
+    domain = [('active', '=', True)]
     if account_id:
-        account = env['whatsapp.account'].sudo().browse(int(account_id))
-        if account.exists():
-            return account
-
-    # Try metadata phone_number_id
-    try:
-        meta = payload.get('entry', [{}])[0].get('changes', [{}])[0].get('value', {}).get('metadata', {})
-        phone_number_id = meta.get('phone_number_id')
-        if phone_number_id:
-            account = env['whatsapp.account'].sudo().search([('phone_number_id', '=', phone_number_id)], limit=1)
-            if account.exists():
-                return account
-    except Exception:
-        pass
-
-    # Fallback: configured default account, then first active account.
-    return env['whatsapp.account'].sudo()._get_default_account()
+        domain.append(('id', '=', int(account_id)))
+    if phone_id:
+        domain.append(('phone_number_id', '=', str(phone_id)))
+    elif entry.get('id'):
+        domain.append(('business_account_id', '=', str(entry['id'])))
+    elif not account_id:
+        return env['whatsapp.account']
+    accounts = env['whatsapp.account'].sudo().search(domain, limit=2)
+    return accounts if len(accounts) == 1 else env['whatsapp.account']
 
 
 class WhatsAppWebhook(http.Controller):
@@ -274,7 +199,7 @@ class WhatsAppWebhook(http.Controller):
         """Validate Meta X-Hub-Signature-256 against the exact raw request body."""
         if not account:
             return False, 'No matching account', 403
-        if account.sudo().skip_webhook_hmac:
+        if account.sudo().skip_webhook_hmac and os.environ.get('ODOO_ENVIRONMENT') == 'development':
             _logger.warning('[WH-HMAC] Signature check skipped for account %s (debug mode).', account.id)
             return True, None, None
         if not account.sudo().app_secret:
@@ -351,69 +276,14 @@ class WhatsAppWebhook(http.Controller):
                 # 2. Queue webhook processing with a bounded worker pool.
                 # This keeps Meta responses fast without spawning unlimited DB cursors.
                 def process_webhook_thread(db_name, log_id, account_id):
-                    last_error = None
-                    for attempt, delay in enumerate((0,) + self.SERIALIZATION_RETRY_DELAYS, start=1):
-                        if delay:
-                            time.sleep(delay)
+                    registry = Registry(db_name)
+                    with registry.cursor() as worker_cr:
+                        worker_env = api.Environment(worker_cr, odoo.SUPERUSER_ID, {})
+                        logs = worker_env['whatsapp.webhook.log']
                         try:
-                            registry = Registry(db_name)
-                            with registry.cursor() as thread_cr:
-                                thread_env = api.Environment(thread_cr, odoo.SUPERUSER_ID, {})
-                                thread_log = thread_env['whatsapp.webhook.log'].sudo().browse(log_id).exists()
-                                if not thread_log:
-                                    return
-                                thread_acc = (
-                                    thread_env['whatsapp.account'].sudo().browse(account_id).exists()
-                                    if account_id else None
-                                )
-                                payload_json = json.loads(thread_log.raw_payload)
-
-                                for entry in payload_json.get('entry', []):
-                                    for change in entry.get('changes', []):
-                                        field = change.get('field', '')
-                                        value = change.get('value') or {}
-                                        self._dispatch_change(thread_env, thread_acc, field, value, thread_log.raw_payload)
-
-                                thread_log.sudo().write({
-                                    'status': 'processed',
-                                    'error_detail': False,
-                                })
-                                thread_cr.commit()
-                                return
+                            logs._process_log_with_retry(log_id)
                         except Exception as exc:
-                            last_error = exc
-                            if self._is_serialization_failure(exc):
-                                _logger.info(
-                                    '[WH-THREAD] Serialization retry %s/%s for log_id=%s',
-                                    attempt,
-                                    len(self.SERIALIZATION_RETRY_DELAYS) + 1,
-                                    log_id,
-                                )
-                                continue
-                            break
-
-                    _logger.error(
-                        '[WH-THREAD-CRASH] Webhook processing failed for log_id=%s: %s',
-                        log_id,
-                        last_error,
-                    )
-                    try:
-                        registry = Registry(db_name)
-                        with registry.cursor() as error_cr:
-                            error_env = api.Environment(error_cr, odoo.SUPERUSER_ID, {})
-                            error_log = error_env['whatsapp.webhook.log'].sudo().browse(log_id).exists()
-                            if error_log:
-                                error_log.write({
-                                    'status': 'error',
-                                    'error_detail': (
-                                        str(last_error)
-                                        or last_error.__class__.__name__
-                                        if last_error else 'Unknown webhook worker failure'
-                                    )[:2000],
-                                })
-                            error_cr.commit()
-                    except Exception:
-                        _logger.exception('[WH-THREAD-CRASH] Failed to persist webhook error log_id=%s', log_id)
+                            logs._persist_processing_error(log_id, exc)
 
                 try:
                     WEBHOOK_EXECUTOR.submit(process_webhook_thread, db_name, log_id, account.id if account else None)
@@ -482,6 +352,7 @@ class WhatsAppWebhook(http.Controller):
                     raise
                 _logger.error(f'[WH-DISPATCH] Handler for field={field} failed: {e}', exc_info=True)
                 self._update_log_error(env, field, value, str(e))
+                raise
         else:
             _logger.info(f'[WH-DISPATCH] No handler for field={field}, ignoring')
 
@@ -541,8 +412,11 @@ class WhatsAppWebhook(http.Controller):
             _logger.warning('[WH-MSG] Inbound payload has no usable sender number; skipping message %s', wamid)
             return
 
+        if wamid:
+            env.cr.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                           ['wa-inbound:%s:%s' % (account.id, wamid)])
         # --- Duplicate guard ---
-        if wamid and env['whatsapp.message'].sudo().search_count([('message_id', '=', wamid)]):
+        if wamid and env['whatsapp.message'].sudo().search_count([('message_id', '=', wamid), ('account_id', '=', account.id)]):
             _logger.info(f'[WH-MSG] Duplicate wamid={wamid}, skipping')
             return
 
@@ -572,6 +446,7 @@ class WhatsAppWebhook(http.Controller):
             'direction': 'inbound',
             'status': 'delivered',
             'raw_data': json.dumps(msg_data),
+            'meta_received_at': self._parse_meta_timestamp(timestamp),
         }
         if partner:
             vals['partner_id'] = partner.id
@@ -584,7 +459,7 @@ class WhatsAppWebhook(http.Controller):
             parent_wamid = context.get('id')
             if parent_wamid:
                 vals['parent_message_id'] = parent_wamid
-                parent = env['whatsapp.message'].sudo().search([('message_id', '=', parent_wamid)], limit=1)
+                parent = env['whatsapp.message'].sudo().search([('message_id', '=', parent_wamid), ('account_id', '=', account.id)], limit=1)
                 if parent:
                     vals['parent_id'] = parent.id
 
@@ -599,7 +474,7 @@ class WhatsAppWebhook(http.Controller):
             reacted_to_wamid = reaction.get('message_id', '')
             vals['body'] = f'[Reaction: {emoji}]'
             vals['button_payload'] = reacted_to_wamid
-            reacted_msg = env['whatsapp.message'].sudo().search([('message_id', '=', reacted_to_wamid)], limit=1)
+            reacted_msg = env['whatsapp.message'].sudo().search([('message_id', '=', reacted_to_wamid), ('account_id', '=', account.id)], limit=1)
             if reacted_msg:
                 vals['parent_id'] = reacted_msg.id
 
@@ -694,7 +569,7 @@ class WhatsAppWebhook(http.Controller):
             revoked_wamid = revoke.get('id', '')
             vals['body'] = '[Message deleted]'
             # Mark the original message
-            orig = env['whatsapp.message'].sudo().search([('message_id', '=', revoked_wamid)], limit=1)
+            orig = env['whatsapp.message'].sudo().search([('message_id', '=', revoked_wamid), ('account_id', '=', account.id)], limit=1)
             if orig:
                 orig.sudo().write({'body': '[Message deleted]', 'status': 'failed'})
             return  # Don't save a new message record for deletions
@@ -704,7 +579,7 @@ class WhatsAppWebhook(http.Controller):
             edit_data = msg_data.get('edit', {})
             edited_wamid = edit_data.get('id', '')
             new_text = edit_data.get('text', {}).get('body', '')
-            orig = env['whatsapp.message'].sudo().search([('message_id', '=', edited_wamid)], limit=1)
+            orig = env['whatsapp.message'].sudo().search([('message_id', '=', edited_wamid), ('account_id', '=', account.id)], limit=1)
             if orig:
                 orig.sudo().write({'body': f'{new_text} (edited)', 'error_message': 'Edited by sender'})
             return  # Don't save a new record
@@ -767,10 +642,9 @@ class WhatsAppWebhook(http.Controller):
                 _logger.info(f'[COMPLIANCE] Opt-out keyword detected from {phone_number}')
                 msg_record.sudo().write({'is_opt_out': True})
                 if msg_record.partner_id:
-                    if 'whatsapp_opt_in' in msg_record.partner_id._fields:
-                        msg_record.partner_id.sudo().write({'whatsapp_opt_in': False})
                     env['whatsapp.consent.log'].sudo()._opt_out_partner(
-                        msg_record.partner_id, account, reason=f"Keyword trigger: {body.strip()}"
+                        msg_record.partner_id, account, reason=f"Keyword trigger: {body.strip()}",
+                        consent_date=msg_record.meta_received_at or msg_record.create_date,
                     )
                 if msg_record.chat_id_ref:
                     msg_record.chat_id_ref.sudo().write({
@@ -992,7 +866,19 @@ class WhatsAppWebhook(http.Controller):
         if not wamid or not new_status:
             return
 
-        msg = env['whatsapp.message'].sudo().search([('message_id', '=', wamid)], limit=1)
+        msg = env['whatsapp.message'].sudo().search([('message_id', '=', wamid), ('account_id', '=', account.id)], limit=1)
+        if not msg:
+            reference = str(status_data.get('biz_opaque_callback_data') or '')
+            if reference.startswith('wa_message_') and reference[11:].isdigit():
+                msg = env['whatsapp.message'].sudo().search([
+                    ('id', '=', int(reference[11:])), ('account_id', '=', account.id),
+                ], limit=1)
+                if not msg:
+                    raise WebhookSerializationRetry('Original outbound transaction is not visible yet.')
+                if msg.message_id and msg.message_id != wamid:
+                    raise ValueError('Conflicting Meta dispatch identity.')
+                msg.write({'message_id': wamid, 'delivery_uncertain': False})
+                env['whatsapp.send.attempt']._finish(msg, 'accepted', wamid=wamid)
         if not msg:
             _logger.debug(f'[WH-STATUS] No message found for wamid={wamid}')
             self._touch_account_webhook(env, account, status_wamid=wamid)
@@ -1022,7 +908,7 @@ class WhatsAppWebhook(http.Controller):
             or new_rank >= old_rank
         )
 
-        update_vals = {}
+        update_vals = {'delivery_uncertain': False}
         if should_update_status:
             update_vals['status'] = new_status
         elif old_status != new_status:
@@ -1389,7 +1275,11 @@ class WhatsAppWebhook(http.Controller):
     def whatsapp_media_proxy(self, media_id, **kwargs):
         """Fetch media from Meta and serve it to the browser"""
         try:
-            account = request.env['whatsapp.account'].sudo()._get_default_account()
+            message = request.env['whatsapp.message'].search([('media_url', '=', media_id)], limit=1)
+            if not message:
+                return request.not_found()
+            message.check_access('read')
+            account = message.account_id
             if not account:
                 return request.not_found()
 
@@ -1412,7 +1302,8 @@ class WhatsAppWebhook(http.Controller):
                 media_resp.content,
                 headers=[
                     ('Content-Type', media_resp.headers.get('Content-Type', 'image/jpeg')),
-                    ('Cache-Control', 'max-age=86400'),
+                    ('Cache-Control', 'private, no-store'),
+                    ('X-Content-Type-Options', 'nosniff'),
                 ]
             )
         except Exception as e:
@@ -1445,7 +1336,7 @@ class WhatsAppWebhook(http.Controller):
 
         with cr:
             expected_secret = env['ir.config_parameter'].sudo().get_param('whatsapp.sidecar.secret')
-            if not expected_secret or secret != expected_secret:
+            if not expected_secret or not secret or not hmac.compare_digest(secret, expected_secret):
                 _logger.warning('[SIDECAR-IN] Unauthorized access attempt with secret %s', _mask_secret(secret))
                 return request.make_json_response({'status': 'error', 'message': 'Unauthorized'}, status=403)
 
@@ -1481,11 +1372,14 @@ class WhatsAppWebhook(http.Controller):
                 if not ok:
                     return {'status': 'error', 'message': message, 'http_status': status}
 
-            for entry in payload.get('entry', []):
-                for change in entry.get('changes', []):
-                    field = change.get('field')
-                    value = change.get('value') or {}
-                    self._dispatch_change(env, account, field, value, json.dumps(payload))
+            if raw_body is None:
+                return {'status': 'error', 'message': 'Signed payload required', 'http_status': 403}
+            env['whatsapp.webhook.log'].sudo().create({
+                'account_id': account.id,
+                'event_type': 'waba_webhook',
+                'raw_payload': raw_body.decode('utf-8') if isinstance(raw_body, bytes) else raw_body,
+                'status': 'received',
+            })
             cr.commit()
             return {'status': 'success'}
         except Exception as exc:

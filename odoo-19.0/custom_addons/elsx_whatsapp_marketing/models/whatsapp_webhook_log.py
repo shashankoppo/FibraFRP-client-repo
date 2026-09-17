@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from datetime import timedelta
 import json
+import hmac
 import time
 
 from odoo import SUPERUSER_ID, models, fields, api, _
@@ -30,6 +31,8 @@ class WhatsAppWebhookLog(models.Model):
     ], string='Processing Status', default='received')
     error_detail = fields.Text('Error Detail')
     raw_payload = fields.Text('Raw JSON Payload')
+    attempt_count = fields.Integer('Processing Attempts', default=0, readonly=True)
+    next_attempt_at = fields.Datetime('Next Attempt', index=True, readonly=True)
     create_date = fields.Datetime('Received At', readonly=True)
 
     @api.model
@@ -56,8 +59,16 @@ class WhatsAppWebhookLog(models.Model):
                 time.sleep(delay)
             with self.env.registry.cursor() as recovery_cr:
                 recovery_env = api.Environment(recovery_cr, SUPERUSER_ID, {})
+                recovery_cr.execute(
+                    'SELECT id FROM whatsapp_webhook_log WHERE id = %s FOR UPDATE SKIP LOCKED',
+                    [log_id],
+                )
+                if not recovery_cr.fetchone():
+                    return False
                 log = recovery_env['whatsapp.webhook.log'].sudo().browse(log_id).exists()
                 if not log or log.status in ('processed', 'ignored'):
+                    return False
+                if log.attempt_count >= 12 or (log.next_attempt_at and log.next_attempt_at > fields.Datetime.now()):
                     return False
                 try:
                     processed = log._process_received_payload()
@@ -79,12 +90,18 @@ class WhatsAppWebhookLog(models.Model):
     @api.model
     def _persist_processing_error(self, log_id, exc):
         with self.env.registry.cursor() as error_cr:
+            error_cr.execute('SELECT id FROM whatsapp_webhook_log WHERE id=%s FOR UPDATE SKIP LOCKED', [log_id])
+            if not error_cr.fetchone():
+                return
             error_env = api.Environment(error_cr, SUPERUSER_ID, {})
             log = error_env['whatsapp.webhook.log'].sudo().browse(log_id).exists()
-            if log:
+            if log and log.status not in ('processed', 'ignored'):
+                attempt = log.attempt_count + 1
                 log.write({
                     'status': 'error',
                     'error_detail': (str(exc) or exc.__class__.__name__)[:2000],
+                    'attempt_count': attempt,
+                    'next_attempt_at': fields.Datetime.now() + timedelta(seconds=min(3600, 30 * 2 ** min(attempt, 7))) if attempt < 12 else False,
                 })
             error_cr.commit()
 
@@ -118,12 +135,22 @@ class WhatsAppWebhookLog(models.Model):
 
         from odoo.addons.elsx_whatsapp_marketing.controllers.whatsapp_webhook import WhatsAppWebhook
 
-        replay_log = self.with_context(whatsapp_webhook_replay=True)
+        replay_log = self.with_context(whatsapp_webhook_replay=True, whatsapp_queue_only=True)
         replay_env = replay_log.env
         replay_account = account.with_env(replay_env)
         dispatcher = WhatsAppWebhook()
         for entry in payload.get('entry', []):
             for change in entry.get('changes', []):
+                phone_id = ((change.get('value') or {}).get('metadata') or {}).get('phone_number_id')
+                if phone_id:
+                    scoped_accounts = replay_env['whatsapp.account'].sudo().search([
+                        ('phone_number_id', '=', str(phone_id)), ('active', '=', True),
+                    ], limit=2)
+                    if len(scoped_accounts) != 1:
+                        raise UserError(_('Webhook phone account is missing or ambiguous.'))
+                    replay_account = scoped_accounts
+                    if not hmac.compare_digest(replay_account.sudo().app_secret or '', account.sudo().app_secret or ''):
+                        raise UserError(_('Webhook account does not share the verified signing secret.'))
                 dispatcher._dispatch_change(
                     replay_env,
                     replay_account,
@@ -135,10 +162,16 @@ class WhatsAppWebhookLog(models.Model):
             'account_id': account.id,
             'status': 'processed',
             'error_detail': False,
+            'next_attempt_at': False,
         })
         return True
 
     def action_replay(self):
+        if not self.env.user.has_group('elsx_whatsapp_marketing.group_whatsapp_manager'):
+            raise UserError(_("Only WhatsApp managers can replay webhook events."))
+        self.check_access('write')
+        self.filtered(lambda log: log.status == 'error').write({'attempt_count': 0, 'next_attempt_at': False})
+        self.env.cr.commit()
         processed = 0
         failed = 0
         for log_id in self.ids:
@@ -170,11 +203,9 @@ class WhatsAppWebhookLog(models.Model):
         pending = self.sudo().search([
             ('event_type', '=', 'waba_webhook'),
             ('create_date', '<=', cutoff),
-            '|',
-                ('status', '=', 'received'),
-                '&',
-                    ('status', '=', 'error'),
-                    ('error_detail', 'ilike', 'serialize'),
+            ('status', 'in', ['received', 'error']),
+            ('attempt_count', '<', 12),
+            '|', ('next_attempt_at', '=', False), ('next_attempt_at', '<=', fields.Datetime.now()),
         ], order='create_date asc, id asc', limit=limit)
         processed = 0
         failed = 0
@@ -213,7 +244,7 @@ class WhatsAppWebhookLog(models.Model):
             return 0
 
         cutoff_date = fields.Datetime.now() - timedelta(days=days)
-        old_logs = self.search([('create_date', '<', cutoff_date)])
+        old_logs = self.search([('create_date', '<', cutoff_date), ('status', 'in', ['processed', 'ignored'])])
         
         deleted_count = len(old_logs)
         if deleted_count > 0:

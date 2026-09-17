@@ -28,3 +28,5 @@ from . import elsx_ai_service
 from . import whatsapp_diagnostics
 from . import res_config_settings
 from . import res_users
+from . import whatsapp_bus
+from . import whatsapp_send_attempt

@@ -1,5 +1,9 @@
 # FiberaFRP WhatsApp Marketing & CRM User Guide
 
+> Deployment and safety update: see [Client-Safe Deployment](DEPLOYMENT_SAFETY.md) for the current
+> production/new-environment commands, consent behavior and staged WhatsApp sidecar retirement.
+> Older sidecar or automatic-startup-upgrade instructions below are superseded by that runbook.
+
 ## 1. Purpose
 
 This guide explains how to use the WhatsApp Marketing system integrated with Odoo CRM. It is written for sales, support, marketing, and admin users who send WhatsApp messages, manage chats, run campaigns, create templates, and connect WhatsApp conversations with CRM leads, quotations, invoices, and customer records.

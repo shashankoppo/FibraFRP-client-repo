@@ -20,6 +20,7 @@ const META_APP_SECRET = process.env.META_APP_SECRET || process.env.APP_SECRET ||
 const SOCKET_AUTH_TOKEN = process.env.SOCKET_AUTH_TOKEN || '';
 const REDIS_URL = process.env.REDIS_URL || '';
 const QUEUE_KEY = process.env.REDIS_QUEUE_KEY || 'elsx:whatsapp:webhook:queue';
+const PROCESSING_KEY = `${QUEUE_KEY}:processing`;
 const DEAD_KEY = process.env.REDIS_DEAD_KEY || 'elsx:whatsapp:webhook:dead';
 const RECENT_EVENTS_KEY = process.env.REDIS_RECENT_EVENTS_KEY || 'elsx:whatsapp:recent-events';
 const MAX_ATTEMPTS = parseInt(process.env.MAX_FORWARD_ATTEMPTS || '12', 10);
@@ -30,8 +31,6 @@ if (IS_PRODUCTION) {
     if (!SIDECAR_SECRET) missing.push('SIDECAR_SECRET');
     if (!META_APP_SECRET) missing.push('META_APP_SECRET');
     if (!VERIFY_TOKEN) missing.push('VERIFY_TOKEN');
-    if (!CORS_ORIGIN) missing.push('CORS_ORIGIN');
-    if (!SOCKET_AUTH_TOKEN) missing.push('SOCKET_AUTH_TOKEN');
     if (missing.length) {
         throw new Error(`[SIDECAR] Refusing production startup. Missing: ${missing.join(', ')}`);
     }
@@ -109,6 +108,11 @@ async function initRedis() {
             redis.connect(),
             new Promise((_, reject) => setTimeout(() => reject(new Error('Redis connection timed out')), 4000)),
         ]);
+        // One legacy relay owns these keys. Recover claims left by its previous process.
+        const abandoned = await redis.lLen(PROCESSING_KEY);
+        for (let index = 0; index < abandoned; index += 1) {
+            await redis.rPopLPush(PROCESSING_KEY, QUEUE_KEY);
+        }
     } catch (err) {
         redisReady = false;
         console.warn('[SIDECAR] Redis connection failed, using memory queue:', err.message);
@@ -156,7 +160,7 @@ async function requeueWebhook(item) {
     const serialized = JSON.stringify(item);
     if (redisReady) {
         try {
-            await redis.lPush(QUEUE_KEY, serialized);
+            await redis.multi().lPush(QUEUE_KEY, serialized).lRem(PROCESSING_KEY, 1, item._queueRaw || '').exec();
             return;
         } catch (err) {
             redisReady = false;
@@ -170,23 +174,22 @@ async function deadLetter(item) {
     const serialized = JSON.stringify(item);
     if (redisReady) {
         try {
-            await redis.lPush(DEAD_KEY, serialized);
-            await redis.lTrim(DEAD_KEY, 0, 999);
+            await redis.multi().lPush(DEAD_KEY, serialized).lRem(PROCESSING_KEY, 1, item._queueRaw || '').exec();
             return;
         } catch (err) {
             console.warn('[SIDECAR] Redis dead-letter write failed:', err.message);
         }
     }
     memoryDead.push(item);
-    if (memoryDead.length > 1000) memoryDead.shift();
 }
 
 async function dequeueWebhook() {
     let item = null;
     if (redisReady) {
         try {
-            const raw = await redis.rPop(QUEUE_KEY);
+            const raw = await redis.rPopLPush(QUEUE_KEY, PROCESSING_KEY);
             item = raw ? JSON.parse(raw) : null;
+            if (item) Object.defineProperty(item, '_queueRaw', { value: raw });
         } catch (err) {
             redisReady = false;
             console.warn('[SIDECAR] Redis dequeue failed, falling back to memory:', err.message);
@@ -236,7 +239,11 @@ function verifyMetaSignature(req) {
         && crypto.timingSafeEqual(actualBuffer, expectedBuffer);
 }
 
+let queueProcessing = false;
 async function processQueue() {
+    if (queueProcessing) return;
+    queueProcessing = true;
+    try {
     const item = await dequeueWebhook();
     if (!item) return;
 
@@ -247,6 +254,7 @@ async function processQueue() {
 
     try {
         await forwardToErp(item);
+        if (item._queueRaw && redisReady) await redis.lRem(PROCESSING_KEY, 1, item._queueRaw);
         console.log(`[SIDECAR] Webhook forwarded to ERP item=${item.id} attempts=${item.attempts + 1}`);
     } catch (err) {
         item.attempts += 1;
@@ -259,6 +267,7 @@ async function processQueue() {
             await requeueWebhook(item);
         }
     }
+    } finally { queueProcessing = false; }
 }
 
 async function rememberEvent(event) {
@@ -281,6 +290,7 @@ async function getQueueStats() {
             return {
                 driver: 'redis',
                 queued: await redis.lLen(QUEUE_KEY),
+                pending: await redis.lLen(PROCESSING_KEY),
                 dead: await redis.lLen(DEAD_KEY),
             };
         } catch (err) {
@@ -335,13 +345,17 @@ app.post('/webhook', async (req, res) => {
         return res.status(403).send('Invalid signature');
     }
 
-    res.status(200).send('EVENT_RECEIVED');
-
-    io.emit('sync_required', { reason: 'webhook_received' });
-    await enqueueWebhook(body, 'meta', {
-        rawBody: req.rawBody,
-        metaSignature: req.headers['x-hub-signature-256'] || null,
-    });
+    try {
+        // Odoo acknowledges only after committing its durable webhook record.
+        await forwardToErp(makeQueueItem(body, 'meta', {
+            rawBody: req.rawBody,
+            metaSignature: req.headers['x-hub-signature-256'] || null,
+        }));
+        res.status(200).send('EVENT_RECEIVED');
+    } catch (err) {
+        console.warn('[SIDECAR] ERP persistence unavailable:', err.code || err.name);
+        res.status(503).send('Retry later');
+    }
 });
 
 app.post('/relay/new-message', requireSidecarSecret, async (req, res) => {
@@ -354,32 +368,32 @@ app.post('/relay/new-message', requireSidecarSecret, async (req, res) => {
     res.status(200).json({ status: 'sent' });
 });
 
-io.use((socket, next) => {
-    const token = socket.handshake.auth?.token || socket.handshake.query?.socket_token;
-    if (SOCKET_AUTH_TOKEN && timingSafeSecretEquals(token, SOCKET_AUTH_TOKEN)) {
-        return next();
-    }
-    if (!SOCKET_AUTH_TOKEN && !IS_PRODUCTION) {
-        return next();
-    }
-    return next(new Error('Unauthorized'));
+io.use((socket, next) => next(new Error('Socket mode retired. Refresh Odoo to use ERP Bus.')));
+
+app.get('/migration/status', requireSidecarSecret, async (req, res) => {
+    res.json({ queue: await getQueueStats(), processing: queueProcessing, socket_mode: 'retired' });
 });
 
-io.on('connection', (socket) => {
-    console.log(`[SOCKET] User connected: ${socket.id}`);
-    socket.emit('sync_required', { reason: 'connected' });
-
-    socket.on('join_chat', (chatId) => {
-        socket.join(`chat_${chatId}`);
-    });
-
-    socket.on('presence', (data) => {
-        io.emit('agent_presence', { socket_id: socket.id, ...data, ts: Date.now() });
-    });
-
-    socket.on('disconnect', () => {
-        console.log(`[SOCKET] User disconnected: ${socket.id}`);
-    });
+app.post('/migration/replay-failed', requireSidecarSecret, async (req, res) => {
+    const limit = Number(req.body.limit || 25);
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+        return res.status(400).json({ error: 'limit must be between 1 and 100' });
+    }
+    let moved = 0;
+    try {
+        if (REDIS_URL && !redisReady) return res.status(503).json({ error: 'Redis unavailable' });
+        if (redisReady) {
+            while (moved < limit && await redis.rPopLPush(DEAD_KEY, QUEUE_KEY)) moved += 1;
+        } else {
+            while (moved < limit && memoryDead.length) {
+                memoryQueue.push(memoryDead.shift());
+                moved += 1;
+            }
+        }
+        return res.json({ replayed: moved });
+    } catch (err) {
+        return res.status(503).json({ error: 'Replay interrupted; remaining events retained' });
+    }
 });
 
 initRedis().finally(() => {

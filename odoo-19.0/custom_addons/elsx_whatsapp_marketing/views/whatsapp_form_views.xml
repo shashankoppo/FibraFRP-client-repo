@@ -43,6 +43,7 @@
                             <field name="submission_count" readonly="1"/>
                             <field name="auto_create_lead"/>
                             <field name="require_consent"/>
+                            <field name="consent_type"/>
                         </group>
                     </group>
                     <group>

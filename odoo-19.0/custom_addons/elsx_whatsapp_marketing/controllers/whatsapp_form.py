@@ -3,32 +3,81 @@ import base64
 import json
 import time
 import hashlib
+import ipaddress
+import os
+import io
+from PIL import Image
+from psycopg2.errors import SerializationFailure
 from html import escape
 
 from odoo import fields, http
 from odoo.http import request
+from odoo.tools.mimetypes import guess_mimetype
+from odoo.tools.pdf import PdfReader
 
 
 class WhatsAppPublicFormController(http.Controller):
 
+    def _valid_file_content(self, content, mimetype):
+        try:
+            if mimetype in {'image/jpeg', 'image/png', 'image/webp'}:
+                with Image.open(io.BytesIO(content)) as picture:
+                    if picture.width * picture.height > 16000000:
+                        return False
+                    picture.verify()
+                with Image.open(io.BytesIO(content)) as picture:
+                    picture.load()
+                return True
+            if mimetype == 'application/pdf':
+                reader = PdfReader(io.BytesIO(content), strict=True)
+                if reader.is_encrypted or not 0 < len(reader.pages) <= 100:
+                    return False
+                root = reader.trailer['/Root']
+                names = root.get('/Names', {})
+                if hasattr(names, 'get_object'):
+                    names = names.get_object()
+                return not any(key in root for key in ('/OpenAction', '/AA')) and not any(
+                    key in names for key in ('/JavaScript', '/EmbeddedFiles'))
+        except Exception:
+            return False
+        return False
+
     def _request_ip(self):
-        forwarded = request.httprequest.headers.get('X-Forwarded-For', '')
-        if forwarded:
-            return forwarded.split(',')[0].strip()
-        return request.httprequest.remote_addr or ''
+        original = request.httprequest.environ.get('werkzeug.proxy_fix.orig', {})
+        peer = original.get('REMOTE_ADDR') or request.httprequest.remote_addr or ''
+        try:
+            address = ipaddress.ip_address(peer)
+            trusted = [ipaddress.ip_network(value.strip()) for value in
+                       os.environ.get('ODOO_TRUSTED_PROXY_CIDRS', '').split(',') if value.strip()]
+            if any(address in network for network in trusted):
+                return request.httprequest.remote_addr or peer
+        except ValueError:
+            pass
+        return peer
 
     def _rate_limit_ip(self, icp, token, ip_address):
         rate_seconds = int(icp.get_param('whatsapp.form.rate_limit.ip.seconds', default='30') or 0)
         if not rate_seconds or not ip_address:
             return False
         digest = hashlib.sha256(('%s:%s' % (token, ip_address)).encode('utf-8')).hexdigest()
-        param_key = 'whatsapp.form.rate_limit.ip.%s' % digest
+        param_key = 'whatsapp.form.rate_limit.bucket.%s' % digest
         now = time.time()
-        previous = float(icp.get_param(param_key, default='0') or 0)
-        if previous and now - previous < rate_seconds:
+        # A separate committed transaction also throttles rejected submissions.
+        try:
+            with request.env.registry.cursor() as cr:
+                cr.execute('''
+                    INSERT INTO ir_config_parameter (key, value, create_date, write_date)
+                    VALUES (%s, %s, NOW(), NOW())
+                    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, write_date = NOW()
+                    WHERE ir_config_parameter.value::double precision <= %s
+                    RETURNING id
+                ''', [param_key, str(now), now - rate_seconds])
+                accepted = bool(cr.fetchone())
+                cr.execute("DELETE FROM ir_config_parameter WHERE key LIKE 'whatsapp.form.rate_limit.bucket.%%' AND write_date < NOW() - INTERVAL '1 day'")
+                cr.commit()
+        except SerializationFailure:
             return True
-        icp.set_param(param_key, str(now))
-        return False
+        return not accepted
 
     def _allowed_mimetypes(self, icp):
         raw = icp.get_param(
@@ -88,6 +137,7 @@ class WhatsAppPublicFormController(http.Controller):
         if errors:
             parts.append('<div class="error">%s</div>' % '<br/>'.join(escape(error) for error in errors))
         parts.append('<form method="post" enctype="multipart/form-data">')
+        parts.append('<input type="hidden" name="csrf_token" value="%s"/>' % escape(request.csrf_token()))
         parts.append('<input type="text" name="website_url" tabindex="-1" autocomplete="off" style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden;"/>')
         for key, value in hidden.items():
             if value not in (None, False, ''):
@@ -151,7 +201,7 @@ class WhatsAppPublicFormController(http.Controller):
         )
         return self._render_layout(form.title or form.name, body)
 
-    @http.route('/whatsapp/form/<string:token>', type='http', auth='public', methods=['POST'], csrf=False)
+    @http.route('/whatsapp/form/<string:token>', type='http', auth='public', methods=['POST'], csrf=True)
     def whatsapp_form_post(self, token, **post):
         form = request.env['whatsapp.form'].sudo().search([('public_token', '=', token), ('active', '=', True)], limit=1)
         if not form:
@@ -183,6 +233,10 @@ class WhatsAppPublicFormController(http.Controller):
         allowed_mimetypes = self._allowed_mimetypes(ICP)
         total_upload_bytes = 0
         total_upload_count = 0
+        allowed_file_fields = {field.field_key for field in form.field_ids if field.field_type == 'file'}
+        files = list(request.httprequest.files.items(multi=True))
+        if len(files) > max_files or any(key not in allowed_file_fields for key, _ in files):
+            return self._render_layout('Invalid uploads', '<h1>Invalid uploads</h1>', status=400)
         consent_given = False
         for field in form.field_ids.sorted('sequence'):
             value = post.get(field.field_key)
@@ -194,14 +248,18 @@ class WhatsAppPublicFormController(http.Controller):
                 names = []
                 for uploaded in files:
                     total_upload_count += 1
-                    if max_files and total_upload_count > max_files:
+                    if total_upload_count > max_files:
                         errors.append('Too many files uploaded. Maximum allowed is %s.' % max_files)
                         continue
                     mimetype = (uploaded.mimetype or '').lower()
                     if allowed_mimetypes and mimetype not in allowed_mimetypes:
                         errors.append('%s has unsupported file type %s.' % (uploaded.filename, mimetype or 'unknown'))
                         continue
-                    content = uploaded.read()
+                    content = uploaded.read(max(0, min(max_upload_bytes, max_total_upload_bytes - total_upload_bytes)) + 1)
+                    detected = guess_mimetype(content, default='application/octet-stream')
+                    if detected not in allowed_mimetypes or detected != mimetype or not self._valid_file_content(content, mimetype):
+                        errors.append('%s does not contain an allowed file type.' % uploaded.filename)
+                        continue
                     total_upload_bytes += len(content)
                     if len(content) > max_upload_bytes:
                         errors.append('%s is larger than the %s MB upload limit.' % (uploaded.filename, max_upload_mb))
@@ -214,7 +272,7 @@ class WhatsAppPublicFormController(http.Controller):
                 values[field.field_key] = names
                 continue
             if field.field_type in ('checkbox', 'consent'):
-                value = bool(value)
+                value = value is True or str(value).lower() in ('on', 'true', '1', 'yes')
                 if field.field_type == 'consent' and value:
                     consent_given = True
             elif isinstance(value, str):
@@ -249,6 +307,8 @@ class WhatsAppPublicFormController(http.Controller):
         if post.get('campaign_id'):
             try:
                 campaign = request.env['whatsapp.campaign'].sudo().browse(int(post.get('campaign_id'))).exists()
+                if campaign and campaign.account_id != form.account_id:
+                    campaign = request.env['whatsapp.campaign']
             except (TypeError, ValueError):
                 campaign = request.env['whatsapp.campaign'].sudo().browse()
 
@@ -266,12 +326,10 @@ class WhatsAppPublicFormController(http.Controller):
             'consent_date': fields.Datetime.now() if consent_given else False,
         })
         if consent_given and submission.partner_id and form.account_id:
-            if 'whatsapp_opt_in' in submission.partner_id._fields:
-                submission.partner_id.sudo().write({'whatsapp_opt_in': True})
             request.env['whatsapp.consent.log'].sudo().create({
                 'partner_id': submission.partner_id.id,
                 'account_id': form.account_id.id,
-                'consent_type': 'all',
+                'consent_type': form.consent_type,
                 'status': 'opted_in',
                 'source': 'website',
                 'ip_address': ip_address,

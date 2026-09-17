@@ -2,6 +2,7 @@
 from odoo import models, fields, api
 import logging
 import json
+from ..privacy import redact_json, redact_url
 
 _logger = logging.getLogger(__name__)
 
@@ -37,6 +38,19 @@ class WhatsAppApiLog(models.Model):
     template_name = fields.Char('Template Used')
     
     success = fields.Boolean('API Accepted', compute='_compute_success', store=True)
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        sanitized = []
+        for values in vals_list:
+            values = dict(values)
+            for key in ('request_body', 'response_body'):
+                if values.get(key):
+                    values[key] = redact_json(values[key], content=True)
+            if values.get('endpoint'):
+                values['endpoint'] = redact_url(values['endpoint'])
+            sanitized.append(values)
+        return super().create(sanitized)
 
     @api.depends('status_code')
     def _compute_success(self):

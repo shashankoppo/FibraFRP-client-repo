@@ -591,6 +591,7 @@ class WhatsAppCampaign(models.Model):
         ('draft', 'Draft'),
         ('scheduled', 'Scheduled'),
         ('running', 'Running'),
+        ('paused', 'Paused'),
         ('completed', 'Completed'),
         ('cancelled', 'Cancelled'),
         ('archived', 'Archived'),
@@ -1473,11 +1474,9 @@ class WhatsAppCampaign(models.Model):
         # Enforce compliance: Exclude partners who have a linked opted-out whatsapp.contact or have whatsapp_opt_in = False
         original_partners = partners
         exclusion_notes = []
-        opted_out = self.env['whatsapp.contact'].sudo().search([
-            ('partner_id', 'in', partners.ids),
-            ('opt_in', '=', False)
-        ]).mapped('partner_id')
-        partners = partners.filtered(lambda p: p.whatsapp_opt_in)
+        opted_out = partners.filtered(lambda partner: self.env['whatsapp.consent.log']._effective_status(
+            partner, self.account_id, 'marketing',
+        ) != 'opted_in')
         if opted_out:
             partners = partners - opted_out
             exclusion_notes.append(f'Opted out/DND: {len(opted_out)}')
@@ -2394,6 +2393,20 @@ class WhatsAppCampaign(models.Model):
             'participants': stopped_participants,
             'schedules': stopped_schedules,
         }
+
+    def action_pause(self):
+        self.check_access('write')
+        if self.filtered(lambda campaign: campaign.state != 'running'):
+            raise UserError(_('Only running campaigns can be paused.'))
+        self.write({'state': 'paused'})
+        return True
+
+    def action_resume(self):
+        self.check_access('write')
+        if self.filtered(lambda campaign: campaign.state != 'paused'):
+            raise UserError(_('Only paused campaigns can be resumed.'))
+        self.write({'state': 'running', 'last_batch_at': False})
+        return True
 
     def action_cancel(self):
         """Cancel future work while preserving delivered message history."""

@@ -54,6 +54,11 @@ class WhatsAppForm(models.Model):
         default=False,
         help='Warn admins to include a required consent checkbox before using the form in campaigns.',
     )
+    consent_type = fields.Selection([
+        ('transactional', 'Enquiry / Service'),
+        ('marketing', 'Marketing'),
+        ('all', 'All Communications'),
+    ], required=True, default='transactional', string='Consent Scope')
 
     _public_token_unique = models.Constraint(
         'unique(public_token)',

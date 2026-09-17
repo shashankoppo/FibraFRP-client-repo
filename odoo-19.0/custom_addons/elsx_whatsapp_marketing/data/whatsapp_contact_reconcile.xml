@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <data noupdate="0">
+    <data noupdate="1">
         <function model="whatsapp.contact" name="_reconcile_all_partner_links"/>
         <function model="whatsapp.campaign" name="_repair_delivery_crons"/>
         <function model="whatsapp.message" name="_repair_campaign_message_provenance"/>

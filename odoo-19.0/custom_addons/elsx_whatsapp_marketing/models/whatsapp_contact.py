@@ -67,10 +67,13 @@ class WhatsAppContact(models.Model):
                 partner = self.env['whatsapp.message']._find_partner_by_phone(vals['phone_number'])
                 if partner:
                     vals['partner_id'] = partner.id
+            if 'opt_in' not in vals and vals.get('partner_id'):
+                partner = self.env['res.partner'].sudo().browse(vals['partner_id'])
+                vals['opt_in'] = partner.whatsapp_opt_in
 
         records = super(WhatsAppContact, self).create(vals_list)
-        for record in records:
-            record._sync_to_partner()
+        for record, vals in zip(records, vals_list):
+            record._sync_to_partner(sync_consent='opt_in' in vals)
         return records
 
     def write(self, vals):
@@ -81,13 +84,15 @@ class WhatsAppContact(models.Model):
         fields_to_check = ['opt_in', 'partner_id', 'phone_number', 'name', 'email', 'tag_ids']
         if any(f in vals for f in fields_to_check):
             for record in self:
-                record._sync_to_partner()
+                record._sync_to_partner(sync_consent='opt_in' in vals)
         return res
 
-    def _sync_to_partner(self):
+    def _sync_to_partner(self, sync_consent=False):
         self.ensure_one()
         if self.env.context.get('skip_partner_sync'):
             return
+        scoped_consent = self.env.context.get('whatsapp_scoped_consent')
+        sync_consent = sync_consent and not scoped_consent
 
         if not self.partner_id:
             partner = False
@@ -101,7 +106,7 @@ class WhatsAppContact(models.Model):
                 partner_values = {
                     'name': self.name or self.phone_number or self.email,
                     'email': self.email or False,
-                    'whatsapp_opt_in': self.opt_in,
+                    'whatsapp_opt_in': self.opt_in if not scoped_consent else False,
                 }
                 if self.phone_number:
                     partner_values['phone'] = self.phone_number
@@ -117,7 +122,9 @@ class WhatsAppContact(models.Model):
 
         partner = self.partner_id.sudo()
         update_vals = {}
-        if partner.whatsapp_opt_in != self.opt_in:
+        if not sync_consent and not scoped_consent and self.opt_in != partner.whatsapp_opt_in:
+            self.with_context(skip_partner_sync=True).write({'opt_in': partner.whatsapp_opt_in})
+        if sync_consent and partner.whatsapp_opt_in != self.opt_in:
             update_vals['whatsapp_opt_in'] = self.opt_in
         placeholder_names = {
             self.phone_number,

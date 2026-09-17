@@ -28,22 +28,23 @@ class WhatsAppDiagnosticSnapshot(models.Model):
     def _count_if_model(self, model_name, domain=None):
         if model_name not in self.env.registry.models:
             return 0
-        return self.env[model_name].sudo().search_count(domain or [])
+        return self.env[model_name].search_count(domain or [])
 
     @api.model
     def _collect_snapshot(self):
         ICP = self.env['ir.config_parameter'].sudo()
         now = fields.Datetime.now()
-        Message = self.env['whatsapp.message'].sudo()
-        Campaign = self.env['whatsapp.campaign'].sudo()
-        Account = self.env['whatsapp.account'].sudo()
-        Contact = self.env['whatsapp.contact'].sudo()
-        Template = self.env['whatsapp.template'].sudo()
-        Webhook = self.env['whatsapp.webhook.log'].sudo()
+        Message = self.env['whatsapp.message']
+        Campaign = self.env['whatsapp.campaign']
+        Account = self.env['whatsapp.account']
+        Contact = self.env['whatsapp.contact']
+        Template = self.env['whatsapp.template']
+        Webhook = self.env['whatsapp.webhook.log']
 
         cron_checks = []
         for xmlid, model_name, code, _interval, _interval_type in Campaign._delivery_cron_specs():
             cron = self.env.ref(xmlid, raise_if_not_found=False)
+            cron = cron.sudo() if cron else cron
             actual_model = cron.model_id.model if cron and cron.model_id else False
             cron_checks.append({
                 'xmlid': xmlid,
@@ -51,6 +52,8 @@ class WhatsAppDiagnosticSnapshot(models.Model):
                 'code': code,
                 'active': bool(cron and cron.active),
                 'healthy': bool(cron and cron.active and actual_model == model_name and cron.code == code),
+                'last_run': fields.Datetime.to_string(cron.lastcall) if cron and cron.lastcall else False,
+                'next_run': fields.Datetime.to_string(cron.nextcall) if cron else False,
             })
 
         approved_templates = Template.search([('status', '=', 'approved'), ('active', '=', True)])
@@ -62,7 +65,7 @@ class WhatsAppDiagnosticSnapshot(models.Model):
         data = {
             'generated_at': fields.Datetime.to_string(now),
             'settings': {
-                'realtime_mode': ICP.get_param('whatsapp.realtime.mode', default='bus'),
+                'realtime_mode': 'bus',
                 'history_initial_limit': ICP.get_param('whatsapp.history.initial.limit', default='50'),
                 'ai_enabled': ICP.get_param('elsx_ai.enabled', default='False'),
                 'ai_auto_write': ICP.get_param('elsx_ai.auto_write', default='False'),
@@ -173,7 +176,7 @@ class WhatsAppDiagnosticSnapshot(models.Model):
         queues = data.get('queues', {})
         freshness = data.get('freshness', {})
         cards = [
-            card('Realtime', settings.get('realtime_mode'), 'socket is optional; bus is default'),
+            card('Realtime', settings.get('realtime_mode')),
             card('History Limit', settings.get('history_initial_limit'), 'initial messages rendered'),
             card('Messages', counts.get('messages')),
             card('Contacts Linked', f"{counts.get('linked_contacts', 0)} / {counts.get('contacts', 0)}"),
@@ -181,6 +184,10 @@ class WhatsAppDiagnosticSnapshot(models.Model):
             card('Workers Healthy', f"{data.get('workers', {}).get('healthy', 0)} / {data.get('workers', {}).get('required', 0)}"),
             card('Failed Messages', queues.get('failed_messages')),
             card('Queued Campaign', queues.get('queued_campaign_messages')),
+            card('Queued Direct', queues.get('queued_direct_messages')),
+            card('Oldest Pending (seconds)', queues.get('oldest_queued_age_seconds')),
+            card('Dispatch Review', queues.get('uncertain_dispatches')),
+            card('Failed Webhook Review', queues.get('webhooks_needing_review')),
             card('Retryable Failed', queues.get('failed_retryable_messages')),
             card('Pending Webhooks', queues.get('pending_webhooks')),
         ]
@@ -236,8 +243,17 @@ class WhatsAppDiagnosticSnapshot(models.Model):
 
     @api.model
     def action_capture_now(self):
+        self.check_access('create')
         start = time.monotonic()
         data = self._collect_snapshot()
+        messages = self.env['whatsapp.message']
+        oldest = messages.search([('status', '=', 'queued')], order='create_date, id', limit=1)
+        data['queues'].update({
+            'queued_direct_messages': messages.search_count([('campaign_id', '=', False), ('status', '=', 'queued')]),
+            'oldest_queued_age_seconds': int((fields.Datetime.now() - oldest.create_date).total_seconds()) if oldest else 0,
+            'uncertain_dispatches': self.env['whatsapp.send.attempt'].search_count([('state', 'in', ['pending', 'uncertain'])]),
+            'webhooks_needing_review': self.env['whatsapp.webhook.log'].search_count([('status', '=', 'error'), ('attempt_count', '>=', 12)]),
+        })
         severity = self._severity_for_snapshot(data)
         snapshot = self.create({
             'name': 'WhatsApp Stabilization Snapshot %s' % data['generated_at'],

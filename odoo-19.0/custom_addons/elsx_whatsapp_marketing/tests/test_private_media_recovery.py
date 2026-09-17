@@ -273,7 +273,7 @@ class TestPrivateMediaRecovery(TransactionCase):
 
 class TestWhatsAppContactImport(TransactionCase):
     def test_email_and_new_tag_import_together(self):
-        result = self.env['whatsapp.contact'].load(
+        result = self.env['whatsapp.contact'].with_context(name_create_enabled_fields={'tag_ids': True}).load(
             ['name', 'phone_number', 'email', 'tag_ids'],
             [[
                 'Rohit Karday',

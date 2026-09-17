@@ -153,8 +153,8 @@ class WhatsAppChat(models.Model):
         now = fields.Datetime.now()
         for record in self:
             if record.last_inbound_date:
-                diff = now - record.last_inbound_date
-                record.session_open = diff.total_seconds() < 86400
+                diff = now - record.last_inbound_date.replace(microsecond=0)
+                record.session_open = 0 <= diff.total_seconds() < 86400
             else:
                 record.session_open = False
 
@@ -359,13 +359,12 @@ class WhatsAppChat(models.Model):
                         _logger.warning(f"[WABA] Failed to send read receipt to Meta: {e}")
         return True
 
-    @api.depends('message_ids', 'message_ids.create_date', 'message_ids.direction')
+    @api.depends('message_ids', 'message_ids.create_date', 'message_ids.meta_received_at', 'message_ids.direction')
     def _compute_last_inbound(self):
         for record in self:
-            last = record.message_ids.filtered(
-                lambda m: m.direction == 'inbound'
-            ).sorted(key=self._message_order_key, reverse=True)[:1]
-            record.last_inbound_date = last.create_date if last else False
+            dates = [message.meta_received_at or message.create_date
+                     for message in record.message_ids if message.direction == 'inbound']
+            record.last_inbound_date = max(filter(None, dates), default=False)
 
     def _compute_partner_profile_data(self):
         for record in self:
@@ -1213,7 +1212,8 @@ class WhatsAppChat(models.Model):
     @api.model
     def get_quick_reply_suggestions(self, chat_id=False, query=''):
         """Return canned replies for the composer slash palette."""
-        chat = self.sudo().browse(int(chat_id)) if chat_id else self.browse()
+        chat = self.browse(int(chat_id)).exists() if chat_id else self.browse()
+        chat.check_access('read')
         account = chat.account_id if chat and chat.exists() else False
         domain = [('active', '=', True)]
         if account:
@@ -1230,7 +1230,7 @@ class WhatsAppChat(models.Model):
                 ('message', 'ilike', search_text),
             ]
 
-        replies = self.env['whatsapp.quick.reply'].sudo().search(domain, limit=8)
+        replies = self.env['whatsapp.quick.reply'].search(domain, limit=8)
         result = []
         for reply in replies:
             message = reply.message or ''
@@ -1248,19 +1248,12 @@ class WhatsAppChat(models.Model):
 
     @api.model
     def get_sidecar_url(self):
-        """Retrieve the sidecar url securely for standard users without AccessError on ir.config_parameter"""
-        params = self.env['ir.config_parameter'].sudo()
-        if params.get_param('whatsapp.realtime.mode', default='bus') != 'socket':
-            return ''
-        return params.get_param('whatsapp.sidecar.url') or ''
+        """Legacy RPC retained for cached clients; realtime now uses ERP Bus."""
+        return ''
 
     @api.model
     def get_sidecar_socket_token(self):
-        """Return the optional browser-facing Socket.IO token for realtime mode."""
-        params = self.env['ir.config_parameter'].sudo()
-        if params.get_param('whatsapp.realtime.mode', default='bus') != 'socket':
-            return ''
-        return params.get_param('whatsapp.sidecar.socket_token') or ''
+        return ''
 
     def action_open_send_wizard(self):
         self.ensure_one()
@@ -1387,7 +1380,11 @@ class WhatsAppChat(models.Model):
                 for member in team_members
             }
             if not agents:
-                agents = self.env['res.users'].sudo().search([('share', '=', False), ('active', '=', True)])
+                agents = self.env['res.users'].sudo().search([
+                    ('share', '=', False), ('active', '=', True),
+                    ('company_ids', 'in', self.account_id.company_id.ids),
+                    ('all_group_ids', 'in', self.env.ref('elsx_whatsapp_marketing.group_whatsapp_manager').ids),
+                ])
                 max_by_user = {user.id: 5 for user in agents}
             online_ids = [p.user_id.id for p in self.env['mail.presence'].sudo().search([('user_id', 'in', agents.ids), ('status', '=', 'online')])]
             target_pool = agents.filtered(lambda a: a.id in online_ids) or agents
@@ -1464,7 +1461,8 @@ class WhatsAppChat(models.Model):
         for record in self:
             html_parts = []
             last_date = None
-            Message = self.env['whatsapp.message'].sudo()
+            record.check_access('read')
+            Message = self.env['whatsapp.message']
             default_limit = int(self.env['ir.config_parameter'].sudo().get_param('whatsapp.history.initial.limit', default=50) or 50)
             limit = int(self.env.context.get('wa_history_limit', default_limit) or default_limit)
             domain = [('chat_id_ref', '=', record.id)]

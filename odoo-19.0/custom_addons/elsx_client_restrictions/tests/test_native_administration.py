@@ -27,7 +27,7 @@ class TestNativeAdministration(TransactionCase):
         self.assertEqual(settings.res_model, "res.config.settings")
         self.assertEqual(apps.res_model, "ir.module.module")
         self.assertEqual(apps_menu.action, apps)
-        self.assertFalse(
+        self.assertTrue(
             hasattr(self.env["ir.module.module"], "_elsx_require_apps_unlocked")
         )
 

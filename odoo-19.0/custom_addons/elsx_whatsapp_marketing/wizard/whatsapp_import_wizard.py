@@ -263,6 +263,7 @@ class WhatsAppImportWizard(models.TransientModel):
         return tags
 
     def _apply_row(self, row):
+        self = self.with_context(whatsapp_scoped_consent=True)
         phone = self._normalized_phone(row.get('phone'))
         if not phone:
             raise ValueError(_('Phone number is empty or invalid.'))
@@ -303,7 +304,10 @@ class WhatsAppImportWizard(models.TransientModel):
             'last_import_date': fields.Datetime.now(),
         }
         if is_new_contact:
-            contact_candidates['opt_in'] = self.default_opt_in if opt_in is None else opt_in
+            contact_candidates['opt_in'] = (
+                opt_in if opt_in is not None else
+                partner.whatsapp_opt_in if existed else self.default_opt_in
+            )
             contact = self.env['whatsapp.contact'].sudo().create({
                 key: value for key, value in contact_candidates.items() if value is not None
             })
@@ -316,8 +320,6 @@ class WhatsAppImportWizard(models.TransientModel):
                     contact_values[field_name] = value
             if opt_in is not None:
                 contact_values['opt_in'] = opt_in
-            elif not existed:
-                contact_values['opt_in'] = self.default_opt_in
             if contact_values:
                 contact.write(contact_values)
 
@@ -338,7 +340,7 @@ class WhatsAppImportWizard(models.TransientModel):
             contact.write({'custom_attributes': json.dumps(current_attributes, ensure_ascii=True, sort_keys=True)})
 
         effective_opt_in = contact.opt_in
-        if opt_in is not None or not existed:
+        if opt_in is not None or (not existed and self.default_opt_in):
             now = fields.Datetime.now()
             contact.write({
                 'opt_in_date': now if effective_opt_in and not contact.opt_in_date else contact.opt_in_date,

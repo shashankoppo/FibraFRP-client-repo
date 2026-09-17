@@ -1,11 +1,14 @@
 # Deployment
 
-Ubuntu and Alpine container startup upgrades this compatibility addon through
-the encrypted-backup release gate.
+Ubuntu and Alpine use `bash deploy-prod.sh` from `odoo-19.0` to upgrade installed
+addons through the encrypted-backup release gate. Ordinary container startup
+does not perform schema upgrades. Fresh databases use `bash deploy-new.sh` with
+this addon explicitly included in `NEW_INSTALL_MODULES`.
 
-After deployment, verify that Settings, Users, Companies, and Apps open their
-native Odoo 19 Community actions, Administrator can manage user permissions,
-and Safe Module Change is absent.
+After deployment, verify that Settings, Users and Companies open their native
+actions, Administrator can manage user permissions, and Apps requires its
+separate password. Test wrong password, unlock, relock, expiry and direct locked
+module-management RPCs. Safe Module Change remains absent.
 
 Use `?debug=1` or Odoo's Activate Developer Mode command to expose native
 Groups, Access Rights, and Record Rules technical buttons.

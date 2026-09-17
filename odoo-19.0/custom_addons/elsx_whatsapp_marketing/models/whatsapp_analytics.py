@@ -142,8 +142,8 @@ class WhatsAppAnalytics(models.Model):
         return now - timedelta(days=7)
 
     def _dashboard_where(self, start_date=False, account_id=False, extra=None):
-        clauses = list(extra or [])
-        params = []
+        clauses = list(extra or []) + ['account_id = ANY(%s)']
+        params = [self.env['whatsapp.account'].search([]).ids]
         if start_date:
             clauses.append("create_date >= %s")
             params.append(start_date)
@@ -196,7 +196,7 @@ class WhatsAppAnalytics(models.Model):
         }
 
     def _dashboard_chat_stats(self, start_date=False, account_id=False):
-        Chat = self.env['whatsapp.chat'].sudo()
+        Chat = self.env['whatsapp.chat']
         chat_domain = []
         if account_id:
             chat_domain.append(('account_id', '=', account_id))
@@ -294,7 +294,7 @@ class WhatsAppAnalytics(models.Model):
             campaign_domain.append(('create_date', '>=', start_date))
         if account_id:
             campaign_domain.append(('account_id', '=', account_id))
-        campaigns = self.env['whatsapp.campaign'].sudo().search(campaign_domain, order='create_date desc', limit=5)
+        campaigns = self.env['whatsapp.campaign'].search(campaign_domain, order='create_date desc', limit=5)
         recent_campaigns = [{
             'id': c.id,
             'name': c.name,
@@ -306,7 +306,7 @@ class WhatsAppAnalytics(models.Model):
             'ctr_rate': round((len(c.message_ids.filtered(lambda msg: msg.direction == 'inbound' and (msg.button_text or msg.button_payload or msg.list_item_id))) / c.sent_count * 100.0) if c.sent_count else 0.0, 1),
         } for c in campaigns]
 
-        chats = self.env['whatsapp.chat'].sudo().search([('account_id', '=', account_id)] if account_id else [])
+        chats = self.env['whatsapp.chat'].search([('account_id', '=', account_id)] if account_id else [])
         agent_stats = []
         for agent in chats.mapped('assigned_user_id'):
             if not agent:
@@ -380,7 +380,7 @@ class WhatsAppAnalytics(models.Model):
         return {row[0]: row[1] for row in self.env.cr.fetchall()}
 
     def _dashboard_account_health(self, account_id=False):
-        accounts = self.env['whatsapp.account'].sudo().search([('active', '=', True)], order='id')
+        accounts = self.env['whatsapp.account'].search([('active', '=', True)], order='id')
         selected_accounts = accounts.filtered(lambda a: a.id == account_id) if account_id else accounts
         live_usage = self._dashboard_today_usage_by_account(accounts.ids)
         cards = []
@@ -440,11 +440,11 @@ class WhatsAppAnalytics(models.Model):
 
     def _dashboard_conversion_sections(self, start_date=False, account_id=False):
         """Live lightweight counters for features outside basic message delivery."""
-        Submission = self.env['whatsapp.form.submission'].sudo()
-        Campaign = self.env['whatsapp.campaign'].sudo()
-        Rule = self.env['whatsapp.campaign.reply.rule'].sudo()
-        Chat = self.env['whatsapp.chat'].sudo()
-        Flow = self.env['whatsapp.bot.flow'].sudo()
+        Submission = self.env['whatsapp.form.submission']
+        Campaign = self.env['whatsapp.campaign']
+        Rule = self.env['whatsapp.campaign.reply.rule']
+        Chat = self.env['whatsapp.chat']
+        Flow = self.env['whatsapp.bot.flow']
 
         submission_domain = []
         campaign_domain = []
@@ -464,8 +464,8 @@ class WhatsAppAnalytics(models.Model):
         form_new = Submission.search_count(submission_domain + [('state', '=', 'new')])
         form_leads = Submission.search_count(submission_domain + [('state', '=', 'lead_created')])
 
-        form_where = []
-        form_params = []
+        form_where = ['s.account_id = ANY(%s)']
+        form_params = [self.env['whatsapp.account'].search([]).ids]
         if start_date:
             form_where.append("s.create_date >= %s")
             form_params.append(start_date)
@@ -502,8 +502,8 @@ class WhatsAppAnalytics(models.Model):
         } for rule in rules.sorted(lambda r: r.handled_count, reverse=True)[:5]]
 
         source_chat_count = Chat.search_count(chat_domain + [('source_campaign_id', '!=', False)])
-        source_where = ["ch.source_campaign_id IS NOT NULL"]
-        source_params = []
+        source_where = ["ch.source_campaign_id IS NOT NULL", 'ch.account_id = ANY(%s)']
+        source_params = [self.env['whatsapp.account'].search([]).ids]
         if start_date:
             source_where.append("ch.create_date >= %s")
             source_params.append(start_date)
@@ -525,7 +525,7 @@ class WhatsAppAnalytics(models.Model):
             'chats': row[2] or 0,
         } for row in self.env.cr.fetchall()]
 
-        has_ai_jobs = bool(self.env.registry.get('elsx.ai.job'))
+        has_ai_jobs = bool(self.env.registry.get('elsx.ai.job')) and self.env.user.has_group('base.group_system')
         ai_jobs = self.env['elsx.ai.job'].sudo() if has_ai_jobs else False
         ai_domain = [('create_date', '>=', start_date)] if start_date and has_ai_jobs else []
         ai_total = ai_jobs.search_count(ai_domain) if has_ai_jobs else 0
@@ -541,7 +541,7 @@ class WhatsAppAnalytics(models.Model):
             except Exception:
                 warning_count += 1
 
-        payment_ready_accounts = self.env['whatsapp.account'].sudo().search_count([
+        payment_ready_accounts = self.env['whatsapp.account'].search_count([
             ('active', '=', True),
             ('payment_link_mode', '!=', 'disabled'),
         ] + ([('id', '=', account_id)] if account_id else []))
@@ -586,9 +586,12 @@ class WhatsAppAnalytics(models.Model):
 
         Critical operational values are live. Heavy chart/table sections are cached briefly in hybrid mode.
         """
+        self.check_access('read')
         ICP = self.env['ir.config_parameter'].sudo()
         now = fields.Datetime.now()
         account_id = int(account_id) if account_id and str(account_id).isdigit() else False
+        if account_id:
+            self.env['whatsapp.account'].browse(account_id).check_access('read')
         date_range = date_range if date_range in ('today', '7d', '30d', 'all') else '7d'
         refresh_mode = refresh_mode if refresh_mode in ('hybrid', 'live', 'cache') else 'hybrid'
         start_date = self._dashboard_start_date(date_range, now)
@@ -603,7 +606,7 @@ class WhatsAppAnalytics(models.Model):
         active_campaign_domain = [('state', 'in', ['running', 'scheduled'])]
         if account_id:
             active_campaign_domain.append(('account_id', '=', account_id))
-        active_campaigns = self.env['whatsapp.campaign'].sudo().search_count(active_campaign_domain)
+        active_campaigns = self.env['whatsapp.campaign'].search_count(active_campaign_domain)
 
         account_health = self._dashboard_account_health(account_id=account_id)
         conversion_sections = self._dashboard_conversion_sections(start_date=start_date, account_id=account_id)
@@ -620,7 +623,8 @@ class WhatsAppAnalytics(models.Model):
             'replied': live_msg['inbound'],
         }
 
-        cache_key = 'whatsapp.dashboard.cache.%s.%s' % (date_range, account_id or 'all')
+        scope = '-'.join(map(str, self.env['whatsapp.account'].search([]).ids))
+        cache_key = 'whatsapp.dashboard.cache.%s.%s.%s.%s' % (self.env.uid, scope, date_range, account_id or 'all')
         cached = {}
         cache_age = None
         source = 'live'

@@ -99,7 +99,6 @@
                     <button name="action_test_connection" string="Test Connection" type="object" class="btn-primary"/>
                     <button name="action_sync_meta_health" string="Sync Meta Health" type="object" class="btn-secondary" icon="fa-heartbeat"/>
                     <button name="action_perform_api_test_calls" string="Perform Meta Test Calls" type="object" class="btn-info" icon="fa-vial"/>
-                    <button name="action_test_sidecar" string="Test Sidecar" type="object" class="btn-secondary" icon="fa-heartbeat"/>
                     <button name="action_sync_templates" string="Sync Templates" type="object" class="btn-secondary" icon="fa-refresh" invisible="status != 'connected'"/>
                     <button name="action_create_sample_templates" string="Load Sample Templates" type="object" class="btn-secondary" icon="fa-magic"/>
                     <button name="action_initialize_whatsapp_defaults" string="Initialize Defaults" type="object" class="btn-secondary" icon="fa-check-circle"/>

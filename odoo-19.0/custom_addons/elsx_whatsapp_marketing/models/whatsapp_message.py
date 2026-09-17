@@ -2,7 +2,8 @@
 import odoo
 import odoo.modules.registry
 from odoo import models, fields, api, _
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
+from .whatsapp_compliance import WhatsAppDeliveryDeferred
 import requests
 import json
 import logging
@@ -25,7 +26,6 @@ RETRYABLE_FAILURE_TEXT_MARKERS = (
     'could not serialize access', 'rate limit', 'server error',
     'temporarily unavailable', 'timeout', 'timed out',
 )
-SIDECAR_NOTIFY_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix='wa-sidecar')
 MEDIA_DOWNLOAD_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix='wa-media')
 
 
@@ -67,111 +67,9 @@ def _should_notify_realtime(message):
     return True
 
 
-def _notify_sidecar_with_cursor_legacy(env, message_id, event_type='new_message'):
-    """Fire-and-forget notification to the sidecar â€” non-blocking thread."""
-    # Capture db_name from the current cursor before spawning a thread
-    try:
-        db_name = env.cr.dbname
-    except Exception:
-        return  # env is already closed or unavailable
-
-    def _do_request():
-        try:
-            # Use the correct registry access pattern
-            registry = odoo.modules.registry.Registry(db_name)
-            with registry.cursor() as cr:
-                new_env = api.Environment(cr, odoo.SUPERUSER_ID, {})
-
-                params = new_env['ir.config_parameter'].sudo()
-                if params.get_param('whatsapp.realtime.mode', default='bus') != 'socket':
-                    return
-                base_url = params.get_param('whatsapp.sidecar.url')
-                secret = params.get_param('whatsapp.sidecar.secret')
-                if not base_url or not secret:
-                    return
-
-                msg = new_env['whatsapp.message'].sudo().browse(message_id)
-                if not msg.exists():
-                    return
-
-                payload = {
-                    'chat_id': msg.chat_id_ref.id if msg.chat_id_ref else msg.phone_number,
-                    'message_id': msg.id,
-                    'message_wamid': msg.message_id,
-                    'status': msg.status,
-                    'message': {
-                        'id': msg.id,
-                        'wamid': msg.message_id,
-                        'body': msg.body,
-                        'direction': msg.direction,
-                        'type': msg.message_type,
-                        'status': msg.status,
-                    },
-                    'type': event_type,
-                }
-                headers = {'x-sidecar-key': secret}
-                requests.post(
-                    f"{base_url.rstrip('/')}/relay/new-message",
-                    json=payload, headers=headers, timeout=5
-                )
-        except Exception as e:
-            _logger.warning('[SIDECAR-ASYNC] notification failed: %s', e)
-
-    _submit_best_effort(SIDECAR_NOTIFY_EXECUTOR, _do_request, '[SIDECAR-ASYNC]')
-
-
 def notify_sidecar_background(env, message_id, event_type='new_message'):
-    """Notify the socket sidecar after commit without borrowing another DB cursor."""
-    try:
-        params = env['ir.config_parameter'].sudo()
-        if params.get_param('whatsapp.realtime.mode', default='bus') != 'socket':
-            return False
-        base_url = params.get_param('whatsapp.sidecar.url')
-        secret = params.get_param('whatsapp.sidecar.secret')
-        if not base_url or not secret:
-            return False
-
-        msg = env['whatsapp.message'].sudo().browse(message_id).exists()
-        if not msg:
-            return False
-        payload = {
-            'chat_id': msg.chat_id_ref.id if msg.chat_id_ref else msg.phone_number,
-            'message_id': msg.id,
-            'message_wamid': msg.message_id,
-            'status': msg.status,
-            'message': {
-                'id': msg.id,
-                'wamid': msg.message_id,
-                'body': msg.body,
-                'direction': msg.direction,
-                'type': msg.message_type,
-                'status': msg.status,
-            },
-            'type': event_type,
-        }
-    except Exception as exc:
-        _logger.debug('[SIDECAR-ASYNC] notification skipped: %s', exc)
-        return False
-
-    def _do_request():
-        try:
-            requests.post(
-                f"{base_url.rstrip('/')}/relay/new-message",
-                json=payload,
-                headers={'x-sidecar-key': secret},
-                timeout=5,
-            )
-        except Exception as exc:
-            _logger.warning('[SIDECAR-ASYNC] notification failed: %s', exc)
-
-    def _submit_after_commit():
-        _submit_best_effort(SIDECAR_NOTIFY_EXECUTOR, _do_request, '[SIDECAR-ASYNC]')
-
-    try:
-        env.cr.postcommit.add(_submit_after_commit)
-    except Exception:
-        _submit_after_commit()
-    return True
+    """Compatibility helper: live notifications now use private ERP Bus channels."""
+    return False
 
 
 class WhatsAppMessage(models.Model):
@@ -300,6 +198,8 @@ class WhatsAppMessage(models.Model):
 
     # Compliance & Safety
     is_opt_out = fields.Boolean('Opt-out Message', default=False, help="True if this message triggered a STOP request.")
+    meta_received_at = fields.Datetime('Customer Message Time', readonly=True, index=True, copy=False)
+    delivery_uncertain = fields.Boolean('Delivery Needs Review', readonly=True, copy=False, index=True)
 
     # Automation
     is_automated = fields.Boolean('Automated Message', default=False)
@@ -571,9 +471,20 @@ class WhatsAppMessage(models.Model):
             else:
                 record.chat_id = False
 
+    @api.constrains('account_id', 'chat_id_ref', 'parent_id', 'campaign_id', 'template_id')
+    def _check_account_relationships(self):
+        for record in self:
+            for linked in (record.chat_id_ref, record.parent_id, record.campaign_id, record.template_id):
+                if linked and linked.account_id and linked.account_id != record.account_id:
+                    raise ValidationError(_('Messages cannot link to records belonging to another WhatsApp account.'))
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
+            if not self.env.su:
+                if vals.get('direction') == 'inbound' or vals.get('meta_received_at'):
+                    raise AccessError(_('Customer message evidence can only be created by the verified webhook.'))
+                self.env['whatsapp.account'].browse(vals.get('account_id')).check_access('read')
             if vals.get('phone_number'):
                 account = self.env['whatsapp.account'].sudo().browse(vals.get('account_id')) if vals.get('account_id') else False
                 vals['phone_number'] = self._normalize_phone(vals['phone_number'], account=account, strict=False)
@@ -584,7 +495,7 @@ class WhatsAppMessage(models.Model):
             if vals.get('campaign_id'):
                 campaign = self.env['whatsapp.campaign'].sudo().browse(vals['campaign_id']).exists()
                 vals['is_campaign_message'] = True
-                vals['campaign_origin_id'] = campaign.id or vals['campaign_id']
+                vals.setdefault('campaign_origin_id', campaign.id or vals['campaign_id'])
                 if campaign:
                     vals['campaign_name_snapshot'] = campaign.name
 
@@ -653,13 +564,19 @@ class WhatsAppMessage(models.Model):
         return messages
 
     def write(self, vals):
+        if not self.env.su and ('meta_received_at' in vals or 'direction' in vals and any(
+                record.direction != vals['direction'] for record in self)):
+            raise AccessError(_('Customer message evidence cannot be changed through RPC.'))
         if vals.get('campaign_id'):
             campaign = self.env['whatsapp.campaign'].sudo().browse(vals['campaign_id']).exists()
             vals = dict(vals)
             vals['is_campaign_message'] = True
-            vals['campaign_origin_id'] = campaign.id or vals['campaign_id']
-            if campaign:
-                vals['campaign_name_snapshot'] = campaign.name
+            missing_origin = self.filtered(lambda message: not message.campaign_origin_id)
+            if missing_origin:
+                super(WhatsAppMessage, missing_origin).write({
+                    'campaign_origin_id': campaign.id or vals['campaign_id'],
+                    'campaign_name_snapshot': campaign.name if campaign else False,
+                })
         res = super(WhatsAppMessage, self).write(vals)
         notify_fields = {
             'status',
@@ -1301,41 +1218,86 @@ class WhatsAppMessage(models.Model):
         self.ensure_one()
         # 1. Tier Limit Check
         if not self.account_id._has_daily_capacity():
-            raise ValidationError(_("Daily messaging limit reached for account %s.") % self.account_id.name)
+            raise WhatsAppDeliveryDeferred(_("Daily messaging limit reached for account %s.") % self.account_id.name)
 
         policy = self._get_active_compliance_policy()
-        is_manual_open_chat_reply = bool(
-            not self.is_automated
-            and not self.campaign_id
-            and self.chat_id_ref
-            and self.chat_id_ref.session_open
+        category = self._consent_category()
+        is_service_reply = bool(
+            category == 'transactional' and not self.campaign_id
+            and self.chat_id_ref and self.chat_id_ref.session_open
+            and self.chat_id_ref.account_id == self.account_id
+            and self.chat_id_ref.phone_number == self.phone_number
         )
+        if self.campaign_id.state == 'paused':
+            raise WhatsAppDeliveryDeferred(_('The campaign is paused.'))
+        if self.campaign_id and self.campaign_id.state != 'running':
+            raise ValidationError(_("The campaign must be running before messages can be sent."))
 
         # 2. Opt-in / Opt-out / DND Checks
         if self.partner_id:
-            if (
-                not is_manual_open_chat_reply
-                and 'whatsapp_opt_in' in self.partner_id._fields
-                and not self.partner_id.whatsapp_opt_in
-            ):
+            numbers = [self.partner_id.phone, getattr(self.partner_id, 'mobile', False)]
+            numbers += self.env['whatsapp.contact'].sudo().search([
+                ('partner_id', '=', self.partner_id.id),
+            ]).mapped('phone_number')
+            if self.phone_number not in {self._normalize_phone(number, account=self.account_id) for number in numbers if number}:
+                raise ValidationError(_("The recipient number does not match the contact whose consent is being used."))
+            consent_status = self.env['whatsapp.consent.log']._effective_status(
+                self.partner_id, self.account_id, category,
+            )
+            if not is_service_reply and consent_status == 'unknown':
                 raise ValidationError(_("Partner %s has not opted in to WhatsApp messages.") % self.partner_id.name)
 
-            consent = self.env['whatsapp.consent.log'].sudo().search([
-                ('partner_id', '=', self.partner_id.id),
-                ('account_id', '=', self.account_id.id),
-                ('status', 'in', ['opted_out', 'revoked'])
-            ], limit=1)
-            if consent:
+            if consent_status in ('opted_out', 'revoked'):
                 raise ValidationError(_("Partner %s has opted out of WhatsApp messages.") % self.partner_id.name)
 
             if policy and policy.respect_dnd_list and self.partner_id.id in policy.dnd_contact_ids.ids:
                 raise ValidationError(_("Partner %s is on the WhatsApp do-not-contact list.") % self.partner_id.name)
 
-        if policy and (self.is_automated or self.campaign_id):
+        elif not is_service_reply:
+            raise ValidationError(_("Link a recipient with recorded consent before sending this message."))
+
+        if self.message_type != 'template' and not is_service_reply:
+            raise ValidationError(_("The customer-service window is closed. Use an approved template."))
+
+        if policy and (self.is_automated or self.campaign_id or category == 'marketing'):
             quiet = self._current_quiet_hour(policy)
             if quiet:
-                raise ValidationError(_("Quiet hours are active for policy %s.") % policy.name)
+                raise WhatsAppDeliveryDeferred(_("Quiet hours are active for policy %s.") % policy.name)
         return True
+
+    def _check_latest_dispatch_eligibility(self):
+        """Read a fresh committed snapshot, independent of a long-running queue transaction."""
+        self.ensure_one()
+        with self.env.registry.cursor() as cr:
+            fresh = api.Environment(cr, self.env.uid, self.env.context, su=self.env.su)
+            campaign = fresh['whatsapp.campaign'].browse(self.campaign_id.id).exists()
+            if campaign and campaign.state not in ('running', 'scheduled'):
+                raise WhatsAppDeliveryDeferred(_('Campaign delivery was stopped or paused before dispatch.'))
+            partner = fresh['res.partner'].browse(self.partner_id.id).exists()
+            account = fresh['whatsapp.account'].browse(self.account_id.id).exists()
+            if not partner or not account:
+                # New records in this transaction were checked by _check_compliance.
+                return
+            category = self._consent_category()
+            status = fresh['whatsapp.consent.log']._effective_status(partner, account, category)
+            chat = fresh['whatsapp.chat'].browse(self.chat_id_ref.id).exists()
+            service_reply = bool(category == 'transactional' and not campaign and chat
+                                 and chat.account_id == account and chat.phone_number == self.phone_number
+                                 and chat.session_open)
+            if status in ('opted_out', 'revoked') or status == 'unknown' and not service_reply:
+                raise ValidationError(_('Current recipient consent does not permit this message.'))
+            if self.message_type != 'template' and not service_reply:
+                raise ValidationError(_('The customer-service window closed before dispatch.'))
+
+    def _consent_category(self):
+        self.ensure_one()
+        if self.campaign_id:
+            return 'marketing'
+        if self.message_type == 'template':
+            # Unresolved template names must not bypass marketing consent.
+            category = (self.template_id.category or '').lower() if self.template_id else ''
+            return 'transactional' if category in ('utility', 'authentication') else 'marketing'
+        return 'transactional'
 
     def action_send(self):
         """
@@ -1343,7 +1305,7 @@ class WhatsAppMessage(models.Model):
         Unified entry point for Draft, Queued, and One-Click messages.
         """
         for record in self:
-            if record.direction == 'inbound' or record.status in ['sent', 'delivered', 'read']:
+            if record.direction == 'inbound' or record.status in ['sent', 'delivered', 'read', 'cancelled']:
                 continue
 
             if record.is_campaign_message and not record.campaign_id:
@@ -1354,7 +1316,12 @@ class WhatsAppMessage(models.Model):
                 ))
 
             # Compliance Check before attempting send
-            record._check_compliance()
+            try:
+                record._check_compliance()
+            except WhatsAppDeliveryDeferred as exc:
+                record.write({'status': 'queued', 'next_retry_at': fields.Datetime.now() + timedelta(minutes=5),
+                              'error_message': str(exc)})
+                continue
 
             payload = {}
             # 1. Start with raw_data if available (contains pre-calculated components)
@@ -1457,6 +1424,8 @@ class WhatsAppMessage(models.Model):
         return True
 
     def action_retry(self):
+        if any(self.mapped('delivery_uncertain')):
+            raise UserError(_("Resolve uncertain dispatches against Meta delivery evidence before retrying."))
         cancelled_campaign_messages = self.filtered(
             lambda msg: msg.campaign_id and msg.campaign_id.state in ('cancelled', 'archived')
         )
@@ -1489,13 +1458,13 @@ class WhatsAppMessage(models.Model):
         self.env.cr.execute("""
             UPDATE whatsapp_message AS message
                SET is_campaign_message = TRUE,
-                   campaign_origin_id = campaign.id,
-                   campaign_name_snapshot = campaign.name
+                   campaign_origin_id = COALESCE(NULLIF(message.campaign_origin_id, 0), campaign.id),
+                   campaign_name_snapshot = COALESCE(message.campaign_name_snapshot, campaign.name)
               FROM whatsapp_campaign AS campaign
              WHERE message.campaign_id = campaign.id
                AND (
                     NOT COALESCE(message.is_campaign_message, FALSE)
-                    OR message.campaign_origin_id IS DISTINCT FROM campaign.id
+                    OR COALESCE(message.campaign_origin_id, 0) = 0
                     OR message.campaign_name_snapshot IS NULL
                )
         """)
@@ -1583,8 +1552,7 @@ class WhatsAppMessage(models.Model):
     @api.model
     def _cron_process_broadcast_queue(self, limit=100):
         """
-        High-priority processor for the broadcast campaign queue.
-        Processes newly 'queued' messages that haven't failed yet.
+        Process direct messages. Campaign delivery has its own worker.
         """
         started = time.monotonic()
         now = fields.Datetime.now()
@@ -1617,6 +1585,10 @@ class WhatsAppMessage(models.Model):
                         'next_retry_at': fields.Datetime.now() + timedelta(seconds=backoff_seconds + random.uniform(0, 10)),
                     })
                 msg.write(vals)
+
+            finally:
+                if self.env.context.get('cron_id'):
+                    self.env['ir.cron']._commit_progress(1, remaining=0)
 
         duration_ms = round((time.monotonic() - started) * 1000, 2)
         _logger.info(
@@ -1684,6 +1656,9 @@ class WhatsAppMessage(models.Model):
                     msg.write(vals)
                 except Exception:
                     _logger.error(f"[CRON-RETRY] Could not update message {msg.id} after failure")
+            finally:
+                if self.env.context.get('cron_id'):
+                    self.env['ir.cron']._commit_progress(1, remaining=0)
 
         duration_ms = round((time.monotonic() - started) * 1000, 2)
         _logger.info(

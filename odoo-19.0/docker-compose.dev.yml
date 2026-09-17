@@ -1,0 +1,6 @@
+services:
+  odoo:
+    volumes:
+      - .:/opt/odoo
+    environment:
+      ODOO_ENVIRONMENT: development

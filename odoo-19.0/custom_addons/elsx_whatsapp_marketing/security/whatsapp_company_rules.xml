@@ -1,0 +1,551 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="rule_whatsapp_snapshot_owner" model="ir.rule">
+        <field name="name">Diagnostic snapshots: creator only</field>
+        <field name="model_id" ref="model_whatsapp_diagnostic_snapshot"/>
+        <field name="domain_force">[('create_uid', '=', user.id)]</field>
+    </record>
+    <record id="rule_whatsapp_send_attempt_company" model="ir.rule">
+        <field name="name">Dispatch evidence: allowed companies</field>
+        <field name="model_id" ref="model_whatsapp_send_attempt"/>
+        <field name="domain_force">[('company_ref', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_account_company" model="ir.rule">
+        <field name="name">whatsapp_account: allowed companies</field>
+        <field name="model_id" ref="model_whatsapp_account"/>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_message_company" model="ir.rule">
+        <field name="name">whatsapp_message: allowed companies</field>
+        <field name="model_id" ref="model_whatsapp_message"/>
+        <field name="domain_force">['|', ('account_id.company_id', '=', False), ('account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_chat_company" model="ir.rule">
+        <field name="name">whatsapp_chat: allowed companies</field>
+        <field name="model_id" ref="model_whatsapp_chat"/>
+        <field name="domain_force">['|', ('account_id.company_id', '=', False), ('account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_campaign_company" model="ir.rule">
+        <field name="name">whatsapp_campaign: allowed companies</field>
+        <field name="model_id" ref="model_whatsapp_campaign"/>
+        <field name="domain_force">['|', ('account_id.company_id', '=', False), ('account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_template_company" model="ir.rule">
+        <field name="name">whatsapp_template: allowed companies</field>
+        <field name="model_id" ref="model_whatsapp_template"/>
+        <field name="domain_force">['|', ('account_id.company_id', '=', False), ('account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_form_company" model="ir.rule">
+        <field name="name">whatsapp_form: allowed companies</field>
+        <field name="model_id" ref="model_whatsapp_form"/>
+        <field name="domain_force">['|', ('account_id.company_id', '=', False), ('account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_form_submission_company" model="ir.rule">
+        <field name="name">whatsapp_form_submission: allowed companies</field>
+        <field name="model_id" ref="model_whatsapp_form_submission"/>
+        <field name="domain_force">['|', ('account_id.company_id', '=', False), ('account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_api_log_company" model="ir.rule">
+        <field name="name">whatsapp_api_log: allowed companies</field>
+        <field name="model_id" ref="model_whatsapp_api_log"/>
+        <field name="domain_force">['|', ('account_id.company_id', '=', False), ('account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_webhook_log_company" model="ir.rule">
+        <field name="name">whatsapp_webhook_log: allowed companies</field>
+        <field name="model_id" ref="model_whatsapp_webhook_log"/>
+        <field name="domain_force">['|', ('account_id.company_id', '=', False), ('account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_compliance_policy_company" model="ir.rule">
+        <field name="name">whatsapp_compliance_policy: allowed companies</field>
+        <field name="model_id" ref="model_whatsapp_compliance_policy"/>
+        <field name="domain_force">['|', ('account_id.company_id', '=', False), ('account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_compliance_policy_team" model="ir.rule">
+        <field name="name">whatsapp_compliance_policy: account team</field>
+        <field name="model_id" ref="model_whatsapp_compliance_policy"/>
+        <field name="domain_force">[('account_id.team_member_ids.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+    </record>
+    <record id="rule_whatsapp_compliance_policy_manager" model="ir.rule">
+        <field name="name">whatsapp_compliance_policy: managers</field>
+        <field name="model_id" ref="model_whatsapp_compliance_policy"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
+    </record>
+    <record id="rule_whatsapp_consent_log_company" model="ir.rule">
+        <field name="name">whatsapp_consent_log: allowed companies</field>
+        <field name="model_id" ref="model_whatsapp_consent_log"/>
+        <field name="domain_force">['|', ('account_id.company_id', '=', False), ('account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_consent_log_team" model="ir.rule">
+        <field name="name">whatsapp_consent_log: account team</field>
+        <field name="model_id" ref="model_whatsapp_consent_log"/>
+        <field name="domain_force">[('account_id.team_member_ids.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+    </record>
+    <record id="rule_whatsapp_consent_log_manager" model="ir.rule">
+        <field name="name">whatsapp_consent_log: managers</field>
+        <field name="model_id" ref="model_whatsapp_consent_log"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
+    </record>
+    <record id="rule_whatsapp_team_member_company" model="ir.rule">
+        <field name="name">whatsapp_team_member: allowed companies</field>
+        <field name="model_id" ref="model_whatsapp_team_member"/>
+        <field name="domain_force">['|', ('account_id.company_id', '=', False), ('account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_team_member_team" model="ir.rule">
+        <field name="name">whatsapp_team_member: account team</field>
+        <field name="model_id" ref="model_whatsapp_team_member"/>
+        <field name="domain_force">[('account_id.team_member_ids.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+    </record>
+    <record id="rule_whatsapp_team_member_manager" model="ir.rule">
+        <field name="name">whatsapp_team_member: managers</field>
+        <field name="model_id" ref="model_whatsapp_team_member"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
+    </record>
+    <record id="rule_whatsapp_media_library_company" model="ir.rule">
+        <field name="name">whatsapp_media_library: allowed companies</field>
+        <field name="model_id" ref="model_whatsapp_media_library"/>
+        <field name="domain_force">['|', ('account_id.company_id', '=', False), ('account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_media_library_team" model="ir.rule">
+        <field name="name">whatsapp_media_library: account team</field>
+        <field name="model_id" ref="model_whatsapp_media_library"/>
+        <field name="domain_force">[('account_id.team_member_ids.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+    </record>
+    <record id="rule_whatsapp_media_library_manager" model="ir.rule">
+        <field name="name">whatsapp_media_library: managers</field>
+        <field name="model_id" ref="model_whatsapp_media_library"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
+    </record>
+    <record id="rule_whatsapp_scheduled_message_company" model="ir.rule">
+        <field name="name">whatsapp_scheduled_message: allowed companies</field>
+        <field name="model_id" ref="model_whatsapp_scheduled_message"/>
+        <field name="domain_force">['|', ('account_id.company_id', '=', False), ('account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_scheduled_message_team" model="ir.rule">
+        <field name="name">whatsapp_scheduled_message: account team</field>
+        <field name="model_id" ref="model_whatsapp_scheduled_message"/>
+        <field name="domain_force">[('account_id.team_member_ids.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+    </record>
+    <record id="rule_whatsapp_scheduled_message_manager" model="ir.rule">
+        <field name="name">whatsapp_scheduled_message: managers</field>
+        <field name="model_id" ref="model_whatsapp_scheduled_message"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
+    </record>
+    <record id="rule_whatsapp_bot_rule_company" model="ir.rule">
+        <field name="name">whatsapp_bot_rule: allowed companies</field>
+        <field name="model_id" ref="model_whatsapp_bot_rule"/>
+        <field name="domain_force">['|', ('account_id.company_id', '=', False), ('account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_bot_rule_team" model="ir.rule">
+        <field name="name">whatsapp_bot_rule: account team</field>
+        <field name="model_id" ref="model_whatsapp_bot_rule"/>
+        <field name="domain_force">[('account_id.team_member_ids.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+    </record>
+    <record id="rule_whatsapp_bot_rule_manager" model="ir.rule">
+        <field name="name">whatsapp_bot_rule: managers</field>
+        <field name="model_id" ref="model_whatsapp_bot_rule"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
+    </record>
+    <record id="rule_whatsapp_bot_flow_company" model="ir.rule">
+        <field name="name">whatsapp_bot_flow: allowed companies</field>
+        <field name="model_id" ref="model_whatsapp_bot_flow"/>
+        <field name="domain_force">['|', ('account_id.company_id', '=', False), ('account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_bot_flow_team" model="ir.rule">
+        <field name="name">whatsapp_bot_flow: account team</field>
+        <field name="model_id" ref="model_whatsapp_bot_flow"/>
+        <field name="domain_force">[('account_id.team_member_ids.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+    </record>
+    <record id="rule_whatsapp_bot_flow_manager" model="ir.rule">
+        <field name="name">whatsapp_bot_flow: managers</field>
+        <field name="model_id" ref="model_whatsapp_bot_flow"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
+    </record>
+    <record id="rule_whatsapp_quick_reply_company" model="ir.rule">
+        <field name="name">whatsapp_quick_reply: allowed companies</field>
+        <field name="model_id" ref="model_whatsapp_quick_reply"/>
+        <field name="domain_force">['|', ('account_id.company_id', '=', False), ('account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_quick_reply_team" model="ir.rule">
+        <field name="name">whatsapp_quick_reply: account team</field>
+        <field name="model_id" ref="model_whatsapp_quick_reply"/>
+        <field name="domain_force">[('account_id.team_member_ids.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+    </record>
+    <record id="rule_whatsapp_quick_reply_manager" model="ir.rule">
+        <field name="name">whatsapp_quick_reply: managers</field>
+        <field name="model_id" ref="model_whatsapp_quick_reply"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
+    </record>
+    <record id="rule_whatsapp_campaign_participant_company" model="ir.rule">
+        <field name="name">whatsapp_campaign_participant: allowed companies</field>
+        <field name="model_id" ref="model_whatsapp_campaign_participant"/>
+        <field name="domain_force">['|', ('campaign_id.account_id.company_id', '=', False), ('campaign_id.account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_campaign_participant_team" model="ir.rule">
+        <field name="name">whatsapp_campaign_participant: account team</field>
+        <field name="model_id" ref="model_whatsapp_campaign_participant"/>
+        <field name="domain_force">[('campaign_id.account_id.team_member_ids.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+    </record>
+    <record id="rule_whatsapp_campaign_participant_manager" model="ir.rule">
+        <field name="name">whatsapp_campaign_participant: managers</field>
+        <field name="model_id" ref="model_whatsapp_campaign_participant"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
+    </record>
+    <record id="rule_whatsapp_campaign_step_company" model="ir.rule">
+        <field name="name">whatsapp_campaign_step: allowed companies</field>
+        <field name="model_id" ref="model_whatsapp_campaign_step"/>
+        <field name="domain_force">['|', ('campaign_id.account_id.company_id', '=', False), ('campaign_id.account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_campaign_step_team" model="ir.rule">
+        <field name="name">whatsapp_campaign_step: account team</field>
+        <field name="model_id" ref="model_whatsapp_campaign_step"/>
+        <field name="domain_force">[('campaign_id.account_id.team_member_ids.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+    </record>
+    <record id="rule_whatsapp_campaign_step_manager" model="ir.rule">
+        <field name="name">whatsapp_campaign_step: managers</field>
+        <field name="model_id" ref="model_whatsapp_campaign_step"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
+    </record>
+    <record id="rule_whatsapp_scheduled_campaign_company" model="ir.rule">
+        <field name="name">whatsapp_scheduled_campaign: allowed companies</field>
+        <field name="model_id" ref="model_whatsapp_scheduled_campaign"/>
+        <field name="domain_force">['|', ('campaign_id.account_id.company_id', '=', False), ('campaign_id.account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_scheduled_campaign_team" model="ir.rule">
+        <field name="name">whatsapp_scheduled_campaign: account team</field>
+        <field name="model_id" ref="model_whatsapp_scheduled_campaign"/>
+        <field name="domain_force">[('campaign_id.account_id.team_member_ids.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+    </record>
+    <record id="rule_whatsapp_scheduled_campaign_manager" model="ir.rule">
+        <field name="name">whatsapp_scheduled_campaign: managers</field>
+        <field name="model_id" ref="model_whatsapp_scheduled_campaign"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
+    </record>
+    <record id="rule_whatsapp_chat_note_company" model="ir.rule">
+        <field name="name">whatsapp_chat_note: allowed companies</field>
+        <field name="model_id" ref="model_whatsapp_chat_note"/>
+        <field name="domain_force">['|', ('chat_id.account_id.company_id', '=', False), ('chat_id.account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_chat_note_team" model="ir.rule">
+        <field name="name">whatsapp_chat_note: account team</field>
+        <field name="model_id" ref="model_whatsapp_chat_note"/>
+        <field name="domain_force">[('chat_id.account_id.team_member_ids.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+    </record>
+    <record id="rule_whatsapp_chat_note_manager" model="ir.rule">
+        <field name="name">whatsapp_chat_note: managers</field>
+        <field name="model_id" ref="model_whatsapp_chat_note"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
+    </record>
+    <record id="rule_whatsapp_conversation_assignment_company" model="ir.rule">
+        <field name="name">whatsapp_conversation_assignment: allowed companies</field>
+        <field name="model_id" ref="model_whatsapp_conversation_assignment"/>
+        <field name="domain_force">['|', ('chat_id.account_id.company_id', '=', False), ('chat_id.account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_conversation_assignment_team" model="ir.rule">
+        <field name="name">whatsapp_conversation_assignment: account team</field>
+        <field name="model_id" ref="model_whatsapp_conversation_assignment"/>
+        <field name="domain_force">[('chat_id.account_id.team_member_ids.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+    </record>
+    <record id="rule_whatsapp_conversation_assignment_manager" model="ir.rule">
+        <field name="name">whatsapp_conversation_assignment: managers</field>
+        <field name="model_id" ref="model_whatsapp_conversation_assignment"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
+    </record>
+    <record id="rule_whatsapp_form_field_company" model="ir.rule">
+        <field name="name">whatsapp_form_field: allowed companies</field>
+        <field name="model_id" ref="model_whatsapp_form_field"/>
+        <field name="domain_force">['|', ('form_id.account_id.company_id', '=', False), ('form_id.account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_form_field_team" model="ir.rule">
+        <field name="name">whatsapp_form_field: account team</field>
+        <field name="model_id" ref="model_whatsapp_form_field"/>
+        <field name="domain_force">['|', ('form_id.account_id', '=', False), ('form_id.account_id.team_member_ids.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+    </record>
+    <record id="rule_whatsapp_form_field_manager" model="ir.rule">
+        <field name="name">whatsapp_form_field: managers</field>
+        <field name="model_id" ref="model_whatsapp_form_field"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
+    </record>
+    <record id="rule_whatsapp_quiet_hours_company" model="ir.rule">
+        <field name="name">whatsapp_quiet_hours: allowed companies</field>
+        <field name="model_id" ref="model_whatsapp_quiet_hours"/>
+        <field name="domain_force">['|', ('policy_id.account_id.company_id', '=', False), ('policy_id.account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_quiet_hours_team" model="ir.rule">
+        <field name="name">whatsapp_quiet_hours: account team</field>
+        <field name="model_id" ref="model_whatsapp_quiet_hours"/>
+        <field name="domain_force">[('policy_id.account_id.team_member_ids.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+    </record>
+    <record id="rule_whatsapp_quiet_hours_manager" model="ir.rule">
+        <field name="name">whatsapp_quiet_hours: managers</field>
+        <field name="model_id" ref="model_whatsapp_quiet_hours"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
+    </record>
+    <record id="rule_whatsapp_bot_node_company" model="ir.rule">
+        <field name="name">whatsapp_bot_node: allowed companies</field>
+        <field name="model_id" ref="model_whatsapp_bot_node"/>
+        <field name="domain_force">['|', ('flow_id.account_id.company_id', '=', False), ('flow_id.account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_bot_node_team" model="ir.rule">
+        <field name="name">whatsapp_bot_node: account team</field>
+        <field name="model_id" ref="model_whatsapp_bot_node"/>
+        <field name="domain_force">[('flow_id.account_id.team_member_ids.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+    </record>
+    <record id="rule_whatsapp_bot_node_manager" model="ir.rule">
+        <field name="name">whatsapp_bot_node: managers</field>
+        <field name="model_id" ref="model_whatsapp_bot_node"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
+    </record>
+    <record id="rule_whatsapp_bot_edge_company" model="ir.rule">
+        <field name="name">whatsapp_bot_edge: allowed companies</field>
+        <field name="model_id" ref="model_whatsapp_bot_edge"/>
+        <field name="domain_force">['|', ('flow_id.account_id.company_id', '=', False), ('flow_id.account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_bot_edge_team" model="ir.rule">
+        <field name="name">whatsapp_bot_edge: account team</field>
+        <field name="model_id" ref="model_whatsapp_bot_edge"/>
+        <field name="domain_force">[('flow_id.account_id.team_member_ids.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+    </record>
+    <record id="rule_whatsapp_bot_edge_manager" model="ir.rule">
+        <field name="name">whatsapp_bot_edge: managers</field>
+        <field name="model_id" ref="model_whatsapp_bot_edge"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
+    </record>
+    <record id="rule_whatsapp_bot_flow_step_company" model="ir.rule">
+        <field name="name">whatsapp_bot_flow_step: allowed companies</field>
+        <field name="model_id" ref="model_whatsapp_bot_flow_step"/>
+        <field name="domain_force">['|', ('account_id.company_id', '=', False), ('account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_bot_flow_step_team" model="ir.rule">
+        <field name="name">whatsapp_bot_flow_step: account team</field>
+        <field name="model_id" ref="model_whatsapp_bot_flow_step"/>
+        <field name="domain_force">[('account_id.team_member_ids.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+    </record>
+    <record id="rule_whatsapp_bot_flow_step_manager" model="ir.rule">
+        <field name="name">whatsapp_bot_flow_step: managers</field>
+        <field name="model_id" ref="model_whatsapp_bot_flow_step"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
+    </record>
+    <record id="rule_whatsapp_template_variable_company" model="ir.rule">
+        <field name="name">whatsapp_template_variable: allowed companies</field>
+        <field name="model_id" ref="model_whatsapp_template_variable"/>
+        <field name="domain_force">['|', ('template_id.account_id.company_id', '=', False), ('template_id.account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_template_variable_team" model="ir.rule">
+        <field name="name">whatsapp_template_variable: account team</field>
+        <field name="model_id" ref="model_whatsapp_template_variable"/>
+        <field name="domain_force">['|', ('template_id.account_id', '=', False), ('template_id.account_id.team_member_ids.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+    </record>
+    <record id="rule_whatsapp_template_variable_manager" model="ir.rule">
+        <field name="name">whatsapp_template_variable: managers</field>
+        <field name="model_id" ref="model_whatsapp_template_variable"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
+    </record>
+    <record id="rule_whatsapp_template_card_company" model="ir.rule">
+        <field name="name">whatsapp_template_card: allowed companies</field>
+        <field name="model_id" ref="model_whatsapp_template_card"/>
+        <field name="domain_force">['|', ('template_id.account_id.company_id', '=', False), ('template_id.account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_template_card_team" model="ir.rule">
+        <field name="name">whatsapp_template_card: account team</field>
+        <field name="model_id" ref="model_whatsapp_template_card"/>
+        <field name="domain_force">['|', ('template_id.account_id', '=', False), ('template_id.account_id.team_member_ids.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+    </record>
+    <record id="rule_whatsapp_template_card_manager" model="ir.rule">
+        <field name="name">whatsapp_template_card: managers</field>
+        <field name="model_id" ref="model_whatsapp_template_card"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
+    </record>
+    <record id="rule_whatsapp_contact_company" model="ir.rule">
+        <field name="name">WhatsApp contacts: allowed companies</field>
+        <field name="model_id" ref="model_whatsapp_contact"/>
+        <field name="domain_force">['|', ('partner_id.company_id', '=', False), ('partner_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_contact_team" model="ir.rule">
+        <field name="name">WhatsApp contacts: own or account conversations</field>
+        <field name="model_id" ref="model_whatsapp_contact"/>
+        <field name="domain_force">['|', ('create_uid', '=', user.id), ('partner_id.whatsapp_message_ids.account_id.team_member_ids.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+    </record>
+    <record id="rule_whatsapp_contact_manager" model="ir.rule">
+        <field name="name">WhatsApp contacts: managers</field>
+        <field name="model_id" ref="model_whatsapp_contact"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
+    </record>
+    <record id="rule_whatsapp_campaign_reply_rule_company" model="ir.rule">
+        <field name="name">whatsapp_campaign_reply_rule: company</field>
+        <field name="model_id" ref="model_whatsapp_campaign_reply_rule"/>
+        <field name="domain_force">['|', ('campaign_id.account_id.company_id', '=', False), ('campaign_id.account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_campaign_reply_rule_team" model="ir.rule">
+        <field name="name">whatsapp_campaign_reply_rule: team</field>
+        <field name="model_id" ref="model_whatsapp_campaign_reply_rule"/>
+        <field name="domain_force">[('campaign_id.account_id.team_member_ids.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+    </record>
+    <record id="rule_whatsapp_campaign_reply_rule_manager" model="ir.rule">
+        <field name="name">whatsapp_campaign_reply_rule: manager</field>
+        <field name="model_id" ref="model_whatsapp_campaign_reply_rule"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
+    </record>
+    <record id="rule_whatsapp_template_audit_company" model="ir.rule">
+        <field name="name">whatsapp_template_audit: company</field>
+        <field name="model_id" ref="model_whatsapp_template_audit"/>
+        <field name="domain_force">['|', ('template_id.account_id.company_id', '=', False), ('template_id.account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_template_audit_team" model="ir.rule">
+        <field name="name">whatsapp_template_audit: team</field>
+        <field name="model_id" ref="model_whatsapp_template_audit"/>
+        <field name="domain_force">['|', ('template_id.account_id', '=', False), ('template_id.account_id.team_member_ids.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+    </record>
+    <record id="rule_whatsapp_template_audit_manager" model="ir.rule">
+        <field name="name">whatsapp_template_audit: manager</field>
+        <field name="model_id" ref="model_whatsapp_template_audit"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
+    </record>
+    <record id="rule_whatsapp_bot_flow_branch_company" model="ir.rule">
+        <field name="name">whatsapp_bot_flow_branch: company</field>
+        <field name="model_id" ref="model_whatsapp_bot_flow_branch"/>
+        <field name="domain_force">['|', ('step_id.flow_id.account_id.company_id', '=', False), ('step_id.flow_id.account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_bot_flow_branch_team" model="ir.rule">
+        <field name="name">whatsapp_bot_flow_branch: team</field>
+        <field name="model_id" ref="model_whatsapp_bot_flow_branch"/>
+        <field name="domain_force">[('step_id.flow_id.account_id.team_member_ids.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+    </record>
+    <record id="rule_whatsapp_bot_flow_branch_manager" model="ir.rule">
+        <field name="name">whatsapp_bot_flow_branch: manager</field>
+        <field name="model_id" ref="model_whatsapp_bot_flow_branch"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
+    </record>
+    <record id="rule_whatsapp_bot_flow_button_company" model="ir.rule">
+        <field name="name">whatsapp_bot_flow_button: company</field>
+        <field name="model_id" ref="model_whatsapp_bot_flow_button"/>
+        <field name="domain_force">['|', ('step_id.flow_id.account_id.company_id', '=', False), ('step_id.flow_id.account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_bot_flow_button_team" model="ir.rule">
+        <field name="name">whatsapp_bot_flow_button: team</field>
+        <field name="model_id" ref="model_whatsapp_bot_flow_button"/>
+        <field name="domain_force">[('step_id.flow_id.account_id.team_member_ids.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+    </record>
+    <record id="rule_whatsapp_bot_flow_button_manager" model="ir.rule">
+        <field name="name">whatsapp_bot_flow_button: manager</field>
+        <field name="model_id" ref="model_whatsapp_bot_flow_button"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
+    </record>
+    <record id="rule_whatsapp_bot_flow_log_company" model="ir.rule">
+        <field name="name">whatsapp_bot_flow_log: company</field>
+        <field name="model_id" ref="model_whatsapp_bot_flow_log"/>
+        <field name="domain_force">['|', ('flow_id.account_id.company_id', '=', False), ('flow_id.account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_bot_flow_log_team" model="ir.rule">
+        <field name="name">whatsapp_bot_flow_log: team</field>
+        <field name="model_id" ref="model_whatsapp_bot_flow_log"/>
+        <field name="domain_force">[('flow_id.account_id.team_member_ids.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+    </record>
+    <record id="rule_whatsapp_bot_flow_log_manager" model="ir.rule">
+        <field name="name">whatsapp_bot_flow_log: manager</field>
+        <field name="model_id" ref="model_whatsapp_bot_flow_log"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
+    </record>
+    <record id="rule_whatsapp_analytics_company" model="ir.rule">
+        <field name="name">whatsapp_analytics: company</field>
+        <field name="model_id" ref="model_whatsapp_analytics"/>
+        <field name="domain_force">['|', ('account_id.company_id', '=', False), ('account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_analytics_team" model="ir.rule">
+        <field name="name">whatsapp_analytics: team</field>
+        <field name="model_id" ref="model_whatsapp_analytics"/>
+        <field name="domain_force">[('account_id.team_member_ids.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+    </record>
+    <record id="rule_whatsapp_analytics_manager" model="ir.rule">
+        <field name="name">whatsapp_analytics: manager</field>
+        <field name="model_id" ref="model_whatsapp_analytics"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
+    </record>
+    <record id="rule_whatsapp_analytics_report_company" model="ir.rule">
+        <field name="name">whatsapp_analytics_report: company</field>
+        <field name="model_id" ref="model_whatsapp_analytics_report"/>
+        <field name="domain_force">['|', ('account_id.company_id', '=', False), ('account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_analytics_report_team" model="ir.rule">
+        <field name="name">whatsapp_analytics_report: team</field>
+        <field name="model_id" ref="model_whatsapp_analytics_report"/>
+        <field name="domain_force">[('account_id.team_member_ids.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+    </record>
+    <record id="rule_whatsapp_analytics_report_manager" model="ir.rule">
+        <field name="name">whatsapp_analytics_report: manager</field>
+        <field name="model_id" ref="model_whatsapp_analytics_report"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
+    </record>
+    <record id="rule_whatsapp_team_performance_company" model="ir.rule">
+        <field name="name">whatsapp_team_performance: company</field>
+        <field name="model_id" ref="model_whatsapp_team_performance"/>
+        <field name="domain_force">['|', ('account_id.company_id', '=', False), ('account_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_whatsapp_team_performance_team" model="ir.rule">
+        <field name="name">whatsapp_team_performance: team</field>
+        <field name="model_id" ref="model_whatsapp_team_performance"/>
+        <field name="domain_force">[('account_id.team_member_ids.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+    </record>
+    <record id="rule_whatsapp_team_performance_manager" model="ir.rule">
+        <field name="name">whatsapp_team_performance: manager</field>
+        <field name="model_id" ref="model_whatsapp_team_performance"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
+    </record>
+</odoo>

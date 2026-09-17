@@ -85,6 +85,15 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
         self.assertFalse(contact.opt_in)
         self.assertFalse(contact.partner_id.whatsapp_opt_in)
 
+    def test_account_import_consent_does_not_grant_other_accounts(self):
+        self._wizard('Name,Phone,Consent\nScoped Customer,9881934799,Yes\n').action_import()
+        contact = self.env['whatsapp.contact'].search([('phone_number', '=', '919881934799')])
+        other = self.account.copy({'phone_number_id': 'other-import-phone'})
+        logs = self.env['whatsapp.consent.log']
+        self.assertEqual(logs._effective_status(contact.partner_id, self.account, 'marketing'), 'opted_in')
+        self.assertEqual(logs._effective_status(contact.partner_id, other, 'marketing'), 'unknown')
+        self.assertFalse(contact.partner_id.whatsapp_opt_in)
+
     def test_fill_missing_does_not_overwrite_existing_values(self):
         partner = self.env['res.partner'].create({
             'name': 'Existing Name',
@@ -129,7 +138,10 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
         contact = self.env['whatsapp.contact'].search([('phone_number', '=', '919881934777')])
         self.assertFalse(contact.opt_in)
         self.assertFalse(contact.partner_id.whatsapp_opt_in)
-        self.assertTrue(contact.opt_out_date)
+        self.assertFalse(contact.opt_out_date)
+        self.assertFalse(self.env['whatsapp.consent.log'].search([
+            ('partner_id', '=', contact.partner_id.id), ('account_id', '=', self.account.id),
+        ]))
 
     def test_invalid_row_does_not_block_valid_rows(self):
         wizard = self._wizard(
@@ -175,7 +187,12 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
         ])
         self.assertTrue(all(contact.partner_id for contact in contacts))
 
+        template = self.env['whatsapp.template'].create({
+            'name': 'import_audience', 'account_id': self.account.id,
+            'category': 'marketing', 'body': 'Hello', 'status': 'approved',
+        })
         campaign = self.env['whatsapp.campaign'].create({
+            'template_id': template.id,
             'name': 'Import Audience Campaign',
             'account_id': self.account.id,
             'campaign_type': 'broadcast',
@@ -200,6 +217,8 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
 
         with patch.object(WhatsAppAccount, 'send_message', new=fake_send):
             campaign.action_send_campaign()
+            self.assertTrue(all(message.status in ('draft', 'queued') for message in campaign.message_ids))
+            campaign._cron_process_global_queue()
 
         self.assertEqual(len(campaign.message_ids), 2)
         self.assertTrue(all(message.status == 'sent' for message in campaign.message_ids))
@@ -315,7 +334,7 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
         })
 
         with (
-            patch.object(message_module.SIDECAR_NOTIFY_EXECUTOR, 'submit') as submit,
+            patch('concurrent.futures.ThreadPoolExecutor.submit') as submit,
             patch.object(message_module.odoo.modules.registry, 'Registry') as registry,
         ):
             notified = message_module.notify_sidecar_background(self.env, message.id)
@@ -363,6 +382,7 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
             'batch_interval': 5,
             'state': 'running',
             'last_batch_at': fields.Datetime.now(),
+            'partner_ids': [(4, self.env['res.partner'].create({'name': 'Queue Fixture', 'phone': '919999000099'}).id)],
         })
         future = fields.Datetime.add(fields.Datetime.now(), hours=1)
         messages = self.env['whatsapp.message'].create([
@@ -396,6 +416,7 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
             'batch_size': 2,
             'batch_interval': 5,
             'state': 'running',
+            'partner_ids': [(4, self.env['res.partner'].create({'name': 'Queue Fixture', 'phone': '919999000099'}).id)],
         })
         future = fields.Datetime.add(fields.Datetime.now(), hours=1)
         messages = self.env['whatsapp.message'].create([
@@ -759,6 +780,7 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
             'batch_interval': 5,
             'state': 'running',
             'last_batch_at': fields.Datetime.now(),
+            'partner_ids': [(4, self.env['res.partner'].create({'name': 'Queue Fixture', 'phone': '919999000099'}).id)],
         })
         self.env['whatsapp.message'].create({
             'account_id': self.account.id,
@@ -783,6 +805,7 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
             'target_type': 'manual',
             'message_body': 'Hello',
             'state': 'running',
+            'partner_ids': [(4, self.env['res.partner'].create({'name': 'Queue Fixture', 'phone': '919999000099'}).id)],
         })
         future = fields.Datetime.add(fields.Datetime.now(), hours=1)
         queued, failed, sent = self.env['whatsapp.message'].create([
@@ -1144,8 +1167,8 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
         queued_partner, sent_partner = self.env['res.partner'].with_context(
             skip_whatsapp_contact_sync=True
         ).create([
-            {'name': 'Cancelled Queue Recipient', 'phone': '919881936121'},
-            {'name': 'Actually Sent Recipient', 'phone': '919881936122'},
+            {'name': 'Cancelled Queue Recipient', 'phone': '919881936121', 'whatsapp_opt_in': True},
+            {'name': 'Actually Sent Recipient', 'phone': '919881936122', 'whatsapp_opt_in': True},
         ])
         old_campaign = self.env['whatsapp.campaign'].create({
             'name': 'Old Campaign',
@@ -1154,6 +1177,7 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
             'target_type': 'manual',
             'message_body': 'Old',
             'state': 'running',
+            'partner_ids': [(4, self.env['res.partner'].create({'name': 'Queue Fixture', 'phone': '919999000099'}).id)],
         })
         self.env['whatsapp.message'].create([
             {
@@ -1252,15 +1276,15 @@ class TestWhatsAppAdvancedContactImport(TransactionCase):
         with patch.object(
             WhatsAppAccount,
             '_upload_media_to_meta',
-            return_value='uploaded-video-id',
+            return_value='987654321',
         ) as upload:
             campaign.action_send_campaign()
 
         upload.assert_called_once()
         messages = campaign.message_ids.filtered(lambda message: message.direction == 'outbound')
         self.assertEqual(len(messages), 3)
-        self.assertTrue(all(message.media_url == 'uploaded-video-id' for message in messages))
+        self.assertTrue(all(message.media_url == '987654321' for message in messages))
         for message in messages:
             payload = json.loads(message.raw_data)
             header = next(component for component in payload['components'] if component['type'] == 'header')
-            self.assertEqual(header['parameters'][0]['video'], {'id': 'uploaded-video-id'})
+            self.assertEqual(header['parameters'][0]['video'], {'id': '987654321'})

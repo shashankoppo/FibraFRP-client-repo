@@ -21,6 +21,8 @@
                     decoration-warning="status == 'received'"
                     decoration-info="status == 'ignored'"/>
                 <field name="error_detail" optional="hide"/>
+                <field name="attempt_count" optional="show"/>
+                <field name="next_attempt_at" optional="show"/>
             </list>
         </field>
     </record>
@@ -69,6 +71,7 @@
                 <field name="phone_number"/>
                 <field name="message_id" string="WAMID"/>
                 <filter string="Errors" name="errors" domain="[('status','=','error')]"/>
+                <filter string="Needs Review" name="dead_letter" domain="[('status','=','error'), ('attempt_count','&gt;=',12)]"/>
                 <separator/>
                 <group>
                     <filter string="Event Type" name="group_event" context="{'group_by': 'event_type'}"/>

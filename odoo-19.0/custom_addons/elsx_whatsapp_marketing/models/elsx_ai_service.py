@@ -213,11 +213,13 @@ class ElsxAiProvider(models.Model):
 
     def _build_payload(self, job):
         self.ensure_one()
-        system_prompt = job.prompt_id.system_prompt or ''
-        user_prompt = job.prompt_id.user_prompt or ''
-        input_text = job.input_text or ''
+        from ..privacy import redact_text, redact_json
+        system_prompt = redact_text(job.prompt_id.system_prompt or '')
+        user_prompt = redact_text(job.prompt_id.user_prompt or '')
+        input_text = redact_text(job.input_text or '')
         if job.input_payload:
-            input_text = "%s\n\nPayload:\n%s" % (input_text, job.input_payload) if input_text else job.input_payload
+            payload_text = redact_json(job.input_payload)
+            input_text = "%s\n\nPayload:\n%s" % (input_text, payload_text) if input_text else payload_text
         final_user_prompt = "\n\n".join(part for part in [user_prompt, input_text] if part).strip() or input_text or "Respond briefly."
         model = self.default_model or self.env['ir.config_parameter'].sudo().get_param('elsx_ai.default_model') or 'default'
         fmt = self._default_format_for_type()

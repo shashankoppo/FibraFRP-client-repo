@@ -41,7 +41,7 @@ export class WhatsAppChatHandler {
         this._boundHashChange = null;
         this._lastPlayedMessageId = new Set();
         this._processedMessageIds = new Set();
-        this._lastBusActivity = 0; // BUG 3+8 FIX: timestamp of last Bus/Socket notification
+        this._lastBusActivity = 0; // BUG 3+8 FIX: timestamp of last ERP Bus notification
         this._quickReplyItems = [];
         this._quickReplyActiveIndex = 0;
         this._quickReplyQueryKey = null;
@@ -366,86 +366,6 @@ export class WhatsAppChatHandler {
         return false;
     }
 
-    // ── Socket.IO ──────────────────────────────────────────────────
-    async initSocket() {
-        if (typeof io === 'undefined') return;
-        if (this.socket) this.socket.disconnect();
-
-        let socketUrl = '';
-        let socketToken = '';
-        try {
-            const sysParam = await this._rpc('whatsapp.chat', 'get_sidecar_url', []);
-            if (sysParam) {
-                socketUrl = sysParam;
-                if (socketUrl.includes('sidecar')) {
-                    socketUrl = socketUrl.replace('sidecar', window.location.hostname);
-                }
-            }
-            socketToken = await this._rpc('whatsapp.chat', 'get_sidecar_socket_token', []);
-        } catch (e) {
-            console.warn('[WhatsApp] Could not fetch sidecar url:', e);
-        }
-        if (!socketUrl) return;
-
-        this.socket = io(socketUrl, {
-            auth: socketToken ? { token: socketToken } : {},
-            transports: ['websocket', 'polling'],
-            reconnection: true,
-            reconnectionAttempts: 10,
-            reconnectionDelay: 2000,
-            timeout: 10000,
-        });
-
-        this.socket.on('connect', () => {
-            this._updateConnectionStatus('connected');
-            this._touchPresence();
-            this._surgicalRefresh();
-        });
-        this.socket.on('whatsapp_event', (data) => {
-            // BUG 3 FIX: Record socket activity to suppress redundant polling
-            this._lastBusActivity = Date.now();
-            if (data?.type === 'status_update' && (data.message_id || data.message?.id) && (data.status || data.message?.status)) {
-                const messageId = data.message_id || data.message?.id;
-                const status = data.status || data.message?.status;
-                this._patchMessageStatus(data.chat_id, messageId, status);
-                if (data.chat_id) {
-                    this._patchSidebarStatus(data.chat_id, status);
-                    this._updateSidebarForChat(data.chat_id);
-                }
-                return;
-            }
-            if (this._isDuplicateNewMessage(data || {})) {
-                return;
-            }
-
-            // Reset cache so incoming message ALWAYS re-renders
-            this._lastHtml = null;
-
-            const activeChatId = this._getActiveChatId();
-            
-            // 1. Refresh UI if it's for the current chat (or we are in list view)
-            if (!activeChatId || activeChatId == data.chat_id) {
-                this._surgicalRefresh();
-            }
-
-            // 2. Update sidebar preview + counts
-            if (data.chat_id) {
-                this._updateSidebarForChat(data.chat_id);
-            } else {
-                this._updateSidebarCounts();
-            }
-
-            // 3. Play sound for ALL inbound messages regardless of active chat
-            if (data.type === 'new_message' && data.message?.direction === 'inbound') {
-                this._playSound('received', data.chat_id, data.message?.id);
-            }
-        });
-        this.socket.on('sync_required', () => this._surgicalRefresh());
-        this.socket.on('whatsapp_typing', (data) => this._showTypingIndicator(data));
-        this.socket.on('disconnect', () => this._updateConnectionStatus('disconnected'));
-        this.socket.on('connect_error', () => this._updateConnectionStatus('error'));
-    }
-
     _updateConnectionStatus(status) {
         const dot = document.getElementById('whatsapp_socket_status');
         if (dot) {
@@ -460,7 +380,7 @@ export class WhatsAppChatHandler {
             }
         }
 
-        // We silently fall back to 8-second polling if the socket disconnects.
+        // We silently fall back to 8-second polling if ERP Bus disconnects.
         // Displaying a persistent "Computer not connected" banner causes user confusion
         // because the application still functions correctly via ERP RPC polling.
         const banner = document.getElementById('wa-connection-banner');
@@ -470,8 +390,15 @@ export class WhatsAppChatHandler {
     // ── Initialization ─────────────────────────────────────────────
     init() {
         try {
-            // Subscribe to channels using modern Bus API
-            this.bus.addChannel('elsx_whatsapp_channel');
+            // Odoo subscribes authenticated users to their private partner channel.
+            this._busConnectionListeners = [
+                ['BUS:CONNECT', 'connected'], ['BUS:RECONNECT', 'connected'],
+                ['BUS:DISCONNECT', 'disconnected'], ['BUS:RECONNECTING', 'reconnecting'],
+            ].map(([event, status]) => {
+                const callback = () => this._updateConnectionStatus(status);
+                this.bus.addEventListener(event, callback);
+                return { event, callback };
+            });
             
             // Subscribe directly to modern Bus notification types
             this._busSubscriptions = [];
@@ -535,7 +462,7 @@ export class WhatsAppChatHandler {
         });
         this._historyMountObserver.observe(document.body, { childList: true, subtree: true });
 
-        // Fallback polling — fires every 8 seconds as safety net when bus/socket is absent.
+        // Fallback polling — fires every 8 seconds as safety net when ERP Bus is absent.
         // BUG 3+8 FIX: Skip polling when Bus was active recently (<12s) or not on WA view.
         this._startFallbackPolling();
 
@@ -603,10 +530,7 @@ export class WhatsAppChatHandler {
         }
         document.addEventListener('keydown', this._boundKeydown);
 
-        // Attempt socket connection after loadJS
-        if (typeof io !== 'undefined') {
-            this.initSocket();
-        }
+        this._updateConnectionStatus(this.bus.workerState === 'CONNECTED' ? 'connected' : 'reconnecting');
     }
 
     // ── Custom JS Sidebar Engine (SPA) ─────────────────────────────
@@ -1616,7 +1540,7 @@ export class WhatsAppChatHandler {
             return;
         }
         
-        // Play sound for inbound messages from Bus notifications (backup to Socket.IO)
+        // Play sound for inbound messages from ERP Bus notifications
         if (payload?.type === 'new_message' && payload?.chat_id) {
             this._playSound('received', payload.chat_id, payload.message_id);
         }
@@ -2831,9 +2755,6 @@ export class WhatsAppChatHandler {
 
         const chatId = this._getActiveChatId();
         const isActive = !document.hidden && document.hasFocus();
-        if (this.socket?.connected) {
-            this.socket.emit('presence', { chat_id: chatId, active: isActive });
-        }
         if (!chatId) return;
         try {
             await this._rpc('whatsapp.chat', 'action_touch_agent_presence', [[chatId]], {
@@ -3388,10 +3309,10 @@ export class WhatsAppChatHandler {
             clearTimeout(this._quickReplyFetchTimer);
             this._quickReplyFetchTimer = null;
         }
-        if (this.socket) {
-            this.socket.disconnect();
-            this.socket = null;
+        for (const { event, callback } of this._busConnectionListeners || []) {
+            this.bus.removeEventListener(event, callback);
         }
+        this._busConnectionListeners = [];
         if (this._busSubscriptions) {
             this._busSubscriptions.forEach(({ type, callback }) => {
                 this.bus.unsubscribe(type, callback);

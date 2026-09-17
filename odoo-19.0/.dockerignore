@@ -31,7 +31,7 @@ doc/
 setup/
 
 # Deployment scripts (not needed inside the container)
-deploy/
+# Deployment runners are required by the immutable runtime image.
 secure_backups/
 
 # Scratch / AI / dev tooling
@@ -48,3 +48,10 @@ face_sidecar/
 
 # Environment file (secrets)
 .env
+.env.*
+**/.env
+**/.env.*
+**/*.env
+**/node_modules/
+backups/
+*.pg_dump

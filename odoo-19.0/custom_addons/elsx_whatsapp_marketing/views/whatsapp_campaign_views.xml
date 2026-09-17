@@ -34,6 +34,8 @@
                     <button name="action_run_preflight" string="Run Preflight" type="object" class="btn-secondary" invisible="state != 'draft'"/>
                     <button name="%(elsx_whatsapp_marketing.action_whatsapp_campaign_schedule_wizard)d" string="Schedule / Send" type="action" class="btn-primary" invisible="state != 'draft'" context="{'default_campaign_id': id}"/>
                     <button name="action_process_queue" string="Process Queue (Send 50)" type="object" class="btn-warning" invisible="state != 'running'"/>
+                    <button name="action_pause" string="Pause" icon="fa-pause" type="object" invisible="state != 'running'" groups="elsx_whatsapp_marketing.group_whatsapp_manager"/>
+                    <button name="action_resume" string="Resume" icon="fa-play" type="object" invisible="state != 'paused'" groups="elsx_whatsapp_marketing.group_whatsapp_manager"/>
                     <button name="action_retry_failed_messages" string="Retry Safe Failures" type="object" class="btn-secondary" invisible="failed_recipient_count == 0 or state in ['cancelled', 'archived']"/>
                     <button name="action_view_failed_recipients" string="Failed Recipients" type="object" class="btn-secondary" invisible="failed_recipient_count == 0"/>
                     <button name="action_export_failed_recipients" string="Export Failed" type="object" class="btn-secondary" invisible="failed_recipient_count == 0"/>
@@ -41,7 +43,7 @@
                     <button name="action_archive_record" string="Archive" type="object" class="btn-secondary" invisible="state == 'archived'"/>
                     <button name="action_unarchive_record" string="Unarchive" type="object" class="btn-primary" invisible="state != 'archived'"/>
                     <button name="action_reset_to_draft" string="Reset to Draft" type="object" class="btn-primary" invisible="state not in ['cancelled', 'archived']"/>
-                    <field name="state" widget="statusbar" statusbar_visible="draft,scheduled,running,completed"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,scheduled,running,paused,completed"/>
                 </header>
                 <sheet>
                     <div class="oe_title">

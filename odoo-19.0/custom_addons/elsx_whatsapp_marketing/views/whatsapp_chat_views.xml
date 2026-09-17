@@ -187,7 +187,7 @@
                                     <div class="o_whatsapp_avatar o_whatsapp_avatar_header position-relative me-3 rounded-circle d-flex align-items-center justify-content-center" style="width: 42px; height: 42px; background: #e7f7f3; color: #00A884;">
                                         <span class="o_whatsapp_avatar_initial fw-bold" style="font-size:1.1rem;"><field name="display_name_initial"/></span>
                                         <!-- Real-time Status Indicator Hook -->
-                                        <div id="whatsapp_socket_status" class="position-absolute bottom-0 end-0 bg-secondary border border-2 border-white rounded-circle" style="width: 14px; height: 14px;" title="Sidecar Status"/>
+                                        <div id="whatsapp_socket_status" class="position-absolute bottom-0 end-0 bg-secondary border border-2 border-white rounded-circle" style="width: 14px; height: 14px;" title="ERP Bus Status"/>
                                     </div>
                                     <div>
                                         <div class="d-flex align-items-center gap-2">

@@ -385,7 +385,7 @@ class WhatsAppTemplate(models.Model):
             return {"type": media_type, media_type: media_object}
         # Meta API sometimes requires 'id' to be an integer (e.g. v19.0 JSON schema)
         if media_value.isdigit():
-            media_object = {"id": int(media_value)}
+            media_object = {"id": media_value}
             if media_type == 'document' and media_filename:
                 media_object["filename"] = str(media_filename)
             return {"type": media_type, media_type: media_object}

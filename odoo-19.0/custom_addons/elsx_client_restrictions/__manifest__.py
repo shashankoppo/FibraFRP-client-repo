@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 {
-    "name": "ELSX Native Administration Cleanup",
-    "version": "2.9.0",
+    "name": "ELSX Apps Access and Native Administration",
+    "version": "2.10.0",
     "category": "Administration",
-    "summary": "Removes legacy restrictions and restores native administration",
+    "summary": "Password-protected Apps entry with native ERP administration",
     "description": """
 ELSX Native Administration Cleanup
 ==================================
 
 This technical compatibility addon removes retired ELSX access restrictions
-and restores unrestricted native Community Settings, Users, Companies, Apps, groups,
-access-rights, and record-rule administration.
+and restores native Community Settings, Users, Companies, groups, access rights
+and record rules. Apps entry and module changes require a separate session unlock.
     """,
     "author": "ELSX",
     "website": "https://elsxglobal.com",
@@ -21,6 +21,6 @@ access-rights, and record-rule administration.
     ],
     "installable": True,
     "application": False,
-    "auto_install": True,
+    "auto_install": False,
     "post_init_hook": "post_init_hook",
 }

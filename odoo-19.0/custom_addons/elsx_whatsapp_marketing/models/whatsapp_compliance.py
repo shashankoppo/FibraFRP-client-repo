@@ -1,9 +1,14 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api
+from odoo.exceptions import ValidationError
 import logging
 import pytz
 
 _logger = logging.getLogger(__name__)
+
+
+class WhatsAppDeliveryDeferred(ValidationError):
+    """A temporary eligibility restriction; keep the message queued."""
 
 
 def _timezone_selection(self):
@@ -142,7 +147,28 @@ class WhatsAppConsentLog(models.Model):
     revoked_by = fields.Many2one('res.users', 'Revoked By', readonly=True)
 
     @api.model
-    def _opt_out_partner(self, partner, account, reason=None):
+    def _effective_status(self, partner, account, category):
+        """Resolve account/category evidence without rewriting legacy consent."""
+        if not partner or not account:
+            return 'unknown'
+        events = self.sudo().search([
+            ('partner_id', '=', partner.id), ('account_id', '=', account.id),
+            ('consent_type', 'in', ['all', category]),
+        ], order='consent_date desc, id desc', limit=1)
+        if events:
+            latest = events[0]
+            conflict = self.sudo().search_count([
+                ('partner_id', '=', partner.id), ('account_id', '=', account.id),
+                ('consent_type', 'in', ['all', category]), ('consent_date', '=', latest.consent_date),
+                ('status', 'in', ['opted_out', 'revoked']),
+            ], limit=1)
+            if conflict:
+                return 'opted_out'
+            return latest.status
+        return 'opted_in' if partner.whatsapp_opt_in else 'unknown'
+
+    @api.model
+    def _opt_out_partner(self, partner, account, reason=None, consent_date=None):
         """Helper to record an opt-out event and block future messages."""
         return self.create({
             'partner_id': partner.id,
@@ -150,6 +176,7 @@ class WhatsAppConsentLog(models.Model):
             'consent_type': 'all',
             'status': 'opted_out',
             'source': 'whatsapp_message',
+            'consent_date': consent_date or fields.Datetime.now(),
             'notes': reason or 'User requested opt-out via WhatsApp',
             'revoked_date': fields.Datetime.now(),
         })

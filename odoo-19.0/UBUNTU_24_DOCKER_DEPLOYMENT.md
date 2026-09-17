@@ -1,5 +1,12 @@
 # Ubuntu 24.04 Docker Deployment Guide
 
+> Legacy reference, superseded for installation and updates by
+> [DEPLOYMENT_QUICKSTART.md](DEPLOYMENT_QUICKSTART.md) on both Ubuntu and Alpine.
+> Use `bash deploy-prod.sh` for an existing client DB, or `bash deploy-new.sh`
+> for a separate fresh VPS. Do not use the older build/restore/reinstall recipes
+> below for routine production updates. Restoring client data requires a separately
+> approved procedure; ordinary Compose startup performs no schema upgrades.
+
 This guide deploys the FiberaFRP Odoo 19 stack on Ubuntu 24.04 using Docker
 Compose. It supports two modes:
 

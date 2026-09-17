@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api, _
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
+from functools import wraps
 import copy
 import requests
 import json
@@ -14,6 +15,16 @@ from urllib.parse import quote, unquote, urlparse
 from datetime import timedelta
 
 _logger = logging.getLogger(__name__)
+
+
+def manager_action(method):
+    @wraps(method)
+    def checked(self, *args, **kwargs):
+        self.check_access('write')
+        if not self.env.su and not self.env.user.has_group('elsx_whatsapp_marketing.group_whatsapp_manager'):
+            raise AccessError(_('Only WhatsApp managers can change account configuration.'))
+        return method(self, *args, **kwargs)
+    return checked
 
 
 LEGACY_WEBHOOK_BASE_URLS = {
@@ -46,6 +57,7 @@ class WhatsAppAccount(models.Model):
     _rec_name = 'name'
 
     name = fields.Char('Account Name', required=True)
+    company_id = fields.Many2one('res.company', required=True, default=lambda self: self.env.company, index=True)
     phone_number = fields.Char('Phone Number', required=True, help='WhatsApp Business phone number with country code')
     phone_number_id = fields.Char('Phone Number ID', required=True, help='WhatsApp Cloud API Phone Number ID')
     business_account_id = fields.Char('Business Account ID', required=True)
@@ -540,6 +552,7 @@ class WhatsAppAccount(models.Model):
             return response.json()
         raise UserError(_("Meta phone-number health sync failed: %s") % (last_error or response.text or response.status_code))
 
+    @manager_action
     def action_sync_meta_health(self):
         """Sync quality rating, phone status, and messaging limits from Meta."""
         for account in self:
@@ -575,6 +588,7 @@ class WhatsAppAccount(models.Model):
             }
         }
     
+    @manager_action
     def action_test_connection(self):
         """Test WhatsApp Cloud API connection"""
         self.ensure_one()
@@ -605,6 +619,7 @@ class WhatsAppAccount(models.Model):
                 }
             }
     
+    @manager_action
     def action_register_phone(self):
         """Register phone number for Cloud API"""
         self.ensure_one()
@@ -633,6 +648,7 @@ class WhatsAppAccount(models.Model):
             _logger.error(f"Registration failed: {e}")
             raise
 
+    @manager_action
     def action_sync_templates(self):
         """Sync templates from Meta WhatsApp Business Account"""
         self.ensure_one()
@@ -1044,16 +1060,53 @@ class WhatsAppAccount(models.Model):
         partner_id = kwargs.get('partner_id') or (existing_msg.partner_id.id if existing_msg and existing_msg.partner_id else False)
         campaign_id = kwargs.get('campaign_id') or (existing_msg.campaign_id.id if existing_msg and existing_msg.campaign_id else False)
         flow_id = kwargs.get('flow_id') or (existing_msg.flow_id.id if existing_msg and existing_msg.flow_id else False)
-        if not existing_msg and not kwargs.get('skip_compliance'):
-            self.env['whatsapp.message'].new({
-                'account_id': self.id,
-                'phone_number': to_number,
-                'partner_id': partner_id,
-                'campaign_id': campaign_id,
-                'message_type': message_type,
-                'direction': 'outbound',
-                'is_automated': bool(kwargs.get('is_automated') or campaign_id),
-            })._check_compliance()
+        self.check_access('read')
+        if not self.env.su and not self.env.user.has_group('elsx_whatsapp_marketing.group_whatsapp_user'):
+            raise UserError(_("WhatsApp access is required to send messages."))
+        template_record = kwargs.get('template_record')
+        if not template_record and message_type == 'template':
+            template_name = (kwargs.get('template') or {}).get('name') or kwargs.get('template_name')
+            if template_name:
+                template_record = self.env['whatsapp.template'].search([
+                    ('account_id', 'in', [False, self.id]),
+                    '|', ('meta_template_name', '=', template_name), ('name', '=', template_name),
+                ], limit=1)
+        chat = self.env['whatsapp.chat'].search([
+            ('account_id', '=', self.id), ('phone_number', '=', to_number),
+        ], limit=1)
+        if not partner_id:
+            partner_id = chat.partner_id.id if chat else False
+        candidate = existing_msg or self.env['whatsapp.message'].new({
+            'account_id': self.id, 'phone_number': to_number,
+            'partner_id': partner_id, 'campaign_id': campaign_id,
+            'chat_id_ref': chat.id if chat else False,
+            'template_id': template_record.id if template_record else False,
+            'message_type': message_type, 'direction': 'outbound',
+            'is_automated': bool(kwargs.get('is_automated') or campaign_id or flow_id),
+        })
+        if existing_msg:
+            existing_msg.check_access('write')
+            if existing_msg.direction != 'outbound':
+                raise UserError(_("Inbound messages cannot be dispatched."))
+            if existing_msg.account_id != self or existing_msg.phone_number != to_number:
+                raise UserError(_("Message account and recipient must match the sending request."))
+            if existing_msg.status in ('sent', 'delivered', 'read', 'cancelled'):
+                return existing_msg
+            if message_type == 'template' and template_record and not existing_msg.template_id:
+                existing_msg.template_id = template_record
+        if message_type == 'template':
+            if not template_record or (template_record.account_id and template_record.account_id != self):
+                raise UserError(_("Sync and select an approved template for this account before sending."))
+            template_record.check_access('read')
+            supplied_name = (kwargs.get('template') or {}).get('name') or kwargs.get('template_name')
+            if supplied_name and supplied_name not in (template_record.meta_template_name, template_record.name):
+                raise UserError(_("Template payload does not match the selected template."))
+        if existing_msg and (existing_msg.message_type != message_type or
+                             (message_type == 'template' and existing_msg.template_id != template_record)):
+            raise UserError(_("Queued message type and template must match the sending request."))
+        candidate._check_compliance()
+        if message_type == 'template' and template_record and template_record.status != 'approved':
+            raise UserError(_("Only approved templates can be sent."))
         url = f"https://graph.facebook.com/{self.api_version}/{self.phone_number_id}/messages"
         headers = {
             'Authorization': f'Bearer {self.sudo().access_token}',
@@ -1098,7 +1151,6 @@ class WhatsAppAccount(models.Model):
                 }
             
             if template_payload:
-                template_record = kwargs.get('template_record')
                 template_payload = self._replace_private_media_links(
                     copy.deepcopy(template_payload),
                     filename=(
@@ -1192,58 +1244,66 @@ class WhatsAppAccount(models.Model):
         if biz_opaque:
             payload['biz_opaque_callback_data'] = str(biz_opaque)
 
-        # Rate Limiting Check
+        if not existing_msg:
+            values = {
+                'account_id': self.id, 'phone_number': to_number, 'partner_id': partner_id,
+                'campaign_id': campaign_id, 'flow_id': flow_id,
+                'chat_id_ref': chat.id if chat else False,
+                'template_id': template_record.id if template_record else False,
+                'message_type': message_type, 'direction': 'outbound',
+                'body': kwargs.get('body') or payload.get('text', {}).get('body') or '',
+                'raw_data': json.dumps(payload),
+                'is_automated': bool(kwargs.get('is_automated') or campaign_id or flow_id),
+            }
+            if message_type in ('image', 'video', 'document', 'audio'):
+                media_payload = payload.get(message_type, {})
+                values.update({
+                    'media_url': media_payload.get('id') or kwargs.get('media_url') or media_payload.get('link'),
+                    'media_file': kwargs.get('media_file'),
+                    'media_filename': kwargs.get('media_filename'),
+                    'media_mime_type': kwargs.get('media_mime_type'),
+                    'caption': kwargs.get('caption'),
+                })
+            elif message_type == 'template':
+                values.update({
+                    'media_url': template_header_media_vals.get('header_media_url') or kwargs.get('header_media_url'),
+                    'media_filename': kwargs.get('header_media_filename') or template_header_media_vals.get('header_media_filename'),
+                    'media_file': kwargs.get('header_media_file'),
+                })
+            existing_msg = self.env['whatsapp.message'].create(values)
+        payload['biz_opaque_callback_data'] = 'wa_message_%s' % existing_msg.id
+
+        if self.env.context.get('whatsapp_queue_only'):
+            existing_msg.write({'status': 'queued', 'raw_data': json.dumps(payload)})
+            return existing_msg
+
+        existing_msg.flush_recordset()
+        self.env.cr.execute('SELECT id FROM whatsapp_message WHERE id=%s FOR UPDATE SKIP LOCKED', [existing_msg.id])
+        if not self.env.cr.fetchone():
+            return existing_msg
+
+        # Payload preparation can take time (especially media uploads). Recheck at dispatch.
+        existing_msg.chat_id_ref.invalidate_recordset(['session_open'])
+        existing_msg._check_compliance()
+        existing_msg._check_latest_dispatch_eligibility()
         if not self._consume_rate_limit_token():
-            import time
-            time.sleep(0.5) # Quick retry wait
-            if not self._consume_rate_limit_token():
-                _logger.warning(f"WhatsApp Rate Limit Exceeded for {self.name}")
-                retry_delay = 60 + random.uniform(0, 15)
-                next_retry_at = fields.Datetime.now() + timedelta(seconds=retry_delay)
-                if existing_msg:
-                    existing_msg.write({
-                        'status': 'queued',
-                        'error_message': 'Rate limit exceeded; queued for retry.',
-                        'next_retry_at': next_retry_at,
-                    })
-                    return existing_msg
-                queued_vals = {
-                    'account_id': self.id,
-                    'phone_number': to_number,
-                    'partner_id': partner_id,
-                    'campaign_id': campaign_id,
-                    'flow_id': flow_id,
-                    'message_type': message_type,
-                    'body': kwargs.get('body') or payload.get('text', {}).get('body') or f"Media: {message_type}",
-                    'direction': 'outbound',
-                    'status': 'queued',
-                    'next_retry_at': next_retry_at,
-                    'error_message': 'Rate limit exceeded; queued for retry.',
-                    'raw_data': json.dumps(payload),
-                }
-                if message_type in ('image', 'video', 'document', 'audio'):
-                    media_payload = payload.get(message_type, {})
-                    queued_vals.update({
-                        'media_url': media_payload.get('id') or kwargs.get('media_url') or media_payload.get('link'),
-                        'media_filename': kwargs.get('media_filename'),
-                        'media_mime_type': kwargs.get('media_mime_type'),
-                        'caption': kwargs.get('caption'),
-                    })
-                    if kwargs.get('media_file'):
-                        queued_vals['media_file'] = kwargs['media_file']
-                elif message_type == 'template':
-                    header_media_url = template_header_media_vals.get('header_media_url') or kwargs.get('header_media_url')
-                    header_media_filename = (
-                        kwargs.get('header_media_filename')
-                        or template_header_media_vals.get('header_media_filename')
-                    )
-                    if header_media_url:
-                        queued_vals['media_url'] = header_media_url
-                    if header_media_filename:
-                        queued_vals['media_filename'] = header_media_filename
-                    if kwargs.get('header_media_file'):
-                        queued_vals['media_file'] = kwargs['header_media_file']
-                return self.env['whatsapp.message'].create(queued_vals)
+            existing_msg.write({
+                'status': 'queued',
+                'error_message': 'Rate limit exceeded; queued for retry.',
+                'next_retry_at': fields.Datetime.now() + timedelta(seconds=60 + random.uniform(0, 15)),
+            })
+            return existing_msg
+
+        attempts = self.env['whatsapp.send.attempt']
+        reserved, previous_state, previous_wamid = attempts._reserve(existing_msg)
+        if not reserved:
+            if previous_state == 'accepted' and previous_wamid:
+                existing_msg.write({'status': 'sent', 'message_id': previous_wamid,
+                                    'delivery_uncertain': False, 'next_retry_at': False})
+            else:
+                existing_msg.write({'status': 'failed', 'delivery_uncertain': True, 'next_retry_at': False,
+                                    'error_message': _('Previous dispatch outcome needs review before any resend.')})
+            return existing_msg
 
         import time
         start_time = time.time()
@@ -1358,8 +1418,16 @@ class WhatsAppAccount(models.Model):
                 if kwargs.get('header_media_file'):
                     vals['media_file'] = kwargs['header_media_file']
 
+            accepted_wamid = (response_data.get('messages') or [{}])[0].get('id')
+            if response.status_code in (200, 201) and not accepted_wamid:
+                attempts._finish(existing_msg, 'uncertain', detail='Successful HTTP response without message ID')
+                existing_msg.write({'status': 'failed', 'delivery_uncertain': True, 'next_retry_at': False,
+                                    'error_message': _('Meta response needs reconciliation before resend.')})
+                return existing_msg
             if response.status_code in (200, 201):
+                attempts._finish(existing_msg, 'accepted', wamid=accepted_wamid)
                 vals.update({
+                    'delivery_uncertain': False,
                     'status': 'sent',
                     'message_id': response_data.get('messages', [{}])[0].get('id'),
                     'sent_date': fields.Datetime.now(),
@@ -1369,6 +1437,7 @@ class WhatsAppAccount(models.Model):
                     'next_retry_at': False,
                 })
             else:
+                attempts._finish(existing_msg, 'rejected', detail='HTTP %s' % response.status_code)
                 error = response_data.get('error', {})
                 error_code = error.get('code')
                 message_model = self.env['whatsapp.message']
@@ -1414,35 +1483,15 @@ class WhatsAppAccount(models.Model):
                 api_log.message_id_ref = msg.id
                 return msg
                 
-        except Exception as e:
-            _logger.error(f"WhatsApp message send error: {str(e)}")
-            if existing_msg:
-                try:
-                    existing_msg.write({
-                        'status': 'failed',
-                        'error_message': str(e),
-                    })
-                except Exception:
-                    _logger.exception("Failed to persist send error on existing message %s", existing_msg.id)
-            else:
-                try:
-                    self.env['whatsapp.message'].create({
-                        'account_id': self.id,
-                        'phone_number': to_number,
-                        'partner_id': partner_id,
-                        'campaign_id': campaign_id,
-                        'flow_id': flow_id,
-                        'message_type': message_type,
-                        'body': kwargs.get('body') or payload.get('text', {}).get('body') or f"Media: {message_type}",
-                        'template_name': payload.get('template', {}).get('name') if message_type == 'template' else False,
-                        'direction': 'outbound',
-                        'status': 'failed',
-                        'error_message': str(e),
-                        'raw_data': json.dumps(payload),
-                    })
-                except Exception:
-                    _logger.exception("Failed to create failed-send message log for account %s", self.id)
-            raise
+        except Exception as exc:
+            # A timeout/crash after dispatch does not prove that Meta rejected it.
+            # Keep the independent reservation pending if recording the outcome also fails.
+            _logger.error("WhatsApp dispatch %s requires reconciliation (%s)", existing_msg.id, type(exc).__name__)
+            existing_msg.write({
+                'status': 'failed', 'delivery_uncertain': True, 'next_retry_at': False,
+                'error_message': _('Delivery outcome is uncertain. Check Meta evidence before retrying.'),
+            })
+            return existing_msg
 
     def _prepare_media_reference(self, media_reference, media_type, filename=False):
         if not media_reference:
@@ -1591,6 +1640,7 @@ class WhatsAppAccount(models.Model):
             raise UserError(_("Template media upload failed: %s") % error_msg)
         return media_handle
 
+    @manager_action
     def action_get_business_profile(self):
         """Fetch profile from Meta"""
         self.ensure_one()
@@ -1631,6 +1681,7 @@ class WhatsAppAccount(models.Model):
             _logger.error(f"Profile sync error: {e}")
             return False
 
+    @manager_action
     def action_update_business_profile(self):
         """Push profile to Meta"""
         self.ensure_one()
@@ -1653,6 +1704,7 @@ class WhatsAppAccount(models.Model):
             _logger.error(f"Profile update error: {e}")
             raise
 
+    @manager_action
     def action_sync_profile_picture(self):
         """Fetch and store the WhatsApp Business profile picture from Meta."""
         self.ensure_one()
@@ -1698,6 +1750,7 @@ class WhatsAppAccount(models.Model):
             self.test_api_status = 'failed'
             self.test_api_response = str(e)
 
+    @manager_action
     def action_perform_api_test_calls(self):
         return self.action_test_connection()
 
@@ -1739,6 +1792,7 @@ class WhatsAppAccount(models.Model):
                 },
             }
 
+    @manager_action
     def action_create_sample_templates(self):
         """Seed the reusable template library and open it."""
         created = self.env['whatsapp.sample.template'].sudo()._seed_sample_templates()
@@ -1759,6 +1813,7 @@ class WhatsAppAccount(models.Model):
             },
         }
 
+    @manager_action
     def action_initialize_whatsapp_defaults(self):
         """Rerunnable fresh-database starter setup for the selected WhatsApp account."""
         self.ensure_one()

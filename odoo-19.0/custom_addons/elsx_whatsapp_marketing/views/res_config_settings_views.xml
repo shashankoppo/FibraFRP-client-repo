@@ -9,17 +9,17 @@
         <field name="arch" type="xml">
             <xpath expr="//form" position="inside">
                 <app data-string="WhatsApp Marketing" string="WhatsApp Marketing" name="elsx_whatsapp_marketing" groups="base.group_system">
-                    <block title="Real-Time Engine (Sidecar)" id="whatsapp_sidecar_setting">
-                        <setting id="whatsapp_realtime_mode_setting" help="Use ERP Bus for normal production. Enable Sidecar Socket only when the sidecar service is configured and healthy.">
+                    <block title="Webhooks" id="whatsapp_sidecar_setting">
+                        <setting id="whatsapp_realtime_mode_setting" invisible="1">
                             <field name="whatsapp_realtime_mode"/>
                         </setting>
-                        <setting id="whatsapp_sidecar_url_setting" help="URL of the Node.js WebSocket server for zero-latency messaging.">
+                        <setting id="whatsapp_sidecar_url_setting" invisible="1">
                             <field name="whatsapp_sidecar_url" placeholder="http://node_sidecar:3000"/>
                         </setting>
-                        <setting id="whatsapp_sidecar_secret_setting" help="Security token used to authenticate webhook relays between the ERP and the Sidecar.">
+                        <setting id="whatsapp_sidecar_secret_setting" help="Authentication for an existing legacy webhook relay during migration.">
                             <field name="whatsapp_sidecar_secret" password="True"/>
                         </setting>
-                        <setting id="whatsapp_sidecar_socket_token_setting" help="Browser-facing token for optional Socket.IO realtime mode. Use a different value than the server-to-server Sidecar Secret.">
+                        <setting id="whatsapp_sidecar_socket_token_setting" invisible="1">
                             <field name="whatsapp_sidecar_socket_token" password="True"/>
                         </setting>
                         <setting id="whatsapp_public_webhook_base_url_setting" help="Public domain used in Meta webhook setup. Leave empty to use the native ERP web.base.url.">
