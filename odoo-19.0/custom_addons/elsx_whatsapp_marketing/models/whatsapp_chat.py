@@ -1289,7 +1289,14 @@ class WhatsAppChat(models.Model):
 
     def action_open_contact(self):
         self.ensure_one()
-        contact = self.env['whatsapp.contact'].search([('phone_number', '=', self.phone_number)], limit=1)
+        phone_number = self.env['whatsapp.message']._normalize_phone(
+            self.phone_number,
+            account=self.account_id,
+            strict=False,
+        )
+        contact = self.env['whatsapp.contact'].search([
+            ('phone_number', '=', phone_number or self.phone_number),
+        ], limit=1)
         if contact:
             return {
                 'type': 'ir.actions.act_window',
@@ -1299,7 +1306,22 @@ class WhatsAppChat(models.Model):
                 'views': [(False, 'form')],
                 'target': 'current',
             }
-        return False
+        # A manually opened chat does not have an inbound webhook to create a
+        # contact. Open a prefilled record instead of leaving the operator at a
+        # dead-end before a consent-controlled template send.
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Create WhatsApp Contact'),
+            'res_model': 'whatsapp.contact',
+            'view_mode': 'form',
+            'views': [(False, 'form')],
+            'target': 'current',
+            'context': {
+                'default_name': self.whatsapp_profile_name or self.phone_number,
+                'default_phone_number': phone_number or self.phone_number,
+                'default_opt_in': False,
+            },
+        }
 
     def action_create_opportunity(self):
         self.ensure_one()

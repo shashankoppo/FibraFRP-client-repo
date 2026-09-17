@@ -14,6 +14,18 @@ class WhatsAppSendWizard(models.TransientModel):
         return self.env['whatsapp.account']._get_default_account()
 
     account_id = fields.Many2one('whatsapp.account', string='WhatsApp Account', required=True, default=_default_account_id)
+    chat_id = fields.Many2one(
+        'whatsapp.chat',
+        string='Conversation',
+        readonly=True,
+        default=lambda self: self.env['whatsapp.chat'].browse(
+            self.env.context.get('default_chat_id')
+            or (
+                self.env.context.get('active_id')
+                if self.env.context.get('active_model') == 'whatsapp.chat' else False
+            )
+        ).exists(),
+    )
     partner_ids = fields.Many2many('res.partner', string='Recipients')
     phone_number = fields.Char(
         'Direct Phone Number',
@@ -38,6 +50,18 @@ class WhatsAppSendWizard(models.TransientModel):
     template_requires_header_media = fields.Boolean(
         compute='_compute_template_requires_header_media',
     )
+    recipient_setup_required = fields.Boolean(compute='_compute_recipient_setup_required')
+
+    @api.depends('chat_id', 'chat_id.partner_id')
+    def _compute_recipient_setup_required(self):
+        for record in self:
+            record.recipient_setup_required = bool(record.chat_id and not record.chat_id.partner_id)
+
+    def action_open_chat_contact(self):
+        self.ensure_one()
+        if not self.chat_id:
+            raise UserError(_('This message is not linked to a WhatsApp conversation.'))
+        return self.chat_id.action_open_contact()
 
     @api.depends('template_id', 'template_id.header_type')
     def _compute_template_requires_header_media(self):
@@ -290,10 +314,7 @@ class WhatsAppSendWizard(models.TransientModel):
         sent_count = 0
         errors = []
 
-        chat_id = self.env.context.get('default_chat_id')
-        if not chat_id and self.env.context.get('active_model') == 'whatsapp.chat':
-            chat_id = self.env.context.get('active_id')
-        chat = self.env['whatsapp.chat'].browse(chat_id).exists() if chat_id else False
+        chat = self.chat_id
         if chat:
             if self.account_id != chat.account_id:
                 self.account_id = chat.account_id

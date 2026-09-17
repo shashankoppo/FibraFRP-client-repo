@@ -539,7 +539,7 @@
                                 </div>
 
                                 <button name="action_open_contact" type="object" class="btn btn-light border w-100 py-2 mt-2 fw-semibold text-dark">
-                                    <i class="fa fa-external-link me-2" title="Open Contact"/> View Contact
+                                    <i class="fa fa-address-card-o me-2" title="Open or Create Contact"/> Open / Create Contact
                                 </button>
                             </div>
                         </div>

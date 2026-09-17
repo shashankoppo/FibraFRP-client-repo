@@ -259,6 +259,48 @@ class TestPrivateMediaRecovery(TransactionCase):
         self.assertEqual(template.header_media_url, value)
         self.assertFalse(template.header_media_file)
 
+    def test_blank_chat_opens_prefilled_contact_setup(self):
+        chat = self.env['whatsapp.chat'].create({
+            'account_id': self.account.id,
+            'phone_number': '15550000002',
+        })
+
+        action = chat.action_open_contact()
+
+        self.assertEqual(action['res_model'], 'whatsapp.contact')
+        self.assertEqual(action['context']['default_phone_number'], '15550000002')
+        self.assertFalse(action['context']['default_opt_in'])
+
+    def test_existing_contact_opens_from_chat(self):
+        contact = self.env['whatsapp.contact'].create({
+            'name': 'Existing Contact',
+            'phone_number': '15550000003',
+        })
+        chat = self.env['whatsapp.chat'].create({
+            'account_id': self.account.id,
+            'phone_number': '15550000003',
+        })
+
+        action = chat.action_open_contact()
+
+        self.assertEqual(action['res_model'], 'whatsapp.contact')
+        self.assertEqual(action['res_id'], contact.id)
+
+    def test_send_wizard_exposes_contact_setup_for_blank_chat(self):
+        chat = self.env['whatsapp.chat'].create({
+            'account_id': self.account.id,
+            'phone_number': '15550000004',
+        })
+        wizard = self.env['whatsapp.send.wizard'].with_context(
+            default_chat_id=chat.id,
+        ).create({
+            'account_id': self.account.id,
+        })
+
+        self.assertEqual(wizard.chat_id, chat)
+        self.assertTrue(wizard.recipient_setup_required)
+        self.assertEqual(wizard.action_open_chat_contact()['res_model'], 'whatsapp.contact')
+
     def test_template_sync_reads_all_pages_and_clears_stale_buttons(self):
         template = self.env['whatsapp.template'].create({
             'name': 'Existing Template',
