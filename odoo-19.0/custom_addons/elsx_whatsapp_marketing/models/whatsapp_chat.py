@@ -569,6 +569,7 @@ class WhatsAppChat(models.Model):
             'direction': 'outbound',
             'message_type': msg_type,
             'chat_id_ref': self.id,
+            'is_agent_inbox_send': True,
             'media_file': self.quick_media_file,
             'media_filename': self.quick_media_filename,
             'caption': body if msg_type != 'text' else False,
@@ -781,6 +782,7 @@ class WhatsAppChat(models.Model):
             'phone_number': self.phone_number,
             'partner_id': self.partner_id.id if self.partner_id else False,
             'chat_id_ref': self.id,
+            'is_agent_inbox_send': True,
             'message_type': 'template',
             'body': template.body,
             'template_id': template.id,
@@ -809,6 +811,7 @@ class WhatsAppChat(models.Model):
             'direction': 'outbound',
             'message_type': message_type,
             'chat_id_ref': self.id,
+            'is_agent_inbox_send': True,
         })
         msg.action_send()
         self.env.invalidate_all()

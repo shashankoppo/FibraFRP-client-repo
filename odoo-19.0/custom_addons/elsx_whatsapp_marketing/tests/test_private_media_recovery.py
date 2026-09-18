@@ -298,7 +298,7 @@ class TestPrivateMediaRecovery(TransactionCase):
         })
 
         self.assertEqual(wizard.chat_id, chat)
-        self.assertTrue(wizard.recipient_setup_required)
+        self.assertFalse(wizard.recipient_setup_required)
         self.assertEqual(wizard.action_open_chat_contact()['res_model'], 'whatsapp.contact')
 
     def test_send_wizard_respects_account_opt_in_policy(self):

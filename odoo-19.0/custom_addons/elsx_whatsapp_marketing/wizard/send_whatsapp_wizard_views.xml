@@ -16,13 +16,6 @@
                             <field name="phone_number" placeholder="e.g. 917247558873 (with country code, no +)"/>
                             <field name="partner_ids" widget="many2many_tags" invisible="phone_number != False"/>
                             <field name="template_requires_header_media" invisible="1"/>
-                            <field name="recipient_setup_required" invisible="1"/>
-                            <div invisible="not recipient_setup_required" class="alert alert-warning py-2 mb-2" role="alert">
-                                This number is not linked to a WhatsApp contact yet. Create the contact and record consent before sending a marketing template.
-                                <button name="action_open_chat_contact" type="object" class="btn btn-sm btn-outline-primary ms-2">
-                                    Open / Create Contact
-                                </button>
-                            </div>
                             <div invisible="not template_requires_header_media" class="alert alert-warning py-2 mb-2" role="alert">
                                 This approved template uses an image, video, or document header. Meta still requires the actual header media for each send. Upload it here, or set a default Header Media File/URL on the template.
                             </div>

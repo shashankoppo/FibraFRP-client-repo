@@ -205,6 +205,10 @@ class WhatsAppMessage(models.Model):
 
     # Automation
     is_automated = fields.Boolean('Automated Message', default=False)
+    is_agent_inbox_send = fields.Boolean(
+        'Agent Inbox Send', default=False, copy=False, readonly=True,
+        help='Set only for a message explicitly sent by an agent from a team inbox chat.',
+    )
     trigger_event = fields.Char('Trigger Event')
 
     # Media handling
@@ -487,6 +491,11 @@ class WhatsAppMessage(models.Model):
                 if vals.get('direction') == 'inbound' or vals.get('meta_received_at'):
                     raise AccessError(_('Customer message evidence can only be created by the verified webhook.'))
                 self.env['whatsapp.account'].browse(vals.get('account_id')).check_access('read')
+            if vals.get('is_agent_inbox_send'):
+                chat = self.env['whatsapp.chat'].sudo().browse(vals.get('chat_id_ref')).exists()
+                account = self.env['whatsapp.account'].sudo().browse(vals.get('account_id')).exists()
+                if not chat or not account or chat.account_id != account or vals.get('direction') != 'outbound':
+                    raise ValidationError(_('An agent inbox send must belong to its outbound team inbox chat.'))
             if vals.get('phone_number'):
                 account = self.env['whatsapp.account'].sudo().browse(vals.get('account_id')) if vals.get('account_id') else False
                 vals['phone_number'] = self._normalize_phone(vals['phone_number'], account=account, strict=False)
@@ -1314,7 +1323,7 @@ class WhatsAppMessage(models.Model):
         campaign = self.campaign_id if campaign is None else campaign
         account = self.account_id if account is None else account
         return bool(
-            not campaign and not self.is_automated and chat
+            self.is_agent_inbox_send and not campaign and not self.is_automated and chat
             and chat.account_id.id == account.id
             and chat.phone_number == self.phone_number
         )

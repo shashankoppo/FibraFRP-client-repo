@@ -28,11 +28,14 @@ class TestWhatsAppHardening(TransactionCase):
         })
 
     def message(self, **values):
-        return self.env['whatsapp.message'].create(dict({
+        message_values = dict({
             'account_id': self.account.id, 'partner_id': self.partner.id,
             'chat_id_ref': self.chat.id, 'phone_number': self.partner.phone,
             'direction': 'outbound', 'message_type': 'text', 'body': 'Service response',
-        }, **values))
+        }, **values)
+        if message_values['direction'] == 'outbound':
+            message_values.setdefault('is_agent_inbox_send', True)
+        return self.env['whatsapp.message'].create(message_values)
 
     def consent(self, status, minutes=0, category='all', account=None):
         return self.env['whatsapp.consent.log'].create({
@@ -76,6 +79,7 @@ class TestWhatsAppHardening(TransactionCase):
             'message_type': 'template',
             'template_id': template.id,
             'direction': 'outbound',
+            'is_agent_inbox_send': True,
         })
         self.assertTrue(message._check_compliance())
 
@@ -108,9 +112,27 @@ class TestWhatsAppHardening(TransactionCase):
                 partner_id=self.partner.id,
                 message_type='template',
                 template_record=template,
+                existing_message=self.message(
+                    message_type='template', template_id=template.id,
+                ),
             )
         self.assertEqual(message.status, 'queued')
         wake_queue.assert_called_once()
+
+    def test_non_inbox_send_stays_consent_gated_even_when_a_chat_exists(self):
+        template = self.env['whatsapp.template'].create({
+            'name': 'non_inbox_marketing_template', 'account_id': self.account.id,
+            'category': 'marketing', 'body': 'Promotion', 'status': 'approved',
+        })
+        with patch('requests.post') as send:
+            with self.assertRaises(ValidationError):
+                self.account.send_message(
+                    self.partner.phone,
+                    partner_id=self.partner.id,
+                    message_type='template',
+                    template_record=template,
+                )
+        send.assert_not_called()
 
     def test_policy_can_explicitly_allow_unknown_consent(self):
         self.env['whatsapp.compliance.policy'].create({

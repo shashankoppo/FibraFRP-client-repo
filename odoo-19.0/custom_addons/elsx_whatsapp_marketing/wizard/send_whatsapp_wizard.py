@@ -55,15 +55,9 @@ class WhatsAppSendWizard(models.TransientModel):
     @api.depends('chat_id', 'chat_id.partner_id')
     def _compute_recipient_setup_required(self):
         for record in self:
-            policy = self.env['whatsapp.compliance.policy'].sudo().search([
-                ('account_id', '=', record.account_id.id),
-                ('active', '=', True),
-            ], limit=1) if record.account_id else False
-            record.recipient_setup_required = bool(
-                record.chat_id
-                and not record.chat_id.partner_id
-                and (not policy or policy.require_opt_in)
-            )
+            # A team-inbox agent can send an approved template to a phone-only chat.
+            # Linking a CRM contact is optional enrichment, never a send prerequisite.
+            record.recipient_setup_required = False
 
     def action_open_chat_contact(self):
         self.ensure_one()
@@ -269,6 +263,7 @@ class WhatsAppSendWizard(models.TransientModel):
                 'phone_number': chat.phone_number,
                 'partner_id': partner_id,
                 'chat_id_ref': chat.id,
+                'is_agent_inbox_send': True,
                 'message_type': 'template',
                 'body': self.template_id.body,
                 'template_id': self.template_id.id,
@@ -293,6 +288,7 @@ class WhatsAppSendWizard(models.TransientModel):
                 'phone_number': chat.phone_number,
                 'partner_id': partner_id,
                 'chat_id_ref': chat.id,
+                'is_agent_inbox_send': True,
                 'message_type': media_type,
                 'body': self.message_body or False,
                 'caption': self.message_body if media_type in ('image', 'video', 'document') else False,
@@ -310,6 +306,7 @@ class WhatsAppSendWizard(models.TransientModel):
             'phone_number': chat.phone_number,
             'partner_id': partner_id,
             'chat_id_ref': chat.id,
+            'is_agent_inbox_send': True,
             'message_type': 'text',
             'body': self.message_body,
             'direction': 'outbound',
