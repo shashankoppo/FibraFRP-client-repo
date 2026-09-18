@@ -1248,8 +1248,8 @@ class WhatsAppMessage(models.Model):
             consent_status = self.env['whatsapp.consent.log']._effective_status(
                 self.partner_id, self.account_id, category,
             )
-            # An agent may manually choose an approved template for an existing,
-            # linked inbox conversation.  That is not a campaign or automation;
+            # An agent may manually choose an approved template from an existing
+            # team inbox conversation. That is not a campaign or automation;
             # preserve the established agent workflow while still blocking an
             # explicit opt-out below.
             if require_opt_in and not (is_service_reply or is_manual_inbox_send) and consent_status == 'unknown':
@@ -1261,7 +1261,7 @@ class WhatsAppMessage(models.Model):
             if policy and policy.respect_dnd_list and self.partner_id.id in policy.dnd_contact_ids.ids:
                 raise ValidationError(_("Partner %s is on the WhatsApp do-not-contact list.") % self.partner_id.name)
 
-        elif require_opt_in and not is_service_reply:
+        elif require_opt_in and not (is_service_reply or is_manual_inbox_send):
             raise ValidationError(_("Link a recipient with recorded consent before sending this message."))
 
         if self.message_type != 'template' and not is_service_reply:
@@ -1308,7 +1308,7 @@ class WhatsAppMessage(models.Model):
                 raise ValidationError(_('The customer-service window closed before dispatch.'))
 
     def _is_manual_inbox_send(self, chat=None, campaign=None, account=None):
-        """Return whether this is an agent's direct reply from its linked inbox chat."""
+        """Return whether this is an agent's direct reply from a team inbox chat."""
         self.ensure_one()
         chat = self.chat_id_ref if chat is None else chat
         campaign = self.campaign_id if campaign is None else campaign

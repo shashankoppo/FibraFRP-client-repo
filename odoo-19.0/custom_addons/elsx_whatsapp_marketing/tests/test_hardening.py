@@ -60,6 +60,25 @@ class TestWhatsAppHardening(TransactionCase):
         })
         self.assertTrue(self.message(message_type='template', template_id=template.id)._check_compliance())
 
+    def test_unlinked_inbox_template_does_not_require_a_partner(self):
+        chat = self.env['whatsapp.chat'].create({
+            'account_id': self.account.id,
+            'phone_number': '919999990003',
+        })
+        template = self.env['whatsapp.template'].create({
+            'name': 'unlinked_inbox_template', 'account_id': self.account.id,
+            'category': 'marketing', 'body': 'Hello', 'status': 'approved',
+        })
+        message = self.env['whatsapp.message'].create({
+            'account_id': self.account.id,
+            'chat_id_ref': chat.id,
+            'phone_number': chat.phone_number,
+            'message_type': 'template',
+            'template_id': template.id,
+            'direction': 'outbound',
+        })
+        self.assertTrue(message._check_compliance())
+
     def test_automated_template_requires_consent(self):
         template = self.env['whatsapp.template'].create({
             'name': 'automated_marketing_test', 'account_id': self.account.id, 'category': 'marketing',
