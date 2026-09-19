@@ -33,7 +33,7 @@
                     <button name="action_generate_ai_content" string="Draft Content" type="object" class="btn-secondary" invisible="state != 'draft'"/>
                     <button name="action_run_preflight" string="Run Preflight" type="object" class="btn-secondary" invisible="state != 'draft'"/>
                     <button name="%(elsx_whatsapp_marketing.action_whatsapp_campaign_schedule_wizard)d" string="Schedule / Send" type="action" class="btn-primary" invisible="state != 'draft'" context="{'default_campaign_id': id}"/>
-                    <button name="action_process_queue" string="Process Queue (Send 50)" type="object" class="btn-warning" invisible="state != 'running'"/>
+                    <button name="action_process_queue" string="Process Queue" type="object" class="btn-warning" invisible="state != 'running'"/>
                     <button name="action_pause" string="Pause" icon="fa-pause" type="object" invisible="state != 'running'" groups="elsx_whatsapp_marketing.group_whatsapp_manager"/>
                     <button name="action_resume" string="Resume" icon="fa-play" type="object" invisible="state != 'paused'" groups="elsx_whatsapp_marketing.group_whatsapp_manager"/>
                     <button name="action_retry_failed_messages" string="Retry Safe Failures" type="object" class="btn-secondary" invisible="failed_recipient_count == 0 or state in ['cancelled', 'archived']"/>
@@ -97,6 +97,7 @@
                         <group string="Enterprise Logistics">
                             <field name="batch_size"/>
                             <field name="batch_interval"/>
+                            <field name="batch_interval_seconds"/>
                             <field name="flow_id" options="{'no_create': True}"/>
                             <field name="form_id" options="{'no_create': True}"/>
                         </group>

@@ -502,15 +502,24 @@ Important fields:
 
 | Field | Meaning |
 |---|---|
-| Batch Size | Number of messages sent per batch. |
-| Batch Interval | Time between batches. |
+| Batch Size | Number of messages claimed in one safe worker batch. It is capped at 1,000 so a worker can recover safely. |
+| Batch Interval (Seconds) | Time between new campaign worker batches. Use this for new campaigns. |
+| Legacy Batch Interval (Min) | Compatibility setting used only by older campaigns that do not have a seconds value. |
 | Queued | Messages waiting to send. |
 | Sent | Messages sent to Meta. |
 | Delivered | Messages delivered to customer. |
 | Read | Customer opened/read the message. |
 | Failed | Message failed. |
 
-If a campaign is running, admins may see **Process Queue (Send 50)**.
+If a campaign is running, admins may use **Process Queue** to wake its background worker.
+
+### Large Campaigns and Measured Capacity
+
+Campaigns use a durable PostgreSQL queue. The worker processes bounded batches, rechecks consent and campaign state before dispatch, and respects the connected Meta account's daily tier and local token-bucket guardrail.
+
+For a large send, open **Configuration > System Health** first. Review the measured accepted messages for the last 5 minutes and hour, current backlog ETA, queue age, daily tier remaining, retries, and webhook health. The dashboard reports local observed throughput; it does not claim a capacity that the connected Meta account has not demonstrated.
+
+Run a controlled test against an isolated copy of the client database before approving a 100,000+ recipient campaign. Keep external delivery disabled for the copy, use a mocked Meta endpoint, then verify queue recovery, inbox responsiveness, and the measured accepted rate. A 1,000,000-recipient launch requires a separate capacity sign-off based on that measurement and the current Meta messaging tier.
 
 ## 18. Campaign Result Review
 

@@ -87,6 +87,42 @@ class WhatsAppDiagnosticSnapshot(models.Model):
         }
 
     @api.model
+    def _recent_throughput(self, now, queued_count):
+        """Measure accepted throughput from durable message timestamps.
+
+        This intentionally reports what this deployment has achieved, not an
+        assumed vendor capacity. Meta tier and quality policy remain external
+        limits and are shown separately from the local worker measurement.
+        """
+        five_minutes_ago = now - timedelta(minutes=5)
+        hour_ago = now - timedelta(hours=1)
+        self.env.cr.execute("""
+            SELECT
+                COUNT(*) FILTER (WHERE sent_date >= %s) AS accepted_5m,
+                COUNT(*) FILTER (WHERE sent_date >= %s) AS accepted_1h,
+                COUNT(*) FILTER (WHERE delivered_date >= %s) AS delivered_1h
+              FROM whatsapp_message
+             WHERE direction = 'outbound'
+               AND sent_date >= %s
+        """, [five_minutes_ago, hour_ago, hour_ago, hour_ago])
+        row = self.env.cr.dictfetchone() or {}
+        accepted_5m = int(row.get('accepted_5m') or 0)
+        accepted_1h = int(row.get('accepted_1h') or 0)
+        delivered_1h = int(row.get('delivered_1h') or 0)
+        observed_messages_per_second = round(accepted_1h / 3600.0, 3)
+        estimate_seconds = (
+            round(queued_count / observed_messages_per_second, 1)
+            if observed_messages_per_second > 0 else False
+        )
+        return {
+            'accepted_last_5m': accepted_5m,
+            'accepted_last_1h': accepted_1h,
+            'delivered_last_1h': delivered_1h,
+            'accepted_messages_per_second_last_1h': observed_messages_per_second,
+            'backlog_eta_seconds_at_observed_rate': estimate_seconds,
+        }
+
+    @api.model
     def _collect_snapshot(self):
         ICP = self.env['ir.config_parameter'].sudo()
         now = fields.Datetime.now()
@@ -187,6 +223,25 @@ class WhatsAppDiagnosticSnapshot(models.Model):
             'freshness': {},
         }
         data['latency'] = self._recent_delivery_latency(now)
+        data['throughput'] = self._recent_throughput(
+            now,
+            queued_campaign_count + queued_direct_count,
+        )
+        connected_accounts = Account.search([('active', '=', True), ('status', '=', 'connected')])
+        data['capacity'] = {
+            'configured_account_fill_rate_messages_per_second': round(
+                sum(connected_accounts.mapped('rate_limit_fill_rate')), 3,
+            ),
+            'daily_remaining_across_connected_accounts': sum(
+                connected_accounts.mapped('daily_limit_remaining'),
+            ),
+            'account_count': len(connected_accounts),
+            'note': (
+                'Configured local rate is a guardrail, not a promise. '
+                'Use measured accepted throughput and the Meta account tier before approving a large send.'
+            ),
+        }
+        data['settings']['queue_worker'] = Campaign._queue_worker_limits()
 
         last_webhook = Webhook.search([], order='create_date desc', limit=1)
         if last_webhook:
@@ -250,6 +305,8 @@ class WhatsAppDiagnosticSnapshot(models.Model):
         counts = data.get('counts', {})
         queues = data.get('queues', {})
         freshness = data.get('freshness', {})
+        throughput = data.get('throughput', {})
+        capacity = data.get('capacity', {})
         cards = [
             card('Realtime', settings.get('realtime_mode')),
             card('History Limit', settings.get('history_initial_limit'), 'initial messages rendered'),
@@ -261,6 +318,12 @@ class WhatsAppDiagnosticSnapshot(models.Model):
             card('Queued Campaign', queues.get('queued_campaign_messages')),
             card('Queued Direct', queues.get('queued_direct_messages')),
             card('Oldest Pending (seconds)', queues.get('oldest_queued_age_seconds')),
+            card('Accepted Last 5 Minutes', throughput.get('accepted_last_5m'), 'measured from local dispatch ledger'),
+            card('Accepted Last Hour', throughput.get('accepted_last_1h'), 'measured from local dispatch ledger'),
+            card('Observed Accept Rate (msg/s)', throughput.get('accepted_messages_per_second_last_1h'), 'last 60 minutes'),
+            card('Backlog ETA (seconds)', throughput.get('backlog_eta_seconds_at_observed_rate') or 'insufficient data', 'estimate at observed rate'),
+            card('Daily Tier Remaining', capacity.get('daily_remaining_across_connected_accounts'), 'connected accounts'),
+            card('Configured Local Rate (msg/s)', capacity.get('configured_account_fill_rate_messages_per_second'), 'guardrail, not Meta capacity'),
             card('Queue to Meta p95 (s)', data.get('latency', {}).get('queue_to_meta_p95_seconds'), 'last 24 hours'),
             card('Meta Delivery p95 (s)', data.get('latency', {}).get('meta_to_delivery_p95_seconds'), 'confirmed webhooks, last 24 hours'),
             card('Dispatch Review', queues.get('uncertain_dispatches')),
@@ -293,6 +356,8 @@ class WhatsAppDiagnosticSnapshot(models.Model):
         queues = data.get('queues', {})
         freshness = data.get('freshness', {})
         latency = data.get('latency', {})
+        throughput = data.get('throughput', {})
+        capacity = data.get('capacity', {})
         stale = freshness.get('stale_connected_accounts') or []
         lines = [
             "System Health: %s" % self._severity_for_snapshot(data).upper(),
@@ -310,6 +375,12 @@ class WhatsAppDiagnosticSnapshot(models.Model):
             "Queued campaign messages: %s" % queues.get('queued_campaign_messages'),
             "Queued direct messages: %s" % queues.get('queued_direct_messages'),
             "Oldest queued message age (seconds): %s" % queues.get('oldest_queued_age_seconds'),
+            "Accepted last 5 minutes: %s" % throughput.get('accepted_last_5m'),
+            "Accepted last hour: %s" % throughput.get('accepted_last_1h'),
+            "Observed accept rate (messages/second, last hour): %s" % throughput.get('accepted_messages_per_second_last_1h'),
+            "Backlog ETA at observed rate (seconds): %s" % (throughput.get('backlog_eta_seconds_at_observed_rate') or 'insufficient data'),
+            "Daily tier remaining across connected accounts: %s" % capacity.get('daily_remaining_across_connected_accounts'),
+            "Configured local rate (messages/second): %s" % capacity.get('configured_account_fill_rate_messages_per_second'),
             "Queue to Meta p95 (seconds, last 24h): %s" % latency.get('queue_to_meta_p95_seconds'),
             "Meta accepted to delivered p95 (seconds, last 24h): %s" % latency.get('meta_to_delivery_p95_seconds'),
             "Retryable failed messages: %s" % queues.get('failed_retryable_messages'),

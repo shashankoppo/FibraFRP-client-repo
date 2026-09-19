@@ -8,6 +8,7 @@ _logger = logging.getLogger(__name__)
 class WhatsAppCampaignParticipant(models.Model):
     _name = 'whatsapp.campaign.participant'
     _description = 'WhatsApp Campaign Participant'
+    _due_work_idx = models.Index("(state, next_execution_date, id)")
     
     _campaign_partner_unique = models.Constraint(
         'unique(campaign_id, partner_id)',
@@ -24,17 +25,64 @@ class WhatsAppCampaignParticipant(models.Model):
         ('paused', 'Paused'),
         ('stopped', 'Stopped'),
     ], string='Status', default='running')
-    def process_drip_campaigns(self):
-        """Cron job to process drip campaigns for all participants"""
-        participants = self.search([
-            ('state', '=', 'running'),
-            ('next_execution_date', '<=', fields.Datetime.now())
-        ])
+    @api.model
+    def _drip_worker_limit(self):
+        try:
+            value = int(self.env['ir.config_parameter'].sudo().get_param(
+                'whatsapp.drip.worker.max.participants', default='100',
+            ) or 100)
+        except (TypeError, ValueError):
+            value = 100
+        return min(max(value, 10), 1000)
+
+    @api.model
+    def _schedule_drip_worker(self, delay_seconds=None):
+        """Wake the durable drip worker without changing its recovery interval."""
+        cron = self.env.ref(
+            'elsx_whatsapp_marketing.ir_cron_process_whatsapp_drip_campaigns',
+            raise_if_not_found=False,
+        )
+        if not cron:
+            _logger.warning('WhatsApp drip campaign cron is missing.')
+            return False
+        try:
+            if not cron.active:
+                cron.sudo().write({'active': True})
+            if delay_seconds is None or int(delay_seconds or 0) <= 0:
+                cron.sudo()._trigger()
+            else:
+                cron.sudo()._trigger(at=fields.Datetime.now() + timedelta(seconds=int(delay_seconds)))
+        except Exception as exc:
+            _logger.warning('Could not trigger WhatsApp drip campaign worker: %s', exc)
+            return False
+        return True
+
+    @api.model
+    def process_drip_campaigns(self, limit=None):
+        """Process a bounded, lock-safe set of due drip participants."""
+        limit = min(max(int(limit or self._drip_worker_limit()), 1), 1000)
+        self.env.cr.execute(
+            """
+                SELECT id
+                  FROM whatsapp_campaign_participant
+                 WHERE state = 'running'
+                   AND next_execution_date <= (NOW() AT TIME ZONE 'UTC')
+                 ORDER BY next_execution_date ASC, id ASC
+                 FOR UPDATE SKIP LOCKED
+                 LIMIT %s
+            """,
+            [limit],
+        )
+        participants = self.browse([row[0] for row in self.env.cr.fetchall()])
+        if not participants:
+            return 0
         
+        processed = 0
         for participant in participants:
             # Check opt-in status dynamically before executing any steps
             if participant.campaign_id.state != 'running':
                 continue
+            processed += 1
             consent_status = self.env['whatsapp.consent.log']._effective_status(
                 participant.partner_id, participant.campaign_id.account_id, 'marketing',
             )
@@ -99,6 +147,10 @@ class WhatsAppCampaignParticipant(models.Model):
             else:
                 # No more steps found, mark as completed
                 participant.state = 'completed'
+
+        self._schedule_drip_worker(delay_seconds=5)
+        _logger.info('[CRON-DRIP-CAMPAIGN] processed=%s limit=%s', processed, limit)
+        return processed
 
     def _get_delay_timedelta(self, step):
         if step.delay_type == 'minutes':

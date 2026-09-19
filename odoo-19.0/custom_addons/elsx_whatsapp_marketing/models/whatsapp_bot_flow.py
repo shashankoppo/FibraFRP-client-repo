@@ -4524,6 +4524,8 @@ class WhatsAppBotFlow(models.Model):
             if step.timeout_minutes and step.timeout_minutes > 0:
                 vals['wake_at'] = fields.Datetime.now() + timedelta(minutes=step.timeout_minutes)
             log.write(vals)
+            if vals.get('wake_at'):
+                self.env['whatsapp.bot.flow.log']._schedule_delayed_flow_resume(vals['wake_at'])
             return {'stop': True, 'status': 'pending'}
 
         elif step.action_type == 'condition':
@@ -4744,6 +4746,7 @@ class WhatsAppBotFlow(models.Model):
                         'wake_at': wake_at,
                         'variables': json.dumps(variables),
                     })
+                    self.env['whatsapp.bot.flow.log']._schedule_delayed_flow_resume(wake_at)
                     _logger.info(
                         "Flow '%s' delayed %ss for %s until %s",
                         self.name, step.delay_seconds, message.phone_number, wake_at,
@@ -5517,6 +5520,7 @@ class WhatsAppBotFlowLog(models.Model):
     _description = 'Bot Flow Execution Log'
     _rec_name = 'flow_id'
     _order = 'create_date desc'
+    _pending_wake_idx = models.Index("(status, wake_at, id)")
 
     flow_id = fields.Many2one('whatsapp.bot.flow', required=True, ondelete='cascade')
     chat_id = fields.Many2one('whatsapp.chat', string='Conversation')
@@ -5555,18 +5559,53 @@ class WhatsAppBotFlowLog(models.Model):
                 record.duration = 0
 
     @api.model
+    def _schedule_delayed_flow_resume(self, wake_at=False):
+        """Request a prompt wake-up while the recurring cron remains recovery."""
+        cron = self.env.ref(
+            'elsx_whatsapp_marketing.ir_cron_resume_delayed_bot_flows',
+            raise_if_not_found=False,
+        )
+        if not cron:
+            _logger.warning('WhatsApp delayed-flow cron is missing.')
+            return False
+        try:
+            if not cron.active:
+                cron.sudo().write({'active': True})
+            if wake_at and wake_at > fields.Datetime.now():
+                cron.sudo()._trigger(at=wake_at)
+            else:
+                cron.sudo()._trigger()
+        except Exception as exc:
+            _logger.warning('Could not trigger WhatsApp delayed-flow worker: %s', exc)
+            return False
+        return True
+
+    @api.model
     def _cron_resume_delayed_flows(self, limit=50):
-        logs = self.sudo().search([
-            ('status', '=', 'pending'),
-            ('wake_at', '!=', False),
-            ('wake_at', '<=', fields.Datetime.now()),
-            ('current_step', '!=', False),
-        ], order='wake_at asc, id asc', limit=limit)
+        limit = min(max(int(limit or 50), 1), 500)
+        self.env.cr.execute(
+            """
+                SELECT id
+                  FROM whatsapp_bot_flow_log
+                 WHERE status = 'pending'
+                   AND wake_at IS NOT NULL
+                   AND wake_at <= (NOW() AT TIME ZONE 'UTC')
+                   AND current_step IS NOT NULL
+                 ORDER BY wake_at ASC, id ASC
+                 FOR UPDATE SKIP LOCKED
+                 LIMIT %s
+            """,
+            [limit],
+        )
+        logs = self.sudo().browse([row[0] for row in self.env.cr.fetchall()])
         for log in logs:
             try:
                 log.flow_id.sudo()._resume_delayed_log(log)
             except Exception as exc:
                 _logger.error("Failed to resume delayed flow log %s: %s", log.id, exc)
+        if len(logs) >= limit:
+            self._schedule_delayed_flow_resume()
+        return len(logs)
 
 
 

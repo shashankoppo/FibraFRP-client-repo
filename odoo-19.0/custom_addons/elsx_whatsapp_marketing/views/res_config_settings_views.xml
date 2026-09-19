@@ -69,6 +69,18 @@
                         </setting>
                     </block>
 
+                    <block title="Queue Throughput &amp; Fairness" id="whatsapp_queue_throughput_setting">
+                        <setting id="whatsapp_queue_worker_max_messages_setting" help="Bounds database work per campaign worker pass. It does not bypass the Meta tier or account rate limit.">
+                            <field name="whatsapp_queue_worker_max_messages"/>
+                        </setting>
+                        <setting id="whatsapp_queue_worker_max_per_campaign_setting" help="Keeps large campaigns from monopolizing campaign worker capacity.">
+                            <field name="whatsapp_queue_worker_max_per_campaign"/>
+                        </setting>
+                        <setting id="whatsapp_drip_worker_max_participants_setting" help="Bounds automation work per drip worker pass while due work wakes the worker immediately.">
+                            <field name="whatsapp_drip_worker_max_participants"/>
+                        </setting>
+                    </block>
+
                     <block title="Forms, Payments &amp; Commerce" id="whatsapp_forms_payment_setting">
                         <setting id="whatsapp_form_rate_limit_setting" help="Protect public WhatsApp forms from repeated submissions. Applies per browser session.">
                             <field name="whatsapp_form_rate_limit_seconds"/>

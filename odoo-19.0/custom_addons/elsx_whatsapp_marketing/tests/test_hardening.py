@@ -302,6 +302,8 @@ class TestWhatsAppHardening(TransactionCase):
 
         self.assertIn('queued_direct_messages', snapshot['queues'])
         self.assertIn('oldest_campaign_queue_age_seconds', snapshot['queues'])
+        self.assertIn('accepted_last_1h', snapshot['throughput'])
+        self.assertIn('daily_remaining_across_connected_accounts', snapshot['capacity'])
         self.assertGreaterEqual(snapshot['latency']['api_accepted_last_24h'], 2)
         self.assertGreaterEqual(snapshot['latency']['queue_to_meta_p95_seconds'], 0.0)
         self.assertGreaterEqual(snapshot['latency']['meta_to_delivery_p95_seconds'], 0.0)

@@ -67,6 +67,24 @@ class ResConfigSettings(models.TransientModel):
         config_parameter='whatsapp.dashboard.cache.minutes',
         help="How long heavy dashboard charts and leaderboard sections can use cached data in hybrid mode."
     )
+    whatsapp_queue_worker_max_messages = fields.Integer(
+        string='Campaign Worker Messages per Pass',
+        default=500,
+        config_parameter='whatsapp.queue.worker.max.messages',
+        help='Maximum campaign messages claimed in one worker pass. This is a recovery-safe transaction bound, not a Meta sending limit.',
+    )
+    whatsapp_queue_worker_max_per_campaign = fields.Integer(
+        string='Campaign Worker Messages per Campaign',
+        default=250,
+        config_parameter='whatsapp.queue.worker.max.per_campaign',
+        help='Fair-share cap per campaign in one worker pass so one large campaign cannot starve other queued work.',
+    )
+    whatsapp_drip_worker_max_participants = fields.Integer(
+        string='Drip Worker Participants per Pass',
+        default=100,
+        config_parameter='whatsapp.drip.worker.max.participants',
+        help='Maximum due drip participants processed in one worker pass.',
+    )
     whatsapp_form_rate_limit_seconds = fields.Integer(
         string='Public Form Rate Limit Seconds',
         default=5,

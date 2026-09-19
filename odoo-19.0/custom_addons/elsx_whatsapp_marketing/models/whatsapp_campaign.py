@@ -26,6 +26,14 @@ class WhatsAppCampaign(models.Model):
     _campaign_state_schedule_idx = models.Index("(state, schedule_date, create_date)")
     _SERIALIZATION_RETRY_DELAYS = (0, 0.1, 0.25, 0.5, 1.0)
 
+    @api.model
+    def default_get(self, fields_list):
+        """Use faster pacing for new campaigns without rewriting existing rows."""
+        values = super().default_get(fields_list)
+        if 'batch_interval_seconds' in fields_list:
+            values.setdefault('batch_interval_seconds', 15)
+        return values
+
     def _is_serialization_failure(self, exc):
         pgcode = getattr(exc, 'pgcode', None)
         if pgcode == '40001':
@@ -116,6 +124,24 @@ class WhatsAppCampaign(models.Model):
 
         delay_seconds = max(int((next_msg.next_retry_at - now).total_seconds()), default_delay_seconds)
         return self._schedule_campaign_queue_cron(delay_seconds=delay_seconds)
+
+    @api.model
+    def _queue_worker_limits(self):
+        """Return bounded worker limits without bypassing Meta account limits."""
+        params = self.env['ir.config_parameter'].sudo()
+
+        def integer_param(key, default, minimum, maximum):
+            try:
+                value = int(params.get_param(key, default=str(default)) or default)
+            except (TypeError, ValueError):
+                value = default
+            return min(max(value, minimum), maximum)
+
+        return {
+            'max_campaigns': integer_param('whatsapp.queue.worker.max.campaigns', 20, 1, 100),
+            'max_messages': integer_param('whatsapp.queue.worker.max.messages', 500, 10, 5000),
+            'max_per_campaign': integer_param('whatsapp.queue.worker.max.per_campaign', 250, 10, 1000),
+        }
 
     @api.model
     def _repair_running_campaign_queues(self):
@@ -633,9 +659,17 @@ class WhatsAppCampaign(models.Model):
     # Enterprise Logic
     batch_size = fields.Integer('Batch Size', default=50, help="Number of messages to send per batch")
     batch_interval = fields.Integer(
-        'Batch Interval (Min)',
+        'Legacy Batch Interval (Min)',
         default=1,
-        help="Minimum minutes between batches. One minute is the fastest built-in pacing; account rate limits still apply.",
+        help="Compatibility fallback for campaigns created before second-level pacing. New campaigns use Batch Interval (Seconds).",
+    )
+    batch_interval_seconds = fields.Integer(
+        'Batch Interval (Seconds)',
+        copy=False,
+        help=(
+            "Minimum seconds between campaign worker batches. Existing campaigns without this value "
+            "keep their previous minute-based interval. Meta tier and account rate limits always apply."
+        ),
     )
     flow_id = fields.Many2one('whatsapp.bot.flow', string='Auto-Start Flow', help="Link recipients to this flow upon delivery")
     form_id = fields.Many2one(
@@ -1100,7 +1134,7 @@ class WhatsAppCampaign(models.Model):
         'split_percentage', 'schedule_type', 'schedule_date', 'campaign_type', 'step_ids',
         'target_type', 'segment_id', 'domain_filter', 'partner_ids', 'tag_ids', 'csv_file',
         'template_id', 'message_body', 'is_ab_test', 'template_id_b', 'message_body_b',
-        'batch_size', 'batch_interval',
+        'batch_size', 'batch_interval', 'batch_interval_seconds',
     )
     def _check_campaign_configuration(self):
         for record in self:
@@ -1108,6 +1142,12 @@ class WhatsAppCampaign(models.Model):
                 raise ValidationError("Batch size must be greater than zero.")
             if record.batch_interval < 0:
                 raise ValidationError("Batch interval cannot be negative.")
+            if record.batch_interval_seconds < 0:
+                raise ValidationError("Batch interval seconds cannot be negative.")
+            if record.batch_size > 1000:
+                raise ValidationError(
+                    "Batch size cannot exceed 1000. Use multiple bounded worker batches for large audiences."
+                )
             if record.split_percentage < 0 or record.split_percentage > 100:
                 raise ValidationError("A/B split percentage must be between 0 and 100.")
             if record.is_ab_test and (record.split_percentage <= 0 or record.split_percentage >= 100):
@@ -1970,6 +2010,8 @@ class WhatsAppCampaign(models.Model):
                         'state': 'running'
                     })
             self.state = target_state
+            if not scheduled_for_later:
+                self.env['whatsapp.campaign.participant']._schedule_drip_worker()
         
         # Log Campaign Launch to Blockchain Ledger
         try:
@@ -2100,10 +2142,11 @@ class WhatsAppCampaign(models.Model):
         """
         started = time.monotonic()
         now = fields.Datetime.now()
+        limits = self._queue_worker_limits()
         campaigns = self.search([
             ('state', 'in', ['running', 'scheduled']),
             ('message_ids.status', 'in', ['draft', 'queued']),
-        ], limit=20, order='create_date asc')
+        ], limit=limits['max_campaigns'], order='create_date asc')
 
         if not campaigns:
             _logger.debug("[CRON-CAMPAIGN-QUEUE] processed=0 duration_ms=0")
@@ -2111,13 +2154,22 @@ class WhatsAppCampaign(models.Model):
 
         Message = self.env['whatsapp.message']
         messages = Message.browse()
+        remaining_budget = limits['max_messages']
         for campaign in campaigns:
+            if remaining_budget <= 0:
+                break
             if campaign.state == 'scheduled' and campaign.schedule_date and campaign.schedule_date > now:
                 continue
-            delay_minutes = max(int(campaign.batch_interval or 1), 1)
-            if campaign.last_batch_at and campaign.last_batch_at + timedelta(minutes=delay_minutes) > now:
+            delay_seconds = int(campaign.batch_interval_seconds or 0)
+            if not delay_seconds:
+                delay_seconds = max(int(campaign.batch_interval or 1), 1) * 60
+            if campaign.last_batch_at and campaign.last_batch_at + timedelta(seconds=delay_seconds) > now:
                 continue
-            batch_size = max(int(campaign.batch_size or 50), 1)
+            batch_size = min(
+                max(int(campaign.batch_size or 50), 1),
+                limits['max_per_campaign'],
+                remaining_budget,
+            )
             campaign_messages = Message.search([
                 ('campaign_id', '=', campaign.id),
                 '|',
@@ -2127,6 +2179,7 @@ class WhatsAppCampaign(models.Model):
             if campaign_messages:
                 campaign.last_batch_at = now
                 messages |= campaign_messages
+                remaining_budget -= len(campaign_messages)
 
         if not messages:
             _logger.info("[CRON-CAMPAIGN-QUEUE] processed=0 due_or_paced_campaigns=%s", len(campaigns))
@@ -2199,9 +2252,11 @@ class WhatsAppCampaign(models.Model):
         ])
         duration_ms = round((time.monotonic() - started) * 1000, 2)
         _logger.info(
-            "[CRON-CAMPAIGN-QUEUE] campaigns=%s processed=%s sent=%s failed=%s total_remaining=%s duration_ms=%s batches=%s",
-            len(campaigns), len(messages), sent_count, failed_count, total_remaining, duration_ms, processed_by_campaign,
+            "[CRON-CAMPAIGN-QUEUE] campaigns=%s processed=%s sent=%s failed=%s total_remaining=%s duration_ms=%s batches=%s limits=%s",
+            len(campaigns), len(messages), sent_count, failed_count, total_remaining, duration_ms, processed_by_campaign, limits,
         )
+        if total_remaining:
+            self._schedule_next_campaign_queue_run(default_delay_seconds=5)
 
     @api.model
     def _delivery_cron_specs(self):
@@ -2238,7 +2293,7 @@ class WhatsAppCampaign(models.Model):
                 'elsx_whatsapp_marketing.ir_cron_process_whatsapp_drip_campaigns',
                 'whatsapp.campaign.participant',
                 'model.process_drip_campaigns()',
-                15,
+                1,
                 'minutes',
             ),
             (
