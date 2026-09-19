@@ -8,9 +8,37 @@
                 <field name="timestamp"/>
                 <field name="user_id"/>
                 <field name="ip_address"/>
+                <field name="ip_source" optional="hidden"/>
+                <field name="device" optional="hidden"/>
                 <field name="action"/>
                 <field name="threat_level"/>
             </list>
+        </field>
+    </record>
+
+    <record id="view_elsx_security_audit_form" model="ir.ui.view">
+        <field name="name">elsx.security.audit.form</field>
+        <field name="model">elsx.security.audit</field>
+        <field name="arch" type="xml">
+            <form string="Security Audit" create="false" edit="false" delete="false">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="timestamp"/>
+                            <field name="user_id"/>
+                            <field name="login"/>
+                            <field name="action"/>
+                            <field name="threat_level"/>
+                        </group>
+                        <group string="Request Evidence">
+                            <field name="ip_address"/>
+                            <field name="ip_source"/>
+                            <field name="device"/>
+                            <field name="user_agent"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
         </field>
     </record>
 

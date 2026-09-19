@@ -1,6 +1,6 @@
 {
     'name': 'ELSX ERP Security Core',
-    'version': '1.0',
+    'version': '19.0.1.0.1',
     'category': 'Security',
     'summary': 'Quantum-Scale Session Management & Threat Detection',
     'description': 'Provides high-frequency session auditing, IP-based access control, and autonomous threat detection.',

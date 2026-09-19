@@ -90,7 +90,9 @@ services:
     restart: unless-stopped
     init: true
     ports:
-      - "8069:8069"
+      # Keep the current public binding unless the VPS has Cloudflare Tunnel on
+      # this host. Set ODOO_BIND_ADDRESS=127.0.0.1 after that tunnel is verified.
+      - "${ODOO_BIND_ADDRESS:-0.0.0.0}:8069:8069"
     environment:
       - DB_HOST=db
       - DB_PORT=5432

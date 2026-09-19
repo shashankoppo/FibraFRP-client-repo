@@ -68,6 +68,8 @@
                 <field name="policy_mode"/>
                 <field name="review_required"/>
                 <field name="ip_address"/>
+                <field name="ip_source" optional="hidden"/>
+                <field name="device" optional="hidden"/>
                 <field name="latitude"/>
                 <field name="longitude"/>
                 <field name="reason"/>
@@ -108,6 +110,8 @@
                     </group>
                     <group string="Evidence">
                         <field name="ip_address"/>
+                        <field name="ip_source"/>
+                        <field name="device"/>
                         <field name="latitude"/>
                         <field name="longitude"/>
                         <field name="device_fingerprint_hash"/>

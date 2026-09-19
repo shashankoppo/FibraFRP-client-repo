@@ -273,6 +273,12 @@ class ElsxFaceVerificationLog(models.Model):
     ], readonly=True)
     review_required = fields.Boolean(readonly=True)
     ip_address = fields.Char(readonly=True)
+    ip_source = fields.Selection([
+        ('direct', 'Direct Connection'),
+        ('trusted_proxy', 'Trusted Proxy'),
+        ('cloudflare_tunnel', 'Cloudflare Tunnel'),
+    ], readonly=True)
+    device = fields.Char(readonly=True)
     latitude = fields.Float(readonly=True)
     longitude = fields.Float(readonly=True)
     reason = fields.Char(readonly=True)

@@ -1,5 +1,6 @@
-from odoo import models, fields, api, http
+from odoo import models, fields
 from odoo.http import request
+from odoo.addons.elsx_attendance_tracking.proxy_context import resolve_client_context
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -12,6 +13,13 @@ class ELSXSecurityAudit(models.Model):
     user_id = fields.Many2one('res.users', 'User')
     login = fields.Char('Login')
     ip_address = fields.Char('IP Address')
+    ip_source = fields.Selection([
+        ('direct', 'Direct Connection'),
+        ('trusted_proxy', 'Trusted Proxy'),
+        ('cloudflare_tunnel', 'Cloudflare Tunnel'),
+    ], 'IP Source', readonly=True)
+    device = fields.Char('Device', readonly=True)
+    user_agent = fields.Char('User Agent', readonly=True)
     action = fields.Selection([
         ('login', 'Login'),
         ('logout', 'Logout'),
@@ -29,28 +37,34 @@ class ELSXSecurityAudit(models.Model):
 class ResUsers(models.Model):
     _inherit = 'res.users'
 
-    def _check_ip_security(self):
-        """Autonomous IP security check"""
-        user_ip = request.httprequest.remote_addr
-        
-        # Check if IP is in our Blocked list
-        blocked_check = self.env['elsx.security.audit'].sudo().search([
-            ('ip_address', '=', user_ip),
-            ('action', '=', 'ip_blocked')
-        ], limit=1)
-        
-        if blocked_check:
-             _logger.warning(f"Blocked IP attempted access: {user_ip}")
-             # In a real scenario, raise AccessDenied() or similar
-             return False
-
-        # Logic to check against blocked IPs or suspicious patterns
-        # For demonstration, we log the access
+    def _record_security_login(self):
+        """Record a successful interactive login without altering authentication."""
+        self.ensure_one()
+        client_context = resolve_client_context(request.httprequest)
+        user_ip = client_context['ip_address']
         self.env['elsx.security.audit'].sudo().create({
             'user_id': self.id,
             'login': self.login,
             'ip_address': user_ip,
+            'ip_source': client_context['ip_source'],
+            'device': client_context['device'],
+            'user_agent': client_context['user_agent'],
             'action': 'login',
             'threat_level': 'low'
         })
         return True
+
+    def _check_ip_security(self):
+        """Backward-compatible entry point for existing custom callers."""
+        self.ensure_one()
+        return self._record_security_login()
+
+    def authenticate(self, credential, user_agent_env):
+        auth_info = super().authenticate(credential, user_agent_env)
+        # API authentication can execute outside an HTTP request. Do not create
+        # incomplete audit rows in that case.
+        if request:
+            user = self.sudo().browse(auth_info['uid']).exists()
+            if user:
+                user._record_security_login()
+        return auth_info

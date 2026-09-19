@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'ELSx Face Attendance',
-    'version': '19.0.1.5.1',
+    'version': '19.0.1.5.2',
     'category': 'Human Resources/Attendances',
     'summary': 'Optional facial verification for Attendances with local Docker processing',
     'description': '''

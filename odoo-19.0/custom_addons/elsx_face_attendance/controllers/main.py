@@ -10,17 +10,9 @@ from odoo import _, fields, http
 from odoo.exceptions import UserError
 from odoo.http import request
 from odoo.addons.hr_attendance.controllers.main import HrAttendance as BaseHrAttendance
+from odoo.addons.elsx_attendance_tracking.proxy_context import resolve_client_context
 
 _logger = logging.getLogger(__name__)
-
-
-def _client_ip():
-    headers = request.httprequest.headers
-    for key in ('CF-Connecting-IP', 'True-Client-IP', 'X-Real-IP', 'X-Forwarded-For'):
-        value = headers.get(key)
-        if value:
-            return value.split(',')[0].strip()
-    return request.httprequest.remote_addr
 
 
 def _hash_evidence(value):
@@ -374,7 +366,8 @@ class ElsxFaceAttendanceController(http.Controller):
         if not FaceProfile._face_enabled():
             return {'ok': False, 'error': _('Face attendance is installed but not enabled by an administrator.')}
         mode = FaceProfile._face_mode()
-        ip_address = _client_ip()
+        client_context = resolve_client_context(request.httprequest)
+        ip_address = client_context['ip_address']
         verification = {
             'verified': False,
             'confidence': 0.0,
@@ -428,6 +421,8 @@ class ElsxFaceAttendanceController(http.Controller):
             'decision': assessment['decision'],
             'review_required': assessment['review_required'],
             'ip_address': ip_address,
+            'ip_source': client_context['ip_source'],
+            'device': client_context['device'],
             'latitude': float(latitude or 0.0) if gps_present else 0.0,
             'longitude': float(longitude or 0.0) if gps_present else 0.0,
             'reason': blocked_reason or verification.get('reason'),
@@ -456,7 +451,7 @@ class ElsxFaceAttendanceController(http.Controller):
         geo = {
             'mode': 'systray',
             'ip_address': ip_address,
-            'browser': (request.httprequest.user_agent.browser or request.httprequest.user_agent.string or 'Unknown')[:128],
+            'browser': client_context['device'],
             'location': _('Face Attendance'),
         }
         if gps_present:
@@ -542,6 +537,7 @@ class ElsxFaceAttendanceController(http.Controller):
 
         mode = FaceProfile._face_mode()
         gps_present = latitude not in (False, None, '') and longitude not in (False, None, '')
+        client_context = resolve_client_context(request.httprequest)
         try:
             sidecar = FaceProfile._call_sidecar('verify', {
                 'image': image,
@@ -599,7 +595,9 @@ class ElsxFaceAttendanceController(http.Controller):
                 'risk_level': assessment['risk_level'],
                 'decision': assessment['decision'],
                 'review_required': assessment['review_required'],
-                'ip_address': _client_ip(),
+                'ip_address': client_context['ip_address'],
+                'ip_source': client_context['ip_source'],
+                'device': client_context['device'],
                 'latitude': float(latitude or 0.0) if gps_present else 0.0,
                 'longitude': float(longitude or 0.0) if gps_present else 0.0,
                 'reason': blocked_reason or sidecar.get('reason'),

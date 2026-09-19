@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'ELSx Attendance Tunnel Tracking',
-    'version': '19.0.1.0.4',
+    'version': '19.0.1.0.5',
     'category': 'Human Resources/Attendances',
     'summary': 'Improves attendance IP/location capture behind tunnels and proxies',
     'description': '''
