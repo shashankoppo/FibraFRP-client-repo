@@ -11,17 +11,12 @@ Run this on the VPS that runs both `cloudflared` and Docker:
 
 ```sh
 cd /home/FibraFRP-client-repo/odoo-19.0
-printf '\nODOO_TRUSTED_PROXY_CIDRS=172.17.0.1/32\nODOO_BIND_ADDRESS=127.0.0.1\n' >> .env
+gateway="$(docker inspect odoo_app --format '{{range .NetworkSettings.Networks}}{{.Gateway}}{{end}}')" && test -n "$gateway" && sed -i '/^ODOO_TRUSTED_PROXY_CIDRS=/d;/^ODOO_BIND_ADDRESS=/d' .env && printf '\nODOO_TRUSTED_PROXY_CIDRS=%s/32\nODOO_BIND_ADDRESS=127.0.0.1\n' "$gateway" >> .env
 ```
 
-`172.17.0.1` is the usual Docker bridge gateway when host `cloudflared` reaches
-the published Odoo port. Confirm it before deployment with:
-
-```sh
-docker inspect odoo_app --format '{{range .NetworkSettings.Networks}}{{.Gateway}}{{end}}'
-```
-
-Use the returned gateway as `ODOO_TRUSTED_PROXY_CIDRS`, with `/32` appended.
+The command determines the actual Docker bridge gateway and replaces only the
+two Cloudflare/Odoo entries in the private `.env` file. Use it only when the
+Tunnel daemon runs on the VPS host.
 If `cloudflared` runs in a separate Docker container, do not use this host
 example. Inspect its Odoo-network address and configure that exact address
 with `/32`, or place the tunnel behind a dedicated reverse proxy network.
@@ -41,6 +36,12 @@ Validate a locally managed configuration before restarting it:
 ```sh
 cloudflared tunnel ingress validate
 sudo systemctl restart cloudflared
+```
+
+On an Alpine OpenRC VPS, use this restart command instead:
+
+```sh
+rc-service cloudflared restart
 ```
 
 The localhost Docker binding prevents direct public access to port 8069 while
