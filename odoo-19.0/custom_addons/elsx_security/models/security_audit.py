@@ -66,5 +66,10 @@ class ResUsers(models.Model):
         if request:
             user = self.sudo().browse(auth_info['uid']).exists()
             if user:
-                user._record_security_login()
+                try:
+                    user._record_security_login()
+                except Exception:
+                    # Security telemetry must not turn a successful login into
+                    # an outage when an audit table or migration is unavailable.
+                    _logger.exception('Unable to record successful-login evidence')
         return auth_info
